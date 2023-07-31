@@ -12,7 +12,7 @@ class MockGetAllUsersUseCase implements GetAllUsersUseCase {
 }
 
 class MockCreateUserUseCase implements CreateUserUseCase {
-    execute(user: UserRequestModel): Promise<UserResponseModel> {
+    execute(): Promise<UserResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
@@ -34,7 +34,7 @@ describe("User Router", () => {
     describe("GET /user", () => {
 
         test("should return 200 with data", async () => {
-            const ExpectedData = [{
+            const ExpectedData: UserResponseModel[] = [{
                 id: 1,
                 lastName: "Smith",
                 firstName: "John",
@@ -66,7 +66,7 @@ describe("User Router", () => {
     describe("POST /user", () => {
 
         test("POST /user", async () => {
-            const InputData = {
+            const InputData: UserRequestModel = {
                 lastName: "Smith",
                 firstName: "John",
                 email: "john@gmail.com",
@@ -75,7 +75,7 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const OutputData = {
+            const OutputData: UserResponseModel = {
                 id: 1,
                 lastName: "Smith",
                 firstName: "John",
@@ -92,7 +92,7 @@ describe("User Router", () => {
         });
 
         test("POST /user returns 500 on use case error", async () => {
-            const InputData = {
+            const InputData: UserRequestModel = {
                 lastName: "Smith",
                 firstName: "John",
                 email: "john@gmail.com",

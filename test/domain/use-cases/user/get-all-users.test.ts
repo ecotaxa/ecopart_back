@@ -1,17 +1,17 @@
-import { UserRequestModel, UserResponseModel } from "../../../../src/domain/entities/user";
+import { UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users'
 
 describe("Get All Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
-        createUser(user: UserRequestModel): Promise<number> {
+        createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         getUsers(): Promise<UserResponseModel[]> {
             throw new Error("Method not implemented.");
         }
-        getUser(id: number): Promise<UserResponseModel | null> {
+        getUser(): Promise<UserResponseModel | null> {
             throw new Error("Method not implemented.");
         }
     }
@@ -23,7 +23,7 @@ describe("Get All Users Use Case", () => {
     })
 
     test("should return data", async () => {
-        const ExpectedResult = [{
+        const ExpectedResult: UserResponseModel[] = [{
             id: 1,
             lastName: "Smith",
             firstName: "John",

@@ -4,13 +4,13 @@ import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        createUser(user: UserRequestModel): Promise<number> {
+        createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         getUsers(): Promise<UserResponseModel[]> {
             throw new Error("Method not implemented.");
         }
-        getUser(id: number): Promise<UserResponseModel | null> {
+        getUser(): Promise<UserResponseModel | null> {
             throw new Error("Method not implemented.");
         }
     }
@@ -23,7 +23,7 @@ describe("Create User Use Case", () => {
     })
 
     test("should return created user", async () => {
-        const InputData = {
+        const InputData: UserRequestModel = {
             lastName: "Smith",
             firstName: "John",
             email: "john@gmail.com",
@@ -32,7 +32,7 @@ describe("Create User Use Case", () => {
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
         }
-        const OutputData = {
+        const OutputData: UserResponseModel = {
             id: 1,
             lastName: "Smith",
             firstName: "John",

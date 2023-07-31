@@ -5,7 +5,7 @@ import { UserRepository } from "../../../src/domain/interfaces/repositories/user
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
 class MockUserDataSource implements UserDataSource {
-    create(user: UserRequestModel): Promise<number> {
+    create(): Promise<number> {
         throw new Error("Method not implemented.");
     }
     getAll(): Promise<UserResponseModel[]> {
@@ -18,11 +18,11 @@ class MockUserDataSource implements UserDataSource {
 class MockBcryptAdapter extends BcryptAdapter {
     constructor() { super(12) }
 
-    async hash(plaintext: string): Promise<string> {
+    async hash(): Promise<string> {
         throw new Error("Method not implemented.");
     }
     // compare password
-    async compare(plaintext: string, digest: string): Promise<boolean> {
+    async compare(): Promise<boolean> {
         throw new Error("Method not implemented.");
     }
 }
@@ -41,7 +41,7 @@ describe("User Repository", () => {
 
     describe("getAllUsers", () => {
         test("should return data", async () => {
-            const expectedData = [{
+            const expectedData: UserResponseModel[] = [{
                 id: 1,
                 lastName: "Smith",
                 firstName: "John",
@@ -60,7 +60,7 @@ describe("User Repository", () => {
 
     describe("createUser", () => {
         test("should return created user id", async () => {
-            const inputData = {
+            const inputData: UserRequestModel = {
                 lastName: "Smith",
                 firstName: "John",
                 email: "john@gmail.com",
@@ -80,7 +80,7 @@ describe("User Repository", () => {
     describe("getUser", () => {
         test("should return one user", async () => {
             const inputData = 1
-            const expectedData = {
+            const expectedData: UserResponseModel = {
                 id: 1,
                 lastName: "Smith",
                 firstName: "John",
