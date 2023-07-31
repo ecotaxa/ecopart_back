@@ -1,10 +1,9 @@
 import { CryptoWrapper } from "./crypto-wrapper"
-
-const bcrypt = require("bcrypt")
+import bcrypt from "bcrypt"
 
 export class BcryptAdapter implements CryptoWrapper {//implements Hasher, HashComparer 
     constructor(private readonly salt: number) { }
-
+    // hash password
     async hash(plaintext: string): Promise<string> {
         return bcrypt.hash(plaintext, this.salt)
     }

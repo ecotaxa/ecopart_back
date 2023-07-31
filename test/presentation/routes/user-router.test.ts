@@ -34,7 +34,17 @@ describe("User Router", () => {
     describe("GET /user", () => {
 
         test("should return 200 with data", async () => {
-            const ExpectedData = [{ id: 1, lastName: "Smith", firstName: "John", email: "john@gmail.com", status: "pending" }];
+            const ExpectedData = [{
+                id: 1,
+                lastName: "Smith",
+                firstName: "John",
+                email: "john@gmail.com",
+                status: "Pending",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }];
             jest.spyOn(mockGetAllUsersUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))
 
             const response = await request(server).get("/user")
@@ -56,15 +66,41 @@ describe("User Router", () => {
     describe("POST /user", () => {
 
         test("POST /user", async () => {
-            const InputData = { lastName: "Smith", firstName: "John", email: "john@gmail.com", password: "test123!" }
-            const OutputData = { id: 1, lastName: "Smith", firstName: "John", email: "john@gmail.com", status: "pending" }
+            const InputData = {
+                lastName: "Smith",
+                firstName: "John",
+                email: "john@gmail.com",
+                password: "test123!",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            }
+            const OutputData = {
+                id: 1,
+                lastName: "Smith",
+                firstName: "John",
+                email: "john@gmail.com",
+                status: "Pending",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
             jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).post("/user").send(InputData)
             expect(response.status).toBe(201)
         });
 
         test("POST /user returns 500 on use case error", async () => {
-            const InputData = { lastName: "Smith", firstName: "John", email: "john@gmail.com" } // TODO typer
+            const InputData = {
+                lastName: "Smith",
+                firstName: "John",
+                email: "john@gmail.com",
+                password: "test123!",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            }
             jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
             const response = await request(server).post("/user").send(InputData)
             expect(response.status).toBe(500)

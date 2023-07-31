@@ -2,7 +2,7 @@ import { UserRequestModel, UserResponseModel } from "../../../domain/entities/us
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 
-const DB_TABLE = "user"
+// const DB_TABLE = "user"
 export class SQLiteUserDataSource implements UserDataSource {
 
     private db: SQLiteDatabaseWrapper
@@ -20,17 +20,17 @@ export class SQLiteUserDataSource implements UserDataSource {
         // INSERT INTO user_status(user_status_label) VALUES('Active');
         // INSERT INTO user_status(user_status_label) VALUES('Suspended');`
         //this.db.run(sql_insert, [])
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, status TEXT NOT NULL DEFAULT 'Pending');"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, status TEXT NOT NULL DEFAULT 'Pending', organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
         this.db.run(sql_create, [])
     }
 
 
     async create(user: UserRequestModel): Promise<number> {
         console.log("--------- create user -----------")
-        const params = [user.firstName, user.lastName, user.email, user.password]
-        const placeholders = params.map((param) => '(?)').join(','); // TODO create tool funct
+        const params = [user.firstName, user.lastName, user.email, user.password, user.organisation, user.country, user.user_planned_usage]
+        const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
         console.log(params)
-        const sql = `INSERT INTO user (first_name, last_name, email, password_hash) VALUES (` + placeholders + `)`;
+        const sql = `INSERT INTO user (first_name, last_name, email, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `)`;
 
         console.log(sql)
 
@@ -55,12 +55,16 @@ export class SQLiteUserDataSource implements UserDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    const result = rows.map(item => ({
-                        id: item.user_id,
-                        firstName: item.first_name,
-                        lastName: item.last_name,
-                        email: item.email,
-                        status: item.status
+                    const result = rows.map(row => ({
+                        id: row.user_id,
+                        firstName: row.first_name,
+                        lastName: row.last_name,
+                        email: row.email,
+                        status: row.status,
+                        organisation: row.organisation,
+                        country: row.country,
+                        user_planned_usage: row.user_planned_usage,
+                        user_creation_date: row.user_creation_date,
                     }));
                     resolve(result);
                 }
@@ -93,7 +97,11 @@ export class SQLiteUserDataSource implements UserDataSource {
                         firstName: row.first_name,
                         lastName: row.last_name,
                         email: row.email,
-                        status: row.status
+                        status: row.status,
+                        organisation: row.organisation,
+                        country: row.country,
+                        user_planned_usage: row.user_planned_usage,
+                        user_creation_date: row.user_creation_date,
                     };
                     resolve(result);
                 }

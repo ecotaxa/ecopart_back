@@ -23,7 +23,17 @@ describe("Get All Users Use Case", () => {
     })
 
     test("should return data", async () => {
-        const ExpectedResult = [{ id: 1, lastName: "Smith", firstName: "John", email: "john@gmail.com", status: "pending" }]
+        const ExpectedResult = [{
+            id: 1,
+            lastName: "Smith",
+            firstName: "John",
+            email: "john@gmail.com",
+            status: "Pending",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }]
 
         jest.spyOn(mockUserRepository, "getUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
         const getAllUsersUse = new GetAllUsers(mockUserRepository)

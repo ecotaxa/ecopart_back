@@ -6,7 +6,7 @@
 //     firstName: string;
 //     lastName: string;
 //     email: string;
-//     status: "pending" | "active" | "suspended";
+//     status: "Pending" | "active" | "suspended";
 // }
 
 // the user request model 
@@ -15,6 +15,9 @@ export interface UserRequestModel {
     firstName: string;
     lastName: string;
     email: string;
+    organisation: string;
+    country: string;
+    user_planned_usage: string;
 }
 
 // the user response model
@@ -23,5 +26,10 @@ export interface UserResponseModel {
     firstName: string;
     lastName: string;
     email: string;
-    status: string//"pending" | "active" | "suspended";
+    status: string//"Pending" | "active" | "suspended";
+    organisation: string;
+    country: string;
+    user_planned_usage: string;
+    user_creation_date: string; //YYYY-MM-DD HH:MM:SS TimeStamp
+
 }
