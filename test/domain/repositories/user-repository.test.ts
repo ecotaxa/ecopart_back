@@ -21,8 +21,6 @@ class MockUserDataSource implements UserDataSource {
 
 }
 class MockBcryptAdapter extends BcryptAdapter {
-    constructor() { super(12) }
-
     async hash(): Promise<string> {
         throw new Error("Method not implemented.");
     }

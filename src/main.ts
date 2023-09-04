@@ -20,7 +20,6 @@ import 'dotenv/config'
 sqlite3.verbose()
 
 const config = {
-    SALT: parseInt(process.env.SALT as string, 10),
     PORT: parseInt(process.env.PORT as string, 10),
     DBSOURCE: process.env.DBSOURCE || 'ecopart.db',
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
@@ -45,8 +44,7 @@ async function getSQLiteDS() {
 (async () => {
     const dataSource = await getSQLiteDS();
 
-    const salt = config.SALT
-    const bcryptAdapter = new BcryptAdapter(salt)
+    const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
 
 
