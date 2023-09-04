@@ -4,7 +4,7 @@ import bcrypt from "bcrypt"
 export class BcryptAdapter implements CryptoWrapper {//implements Hasher, HashComparer 
     // hash password
     async hash(plaintext: string): Promise<string> {
-        const salt = await bcrypt.genSalt()
+        const salt = await bcrypt.genSalt(12)
         return bcrypt.hash(plaintext, salt)
     }
     // compare password
