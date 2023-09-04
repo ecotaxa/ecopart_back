@@ -1,6 +1,7 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
-import { UserRequestModel, UserResponseModel } from "../../../src/domain/entities/user";
+import { AuthUserCredentialsModel } from "../../../src/domain/entities/auth";
+import { UserRequesCreationtModel, UserResponseModel } from "../../../src/domain/entities/user";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
@@ -14,6 +15,10 @@ class MockUserDataSource implements UserDataSource {
     getOne(): Promise<UserResponseModel> {
         throw new Error("Method not implemented.");
     }
+    getUserLogin(): Promise<AuthUserCredentialsModel | null> {
+        throw new Error("Method not implemented.");
+    }
+
 }
 class MockBcryptAdapter extends BcryptAdapter {
     constructor() { super(12) }
@@ -60,7 +65,7 @@ describe("User Repository", () => {
 
     describe("createUser", () => {
         test("should return created user id", async () => {
-            const inputData: UserRequestModel = {
+            const inputData: UserRequesCreationtModel = {
                 lastName: "Smith",
                 firstName: "John",
                 email: "john@gmail.com",
@@ -79,7 +84,7 @@ describe("User Repository", () => {
 
     describe("getUser", () => {
         test("should return one user", async () => {
-            const inputData = 1
+            const inputData = { id: 1 }
             const expectedData: UserResponseModel = {
                 id: 1,
                 lastName: "Smith",
@@ -97,4 +102,51 @@ describe("User Repository", () => {
         });
     })
 
+    describe("verifyUserLogin", () => {
+        test("should return true", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "test@email.com",
+                password: "good_password"
+            }
+            const OutputData: AuthUserCredentialsModel = {
+                email: "test@email.com",
+                password: "hashed_password"
+            }
+            jest.spyOn(mockUserDataSource, "getUserLogin").mockImplementation(() => Promise.resolve(OutputData))
+            jest.spyOn(mockBcryptAdapter, "compare").mockImplementation(() => Promise.resolve(true))
+
+            const result = await userRepository.verifyUserLogin(InputData);
+            expect(result).toBe(true)
+
+        });
+        test("should handle bas password and return false", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "test@email.com",
+                password: "bad_password"
+            }
+            const OutputData: AuthUserCredentialsModel = {
+                email: "test@email.com",
+                password: "hashed_password"
+            }
+            jest.spyOn(mockUserDataSource, "getUserLogin").mockImplementation(() => Promise.resolve(OutputData))
+            jest.spyOn(mockBcryptAdapter, "compare").mockImplementation(() => Promise.resolve(false))
+
+            const result = await userRepository.verifyUserLogin(InputData);
+            expect(result).toBe(false)
+
+        });
+        test("should handle bad email and  return false", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "bad_test@email.com",
+                password: "bad_password"
+            }
+
+            jest.spyOn(mockUserDataSource, "getUserLogin").mockImplementation(() => Promise.resolve(null))
+            jest.spyOn(mockBcryptAdapter, "compare").mockImplementation(() => Promise.resolve(false))
+
+            const result = await userRepository.verifyUserLogin(InputData);
+            expect(result).toBe(false)
+
+        });
+    });
 })

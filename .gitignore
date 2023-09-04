@@ -9,3 +9,6 @@ node_modules
 
 lib
 coverage
+
+.env
+.DS_Store

@@ -10,7 +10,7 @@
 // }
 
 // the user request model 
-export interface UserRequestModel {
+export interface UserRequesCreationtModel {
     password: string;
     firstName: string;
     lastName: string;
@@ -18,6 +18,17 @@ export interface UserRequestModel {
     organisation: string;
     country: string;
     user_planned_usage: string;
+}
+export interface UserRequestModel {
+    id?: number;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    status?: string//"Pending" | "active" | "suspended";
+    organisation?: string;
+    country?: string;
+    user_planned_usage?: string;
+    user_creation_date?: string;
 }
 
 // the user response model
@@ -31,5 +42,4 @@ export interface UserResponseModel {
     country: string;
     user_planned_usage: string;
     user_creation_date: string; //YYYY-MM-DD HH:MM:SS TimeStamp
-
 }

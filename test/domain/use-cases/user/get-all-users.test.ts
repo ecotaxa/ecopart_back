@@ -14,6 +14,9 @@ describe("Get All Users Use Case", () => {
         getUser(): Promise<UserResponseModel | null> {
             throw new Error("Method not implemented.");
         }
+        verifyUserLogin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
     }
     let mockUserRepository: UserRepository;
 

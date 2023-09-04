@@ -1,7 +1,8 @@
 
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
-import { UserResponseModel, UserRequestModel } from "../entities/user";
+import { AuthUserCredentialsModel } from "../entities/auth";
+import { UserResponseModel, UserRequesCreationtModel, UserRequestModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 
 export class UserRepositoryImpl implements UserRepository {
@@ -13,7 +14,7 @@ export class UserRepositoryImpl implements UserRepository {
         this.userCrypto = userCrypto
     }
 
-    async createUser(user: UserRequestModel): Promise<number> {
+    async createUser(user: UserRequesCreationtModel): Promise<number | null> {
         user.password = await this.userCrypto.hash(user.password)
         const result = await this.userDataSource.create(user)
         return result;
@@ -23,10 +24,28 @@ export class UserRepositoryImpl implements UserRepository {
         const result = await this.userDataSource.getAll()
         return result;
     }
-    async getUser(id: number): Promise<UserResponseModel | null> {
-        console.log("getUser", id)
-        const result = await this.userDataSource.getOne(id)
-        console.log(result)
+    async getUser(user: UserRequestModel): Promise<UserResponseModel | null> {
+        const result = await this.userDataSource.getOne(user)
         return result;
     }
+    async verifyUserLogin(user: AuthUserCredentialsModel): Promise<boolean> {
+        try {
+            // Fetch user details based on the provided email 
+            const userDetails = await this.userDataSource.getUserLogin(user.email);
+            // Check if user details were found and passwords match
+            if (userDetails && await this.userCrypto.compare(user.password, userDetails.password)) {
+                // User is authenticated, return true
+                return true;
+            }
+
+            // Either user details were not found or passwords didn't match, return false
+            return false;
+        } catch (error) {
+            // An error occurred while fetching or comparing, log the error and return false
+            console.log(error);
+            return false;
+        }
+    }
+
+
 }
