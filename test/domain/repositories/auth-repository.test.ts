@@ -31,9 +31,10 @@ describe("Auth Repository", () => {
         test("should return valid access token", async () => {
             const InputData = {
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
+                is_admin: 0,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",
@@ -51,9 +52,10 @@ describe("Auth Repository", () => {
         test("should return valid Refresh", async () => {
             const InputData = {
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
+                is_admin: 0,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",

@@ -6,6 +6,12 @@ import { UserRepository } from "../../../src/domain/interfaces/repositories/user
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
 class MockUserDataSource implements UserDataSource {
+    deleteOne(): void {
+        throw new Error("Method not implemented.");
+    }
+    updateOne(): Promise<number> {
+        throw new Error("Method not implemented.");
+    }
     create(): Promise<number> {
         throw new Error("Method not implemented.");
     }
@@ -46,15 +52,17 @@ describe("User Repository", () => {
         test("should return data", async () => {
             const expectedData: UserResponseModel[] = [{
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
                 status: "Pending",
+                is_admin: false,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
                 user_creation_date: '2023-08-01 10:30:00'
             }]
+
             jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
             const result = await userRepository.getUsers();
             expect(result).toBe(expectedData)
@@ -64,8 +72,8 @@ describe("User Repository", () => {
     describe("createUser", () => {
         test("should return created user id", async () => {
             const inputData: UserRequesCreationtModel = {
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
                 password: "123test!",
                 organisation: "LOV",
@@ -85,10 +93,11 @@ describe("User Repository", () => {
             const inputData = { id: 1 }
             const expectedData: UserResponseModel = {
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
                 status: "Pending",
+                is_admin: false,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

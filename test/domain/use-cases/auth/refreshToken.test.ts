@@ -6,6 +6,15 @@ import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../../../src/dom
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        standardUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        isAdmin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
@@ -41,9 +50,10 @@ describe("Create User Use Case", () => {
 
         const InputUserData = {// TODO check types
             id: 1,
-            firstName: 'John',
-            lastName: 'Smith',
+            first_name: 'John',
+            last_name: 'Smith',
             email: 'john@gmail.com',
+            is_admin: false,
             status: 'Pending',
             organisation: 'LOV',
             country: 'France',
@@ -55,9 +65,10 @@ describe("Create User Use Case", () => {
         }
         const OutputUserData: UserResponseModel = {
             id: 1,
-            firstName: 'John',
-            lastName: 'Smith',
+            first_name: 'John',
+            last_name: 'Smith',
             email: 'john@gmail.com',
+            is_admin: false,
             status: 'Pending',
             organisation: 'LOV',
             country: 'France',
@@ -78,9 +89,10 @@ describe("Create User Use Case", () => {
 
         const InputUserData: DecodedToken = {
             id: 1,
-            firstName: 'John',
-            lastName: 'Smith',
+            first_name: 'John',
+            last_name: 'Smith',
             email: 'john@gmail.com',
+            is_admin: false,
             status: 'Pending',
             organisation: 'LOV',
             country: 'France',

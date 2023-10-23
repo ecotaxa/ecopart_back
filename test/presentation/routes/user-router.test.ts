@@ -7,6 +7,7 @@ import { UserResponseModel, UserRequesCreationtModel } from "../../../src/domain
 
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
 import { GetAllUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/get-all-users";
+import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { Request, Response, NextFunction } from "express";
@@ -22,6 +23,12 @@ class MockCreateUserUseCase implements CreateUserUseCase {
         throw new Error("Method not implemented.")
     }
 }
+class MockUpdateUserUseCase implements UpdateUserUseCase {
+    execute(): Promise<UserResponseModel> {
+        throw new Error("Method not implemented.")
+    }
+}
+
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
         next()
@@ -35,12 +42,14 @@ describe("User Router", () => {
     let mockMiddlewareAuth: MockMiddlewareAuth;
     let mockCreateUserUseCase: CreateUserUseCase;
     let mockGetAllUsersUseCase: GetAllUsersUseCase;
+    let mockUpdateUserUseCase: UpdateUserUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
         mockGetAllUsersUseCase = new MockGetAllUsersUseCase()
         mockCreateUserUseCase = new MockCreateUserUseCase()
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockGetAllUsersUseCase, mockCreateUserUseCase))
+        mockUpdateUserUseCase = new MockUpdateUserUseCase()
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase))
     })
 
     beforeEach(() => {
@@ -52,9 +61,10 @@ describe("User Router", () => {
         test("should return 200 with data", async () => {
             const ExpectedData: UserResponseModel[] = [{
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
+                is_admin: false,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",
@@ -62,9 +72,10 @@ describe("User Router", () => {
                 user_creation_date: '2023-08-01 10:30:00'
             }, {
                 id: 2,
-                lastName: "Smith",
-                firstName: "Jim",
+                last_name: "Smith",
+                first_name: "Jim",
                 email: "jim@gmail.com",
+                is_admin: false,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",
@@ -91,8 +102,8 @@ describe("User Router", () => {
 
         test("POST /users", async () => {
             const InputData: UserRequesCreationtModel = {
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
                 password: "test123!",
                 organisation: "LOV",
@@ -101,9 +112,10 @@ describe("User Router", () => {
             }
             const OutputData: UserResponseModel = {
                 id: 1,
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
+                is_admin: false,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",
@@ -117,8 +129,8 @@ describe("User Router", () => {
 
         test("POST /users returns 500 on use case error", async () => {
             const InputData: UserRequesCreationtModel = {
-                lastName: "Smith",
-                firstName: "John",
+                last_name: "Smith",
+                first_name: "John",
                 email: "john@gmail.com",
                 password: "test123!",
                 organisation: "LOV",

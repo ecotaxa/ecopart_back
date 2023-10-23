@@ -66,9 +66,10 @@ describe("User Router", () => {
             }
             const OutputData: UserResponseModel & AuthJwtResponseModel = {
                 id: 1,
-                firstName: "John",
-                lastName: "Smith",
+                first_name: "John",
+                last_name: "Smith",
                 email: "john@gmail.com",
+                is_admin: false,
                 status: "Pending",
                 organisation: "LOV",
                 country: "France",
@@ -104,21 +105,20 @@ describe("User Router", () => {
 
     describe("Test /users/me endpoint", () => {
         test("get user information with valid token", async () => {
-            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkyNjAyNzg4LCJleHAiOjU4NDk2MjgyNzg4fQ.Xf4khx3YYZus-f6Rt_L9crmUk23tLqdsamvukSSizOY"
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOjAsIm9yZ2FuaXNhdGlvbiI6IkxPViIsImNvdW50cnkiOiJGcmFuY2UiLCJ1c2VyX3BsYW5uZWRfdXNhZ2UiOiJNb24gdXNhZ2UiLCJ1c2VyX2NyZWF0aW9uX2RhdGUiOiIyMDIzLTEwLTIzIDE0OjA1OjU0IiwiaWF0IjoxNjk4MDY5OTY1LCJleHAiOjU4NTAxNzQ5OTY1fQ.vVcMomZhko94IOYorhGEu_B9f6oIFomeLAyAfNhMDWc"
             const expectedDecodedAccessToken = {
-                "user": {
-                    "id": 1,
-                    "firstName": "John",
-                    "lastName": "Smith",
-                    "email": "john@gmail.com",
-                    "status": "Pending",
-                    "organisation": "LOV",
-                    "country": "France",
-                    "user_planned_usage": "Mon usage",
-                    "user_creation_date": "2023-07-31 17:18:47"
-                },
-                "exp": 58496282788,
-                "iat": 1692602788,
+                "id": 1,
+                "first_name": "John",
+                "last_name": "Smith",
+                "email": "john@gmail.com",
+                "is_admin": "false",
+                "status": "Pending",
+                "organisation": "LOV",
+                "country": "France",
+                "user_planned_usage": "Mon usage",
+                "user_creation_date": "2023-10-23 14:05:54",
+                "exp": 58501749965,
+                "iat": 1698069965
             }
             const response = await request(server)
                 .get("/auth/user/me")

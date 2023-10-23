@@ -1,10 +1,19 @@
-import { UserResponseModel } from "../../../../src/domain/entities/user";
+import { UserResponseModel, } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users'
 
 describe("Get All Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
+        adminUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        standardUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        isAdmin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
@@ -24,13 +33,14 @@ describe("Get All Users Use Case", () => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
     })
-
+    // TODO TEST when non user
     test("should return data", async () => {
         const ExpectedResult: UserResponseModel[] = [{
             id: 1,
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
+            is_admin: false,
             status: "Pending",
             organisation: "LOV",
             country: "France",

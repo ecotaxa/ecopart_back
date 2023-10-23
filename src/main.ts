@@ -5,6 +5,7 @@ import AuthRouter from './presentation/routers/auth-router'
 
 import { GetAllUsers } from './domain/use-cases/user/get-all-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
+import { UpdateUser } from './domain/use-cases/user/update-user'
 import { LoginUser } from './domain/use-cases/auth/login'
 import { RefreshToken } from './domain/use-cases/auth/refreshToken'
 
@@ -52,6 +53,7 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter)),
         new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter)),
+        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter))
     )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),

@@ -4,6 +4,15 @@ import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        standardUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        isAdmin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
@@ -27,8 +36,8 @@ describe("Create User Use Case", () => {
 
     test("should return created user", async () => {
         const InputData: UserRequesCreationtModel = {
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
             password: "test123!",
             organisation: "LOV",
@@ -37,9 +46,10 @@ describe("Create User Use Case", () => {
         }
         const OutputData: UserResponseModel = {
             id: 1,
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
+            is_admin: false,
             status: "Pending",
             organisation: "LOV",
             country: "France",
@@ -56,8 +66,8 @@ describe("Create User Use Case", () => {
 
     test("Try to add a user that already exist", async () => {
         const InputData: UserRequesCreationtModel = {
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
             password: "test123!",
             organisation: "LOV",
@@ -78,8 +88,8 @@ describe("Create User Use Case", () => {
     });
     test("Can't find created user", async () => {
         const InputData: UserRequesCreationtModel = {
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
             password: "test123!",
             organisation: "LOV",

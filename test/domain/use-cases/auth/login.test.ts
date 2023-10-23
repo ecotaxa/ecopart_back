@@ -6,6 +6,15 @@ import { AuthJwtResponseModel, AuthUserCredentialsModel } from "../../../../src/
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        standardUpdateUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        isAdmin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         createUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
@@ -44,9 +53,10 @@ describe("Create User Use Case", () => {
         }
         const OutputUserData: UserResponseModel = {
             id: 1,
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
+            is_admin: false,
             status: "Pending",
             organisation: "LOV",
             country: "France",
@@ -74,9 +84,10 @@ describe("Create User Use Case", () => {
         }
         const OutputUserData: UserResponseModel = {
             id: 1,
-            lastName: "Smith",
-            firstName: "John",
+            last_name: "Smith",
+            first_name: "John",
             email: "john@gmail.com",
+            is_admin: false,
             status: "Pending",
             organisation: "LOV",
             country: "France",
