@@ -151,11 +151,15 @@ export class SQLiteUserDataSource implements UserDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    const result = {
-                        email: row.email,
-                        password: row.password_hash
-                    };
-                    resolve(result);
+                    if (row) {
+                        const result: AuthUserCredentialsModel = {
+                            email: row.email,
+                            password: row.password_hash
+                        };
+                        resolve(result);
+                    } else {
+                        resolve(null);
+                    }
                 }
             });
         })
