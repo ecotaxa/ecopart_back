@@ -1,5 +1,7 @@
 # ecopart_back
 
+[![Tests CI](https://github.com/ecotaxa/ecopart_back/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ecotaxa/ecopart_back/actions/workflows/main.yml)
+
 **Backend of the EcoPart application**
 
 This repository contains the backend codebase for the EcoPart application, built using TypeScript, NodeJS, Express, SQLite, and Jest for testing. The architecture follows a clean structure, and the API is designed based on REST principles.
