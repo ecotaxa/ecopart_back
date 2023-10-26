@@ -102,23 +102,22 @@ describe("User Router", () => {
     })
 
     // /users/me
-
     describe("Test /users/me endpoint", () => {
         test("get user information with valid token", async () => {
-            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOjAsIm9yZ2FuaXNhdGlvbiI6IkxPViIsImNvdW50cnkiOiJGcmFuY2UiLCJ1c2VyX3BsYW5uZWRfdXNhZ2UiOiJNb24gdXNhZ2UiLCJ1c2VyX2NyZWF0aW9uX2RhdGUiOiIyMDIzLTEwLTIzIDE0OjA1OjU0IiwiaWF0IjoxNjk4MDY5OTY1LCJleHAiOjU4NTAxNzQ5OTY1fQ.vVcMomZhko94IOYorhGEu_B9f6oIFomeLAyAfNhMDWc"
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
             const expectedDecodedAccessToken = {
                 "id": 1,
                 "first_name": "John",
                 "last_name": "Smith",
                 "email": "john@gmail.com",
-                "is_admin": "false",
+                "is_admin": false,
                 "status": "Pending",
                 "organisation": "LOV",
                 "country": "France",
                 "user_planned_usage": "Mon usage",
-                "user_creation_date": "2023-10-23 14:05:54",
-                "exp": 58501749965,
-                "iat": 1698069965
+                "user_creation_date": "2023-10-26 12:57:27",
+                "exp": 58502005275,
+                "iat": 1698325275
             }
             const response = await request(server)
                 .get("/auth/user/me")
