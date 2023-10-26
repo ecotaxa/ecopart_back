@@ -14,18 +14,21 @@ export class UserRepositoryImpl implements UserRepository {
         this.userCrypto = userCrypto
     }
 
+    // TODO TEST
     async adminUpdateUser(user: UserUpdateModel): Promise<number | null> {
         const params_admin = ["id", "first_name", "last_name", "email", "status", "is_admin", "organisation", "country", "user_planned_usage"]
-        const updated_user_id = this.updateUser(user, params_admin)
-        return updated_user_id
+        const updated_user_nb = this.updateUser(user, params_admin)
+        return updated_user_nb
     }
-
+    // TODO TEST
     async standardUpdateUser(user: UserUpdateModel): Promise<number | null> {
         const params_restricted = ["id", "first_name", "last_name", "email", "organisation", "country", "user_planned_usage"]
-        const updated_user_id = this.updateUser(user, params_restricted)
-        return updated_user_id
+        const updated_user_nb = this.updateUser(user, params_restricted)
+        console.log(updated_user_nb)
+        return updated_user_nb
     }
 
+    // TODO TEST
     // return number of lines updated
     private async updateUser(user: UserUpdateModel, params: string[]): Promise<number | null> {
         const filtred_user: UserUpdateModel = Object.keys(user).reduce((acc: any, key: string) => {
@@ -34,9 +37,10 @@ export class UserRepositoryImpl implements UserRepository {
             }
             return acc;
         }, {});
-        if (filtred_user.keys().length > 1) {
-            const updated_user_id = await this.userDataSource.updateOne(filtred_user);
-            return updated_user_id;
+        console.log(filtred_user)
+        if (Object.keys(filtred_user).length > 1) {
+            const updated_user_nb = await this.userDataSource.updateOne(filtred_user);
+            return updated_user_nb;
         } else return 0
     }
 
@@ -71,6 +75,8 @@ export class UserRepositoryImpl implements UserRepository {
             return false;
         }
     }
+
+    // TODO TEST
     async isAdmin(id: number): Promise<boolean> {
         const user = await this.userDataSource.getOne({ id: id })
         if (!user) return false

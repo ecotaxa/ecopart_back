@@ -142,4 +142,39 @@ describe("User Router", () => {
             expect(response.status).toBe(500)
         });
     })
+    describe("PATCH /users", () => {
+
+        test("PATCH /users", async () => {
+            const user_to_update = {
+                last_name: "Smith",
+                first_name: "John"
+            }
+            const OutputData: UserResponseModel = {
+                id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                status: "Pending",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).patch("/users/1").send(user_to_update)
+            expect(response.status).toBe(201)
+        });
+
+        test("POST /users returns 500 on use case error", async () => {
+            const user_to_update = {
+                last_name: "Smith",
+                first_name: "John"
+            }
+
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
+            const response = await request(server).patch("/users/2").send(user_to_update)
+            expect(response.status).toBe(500)
+        });
+    })
 })

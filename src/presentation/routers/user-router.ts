@@ -33,8 +33,7 @@ export default function UsersRouter(
         }
     })
 
-    // TODO : update the  user
-    // TODO : permission of modification? : 
+
     // 401/500 
     router.patch('/:id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
