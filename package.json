@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --watchAll --collectCoverage",
+    "test-CI": "jest --collectCoverage",
     "dev:build": "tsc",
     "dev:serve": "nodemon -e js -w lib lib/main.js",
     "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts"
