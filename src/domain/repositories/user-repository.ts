@@ -76,7 +76,6 @@ export class UserRepositoryImpl implements UserRepository {
         }
     }
 
-    // TODO TEST
     async isAdmin(id: number): Promise<boolean> {
         const user = await this.userDataSource.getOne({ id: id })
         if (!user) return false

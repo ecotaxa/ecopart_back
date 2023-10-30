@@ -1,7 +1,7 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel } from "../../../src/domain/entities/auth";
-import { UserRequesCreationtModel, UserResponseModel } from "../../../src/domain/entities/user";
+import { UserRequesCreationtModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
@@ -154,6 +154,229 @@ describe("User Repository", () => {
             const result = await userRepository.verifyUserLogin(InputData);
             expect(result).toBe(false)
 
+        });
+    });
+
+    describe("updateUser", () => {
+        test("Things to update : admin user try do edit admin property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                status: "Active",
+                is_admin: true
+            }
+            const filtred_user: UserUpdateModel = {
+                id: 2,
+                status: 'Active',
+                is_admin: true
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+
+            const result = await userRepository.adminUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(1)
+        });
+        test("Things to update : admin user try to edit standard property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                last_name: "Smith",
+                first_name: "Joan"
+            }
+            const filtred_user: UserUpdateModel = {
+                id: 2,
+                last_name: "Smith",
+                first_name: "Joan"
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+
+            const result = await userRepository.adminUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(1)
+        });
+
+        test("Nothing to update : admin user try to edit existing property that could not be acess", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+                user_id: 3
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.adminUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
+            expect(result).toBe(0)
+        });
+
+        test("Nothing to update : admin user try to edit existing property that don't exist", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                toto: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+                tutu: 3
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.adminUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
+            expect(result).toBe(0)
+        });
+
+        test("Some things to update : Mix between allowed and unallowed property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                status: 'Active',
+                last_name: "Smith",
+                toto: "ZERTYU",
+                password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+            }
+            const filtred_user: UserUpdateModel = {
+                id: 2,
+                status: 'Active',
+                last_name: "Smith"
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.adminUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(0)
+        });
+
+        test("Things to update : standard user try do edit admin property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                status: "Active",
+                is_admin: true
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.standardUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
+            expect(result).toBe(0)
+        });
+        test("Things to update : standard user try to edit standard property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                last_name: "Smith",
+                first_name: "Joan"
+            }
+            const filtred_user: UserUpdateModel = {
+                id: 2,
+                last_name: "Smith",
+                first_name: "Joan"
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+
+            const result = await userRepository.standardUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(1)
+        });
+
+        test("Nothing to update : standard user try to edit existing property that could not be acess", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+                user_id: 3
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.standardUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
+            expect(result).toBe(0)
+        });
+
+        test("Nothing to update : standard user try to edit existing property that don't exist", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                toto: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+                tutu: 3
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.standardUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
+            expect(result).toBe(0)
+        });
+
+        test("Some things to update : Mix between allowed and unallowed property", async () => {
+            const user_to_update: UserUpdateModel = {
+                id: 2,
+                status: 'Active',
+                last_name: "Smith",
+                toto: "ZERTYU",
+                password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
+            }
+            const filtred_user: UserUpdateModel = {
+                id: 2,
+                last_name: "Smith"
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+
+            const result = await userRepository.standardUpdateUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(0)
+        });
+
+    });
+
+    describe("isAdmin", () => {
+        test("should return true for an admin user", async () => {
+            const adminUser: UserResponseModel = {
+                id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                status: "Pending",
+                is_admin: true,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(adminUser))
+
+            const result = await userRepository.isAdmin(1);
+            expect(result).toBe(true)
+        });
+        test("should return false for a non admin user", async () => {
+            const nonAdminUser: UserResponseModel = {
+                id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                status: "Pending",
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonAdminUser))
+
+            const result = await userRepository.isAdmin(1);
+            expect(result).toBe(false)
+        });
+        test("should return false for a non existing user", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(null))
+            const result = await userRepository.isAdmin(1);
+            expect(result).toBe(false)
         });
     });
 })
