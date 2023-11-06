@@ -13,22 +13,14 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     init_user_db() {
-        // TODO ajouter le table
-        // init user table
-        // const sql_type = "CREATE TABLE IF NOT EXISTS 'user_status' (user_status_id CHAR1 PRIMARY KEY AUTOINCREMENT, user_status_label TEXT NOT NULL);"
-        // this.db.run(sql_type, [])
-        // const sql_insert = `INSERT INTO user_status(user_status_label) VALUES('Pending');
-        // INSERT INTO user_status(user_status_label) VALUES('Active');
-        // INSERT INTO user_status(user_status_label) VALUES('Suspended');`
-        //this.db.run(sql_insert, [])
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, status TEXT NOT NULL DEFAULT 'Pending', is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
         this.db.run(sql_create, [])
     }
 
     async create(user: UserRequesCreationtModel): Promise<number> {
-        const params = [user.first_name, user.last_name, user.email, user.password, user.organisation, user.country, user.user_planned_usage]
+        const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO user (first_name, last_name, email, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `)`;
+        const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `)`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -55,7 +47,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                         first_name: row.first_name,
                         last_name: row.last_name,
                         email: row.email,
-                        status: row.status,
+                        valid_email: row.valid_email == 1 ? true : false,
                         is_admin: row.is_admin == 1 ? true : false,
                         organisation: row.organisation,
                         country: row.country,
@@ -80,14 +72,11 @@ export class SQLiteUserDataSource implements UserDataSource {
     updateOne(user: UserUpdateModel): Promise<number> {
         const { id, ...userData } = user; // Destructure the user object
 
-        //const params_restricted = [user.first_name, user.last_name, user.email, user.organisation, user.country, user.user_planned_usage]
-        //const params_admin = [user.first_name, user.last_name, user.email, user.status, user.is_admin, user.organisation, user.country, user.user_planned_usage]
         const params: any[] = []
         let placeholders: string = ""
-
         for (const [key, value] of Object.entries(userData)) {
-            if (key == "is_admin") { // TODO somewhere else?
-                params.push(value == "true" ? 1 : 0)
+            if (key == "is_admin" || key == "valid_email") { // TODO somewhere else?
+                params.push(value == true || value == "true" ? 1 : 0) // TODO clean
             } else {
                 params.push(value)
             }
@@ -115,30 +104,37 @@ export class SQLiteUserDataSource implements UserDataSource {
         let sql: string = ""
         let param: any[] = []
         if (user.id !== undefined) {
-            sql = "SELECT * FROM user WHERE user_id = (?) LIMIT 1" // TODO db_table
+            sql = "SELECT * FROM user WHERE user_id = (?) LIMIT 1"
             param = [user.id]
         } else if (user.email !== undefined) {
-            sql = "SELECT * FROM user WHERE email = (?) LIMIT 1" // TODO db_table
+            sql = "SELECT * FROM user WHERE email = (?) LIMIT 1"
             param = [user.email]
+        } else if (user.confirmation_code !== undefined) {
+            sql = "SELECT * FROM user WHERE confirmation_code = (?) LIMIT 1"
+            param = [user.confirmation_code]
         }
         return await new Promise((resolve, reject) => {
             this.db.get(sql, param, (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
-                    const result = {
-                        id: row.user_id,
-                        first_name: row.first_name,
-                        last_name: row.last_name,
-                        email: row.email,
-                        status: row.status,
-                        is_admin: row.is_admin == 1 ? true : false,
-                        organisation: row.organisation,
-                        country: row.country,
-                        user_planned_usage: row.user_planned_usage,
-                        user_creation_date: row.user_creation_date,
-                    };
-                    resolve(result);
+                    if (row === undefined) resolve(null);
+                    else {
+                        const result = {
+                            id: row.user_id,
+                            first_name: row.first_name,
+                            last_name: row.last_name,
+                            email: row.email,
+                            confirmation_code: row.confirmation_code,
+                            valid_email: row.valid_email == 1 ? true : false,
+                            is_admin: row.is_admin == 1 ? true : false,
+                            organisation: row.organisation,
+                            country: row.country,
+                            user_planned_usage: row.user_planned_usage,
+                            user_creation_date: row.user_creation_date,
+                        };
+                        resolve(result);
+                    }
                 }
             });
         })

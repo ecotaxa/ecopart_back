@@ -1,13 +1,8 @@
-
-// // full user object
-// export interface User {
-//     id?: string;
-//     password: string;
-//     first_name: string;
-//     last_name: string;
-//     email: string;
-//     status: "Pending" | "active" | "suspended";
-// }
+export enum UserStatus {
+    Pending = "PENDING",
+    Active = "ACTIVE",
+    Anonym = "ANONYM"
+}
 
 // the user request model 
 export interface UserRequesCreationtModel {
@@ -15,6 +10,7 @@ export interface UserRequesCreationtModel {
     first_name: string;
     last_name: string;
     email: string;
+    confirmation_code?: string;
     organisation: string;
     country: string;
     user_planned_usage: string;
@@ -24,7 +20,8 @@ export interface UserRequestModel {
     first_name?: string;
     last_name?: string;
     email?: string;
-    status?: string//"Pending" | "active" | "suspended";
+    valid_email?: boolean;
+    confirmation_code?: string;
     is_admin?: boolean;
     organisation?: string;
     country?: string;
@@ -37,7 +34,8 @@ export interface UserUpdateModel {
     first_name?: string;
     last_name?: string;
     email?: string;
-    status?: string//"Pending" | "active" | "suspended";
+    valid_email?: boolean;
+    confirmation_code?: string;
     is_admin?: boolean;
     organisation?: string;
     country?: string;
@@ -51,7 +49,8 @@ export interface UserResponseModel {
     first_name: string;
     last_name: string;
     email: string;
-    status: string//"Pending" | "active" | "suspended";
+    valid_email: boolean;
+    confirmation_code?: string;
     is_admin: boolean;
     organisation: string;
     country: string;

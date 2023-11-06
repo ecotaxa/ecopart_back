@@ -9,4 +9,5 @@ export interface UserRepository {
     createUser(user: UserRequesCreationtModel): Promise<number | null>;
     getUsers(): Promise<UserResponseModel[]>;
     isAdmin(id: number): Promise<boolean>
+    validUser(user: UserRequestModel): Promise<number | null>
 }

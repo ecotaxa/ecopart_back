@@ -8,9 +8,6 @@ import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'
 import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refreshToken'
 
 
-
-
-
 // TODO password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
     middlewareAuth: MiddlewareAuth,
@@ -27,7 +24,6 @@ export default function AuthRouter(
 
     router.post('/login', async (req: Request, res: Response) => {
         try {
-            console.log
             const tokens = await loginUserUseCase.execute(req.body)
             if (tokens === null) res.status(401).send({ errors: ["Invalid credentials"] })
             else {
@@ -53,7 +49,6 @@ export default function AuthRouter(
 
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
         try {
-            // console.log("hello", (req as CustomRequest).token)
             const user = (req as CustomRequest).token
 
             const token = await refreshTokenUseCase.execute(user)
