@@ -27,14 +27,14 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Read the HTML file
         let htmlContent = "error"
         try {
-            const filePath = path.join(__dirname + "/account_validation_email.html")
+            const filePath = path.join(__dirname + "/templates/account_validation_email.html")
             htmlContent = fs.readFileSync(filePath, 'utf8');
         } catch (err) {
             console.error(err)
         }
 
         // prepare the custom confirmation path
-        const custom_confirmation_path = this.base_url_path + "/users/welcome/" + confirmation_code
+        const custom_confirmation_path = this.base_url_path + "/users/" + created_user.user_id + "/welcome/" + confirmation_code
         const mail_sender = this.mail_sender
 
         // Send the email

@@ -12,10 +12,10 @@ export class UpdateUser implements UpdateUserUseCase {
         let nb_of_updated_user: number | null = null
 
         // update admin can update anyone 
-        if (await this.userRepository.isAdmin(current_user.id)) {
+        if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.adminUpdateUser(user_to_update)
             if (!nb_of_updated_user || nb_of_updated_user == 0) throw new Error("Can't update user");
-        } else if (current_user.id == user_to_update.id) {
+        } else if (current_user.user_id == user_to_update.user_id) {
             // update classic only on himself 
             nb_of_updated_user = await this.userRepository.standardUpdateUser(user_to_update)
             if (!nb_of_updated_user || nb_of_updated_user == 0) throw new Error("Can't update user");
@@ -24,7 +24,7 @@ export class UpdateUser implements UpdateUserUseCase {
             throw new Error("Forbidden");
         }
 
-        const updated_user = await this.userRepository.getUser({ id: user_to_update.id })
+        const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
         if (!updated_user) throw new Error("Can't find updated user");
 
         return updated_user

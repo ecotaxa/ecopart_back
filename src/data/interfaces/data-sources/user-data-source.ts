@@ -4,7 +4,7 @@ import { AuthUserCredentialsModel } from "../../../domain/entities/auth";
 export interface UserDataSource {
     create(user: UserRequesCreationtModel): Promise<number>;
     getAll(): Promise<UserResponseModel[]>;
-    deleteOne(id: string): void;
+    deleteOne(user_id: string): void;
     updateOne(user: UserUpdateModel): Promise<number>;
     getOne(user: UserRequestModel): Promise<UserResponseModel | null>;
     getUserLogin(email: string): Promise<AuthUserCredentialsModel | null>;

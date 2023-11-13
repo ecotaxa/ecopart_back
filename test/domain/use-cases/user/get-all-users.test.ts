@@ -1,3 +1,4 @@
+import { DecodedToken } from "../../../../src/domain/entities/auth";
 import { UserResponseModel, } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users'
@@ -26,7 +27,17 @@ describe("Get All Users Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
+        validUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        generateValidationToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyValidationToken(): DecodedToken | null {
+            throw new Error("Method not implemented.");
+        }
     }
+
     let mockUserRepository: UserRepository;
 
     beforeEach(() => {
@@ -36,12 +47,12 @@ describe("Get All Users Use Case", () => {
     // TODO TEST when non user
     test("should return data", async () => {
         const ExpectedResult: UserResponseModel[] = [{
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

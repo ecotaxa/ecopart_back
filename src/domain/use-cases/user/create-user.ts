@@ -16,20 +16,38 @@ export class CreateUser implements CreateUserUseCase {
     }
 
     async execute(user: UserRequesCreationtModel): Promise<UserResponseModel> {
-        // TODO if email already exist and is ot valid resend email 
-        // TODO try user.isvalid()
-        const created_id = await this.userRepository.createUser(user)
-        if (!created_id) throw new Error("Can't create user");
-        const created_user = await this.userRepository.getUser({ id: created_id })
-        if (!created_user) throw new Error("Can't find created user");
+        // If  unvalidated user with the associated email already exist : resend email 
+        const preexistent_user = await this.userRepository.getUser({ email: user.email })
 
-        //todo send email
-        const confirmation_code = created_user.confirmation_code || "error";
+        if (preexistent_user && !preexistent_user.valid_email) {
+            // generate validation token
+            const confirmation_token = this.userRepository.generateValidationToken(preexistent_user)
+            //delet confirmation_code from created user
+            delete preexistent_user.confirmation_code;
+            //send email    
+            this.mailer.send_confirmation_email(this.transporter, preexistent_user, confirmation_token)
+            return preexistent_user
+        } else if (preexistent_user && preexistent_user.valid_email) {
+            throw new Error("Valid user already exist")
+            // Could sent an email to say that the user already exist
+        } else if (preexistent_user === null) {
+            // Create user
+            const created_id = await this.userRepository.createUser(user)
+            if (!created_id) throw new Error("Can't create user");
 
-        //delet confirmation_code from created user
-        delete created_user.confirmation_code;
-        //send email    
-        this.mailer.send_confirmation_email(this.transporter, created_user, confirmation_code)
-        return created_user
+            //Get created user
+            const created_user = await this.userRepository.getUser({ user_id: created_id })
+            if (!created_user) throw new Error("Can't find created user");
+
+            // Generate validation token
+            const confirmation_token = this.userRepository.generateValidationToken(created_user)
+            // Delet confirmation_code from created user
+            delete created_user.confirmation_code;
+            // Send email    
+            this.mailer.send_confirmation_email(this.transporter, created_user, confirmation_token)
+            return created_user
+        } else {
+            throw new Error("Can't create user");
+        }
     }
 }

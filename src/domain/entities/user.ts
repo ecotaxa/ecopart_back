@@ -16,7 +16,7 @@ export interface UserRequesCreationtModel {
     user_planned_usage: string;
 }
 export interface UserRequestModel {
-    id?: number;
+    user_id?: number;
     first_name?: string;
     last_name?: string;
     email?: string;
@@ -30,7 +30,7 @@ export interface UserRequestModel {
 }
 export interface UserUpdateModel {
     [key: string]: any;
-    id: number;
+    user_id: number;
     first_name?: string;
     last_name?: string;
     email?: string;
@@ -45,7 +45,7 @@ export interface UserUpdateModel {
 
 // the user response model
 export interface UserResponseModel {
-    id: number;
+    user_id: number;
     first_name: string;
     last_name: string;
     email: string;

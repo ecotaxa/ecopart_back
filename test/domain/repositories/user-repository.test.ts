@@ -5,6 +5,9 @@ import { UserRequesCreationtModel, UserResponseModel, UserUpdateModel } from "..
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
+import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken"
+import 'dotenv/config'
+
 class MockUserDataSource implements UserDataSource {
     deleteOne(): void {
         throw new Error("Method not implemented.");
@@ -36,26 +39,29 @@ class MockBcryptAdapter extends BcryptAdapter {
     }
 }
 
+const TEST_VALIDATION_TOKEN_SECRET = process.env.TEST_VALIDATION_TOKEN_SECRET || ''
+
 describe("User Repository", () => {
     let mockUserDataSource: UserDataSource;
     let mockBcryptAdapter: BcryptAdapter;
+    let jwtAdapter: JwtAdapter;
     let userRepository: UserRepository
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockUserDataSource = new MockUserDataSource()
         mockBcryptAdapter = new MockBcryptAdapter()
-        userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter)
+        userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET)
     })
 
     describe("getAllUsers", () => {
         test("should return data", async () => {
             const expectedData: UserResponseModel[] = [{
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
-                status: "Pending",
+                valid_email: true,
                 is_admin: false,
                 organisation: "LOV",
                 country: "France",
@@ -70,7 +76,7 @@ describe("User Repository", () => {
     })
 
     describe("createUser", () => {
-        test("should return created user id", async () => {
+        test("should return created user user_id", async () => {
             const inputData: UserRequesCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
@@ -90,13 +96,13 @@ describe("User Repository", () => {
 
     describe("getUser", () => {
         test("should return one user", async () => {
-            const inputData = { id: 1 }
+            const inputData = { user_id: 1 }
             const expectedData: UserResponseModel = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
-                status: "Pending",
+                valid_email: true,
                 is_admin: false,
                 organisation: "LOV",
                 country: "France",
@@ -160,13 +166,13 @@ describe("User Repository", () => {
     describe("updateUser", () => {
         test("Things to update : admin user try do edit admin property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
-                status: "Active",
+                user_id: 2,
+                valid_email: true,
                 is_admin: true
             }
             const filtred_user: UserUpdateModel = {
-                id: 2,
-                status: 'Active',
+                user_id: 2,
+                valid_email: true,
                 is_admin: true
             }
 
@@ -179,12 +185,12 @@ describe("User Repository", () => {
         });
         test("Things to update : admin user try to edit standard property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith",
                 first_name: "Joan"
             }
             const filtred_user: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith",
                 first_name: "Joan"
             }
@@ -196,7 +202,7 @@ describe("User Repository", () => {
             expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
             expect(result).toBe(1)
         });
-
+        //TODO ID != USER_ID
         test("Nothing to update : admin user try to edit existing property that could not be acess", async () => {
             const user_to_update: UserUpdateModel = {
                 id: 2,
@@ -214,7 +220,7 @@ describe("User Repository", () => {
 
         test("Nothing to update : admin user try to edit existing property that don't exist", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 toto: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
                 tutu: 3
             }
@@ -229,15 +235,15 @@ describe("User Repository", () => {
 
         test("Some things to update : Mix between allowed and unallowed property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
-                status: 'Active',
+                user_id: 2,
+                valid_email: true,
                 last_name: "Smith",
                 toto: "ZERTYU",
                 password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
             }
             const filtred_user: UserUpdateModel = {
-                id: 2,
-                status: 'Active',
+                user_id: 2,
+                valid_email: true,
                 last_name: "Smith"
             }
 
@@ -251,7 +257,7 @@ describe("User Repository", () => {
 
         test("Things to update : standard user try do edit admin property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 status: "Active",
                 is_admin: true
             }
@@ -265,12 +271,12 @@ describe("User Repository", () => {
         });
         test("Things to update : standard user try to edit standard property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith",
                 first_name: "Joan"
             }
             const filtred_user: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith",
                 first_name: "Joan"
             }
@@ -300,7 +306,7 @@ describe("User Repository", () => {
 
         test("Nothing to update : standard user try to edit existing property that don't exist", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 toto: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
                 tutu: 3
             }
@@ -315,14 +321,14 @@ describe("User Repository", () => {
 
         test("Some things to update : Mix between allowed and unallowed property", async () => {
             const user_to_update: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 status: 'Active',
                 last_name: "Smith",
                 toto: "ZERTYU",
                 password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
             }
             const filtred_user: UserUpdateModel = {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith"
             }
 
@@ -339,11 +345,11 @@ describe("User Repository", () => {
     describe("isAdmin", () => {
         test("should return true for an admin user", async () => {
             const adminUser: UserResponseModel = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
-                status: "Pending",
+                valid_email: true,
                 is_admin: true,
                 organisation: "LOV",
                 country: "France",
@@ -357,11 +363,11 @@ describe("User Repository", () => {
         });
         test("should return false for a non admin user", async () => {
             const nonAdminUser: UserResponseModel = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
-                status: "Pending",
+                valid_email: true,
                 is_admin: false,
                 organisation: "LOV",
                 country: "France",

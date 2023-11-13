@@ -43,7 +43,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                     reject(err);
                 } else {
                     const result = rows.map(row => ({
-                        id: row.user_id,
+                        user_id: row.user_id,
                         first_name: row.first_name,
                         last_name: row.last_name,
                         email: row.email,
@@ -60,17 +60,17 @@ export class SQLiteUserDataSource implements UserDataSource {
         })
     }
     //TODO 
-    // async deleteOne(id: String) {
-    //     await this.db.run(`delete ${DB_TABLE} where id = $1`, [id])
+    // async deleteOne(user_id: String) {
+    //     await this.db.run(`delete ${DB_TABLE} where user_id = $1`, [user_id])
     // }
-    deleteOne(id: string): void {
-        console.log(id)
+    deleteOne(user_id: string): void {
+        console.log(user_id)
         throw new Error("Method not implemented.");
     }
 
     // Returns the number of lines updates
     updateOne(user: UserUpdateModel): Promise<number> {
-        const { id, ...userData } = user; // Destructure the user object
+        const { user_id, ...userData } = user; // Destructure the user object
 
         const params: any[] = []
         let placeholders: string = ""
@@ -83,7 +83,7 @@ export class SQLiteUserDataSource implements UserDataSource {
             placeholders = placeholders + key + "=(?),"
         }
         placeholders = placeholders.slice(0, -1);
-        params.push(id)
+        params.push(user_id)
 
         const sql = `UPDATE user SET ` + placeholders + ` WHERE user_id=(?) RETURNING *;`;
 
@@ -101,27 +101,26 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     async getOne(user: UserRequestModel): Promise<UserResponseModel | null> {
-        let sql: string = ""
-        let param: any[] = []
-        if (user.id !== undefined) {
-            sql = "SELECT * FROM user WHERE user_id = (?) LIMIT 1"
-            param = [user.id]
-        } else if (user.email !== undefined) {
-            sql = "SELECT * FROM user WHERE email = (?) LIMIT 1"
-            param = [user.email]
-        } else if (user.confirmation_code !== undefined) {
-            sql = "SELECT * FROM user WHERE confirmation_code = (?) LIMIT 1"
-            param = [user.confirmation_code]
+        const params: any[] = []
+        let placeholders: string = ""
+        // generate sql and params
+        for (const [key, value] of Object.entries(user)) {
+            params.push(value)
+            placeholders = placeholders + key + "=(?) AND "
         }
+        // remove last AND
+        placeholders = placeholders.slice(0, -4);
+        // form final sql
+        const sql = `SELECT * FROM user WHERE ` + placeholders + `LIMIT 1`;
         return await new Promise((resolve, reject) => {
-            this.db.get(sql, param, (err, row) => {
+            this.db.get(sql, params, (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
                     if (row === undefined) resolve(null);
                     else {
                         const result = {
-                            id: row.user_id,
+                            user_id: row.user_id,
                             first_name: row.first_name,
                             last_name: row.last_name,
                             email: row.email,
@@ -139,6 +138,7 @@ export class SQLiteUserDataSource implements UserDataSource {
             });
         })
     }
+
     async getUserLogin(email: string): Promise<AuthUserCredentialsModel | null> {
         const sql = "SELECT * FROM user WHERE email = (?) LIMIT 1"
         const param = [email]

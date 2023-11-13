@@ -17,6 +17,8 @@ export class RefreshToken implements RefreshTokenUseCase {
         // Get full user based on decoded token user's email
         const full_user = await this.userRepository.getUser({ email: userAuth.email })
         if (full_user === null) return full_user
+        // TODO check if it is pertinent
+        if (!full_user.valid_email) throw new Error("User email not verified");
 
         // Get authorisation access token
         const refreshed_token = { jwt: this.authRepository.generateAccessToken(full_user) }

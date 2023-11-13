@@ -201,7 +201,7 @@ describe("Authorization middleware", () => {
 
             const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkyNjk4MjYzLCJleHAiOjU4NDk2Mzc4MjYzfQ.V0lcrrAPrYW1eE0Pq9J8CgfjH9ljk9-QdDjjlgmYxoM"
             const expectedDecodedRefreshToken = {
-                id: 1,
+                user_id: 1,
                 first_name: 'John',
                 last_name: 'Smith',
                 email: 'john@gmail.com',

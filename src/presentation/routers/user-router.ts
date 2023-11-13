@@ -1,5 +1,6 @@
 import express from 'express'
 import { Request, Response } from 'express'
+
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create-user'
 import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-all-users'
@@ -38,10 +39,10 @@ export default function UsersRouter(
 
 
     // 401/500 
-    router.patch('/:id/', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.patch('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            //const updated_user = await updateUserUseCase.execute({ ...req.body, id: req.params.id })
-            const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, id: req.params.id })
+            //const updated_user = await updateUserUseCase.execute({ ...req.body, user_id: req.params.user_id })
+            const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
             res.statusCode = 200
             res.json(updated_user)
         } catch (err) {
@@ -49,16 +50,17 @@ export default function UsersRouter(
         }
     })
 
-    router.get('/welcome/:confirmation_code', async (req: Request, res: Response) => {
+    router.get('/:user_id/welcome/:confirmation_token', async (req: Request, res: Response) => {
         try {
             // call usecase validate user email
-            await validUserUseCase.execute(req.params.confirmation_code)
+            await validUserUseCase.execute(parseInt(req.params.user_id), req.params.confirmation_token)
 
             // redirect to login page // TODO?
             res.status(200).send("Account activated, please login")
 
         } catch (err) {
-            res.status(500).send({ message: err })
+            console.log(err)
+            res.status(500).send({ errors: ["Can't welcome user"] })
         }
     })
     return router

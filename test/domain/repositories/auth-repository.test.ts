@@ -30,12 +30,12 @@ describe("Auth Repository", () => {
     describe("test generateAccessToken", () => {
         test("should return valid access token", async () => {
             const InputData = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -51,12 +51,12 @@ describe("Auth Repository", () => {
     describe("test generateRefreshToken", () => {
         test("should return valid Refresh", async () => {
             const InputData = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

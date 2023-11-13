@@ -1,3 +1,4 @@
+import { DecodedToken } from "../../../../src/domain/entities/auth";
 import { UserRequesCreationtModel, UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
@@ -25,6 +26,15 @@ describe("Create User Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
+        validUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        generateValidationToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyValidationToken(): DecodedToken | null {
+            throw new Error("Method not implemented.");
+        }
     }
 
     let mockUserRepository: UserRepository;
@@ -45,12 +55,12 @@ describe("Create User Use Case", () => {
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: false,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

@@ -1,5 +1,5 @@
 
-import { AuthUserCredentialsModel } from "../../entities/auth";
+import { AuthUserCredentialsModel, DecodedToken } from "../../entities/auth";
 import { UserRequesCreationtModel, UserResponseModel, UserRequestModel, UserUpdateModel } from "../../entities/user";
 export interface UserRepository {
     getUser(user: UserRequestModel): Promise<UserResponseModel | null>;
@@ -8,6 +8,8 @@ export interface UserRepository {
     verifyUserLogin(user: AuthUserCredentialsModel): Promise<boolean>;
     createUser(user: UserRequesCreationtModel): Promise<number | null>;
     getUsers(): Promise<UserResponseModel[]>;
-    isAdmin(id: number): Promise<boolean>
-    validUser(user: UserRequestModel): Promise<number | null>
+    isAdmin(user_id: number): Promise<boolean>;
+    validUser(user: UserRequestModel): Promise<number | null>;
+    generateValidationToken(user: UserRequestModel): string;
+    verifyValidationToken(confirmation_token: string): DecodedToken | null
 }

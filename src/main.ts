@@ -29,6 +29,7 @@ const config = {
     BASE_URL: process.env.BASE_URL || '',
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
+    VALIDATION_TOKEN_SECRET: process.env.VALIDATION_TOKEN_SECRET || '',
 
     MAIL_HOST: process.env.MAIL_HOST || '',
     MAIL_PORT: parseInt(process.env.MAIL_PORT as string, 10),
@@ -72,15 +73,15 @@ async function getSQLiteDS() {
 
     const userMiddleWare = UserRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-        new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter)),
-        new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter), transporter, mailerAdapter),
-        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter)),
-        new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter)),
+        new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
+        new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), transporter, mailerAdapter),
+        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
+        new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
     )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-        new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
-        new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
+        new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
+        new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
     )
 
     server.use("/users", userMiddleWare)

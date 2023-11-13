@@ -2,7 +2,7 @@ import { UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { AuthRepository } from "../../../../src/domain/interfaces/repositories/auth-repository";
 import { LoginUser } from '../../../../src/domain/use-cases/auth/login'
-import { AuthJwtResponseModel, AuthUserCredentialsModel } from "../../../../src/domain/entities/auth";
+import { AuthJwtResponseModel, AuthUserCredentialsModel, DecodedToken } from "../../../../src/domain/entities/auth";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
@@ -25,6 +25,15 @@ describe("Create User Use Case", () => {
             throw new Error("Method not implemented.");
         }
         verifyUserLogin(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
+        validUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        generateValidationToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyValidationToken(): DecodedToken | null {
             throw new Error("Method not implemented.");
         }
     }
@@ -52,12 +61,12 @@ describe("Create User Use Case", () => {
             password: "good_password"
         }
         const OutputUserData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -83,12 +92,12 @@ describe("Create User Use Case", () => {
             password: "bad_password"
         }
         const OutputUserData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

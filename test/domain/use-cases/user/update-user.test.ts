@@ -1,3 +1,4 @@
+import { DecodedToken } from "../../../../src/domain/entities/auth";
 import { UserResponseModel, UserUpdateModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
@@ -36,6 +37,15 @@ describe("Update User Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
+        validUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        generateValidationToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyValidationToken(): DecodedToken | null {
+            throw new Error("Method not implemented.");
+        }
     }
 
     let mockUserRepository: UserRepository;
@@ -49,20 +59,20 @@ describe("Update User Use Case", () => {
     // NOT ADMIN
     test("User is not admin : edit regular properties on himself : ok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan"
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -85,20 +95,20 @@ describe("Update User Use Case", () => {
 
     test("User is not admin : edit admin property on himself : nok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             status: "Active",
             is_admin: true
         }
         const getUserOutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -129,20 +139,20 @@ describe("Update User Use Case", () => {
 
     test("User is not admin : edit someone else regular properties : nok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 2,
+            user_id: 2,
             last_name: "Smith",
             first_name: "Joan"
         }
         const getUserOutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -173,20 +183,20 @@ describe("Update User Use Case", () => {
 
     test("User is not admin : edit someone else adminproperty : nok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 2,
+            user_id: 2,
             status: "Active",
             is_admin: true
         }
         const getUserOutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -222,20 +232,20 @@ describe("Update User Use Case", () => {
     // ADMIN 
     test("User is admin : edit regular properties on himself : ok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan"
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: true,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -258,20 +268,20 @@ describe("Update User Use Case", () => {
 
     test("User is admin : edit admin property on himself : ok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             status: "Active",
             is_admin: true
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: true,
-            status: "Active",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -295,20 +305,20 @@ describe("Update User Use Case", () => {
 
     test("User is admin : edit someone else regular properties : ok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 2,
+            user_id: 2,
             last_name: "Smith",
             first_name: "Joan"
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: false,
-            status: "Pending",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -332,20 +342,20 @@ describe("Update User Use Case", () => {
 
     test("User is admin : edit someone else adminproperty : ok", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 2,
+            user_id: 2,
             status: "Active",
             is_admin: true
         }
         const OutputData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan",
             email: "john@gmail.com",
             is_admin: true,
-            status: "Active",
+            valid_email: true,
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -370,10 +380,10 @@ describe("Update User Use Case", () => {
     // others scenarios (for coverage)
     test("Can't find updated user", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             last_name: "Smith",
             first_name: "Joan"
         }
@@ -400,10 +410,10 @@ describe("Update User Use Case", () => {
     });
     test("nothing to update on an admin user", async () => {
         const current_user: UserUpdateModel = {
-            id: 1
+            user_id: 1
         }
         const user_to_update: UserUpdateModel = {
-            id: 1,
+            user_id: 1,
             status: "Active",
             is_admin: true
         }

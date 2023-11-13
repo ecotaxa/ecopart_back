@@ -8,6 +8,7 @@ import { UserResponseModel, UserRequesCreationtModel } from "../../../src/domain
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
 import { GetAllUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/get-all-users";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
+import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { Request, Response, NextFunction } from "express";
@@ -29,6 +30,12 @@ class MockUpdateUserUseCase implements UpdateUserUseCase {
     }
 }
 
+class MockValidUserUseCase implements ValidUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
+
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
         next()
@@ -43,13 +50,15 @@ describe("User Router", () => {
     let mockCreateUserUseCase: CreateUserUseCase;
     let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
+    let mockValidUserUseCase: ValidUserUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
         mockGetAllUsersUseCase = new MockGetAllUsersUseCase()
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase))
+        mockValidUserUseCase = new MockValidUserUseCase()
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase))
     })
 
     beforeEach(() => {
@@ -60,23 +69,23 @@ describe("User Router", () => {
 
         test("should return 200 with data", async () => {
             const ExpectedData: UserResponseModel[] = [{
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
                 user_creation_date: '2023-08-01 10:30:00'
             }, {
-                id: 2,
+                user_id: 2,
                 last_name: "Smith",
                 first_name: "Jim",
                 email: "jim@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -111,12 +120,12 @@ describe("User Router", () => {
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
             const OutputData: UserResponseModel = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -150,12 +159,12 @@ describe("User Router", () => {
                 first_name: "John"
             }
             const OutputData: UserResponseModel = {
-                id: 1,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
-                status: "Pending",
+                valid_email: true,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -163,7 +172,7 @@ describe("User Router", () => {
             }
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/users/1").send(user_to_update)
-            expect(response.status).toBe(201)
+            expect(response.status).toBe(200)
         });
 
         test("POST /users returns 500 on use case error", async () => {

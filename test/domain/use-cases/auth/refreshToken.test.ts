@@ -27,6 +27,15 @@ describe("Create User Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
+        validUser(): Promise<number | null> {
+            throw new Error("Method not implemented.");
+        }
+        generateValidationToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyValidationToken(): DecodedToken | null {
+            throw new Error("Method not implemented.");
+        }
     }
     class MockAuthRepository implements AuthRepository {
         generateAccessToken(): string {
@@ -49,11 +58,12 @@ describe("Create User Use Case", () => {
     test("should return loged user and auth tokens", async () => {
 
         const InputUserData = {// TODO check types
-            id: 1,
+            user_id: 1,
             first_name: 'John',
             last_name: 'Smith',
             email: 'john@gmail.com',
             is_admin: false,
+            valid_email: true,
             status: 'Pending',
             organisation: 'LOV',
             country: 'France',
@@ -64,12 +74,12 @@ describe("Create User Use Case", () => {
             exp: 1724795389
         }
         const OutputUserData: UserResponseModel = {
-            id: 1,
+            user_id: 1,
             first_name: 'John',
             last_name: 'Smith',
             email: 'john@gmail.com',
             is_admin: false,
-            status: 'Pending',
+            valid_email: true,
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
@@ -88,12 +98,12 @@ describe("Create User Use Case", () => {
     test("should return loged user and auth tokens", async () => {
 
         const InputUserData: DecodedToken = {
-            id: 1,
+            user_id: 1,
             first_name: 'John',
             last_name: 'Smith',
             email: 'john@gmail.com',
             is_admin: false,
-            status: 'Pending',
+            valid_email: true,
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',

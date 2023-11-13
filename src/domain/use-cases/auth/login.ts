@@ -23,6 +23,8 @@ export class LoginUser implements LoginUserUseCase {
             const full_user = await this.userRepository.getUser({ email: user.email })
             if (full_user === null) return full_user
 
+            if (!full_user.valid_email) throw new Error("User email not verified");
+
             // Get authorisation access and refresh tokens
             const tokens = { jwt: this.authRepository.generateAccessToken(full_user), jwt_refresh: this.authRepository.generateRefreshToken(full_user) }//return token ro null}
             return { ...full_user, ...tokens }
