@@ -24,12 +24,12 @@ import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 // }
 
 class MockLoginUserUseCase implements LoginUserUseCase {
-    execute(): Promise<(UserResponseModel & AuthJwtResponseModel) | null> {
+    execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {
         throw new Error("Method not implemented.")
     }
 }
 class MockRefreshTokenUseCase implements RefreshTokenUseCase {
-    execute(): Promise<AuthJwtRefreshedResponseModel | null> {
+    execute(): Promise<AuthJwtRefreshedResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
@@ -92,9 +92,40 @@ describe("User Router", () => {
                 password: "test123"
             }
             const expectedResponse = { errors: ["Invalid credentials"] }
-            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => Promise.resolve(null))
+            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("Invalid credentials"); })
             const response = await request(server).post("/auth/login").send(InputData)
+
             expect(response.status).toBe(401)
+            expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
+        });
+
+        test("login with unvalidated account ", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "john@gmail.com",
+                password: "test123"
+            }
+            const expectedResponse = { errors: ["User email not verified"] }
+            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("User email not verified"); })
+            const response = await request(server).post("/auth/login").send(InputData)
+
+            expect(response.status).toBe(403)
+            expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
+        });
+
+        test("login fail for unexepted reason", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "john@gmail.com",
+                password: "test123"
+            }
+            const expectedResponse = { errors: ["Can't login"] }
+            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error(); })
+            const response = await request(server).post("/auth/login").send(InputData)
+
+            expect(response.status).toBe(500)
             expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
             expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
@@ -157,18 +188,36 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(OutputData)
             expect(response.headers['set-cookie']).toBeDefined();
         });
-        test("should handle invalid refresh token and return a 401 response", async () => {
-            const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
-            const expectedResponse = { errors: ["Invalid credentials"] }
 
-            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => Promise.resolve(null))
+        test("should handle error during refresh token use case and return a 404 response", async () => {
+            // Can't refresh token
+            const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
+            const expectedResponse = { errors: ["Can't find user"] }
+
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("Can't find user"); })
             const response = await request(server)
                 .post("/auth/refreshToken")
-                .set("Cookie", `refresh_token=${valid_refresh_token}; Path=/; HttpOnly;`);
+                .set("Cookie", `refresh_token=${invalid_refresh_token}; Path=/; HttpOnly;`);
 
-            expect(response.status).toBe(401)
-            expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.status).toBe(404)
+            expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
+            expect(response.headers['set-cookie']).toBeUndefined();
+        });
+
+        test("should handle error during refresh token use case and return a 404 response", async () => {
+            // Can't refresh token
+            const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
+            const expectedResponse = { errors: ["Can't refresh token"] }
+
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error(); })
+            const response = await request(server)
+                .post("/auth/refreshToken")
+                .set("Cookie", `refresh_token=${invalid_refresh_token}; Path=/; HttpOnly;`);
+
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.status).toBe(500)
+            expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
             expect(response.headers['set-cookie']).toBeUndefined();
         });
     })

@@ -13,22 +13,24 @@ export class LoginUser implements LoginUserUseCase {
         this.authRepository = authRepository
     }
 
-    async execute(user: AuthUserCredentialsModel): Promise<(UserResponseModel & AuthJwtResponseModel) | null> {
+    async execute(user: AuthUserCredentialsModel): Promise<(UserResponseModel & AuthJwtResponseModel)> {
         // Authenticate user  
         const verifyed = await this.userRepository.verifyUserLogin(user)
 
         if (verifyed === true) {
-
             // Get full user
             const full_user = await this.userRepository.getUser({ email: user.email })
-            if (full_user === null) return full_user
 
+            // If can't find user
+            if (full_user === null) throw new Error("Can't find user");
+            // If founded user email is not verified
             if (!full_user.valid_email) throw new Error("User email not verified");
 
             // Get authorisation access and refresh tokens
-            const tokens = { jwt: this.authRepository.generateAccessToken(full_user), jwt_refresh: this.authRepository.generateRefreshToken(full_user) }//return token ro null}
+            const tokens = { jwt: this.authRepository.generateAccessToken(full_user), jwt_refresh: this.authRepository.generateRefreshToken(full_user) }
+
             return { ...full_user, ...tokens }
-        }
-        return null
+
+        } else throw new Error("Invalid credentials");
     }
 }

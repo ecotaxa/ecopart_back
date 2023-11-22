@@ -11,9 +11,9 @@ export class ValidUser implements ValidUserUseCase {
         // Check if confirmation jwt is valid and decode it
         const decoded_token = this.userRepository.verifyValidationToken(confirmation_token)
         // If token not valid throw error
-        if (!decoded_token) throw new Error("Can't validate user");
+        if (!decoded_token) throw new Error("Invalid confirmation token");
         // Check if user_id in token is the same as user_id in params
-        if (decoded_token.user_id != user_id) throw new Error("Can't validate user");
+        if (decoded_token.user_id != user_id) throw new Error("User vallidation forbidden");
 
         // Find user with confirmation code and user_id
         const user_to_update = await this.userRepository.getUser({ user_id: user_id, confirmation_code: decoded_token.confirmation_code })
@@ -23,11 +23,11 @@ export class ValidUser implements ValidUserUseCase {
         // Update validation status of the found user
         const nb_updated_user = await this.userRepository.validUser(user_to_update)
         // If no user updated throw error
-        if (!nb_updated_user || nb_updated_user == 0) throw new Error("Can't update user");
+        if (nb_updated_user == 0) throw new Error("Can't update user");
 
         // Get updated user 
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
-        if (!updated_user) throw new Error("Can't get updated user");
-        if (!updated_user.valid_email && updated_user.confirmation_code !== undefined) throw new Error("Can't validate user");
+        if (!updated_user) throw new Error("Can't find updated user");
+        if (!updated_user.valid_email || updated_user.confirmation_code !== undefined) throw new Error("Can't validate user");
     }
 }

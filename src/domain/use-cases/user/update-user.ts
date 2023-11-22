@@ -9,19 +9,18 @@ export class UpdateUser implements UpdateUserUseCase {
     }
 
     async execute(current_user: UserUpdateModel, user_to_update: UserUpdateModel): Promise<UserResponseModel> {
-        let nb_of_updated_user: number | null = null
+        let nb_of_updated_user: number = 0
 
         // update admin can update anyone 
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.adminUpdateUser(user_to_update)
-            if (!nb_of_updated_user || nb_of_updated_user == 0) throw new Error("Can't update user");
+            if (nb_of_updated_user == 0) throw new Error("Can't update user");
         } else if (current_user.user_id == user_to_update.user_id) {
             // update classic only on himself 
             nb_of_updated_user = await this.userRepository.standardUpdateUser(user_to_update)
-            if (!nb_of_updated_user || nb_of_updated_user == 0) throw new Error("Can't update user");
-            // TODO RETURN ERROR CODE Forbidden (403), Unauthorized (401)...
+            if (nb_of_updated_user == 0) throw new Error("Can't update user");
         } else {
-            throw new Error("Forbidden");
+            throw new Error("Logged user cannot update this property or user");
         }
 
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })

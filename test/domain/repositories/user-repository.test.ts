@@ -1,12 +1,13 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
-import { AuthUserCredentialsModel } from "../../../src/domain/entities/auth";
-import { UserRequesCreationtModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
+import { AuthUserCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
+import { UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken"
 import 'dotenv/config'
+import { JwtPayload } from "jsonwebtoken";
 
 class MockUserDataSource implements UserDataSource {
     deleteOne(): void {
@@ -38,6 +39,14 @@ class MockBcryptAdapter extends BcryptAdapter {
         throw new Error("Method not implemented.");
     }
 }
+class MockJwtAdapter extends JwtAdapter {
+    sign(): string {
+        throw new Error("Method not implemented.");
+    }
+    verify(): JwtPayload | string {
+        throw new Error("Method not implemented.");
+    }
+}
 
 const TEST_VALIDATION_TOKEN_SECRET = process.env.TEST_VALIDATION_TOKEN_SECRET || ''
 
@@ -51,6 +60,7 @@ describe("User Repository", () => {
         jest.clearAllMocks();
         mockUserDataSource = new MockUserDataSource()
         mockBcryptAdapter = new MockBcryptAdapter()
+        jwtAdapter = new MockJwtAdapter()
         userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET)
     })
 
@@ -161,9 +171,82 @@ describe("User Repository", () => {
             expect(result).toBe(false)
 
         });
+
+        test("should handle crach in sub functions and return false", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "bad_test@email.com",
+                password: "bad_password"
+            }
+
+            jest.spyOn(mockUserDataSource, "getUserLogin").mockImplementation(() => { throw new Error() })
+            jest.spyOn(mockBcryptAdapter, "compare").mockImplementation(() => { throw new Error() })
+
+            const result = await userRepository.verifyUserLogin(InputData);
+            expect(result).toBe(false)
+
+        });
+    });
+
+    describe("verifyValidationToken", () => {
+        test("should decode token and return it", async () => {
+            const InputData: string = "validation_token"
+
+            const OutputData: DecodedToken = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: false,
+                confirmation_code: "123456",
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+
+                iat: 1693237789,
+                exp: 1724795389
+            }
+
+            jest.spyOn(jwtAdapter, "verify").mockImplementation(() => Promise.resolve(OutputData))
+
+            const result = await userRepository.verifyValidationToken(InputData);
+            expect(result).toBe(OutputData)
+
+        });
+        test("should handle error and return null", async () => {
+            const InputData: string = "validation_token"
+
+            jest.spyOn(jwtAdapter, "verify").mockImplementation(() => { throw new Error() })
+
+            const result = await userRepository.verifyValidationToken(InputData);
+            expect(result).toBe(null)
+
+        });
     });
 
     describe("updateUser", () => {
+
+        test("Things to update : any user try to validate his unvalidated account", async () => {
+            const user_to_update: UserUpdateModel = {
+                user_id: 2,
+                confirmation_code: undefined,
+                valid_email: true
+            }
+            const filtred_user: UserUpdateModel = {
+                user_id: 2,
+                confirmation_code: undefined,
+                valid_email: true
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+
+            const result = await userRepository.validUser(user_to_update);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
+            expect(result).toBe(1)
+        });
+
         test("Things to update : admin user try do edit admin property", async () => {
             const user_to_update: UserUpdateModel = {
                 user_id: 2,
@@ -385,4 +468,34 @@ describe("User Repository", () => {
             expect(result).toBe(false)
         });
     });
+
+    describe("generateValidationToken", () => {
+        test("should return true for an admin user", async () => {
+            const User: UserRequestModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: false,
+                confirmation_code: "123456",
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+
+            jest.spyOn(jwtAdapter, "sign").mockImplementation(() => { return "validation_token" })
+
+            const result = await userRepository.generateValidationToken(User);
+
+            expect(jwtAdapter.sign).toHaveBeenCalledWith(
+                { user_id: 1, confirmation_code: "123456" },
+                TEST_VALIDATION_TOKEN_SECRET,
+                { expiresIn: '24h' })
+            expect(result).toBe("validation_token")
+
+        });
+    });
+
 })

@@ -25,45 +25,42 @@ export default function AuthRouter(
     router.post('/login', async (req: Request, res: Response) => {
         try {
             const tokens = await loginUserUseCase.execute(req.body)
-            if (tokens === null) res.status(401).send({ errors: ["Invalid credentials"] })
-            else {
-                res
-                    .cookie("access_token", tokens.jwt, http0nlyCookie)
-                    .cookie("refresh_token", tokens.jwt_refresh, http0nlyCookie)
-                    .status(200)
-                    .json(tokens)
-            }
+            console.log("tokens", tokens)
+            res
+                .cookie("access_token", tokens.jwt, http0nlyCookie)
+                .cookie("refresh_token", tokens.jwt_refresh, http0nlyCookie)
+                .status(200)
+                .send(tokens)
         } catch (err) {
-            // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-            res.status(500).send({ message: err }) // TODO remonter le bon message
+            console.log(err)
+            if (err.message === "Invalid credentials") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User email not verified") res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't login"] })
         }
     })
 
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
+            // TODO check if user valid?
             res.status(200).send((req as CustomRequest).token)
         } catch (err) {
-            res.status(500).send({ message: err })
+            console.log(err.message)
+            res.status(500).send({ errors: ["Can't get user me"] })
         }
     })
 
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
         try {
             const user = (req as CustomRequest).token
-
             const token = await refreshTokenUseCase.execute(user)
-            if (token === null) {
-                res.status(401).send({ errors: ["Invalid credentials"] })
-            }
-            else {
-                res
-                    .status(200)
-                    .cookie("access_token", token.jwt, http0nlyCookie)
-                    .json(token)
-            }
+            res
+                .status(200)
+                .cookie("access_token", token.jwt, http0nlyCookie)
+                .send(token)
         } catch (err) {
-            // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-            res.status(500).send({ message: err }) // TODO remonter le bon message
+            console.log(err)
+            if (err.message === "Can't find user") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't refresh token"] })
         }
     })
 
@@ -76,8 +73,8 @@ export default function AuthRouter(
                 .status(200)
                 .json({ response: "You are Logged Out" });
         } catch (err) {
-            // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-            res.status(500).send({ message: err }) // TODO remonter le bon message
+            console.log(err)
+            res.status(500).send({ errors: ["Can't logout"] })
         }
     })
 

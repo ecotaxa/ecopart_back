@@ -6,10 +6,10 @@ import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users
 describe("Get All Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
-        adminUpdateUser(): Promise<number | null> {
+        adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
-        standardUpdateUser(): Promise<number | null> {
+        standardUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         isAdmin(): Promise<boolean> {
@@ -27,7 +27,7 @@ describe("Get All Users Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
-        validUser(): Promise<number | null> {
+        validUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         generateValidationToken(): string {

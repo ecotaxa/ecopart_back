@@ -16,10 +16,10 @@ import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
 
 describe("Update User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminUpdateUser(): Promise<number | null> {
+        adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
-        standardUpdateUser(): Promise<number | null> {
+        standardUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         isAdmin(): Promise<boolean> {
@@ -37,7 +37,7 @@ describe("Update User Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
-        validUser(): Promise<number | null> {
+        validUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         generateValidationToken(): string {
@@ -80,7 +80,7 @@ describe("Update User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
         const updateUserUseCase = new UpdateUser(mockUserRepository)
@@ -118,7 +118,7 @@ describe("Update User Use Case", () => {
         const OutputError = new Error("Can't update user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
 
@@ -159,10 +159,10 @@ describe("Update User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
-        const OutputError = new Error("Forbidden")
+        const OutputError = new Error("Logged user cannot update this property or user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
 
@@ -203,10 +203,10 @@ describe("Update User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
-        const OutputError = new Error("Forbidden")
+        const OutputError = new Error("Logged user cannot update this property or user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
 
@@ -254,7 +254,7 @@ describe("Update User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
-        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
@@ -290,7 +290,7 @@ describe("Update User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
-        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
@@ -327,7 +327,7 @@ describe("Update User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
-        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
@@ -364,7 +364,7 @@ describe("Update User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
-        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
@@ -391,7 +391,7 @@ describe("Update User Use Case", () => {
         const OutputError = new Error("Can't find updated user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
 
@@ -422,7 +422,7 @@ describe("Update User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(0))
-        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)

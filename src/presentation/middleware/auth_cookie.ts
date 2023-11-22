@@ -38,10 +38,7 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             const token = req.cookies?.access_token;
 
             // If token is missing, send a 401 Unauthorized response
-            if (!token) {
-                res.status(401)
-                return res.send({ errors: ['Token missing. Please authenticate.'] });
-            }
+            if (!token) return res.status(401).send({ errors: ['Token missing. Please authenticate.'] })
 
             // Verify the token using the access secret key
             const decoded = this.jwt.verify(token, this.SECRET_KEY_ACCESS);
@@ -52,8 +49,8 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             next();
         } catch (err) {
             // Send a 401 Unauthorized response for token verification errors
-            res.status(401)
-            return res.send({ errors: ['Token invalid or expired. Please authenticate.'] });
+            return res.status(401).send({ errors: ['Token invalid or expired. Please authenticate.'] })
+
         }
     };
 
@@ -68,10 +65,8 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             // Retrieve the refresh token from the cookie
             const token: string | null = req.cookies?.refresh_token;
             // If token is missing, send a 401 Unauthorized response
-            if (!token) {
-                res.status(401)
-                return res.send({ errors: ['Refresh token missing. Please authenticate.'] });
-            }
+            if (!token) return res.status(401).send({ errors: ['Refresh token missing. Please authenticate.'] })
+
 
             // Verify the token using the refresh secret key
             const decoded = this.jwt.verify(token, this.SECRET_KEY_REFRESH);
@@ -83,8 +78,7 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             next();
         } catch (err) {
             // Send a 401 Unauthorized response for token verification errors
-            res.status(401)
-            return res.send({ errors: ['Refresh token invalid or expired. Please authenticate.'] });
+            return res.status(401).send({ errors: ['Refresh token invalid or expired. Please authenticate.'] });
         }
     };
 }

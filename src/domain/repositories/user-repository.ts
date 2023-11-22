@@ -2,7 +2,7 @@
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, DecodedToken } from "../entities/auth";
-import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, UserStatus } from "../entities/user";
+import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
 
@@ -20,7 +20,7 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     // return number of lines updated
-    private async updateUser(user: UserUpdateModel, params: string[]): Promise<number | null> {
+    private async updateUser(user: UserUpdateModel, params: string[]): Promise<number> {
         const filtred_user: UserUpdateModel = Object.keys(user).reduce((acc: any, key: string) => {
             if (params.includes(key)) {
                 acc[key] = user[key];
@@ -33,27 +33,25 @@ export class UserRepositoryImpl implements UserRepository {
         } else return 0
     }
 
-    async adminUpdateUser(user: UserUpdateModel): Promise<number | null> {
-        const params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage"]
+    async adminUpdateUser(user: UserUpdateModel): Promise<number> {
+        const params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "confirmation_code", "is_admin", "organisation", "country", "user_planned_usage"]
         const updated_user_nb = this.updateUser(user, params_admin)
         return updated_user_nb
     }
 
-    async standardUpdateUser(user: UserUpdateModel): Promise<number | null> {
+    async standardUpdateUser(user: UserUpdateModel): Promise<number> {
         const params_restricted = ["user_id", "first_name", "last_name", "organisation", "country", "user_planned_usage"]
         const updated_user_nb = this.updateUser(user, params_restricted)
         return updated_user_nb
     }
 
-    // TODO TEST
-    async validUser(user: UserResponseModel): Promise<number | null> {
+    async validUser(user: UserResponseModel): Promise<number> {
         const valid_fields = { confirmation_code: undefined, valid_email: true }
         const updated_user_nb = this.updateUser({ ...user, ...valid_fields }, ["user_id", "confirmation_code", "valid_email"])
-
         return updated_user_nb
     }
 
-    async createUser(user: UserRequesCreationtModel): Promise<number | null> {
+    async createUser(user: UserRequesCreationtModel): Promise<number> {
         user.password = await this.userCrypto.hash(user.password)
         user.confirmation_code = await this.userCrypto.generate_uuid()
         const result = await this.userDataSource.create(user)
@@ -92,6 +90,7 @@ export class UserRepositoryImpl implements UserRepository {
             return false;
         }
     }
+    // TODO IMPROVE ERROR HANDLING
     verifyValidationToken(confirmation_token: string): DecodedToken | null {
         try {
             // Verify the token using the refresh secret key
@@ -104,7 +103,7 @@ export class UserRepositoryImpl implements UserRepository {
         } catch (error) {
             // An error occurred while fetching or comparing, log the error and return null
             console.log(error);
-            console.log("Refresh token invalid or expired.");
+            console.log(" Validation token invalid or expired.");
             return null;
         }
     }
@@ -115,12 +114,4 @@ export class UserRepositoryImpl implements UserRepository {
         return user.is_admin
     }
 
-    // TODO TEST
-    async getStatus(user_id: number): Promise<string | null> {
-        const user = await this.userDataSource.getOne({ user_id: user_id })
-        if (!user) return null
-
-        if (user.valid_email) return UserStatus.Active
-        return UserStatus.Pending
-    }
 }

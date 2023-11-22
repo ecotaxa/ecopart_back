@@ -20,33 +20,37 @@ export default function UsersRouter(
     router.get('/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const users = await getAllUsersUseCase.execute()
-            res.send(users)
+            res.status(200).send(users)
         } catch (err) {
-            res.status(500).send({ message: err })
+            console.log(err)
+            res.status(500).send({ errors: ["Can't get users"] })
         }
     })
 
     router.post('/', async (req: Request, res: Response) => {
         try {
             const created_user = await createUserUseCase.execute(req.body)
-            res.statusCode = 201
-            res.json(created_user)
+            res.status(201).send(created_user)
         } catch (err) {
-            //catch validation error or catch user email conflict
-            res.status(500).send({ errors: ["Can't create user"] })
+            console.log(err)
+            if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Can't create user"] })
+            else if (err.message === "Can't update preexistent user") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Can't find updated preexistent user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Can't find created user") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't create user"] })
         }
     })
 
 
-    // 401/500 
     router.patch('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            //const updated_user = await updateUserUseCase.execute({ ...req.body, user_id: req.params.user_id })
             const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
-            res.statusCode = 200
-            res.json(updated_user)
+            res.status(200).send(updated_user)
         } catch (err) {
-            res.status(500).send({ errors: ["Can't update user"] })
+            console.log(err)
+            if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't update user"] })
         }
     })
 
@@ -56,11 +60,16 @@ export default function UsersRouter(
             await validUserUseCase.execute(parseInt(req.params.user_id), req.params.confirmation_token)
 
             // redirect to login page // TODO?
-            res.status(200).send("Account activated, please login")
-
+            res.status(200).send({ message: "Account activated, please login" })
         } catch (err) {
             console.log(err)
-            res.status(500).send({ errors: ["Can't welcome user"] })
+            if (err.message === "Invalid confirmation token") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Invalid confirmation code") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User vallidation forbidden") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Can't update user") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Can't validate user") res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't welcome user"] })
         }
     })
     return router

@@ -6,10 +6,10 @@ import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../../../src/dom
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminUpdateUser(): Promise<number | null> {
+        adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
-        standardUpdateUser(): Promise<number | null> {
+        standardUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         isAdmin(): Promise<boolean> {
@@ -27,7 +27,7 @@ describe("Create User Use Case", () => {
         verifyUserLogin(): Promise<boolean> {
             throw new Error("Method not implemented.");
         }
-        validUser(): Promise<number | null> {
+        validUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
         generateValidationToken(): string {
@@ -57,7 +57,7 @@ describe("Create User Use Case", () => {
 
     test("should return loged user and auth tokens", async () => {
 
-        const InputUserData = {// TODO check types
+        const InputUserData = {
             user_id: 1,
             first_name: 'John',
             last_name: 'Smith',
@@ -116,7 +116,11 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
-        const result = await loginUserUseCase.execute(InputUserData);
-        expect(result).toStrictEqual(null);
+        try {
+            const result = await loginUserUseCase.execute(InputUserData);
+            expect(result).toBe(true);
+        } catch (err) {
+            expect(err.message).toBe("Can't find user");
+        }
     });
 })
