@@ -2,6 +2,7 @@ import express from 'express'
 import { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
+import { IMiddlewareUserValidation } from '../interfaces/middleware/user_validation'
 import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create-user'
 import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-all-users'
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'
@@ -10,6 +11,7 @@ import { CustomRequest } from '../../domain/entities/auth'
 
 export default function UsersRouter(
     middlewareAuth: MiddlewareAuth,
+    middlewareUserValidation: IMiddlewareUserValidation,
     getAllUsersUseCase: GetAllUsersUseCase,
     createUserUseCase: CreateUserUseCase,
     updateUserUseCase: UpdateUserUseCase,
@@ -27,7 +29,7 @@ export default function UsersRouter(
         }
     })
 
-    router.post('/', async (req: Request, res: Response) => {
+    router.post('/', middlewareUserValidation.rulesUserRequesCreationtModel, async (req: Request, res: Response) => {
         try {
             const created_user = await createUserUseCase.execute(req.body)
             res.status(201).send(created_user)

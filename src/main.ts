@@ -1,5 +1,7 @@
 import server from './server'
 import { MiddlewareAuthCookie } from './presentation/middleware/auth_cookie'
+import { MiddlewareAuthValidation } from './presentation/middleware/auth_validation'
+import { MiddlewareUserValidation } from './presentation/middleware/user_validation'
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 
@@ -18,6 +20,7 @@ import sqlite3 from 'sqlite3'
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from './infra/mailer/nodemailer'
+import { CountriesAdapter } from './infra/countries/country'
 
 import 'dotenv/config'
 
@@ -59,6 +62,7 @@ async function getSQLiteDS() {
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
     const mailerAdapter = new NodemailerAdapter((config.BASE_URL + config.PORT), config.MAIL_SENDER)
+    const countriesAdapter = new CountriesAdapter()
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -73,6 +77,7 @@ async function getSQLiteDS() {
 
     const userMiddleWare = UserRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareUserValidation(countriesAdapter),
         new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
         new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), transporter, mailerAdapter),
         new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
@@ -80,6 +85,7 @@ async function getSQLiteDS() {
     )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareAuthValidation(),
         new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
         new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
     )

@@ -1,16 +1,16 @@
-import express from 'express'
-import { Request, Response } from 'express'
+import express, { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
+import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth_validation'
 import { CustomRequest } from '../../domain/entities/auth'
 
 import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'
 import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refreshToken'
 
-
 // TODO password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
     middlewareAuth: MiddlewareAuth,
+    middlewareAuthValidation: IMiddlewareAuthValidation,
     loginUserUseCase: LoginUserUseCase,
     refreshTokenUseCase: RefreshTokenUseCase,
 
@@ -22,7 +22,7 @@ export default function AuthRouter(
         secure: process.env.NODE_ENV === "PROD",
     }
 
-    router.post('/login', async (req: Request, res: Response) => {
+    router.post('/login', middlewareAuthValidation.rulesAuthUserCredentialsModel, async (req: Request, res: Response) => {
         try {
             const tokens = await loginUserUseCase.execute(req.body)
             console.log("tokens", tokens)
