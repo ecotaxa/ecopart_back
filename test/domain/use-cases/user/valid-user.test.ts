@@ -45,7 +45,7 @@ describe("Valid Users Use Case", () => {
         mockUserRepository = new MockUserRepository()
     })
     describe("Nominal case", () => {
-        test("user is validated", async () => {
+        test("User is validated", async () => {
 
             const user_id = 1
             const confirmation_token = "token"

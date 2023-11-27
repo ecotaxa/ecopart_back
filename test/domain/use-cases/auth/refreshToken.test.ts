@@ -55,7 +55,7 @@ describe("Create User Use Case", () => {
         mockAuthRepository = new MockAuthRepository()
     })
 
-    test("should return loged user and auth tokens", async () => {
+    test("Should return loged user and auth tokens", async () => {
 
         const InputUserData = {
             user_id: 1,
@@ -95,7 +95,7 @@ describe("Create User Use Case", () => {
         const result = await loginUserUseCase.execute(InputUserData);
         expect(result).toStrictEqual(OutputAuthData);
     });
-    test("should return loged user and auth tokens", async () => {
+    test("Should return loged user and auth tokens", async () => {
 
         const InputUserData: DecodedToken = {
             user_id: 1,

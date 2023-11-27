@@ -80,7 +80,7 @@ describe("User Router", () => {
 
     describe("Tests for GET /users", () => {
 
-        test("should return 200 with data", async () => {
+        test("Should return 200 with data", async () => {
             const ExpectedData: UserResponseModel[] = [{
                 user_id: 1,
                 last_name: "Smith",
@@ -115,7 +115,7 @@ describe("User Router", () => {
 
         });
 
-        test("get users fail for unexepted reason", async () => {
+        test("Get users fail for unexepted reason", async () => {
             const expectedResponse = { errors: ["Can't get users"] }
             jest.spyOn(mockGetAllUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
             jest.spyOn(mockMiddlewareAuth, "auth")

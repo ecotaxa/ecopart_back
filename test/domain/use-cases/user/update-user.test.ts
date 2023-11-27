@@ -408,7 +408,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.getUser).toBeCalled();
 
     });
-    test("nothing to update on an admin user", async () => {
+    test("Nothing to update on an admin user", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }

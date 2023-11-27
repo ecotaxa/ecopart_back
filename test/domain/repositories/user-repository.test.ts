@@ -64,8 +64,8 @@ describe("User Repository", () => {
         userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET)
     })
 
-    describe("getAllUsers", () => {
-        test("should return data", async () => {
+    describe("GetAllUsers", () => {
+        test("Should return data", async () => {
             const expectedData: UserResponseModel[] = [{
                 user_id: 1,
                 last_name: "Smith",
@@ -85,8 +85,8 @@ describe("User Repository", () => {
         });
     })
 
-    describe("createUser", () => {
-        test("should return created user user_id", async () => {
+    describe("CreateUser", () => {
+        test("Should return created user user_id", async () => {
             const inputData: UserRequesCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
@@ -104,8 +104,8 @@ describe("User Repository", () => {
         });
     })
 
-    describe("getUser", () => {
-        test("should return one user", async () => {
+    describe("GetUser", () => {
+        test("Should return one user", async () => {
             const inputData = { user_id: 1 }
             const expectedData: UserResponseModel = {
                 user_id: 1,
@@ -125,8 +125,8 @@ describe("User Repository", () => {
         });
     })
 
-    describe("verifyUserLogin", () => {
-        test("should return true", async () => {
+    describe("VerifyUserLogin", () => {
+        test("Should return true", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "test@email.com",
                 password: "good_password"
@@ -142,7 +142,7 @@ describe("User Repository", () => {
             expect(result).toBe(true)
 
         });
-        test("should handle bas password and return false", async () => {
+        test("Should handle bas password and return false", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "test@email.com",
                 password: "bad_password"
@@ -158,7 +158,7 @@ describe("User Repository", () => {
             expect(result).toBe(false)
 
         });
-        test("should handle bad email and  return false", async () => {
+        test("Should handle bad email and  return false", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "bad_test@email.com",
                 password: "bad_password"
@@ -172,7 +172,7 @@ describe("User Repository", () => {
 
         });
 
-        test("should handle crach in sub functions and return false", async () => {
+        test("Should handle crach in sub functions and return false", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "bad_test@email.com",
                 password: "bad_password"
@@ -187,8 +187,8 @@ describe("User Repository", () => {
         });
     });
 
-    describe("verifyValidationToken", () => {
-        test("should decode token and return it", async () => {
+    describe("VerifyValidationToken", () => {
+        test("Should decode token and return it", async () => {
             const InputData: string = "validation_token"
 
             const OutputData: DecodedToken = {
@@ -225,7 +225,7 @@ describe("User Repository", () => {
         });
     });
 
-    describe("updateUser", () => {
+    describe("UpdateUser", () => {
 
         test("Things to update : any user try to validate his unvalidated account", async () => {
             const user_to_update: UserUpdateModel = {
@@ -425,8 +425,8 @@ describe("User Repository", () => {
 
     });
 
-    describe("isAdmin", () => {
-        test("should return true for an admin user", async () => {
+    describe("IsAdmin", () => {
+        test("Should return true for an admin user", async () => {
             const adminUser: UserResponseModel = {
                 user_id: 1,
                 last_name: "Smith",
@@ -444,7 +444,7 @@ describe("User Repository", () => {
             const result = await userRepository.isAdmin(1);
             expect(result).toBe(true)
         });
-        test("should return false for a non admin user", async () => {
+        test("Should return false for a non admin user", async () => {
             const nonAdminUser: UserResponseModel = {
                 user_id: 1,
                 last_name: "Smith",
@@ -462,15 +462,15 @@ describe("User Repository", () => {
             const result = await userRepository.isAdmin(1);
             expect(result).toBe(false)
         });
-        test("should return false for a non existing user", async () => {
+        test("Should return false for a non existing user", async () => {
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(null))
             const result = await userRepository.isAdmin(1);
             expect(result).toBe(false)
         });
     });
 
-    describe("generateValidationToken", () => {
-        test("should return true for an admin user", async () => {
+    describe("GenerateValidationToken", () => {
+        test("Should return true for an admin user", async () => {
             const User: UserRequestModel = {
                 user_id: 1,
                 last_name: "Smith",

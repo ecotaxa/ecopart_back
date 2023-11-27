@@ -45,7 +45,7 @@ describe("Get All Users Use Case", () => {
         mockUserRepository = new MockUserRepository()
     })
     // TODO TEST when non user
-    test("should return data", async () => {
+    test("Should return data", async () => {
         const ExpectedResult: UserResponseModel[] = [{
             user_id: 1,
             last_name: "Smith",

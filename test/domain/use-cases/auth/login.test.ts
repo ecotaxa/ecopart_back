@@ -55,7 +55,7 @@ describe("Create User Use Case", () => {
         mockAuthRepository = new MockAuthRepository()
     })
 
-    test("should return loged user and auth tokens", async () => {
+    test("Should return loged user and auth tokens", async () => {
         const InputData: AuthUserCredentialsModel = {
             email: "test@email.com",
             password: "good_password"
@@ -86,7 +86,7 @@ describe("Create User Use Case", () => {
         expect(result).toStrictEqual({ ...OutputUserData, ...OutputAuthData });
     });
 
-    test("should handle bad credentials and throw error", async () => {
+    test("Should handle bad credentials and throw error", async () => {
         const InputData: AuthUserCredentialsModel = {
             email: "test@email.com",
             password: "bad_password"
@@ -118,7 +118,7 @@ describe("Create User Use Case", () => {
         }
     });
 
-    test("should handle user with unverified email and throw error", async () => {
+    test("Should handle user with unverified email and throw error", async () => {
         const InputData: AuthUserCredentialsModel = {
             email: "test@email.com",
             password: "bad_password"
@@ -150,7 +150,7 @@ describe("Create User Use Case", () => {
         }
     });
 
-    test("should handle error during fetching user and and throw error", async () => {
+    test("Should handle error during fetching user and and throw error", async () => {
         const InputData: AuthUserCredentialsModel = {
             email: "test@email.com",
             password: "good_password"

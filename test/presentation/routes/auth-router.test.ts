@@ -15,16 +15,6 @@ import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth_validation";
 
-
-// class MockMiddlewareAuth implements MiddlewareAuth {
-//     auth(_: Request, __: Response, next: NextFunction): void {
-//         next()
-//     }
-//     auth_refresh(_: Request, __: Response, next: NextFunction): void {
-//         next()
-//     }
-// }
-
 class MockLoginUserUseCase implements LoginUserUseCase {
     execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {
         throw new Error("Method not implemented.")
@@ -93,7 +83,7 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeDefined(); // Check if cookies are set
         });
 
-        test("login with invalid credentials ", async () => {
+        test("Login with invalid credentials ", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "john@gmail.com",
                 password: "test123"
@@ -108,7 +98,7 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
         });
 
-        test("login with unvalidated account ", async () => {
+        test("Login with unvalidated account ", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "john@gmail.com",
                 password: "test123"
@@ -123,7 +113,7 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
         });
 
-        test("login fail for unexepted reason", async () => {
+        test("Login fail for unexepted reason", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "john@gmail.com",
                 password: "test123"
@@ -141,7 +131,7 @@ describe("User Router", () => {
 
     // /users/me
     describe("Test /users/me endpoint", () => {
-        test("get user information with valid token", async () => {
+        test("Get user information with valid token", async () => {
             const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
             const expectedDecodedAccessToken = {
                 "id": 1,
@@ -179,7 +169,7 @@ describe("User Router", () => {
 
     //refreshToken
     describe("Test /auth/refreshToken endpoint", () => {
-        test("should refresh token and return a new token", async () => {
+        test("Should refresh token and return a new token", async () => {
             const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
             const OutputData = {
                 jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7fSwiaWF0IjoxNjkzMjE1Njk2LCJleHAiOjE2OTMyMTc0OTZ9.aofgJ6Mu1hWbUDM1dBm2oVj1R9JV8NU0FFFyslbMV_o"
@@ -196,7 +186,7 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeDefined();
         });
 
-        test("should handle error during refresh token use case and return a 404 response", async () => {
+        test("Should handle error during refresh token use case and return a 404 response", async () => {
             // Can't refresh token
             const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
             const expectedResponse = { errors: ["Can't find user"] }
@@ -212,7 +202,7 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeUndefined();
         });
 
-        test("should handle error during refresh token use case and return a 404 response", async () => {
+        test("Should handle error during refresh token use case and return a 404 response", async () => {
             // Can't refresh token
             const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
             const expectedResponse = { errors: ["Can't refresh token"] }
@@ -230,7 +220,7 @@ describe("User Router", () => {
     })
     // logout
     describe("Test /auth/logout endpoint", () => {
-        test("testing logout endpoint", async () => {
+        test("Testing logout endpoint", async () => {
 
             const response = await request(server).post("/auth/logout").send();
 

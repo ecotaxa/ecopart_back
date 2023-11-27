@@ -27,8 +27,8 @@ describe("Auth Repository", () => {
         authRepository = new AuthRepositoryImpl(jwt, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET)
     })
 
-    describe("test generateAccessToken", () => {
-        test("should return valid access token", async () => {
+    describe("Test generateAccessToken", () => {
+        test("Should return valid access token", async () => {
             const InputData = {
                 user_id: 1,
                 last_name: "Smith",
@@ -48,8 +48,8 @@ describe("Auth Repository", () => {
         });
     })
 
-    describe("test generateRefreshToken", () => {
-        test("should return valid Refresh", async () => {
+    describe("Test generateRefreshToken", () => {
+        test("Should return valid Refresh", async () => {
             const InputData = {
                 user_id: 1,
                 last_name: "Smith",
