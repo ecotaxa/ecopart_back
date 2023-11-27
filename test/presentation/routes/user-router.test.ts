@@ -11,6 +11,8 @@ import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user
 import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
+import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user_validation";
+
 import { Request, Response, NextFunction } from "express";
 
 class MockGetAllUsersUseCase implements GetAllUsersUseCase {
@@ -44,9 +46,17 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         throw new Error("Method not implemented.")
     }
 }
+class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
+    rulesUserRequesCreationtModel = []
+    rulesUserRequestModel = []
+    rulesUserUpdateModel = []
+    rulesUserResponseModel = []
+    constructor() { }
+}
 
 describe("User Router", () => {
     let mockMiddlewareAuth: MockMiddlewareAuth;
+    let mockMiddlewareUserValidation: MockMiddlewareUserValidation;
     let mockCreateUserUseCase: CreateUserUseCase;
     let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
@@ -58,7 +68,10 @@ describe("User Router", () => {
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase))
+        mockMiddlewareUserValidation = new MockMiddlewareUserValidation()
+
+
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase))
     })
 
     beforeEach(() => {

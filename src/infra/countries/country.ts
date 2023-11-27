@@ -7,6 +7,4 @@ export class CountriesAdapter implements CountriesWrapper {
     listCountries(): any {
         return this.countries;
     }
-
-
 }

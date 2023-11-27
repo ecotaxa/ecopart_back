@@ -13,6 +13,8 @@ import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/au
 
 import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
+import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth_validation";
+
 
 // class MockMiddlewareAuth implements MiddlewareAuth {
 //     auth(_: Request, __: Response, next: NextFunction): void {
@@ -33,6 +35,9 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
         throw new Error("Method not implemented.")
     }
 }
+class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
+    rulesAuthUserCredentialsModel = [];
+}
 
 describe("User Router", () => {
     // let mockMiddlewareAuth: MockMiddlewareAuth;
@@ -40,6 +45,7 @@ describe("User Router", () => {
     let mockLoginUserUseCase: LoginUserUseCase;
     let mockRefreshTokenUseCase: MockRefreshTokenUseCase;
     let mockJwtAdapter: JwtAdapter;
+    let mockMiddlewareAuthValidation: MockMiddlewareAuthValidation;
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
     const TEST_REFRESH_TOKEN_SECRET = process.env.TEST_REFRESH_TOKEN_SECRET || ''
@@ -48,9 +54,10 @@ describe("User Router", () => {
         //mockMiddlewareAuth = new MockMiddlewareAuth()
         mockJwtAdapter = new JwtAdapter()
         mockMiddlewareAuth = new MiddlewareAuthCookie(mockJwtAdapter, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET);
+        mockMiddlewareAuthValidation = new MockMiddlewareAuthValidation()
         mockLoginUserUseCase = new MockLoginUserUseCase()
         mockRefreshTokenUseCase = new MockRefreshTokenUseCase
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockLoginUserUseCase, mockRefreshTokenUseCase))
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase))
     })
 
     beforeEach(() => {
