@@ -43,8 +43,7 @@ export default function UsersRouter(
         }
     })
 
-
-    router.patch('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.patch('/:user_id/', middlewareUserValidation.rulesUserUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
             res.status(200).send(updated_user)

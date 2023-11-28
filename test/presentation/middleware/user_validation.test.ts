@@ -227,4 +227,82 @@ describe("User Router", () => {
         });
 
     })
+
+    describe("Test user router update user validation", () => {
+        test("update user all params are valid", async () => {
+            const user_to_update = {
+                last_name: "Smith",
+                first_name: "John"
+            }
+            const OutputData: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                valid_email: true,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).patch("/users/1").send(user_to_update)
+
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.status).toBe(200)
+        });
+
+        test("Sanitize last_name and first_name", async () => {
+            const user_to_update = {
+                last_name: " Smith",
+                first_name: " John "
+            }
+            const sanitizedInputData = {
+                first_name: "John",
+                last_name: "Smith",
+                user_id: "1"
+            }
+            const OutputData: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                valid_email: true,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).patch("/users/1").send(user_to_update)
+            expect(response.status).toBe(200)
+            expect(mockUpdateUserUseCase.execute).toBeCalledWith(undefined, sanitizedInputData)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("update user all params are valid", async () => {
+            const user_to_update = {
+                country: "FR56GG",
+            }
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "body",
+                        "msg": "Invalid country. Please select from the list.",
+                        "path": "country",
+                        "type": "field",
+                        "value": "FR56GG",
+                    },
+                ]
+            }
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).patch("/users/1").send(user_to_update)
+
+            expect(response.status).toBe(422)
+            expect(mockCreateUserUseCase.execute).not.toBeCalled()
+            expect(response.body).toStrictEqual(OutputData)
+        });
+    })
 })
