@@ -28,6 +28,6 @@ export class ValidUser implements ValidUserUseCase {
         // Get updated user 
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
         if (!updated_user) throw new Error("Can't find updated user");
-        if (!updated_user.valid_email || updated_user.confirmation_code !== undefined) throw new Error("Can't validate user");
+        if (!updated_user.valid_email || updated_user.confirmation_code !== null) throw new Error("Can't validate user");
     }
 }
