@@ -36,6 +36,7 @@ export interface UserUpdateModel {
     email?: string;
     valid_email?: boolean;
     confirmation_code?: string;
+    password_hash?: string;
     is_admin?: boolean;
     organisation?: string;
     country?: string;

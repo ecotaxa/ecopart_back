@@ -5,14 +5,19 @@ import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth_validat
 import { CustomRequest } from '../../domain/entities/auth'
 
 import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'
-import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refreshToken'
+import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refresh-token'
+import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/change-password'
+//import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
 
-// TODO password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
+// password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareAuthValidation: IMiddlewareAuthValidation,
     loginUserUseCase: LoginUserUseCase,
     refreshTokenUseCase: RefreshTokenUseCase,
+    changePasswordUseCase: ChangePasswordUseCase,
+    //resetPasswordUseCase: ResetPasswordUseCase,
+
 
 ) {
     const router = express.Router()
@@ -22,10 +27,10 @@ export default function AuthRouter(
         secure: process.env.NODE_ENV === "PROD",
     }
 
+    /* LOGIN MANAGEMENT */
     router.post('/login', middlewareAuthValidation.rulesAuthUserCredentialsModel, async (req: Request, res: Response) => {
         try {
             const tokens = await loginUserUseCase.execute(req.body)
-            console.log("tokens", tokens)
             res
                 .cookie("access_token", tokens.jwt, http0nlyCookie)
                 .cookie("refresh_token", tokens.jwt_refresh, http0nlyCookie)
@@ -78,45 +83,49 @@ export default function AuthRouter(
         }
     })
 
-    // /* TODO PASSWORD MANAGEMENT */
-    // //change password TODO
-    // router.post('/password/change', async (req: Request, res: Response) => {
-    //     try {
+    /* PASSWORD MANAGEMENT */
+    //change password
+    router.post('/password/change', middlewareAuthValidation.rulesPassword, middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
 
-    //         const token = await loginUserUseCase.execute(req.body)
+            await changePasswordUseCase.execute((req as CustomRequest).token, req.body)
+            //TODO Unvalidate EXISTING TOKENS for the user?
+            //TODO logout user?
+            res
+                .status(200)
+                .json({ response: "Password sucessfully changed" });
+        } catch (err) {
+            console.log(err)
+            if (err.message === "New password must be different from old password") res.status(500).send({ errors: ["New password must be different from old password"] })
+            else res.status(500).send({ errors: ["Can't change password"] })
+        }
+    })
+
+    // // reset password request
+    // router.post('/password/reset', async (req: Request, res: Response) => {
+    //     try {
+    //         const token = await resetPasswordUseCase.execute(req.body)
     //         res.statusCode = 200// to check
     //         res.json(token)
     //     } catch (err) {
-    //         // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-    //         res.status(500).send({ message: err }) // TODO remonter le bon message
+    //         console.log(err)
+    //         if (err.message === "") res.status(500).send({ errors: [""] })
+    //         else res.status(500).send({ errors: ["Can't reset password"] })
     //     }
     // })
 
-    // // reset password request TODO
-    // router.post('/password/reset', middlewareAuth.auth, async (req: Request, res: Response) => {
+    // // reset password confirm
+    // router.put('/password/reset', async (req: Request, res: Response) => {
     //     try {
-
-    //         const token = await loginUserUseCase.execute(req.body)
+    //         const token = await resetPasswordUseCase.execute(req.body)
     //         res.statusCode = 200// to check
     //         res.json(token)
     //     } catch (err) {
-    //         // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-    //         res.status(500).send({ message: err }) // TODO remonter le bon message
+    //         console.log(err)
+    //         if (err.message === "") res.status(500).send({ errors: [""] })
+    //         else res.status(500).send({ errors: ["Can't reset password"] })
     //     }
-    // })
-
-    // // reset password confirm TODO
-    // router.put('/password/reset', middlewareAuth.auth, async (req: Request, res: Response) => {
-    //     try {
-
-    //         const token = await loginUserUseCase.execute(req.body)
-    //         res.statusCode = 200// to check
-    //         res.json(token)
-    //     } catch (err) {
-    //         // res.status(500).send({ message: "Error saving data" }) // TODO remonter le bon message
-    //         res.status(500).send({ message: err }) // TODO remonter le bon message
-    //     }
-    // })
+    //})
 
 
     return router

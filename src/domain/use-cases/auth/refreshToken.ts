@@ -2,7 +2,7 @@
 import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../entities/auth";
 import { AuthRepository } from "../../interfaces/repositories/auth-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { RefreshTokenUseCase } from "../../interfaces/use-cases/auth/refreshToken";
+import { RefreshTokenUseCase } from "../../interfaces/use-cases/auth/refresh-token";
 
 export class RefreshToken implements RefreshTokenUseCase {
     userRepository: UserRepository

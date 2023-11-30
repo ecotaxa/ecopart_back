@@ -20,3 +20,9 @@ export interface DecodedToken extends UserResponseModel, JwtPayload { }
 export interface CustomRequest extends Request {
     token: DecodedToken;
 }
+export interface ChangeCredentialsModel {
+    user_id: number;
+    password: string;
+    new_password: string;
+    password_hash?: string;
+}

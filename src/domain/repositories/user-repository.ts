@@ -1,7 +1,7 @@
 
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
-import { AuthUserCredentialsModel, DecodedToken } from "../entities/auth";
+import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../entities/auth";
 import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
@@ -31,6 +31,13 @@ export class UserRepositoryImpl implements UserRepository {
             const updated_user_nb = await this.userDataSource.updateOne(filtred_user);
             return updated_user_nb;
         } else return 0
+    }
+
+    async changePassword(credentials: ChangeCredentialsModel): Promise<number> {
+        const params_password = ["user_id", "password_hash"]
+        credentials.password_hash = await this.userCrypto.hash(credentials.new_password)
+        const nb_of_updated_user = this.updateUser(credentials, params_password)
+        return nb_of_updated_user
     }
 
     async adminUpdateUser(user: UserUpdateModel): Promise<number> {

@@ -20,7 +20,7 @@ export class SQLiteUserDataSource implements UserDataSource {
     async create(user: UserRequesCreationtModel): Promise<number> {
         const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `)`;
+        const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -85,8 +85,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         placeholders = placeholders.slice(0, -1);
         params.push(user_id)
 
-        const sql = `UPDATE user SET ` + placeholders + ` WHERE user_id=(?) RETURNING *;`;
-
+        const sql = `UPDATE user SET ` + placeholders + ` WHERE user_id=(?);`;
         return new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
                 if (err) {
@@ -111,7 +110,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         // remove last AND
         placeholders = placeholders.slice(0, -4);
         // form final sql
-        const sql = `SELECT * FROM user WHERE ` + placeholders + `LIMIT 1`;
+        const sql = `SELECT * FROM user WHERE ` + placeholders + `LIMIT 1;`;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -140,7 +139,7 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     async getUserLogin(email: string): Promise<AuthUserCredentialsModel | null> {
-        const sql = "SELECT * FROM user WHERE email = (?) LIMIT 1"
+        const sql = "SELECT * FROM user WHERE email = (?) LIMIT 1;"
         const param = [email]
         return await new Promise((resolve, reject) => {
             this.db.get(sql, param, (err, row) => {

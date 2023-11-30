@@ -10,6 +10,7 @@ import { CreateUser } from './domain/use-cases/user/create-user'
 import { UpdateUser } from './domain/use-cases/user/update-user'
 import { LoginUser } from './domain/use-cases/auth/login'
 import { RefreshToken } from './domain/use-cases/auth/refreshToken'
+import { ChangePassword } from './domain/use-cases/auth/changePassword'
 import { ValidUser } from './domain/use-cases/user/valid-user'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
@@ -88,6 +89,8 @@ async function getSQLiteDS() {
         new MiddlewareAuthValidation(),
         new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
         new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
+        new ChangePassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
+        // new ResetPassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), transporter, mailerAdapter),
     )
 
     server.use("/users", userMiddleWare)
