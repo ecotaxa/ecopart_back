@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
-import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth_validation';
+import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth-validation';
 
 export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
     rulesPassword = [

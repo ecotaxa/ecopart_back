@@ -2,7 +2,7 @@ import express from 'express'
 import { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
-import { IMiddlewareUserValidation } from '../interfaces/middleware/user_validation'
+import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation'
 import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create-user'
 import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-all-users'
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'

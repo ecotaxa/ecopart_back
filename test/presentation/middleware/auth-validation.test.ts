@@ -12,10 +12,10 @@ import { LoginUserUseCase } from "../../../src/domain/interfaces/use-cases/auth/
 import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refresh-token';
 import { ChangePasswordUseCase } from "../../../src/domain/interfaces/use-cases/auth/change-password";
 
-import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_cookie";
+import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth-cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
-import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth_validation";
-import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth_validation";
+import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth-validation";
+import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 
 class MockLoginUserUseCase implements LoginUserUseCase {
     execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {

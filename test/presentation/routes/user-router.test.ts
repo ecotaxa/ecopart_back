@@ -11,7 +11,7 @@ import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user
 import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
-import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user_validation";
+import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
 

@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_cookie";
+import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth-cookie";
 import 'dotenv/config'
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 import { JwtPayload } from "jsonwebtoken";

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
-import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth_validation'
+import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth-validation'
 import { CustomRequest } from '../../domain/entities/auth'
 
 import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'

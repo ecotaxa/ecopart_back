@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
 import { CountriesAdapter } from '../../infra/countries/country';
-import { IMiddlewareUserValidation } from '../interfaces/middleware/user_validation';
+import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation';
 
 
 export class MiddlewareUserValidation implements IMiddlewareUserValidation {
