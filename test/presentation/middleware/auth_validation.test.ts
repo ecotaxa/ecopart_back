@@ -9,7 +9,8 @@ import { UserResponseModel } from "../../../src/domain/entities/user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { LoginUserUseCase } from "../../../src/domain/interfaces/use-cases/auth/login";
-import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refreshToken'
+import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refresh-token';
+import { ChangePasswordUseCase } from "../../../src/domain/interfaces/use-cases/auth/change-password";
 
 import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
@@ -27,6 +28,12 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     }
 }
 
+class MockChangePasswordUseCase implements ChangePasswordUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
+
 describe("User Router", () => {
     // let mockMiddlewareAuth: MockMiddlewareAuth;
     let mockMiddlewareAuth: MiddlewareAuth;
@@ -34,18 +41,20 @@ describe("User Router", () => {
     let mockRefreshTokenUseCase: MockRefreshTokenUseCase;
     let mockJwtAdapter: JwtAdapter;
     let middlewareAuthValidation: IMiddlewareAuthValidation;
+    let mockChangePasswordUseCase: ChangePasswordUseCase;
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
     const TEST_REFRESH_TOKEN_SECRET = process.env.TEST_REFRESH_TOKEN_SECRET || ''
 
     beforeAll(() => {
-        //mockMiddlewareAuth = new MockMiddlewareAuth()
         mockJwtAdapter = new JwtAdapter()
         mockMiddlewareAuth = new MiddlewareAuthCookie(mockJwtAdapter, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET);
         middlewareAuthValidation = new MiddlewareAuthValidation()
         mockLoginUserUseCase = new MockLoginUserUseCase()
-        mockRefreshTokenUseCase = new MockRefreshTokenUseCase
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, middlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase))
+        mockRefreshTokenUseCase = new MockRefreshTokenUseCase()
+        mockChangePasswordUseCase = new MockChangePasswordUseCase()
+
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, middlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase))
     })
 
     beforeEach(() => {

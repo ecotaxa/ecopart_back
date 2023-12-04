@@ -6,6 +6,9 @@ import { ValidUser } from '../../../../src/domain/use-cases/user/valid-user'
 describe("Valid Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
+        changePassword(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
         adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
@@ -51,7 +54,7 @@ describe("Valid Users Use Case", () => {
             const confirmation_token = "token"
 
             const decoded_token: DecodedToken = {
-                user_id: user_id,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -67,7 +70,7 @@ describe("Valid Users Use Case", () => {
                 exp: 1724795389
             }
             const user_to_update: UserResponseModel = {
-                user_id: user_id,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -80,13 +83,13 @@ describe("Valid Users Use Case", () => {
                 user_creation_date: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
-                user_id: user_id,
+                user_id: 1,
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: true,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -106,8 +109,9 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: user_to_update.user_id });
                 expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
+
             } catch (e) {
-                console.log(e)
+                console.log(e.message)
                 expect(true).toBe(false)
             }
         });
@@ -140,7 +144,7 @@ describe("Valid Users Use Case", () => {
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: true,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -206,7 +210,7 @@ describe("Valid Users Use Case", () => {
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: true,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -260,7 +264,7 @@ describe("Valid Users Use Case", () => {
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: true,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -327,7 +331,7 @@ describe("Valid Users Use Case", () => {
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: true,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -449,7 +453,7 @@ describe("Valid Users Use Case", () => {
                 email: "john@gmail.com",
                 is_admin: false,
                 valid_email: false,
-                confirmation_code: undefined,
+                confirmation_code: null,
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",

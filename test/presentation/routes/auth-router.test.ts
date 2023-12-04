@@ -9,11 +9,13 @@ import { UserResponseModel } from "../../../src/domain/entities/user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { LoginUserUseCase } from "../../../src/domain/interfaces/use-cases/auth/login";
-import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refreshToken'
+import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refresh-token'
+import { ChangePasswordUseCase } from "../../../src/domain/interfaces/use-cases/auth/change-password";
 
 import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth_cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth_validation";
+
 
 class MockLoginUserUseCase implements LoginUserUseCase {
     execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {
@@ -26,7 +28,13 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     }
 }
 class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
+    rulesPassword = []
     rulesAuthUserCredentialsModel = [];
+}
+class MockChangePasswordUseCase implements ChangePasswordUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
 }
 
 describe("User Router", () => {
@@ -34,8 +42,10 @@ describe("User Router", () => {
     let mockMiddlewareAuth: MiddlewareAuth;
     let mockLoginUserUseCase: LoginUserUseCase;
     let mockRefreshTokenUseCase: MockRefreshTokenUseCase;
+    let mockChangePasswordUseCase: MockChangePasswordUseCase;
     let mockJwtAdapter: JwtAdapter;
     let mockMiddlewareAuthValidation: MockMiddlewareAuthValidation;
+
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
     const TEST_REFRESH_TOKEN_SECRET = process.env.TEST_REFRESH_TOKEN_SECRET || ''
@@ -46,8 +56,10 @@ describe("User Router", () => {
         mockMiddlewareAuth = new MiddlewareAuthCookie(mockJwtAdapter, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET);
         mockMiddlewareAuthValidation = new MockMiddlewareAuthValidation()
         mockLoginUserUseCase = new MockLoginUserUseCase()
-        mockRefreshTokenUseCase = new MockRefreshTokenUseCase
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase))
+        mockRefreshTokenUseCase = new MockRefreshTokenUseCase()
+        mockChangePasswordUseCase = new MockChangePasswordUseCase()
+
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase))
     })
 
     beforeEach(() => {

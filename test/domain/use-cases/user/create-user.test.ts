@@ -8,6 +8,9 @@ import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        changePassword(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
         adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

@@ -6,6 +6,9 @@ import { AuthJwtResponseModel, AuthUserCredentialsModel, DecodedToken } from "..
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        changePassword(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
         adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

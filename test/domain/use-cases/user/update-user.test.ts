@@ -16,6 +16,9 @@ import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
 
 describe("Update User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        changePassword(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
         adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

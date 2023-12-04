@@ -10,7 +10,7 @@ export interface UserRequesCreationtModel {
     first_name: string;
     last_name: string;
     email: string;
-    confirmation_code?: string;
+    confirmation_code?: string | null;
     organisation: string;
     country: string;
     user_planned_usage: string;
@@ -21,7 +21,7 @@ export interface UserRequestModel {
     last_name?: string;
     email?: string;
     valid_email?: boolean;
-    confirmation_code?: string;
+    confirmation_code?: string | null;
     is_admin?: boolean;
     organisation?: string;
     country?: string;
@@ -35,7 +35,7 @@ export interface UserUpdateModel {
     last_name?: string;
     email?: string;
     valid_email?: boolean;
-    confirmation_code?: string;
+    confirmation_code?: string | null;
     password_hash?: string;
     is_admin?: boolean;
     organisation?: string;
@@ -51,7 +51,7 @@ export interface UserResponseModel {
     last_name: string;
     email: string;
     valid_email: boolean;
-    confirmation_code?: string;
+    confirmation_code?: string | null;
     is_admin: boolean;
     organisation: string;
     country: string;

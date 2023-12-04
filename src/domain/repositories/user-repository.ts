@@ -36,25 +36,25 @@ export class UserRepositoryImpl implements UserRepository {
     async changePassword(credentials: ChangeCredentialsModel): Promise<number> {
         const params_password = ["user_id", "password_hash"]
         credentials.password_hash = await this.userCrypto.hash(credentials.new_password)
-        const nb_of_updated_user = this.updateUser(credentials, params_password)
+        const nb_of_updated_user = await this.updateUser(credentials, params_password)
         return nb_of_updated_user
     }
 
     async adminUpdateUser(user: UserUpdateModel): Promise<number> {
         const params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "confirmation_code", "is_admin", "organisation", "country", "user_planned_usage"]
-        const updated_user_nb = this.updateUser(user, params_admin)
+        const updated_user_nb = await this.updateUser(user, params_admin)
         return updated_user_nb
     }
 
     async standardUpdateUser(user: UserUpdateModel): Promise<number> {
         const params_restricted = ["user_id", "first_name", "last_name", "organisation", "country", "user_planned_usage"]
-        const updated_user_nb = this.updateUser(user, params_restricted)
+        const updated_user_nb = await this.updateUser(user, params_restricted)
         return updated_user_nb
     }
 
     async validUser(user: UserResponseModel): Promise<number> {
         const valid_fields = { confirmation_code: undefined, valid_email: true }
-        const updated_user_nb = this.updateUser({ ...user, ...valid_fields }, ["user_id", "confirmation_code", "valid_email"])
+        const updated_user_nb = await this.updateUser({ ...user, ...valid_fields }, ["user_id", "confirmation_code", "valid_email"])
         return updated_user_nb
     }
 

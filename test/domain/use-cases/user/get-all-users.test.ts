@@ -6,6 +6,9 @@ import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users
 describe("Get All Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
+        changePassword(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
         adminUpdateUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
