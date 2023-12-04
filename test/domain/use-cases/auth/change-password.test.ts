@@ -1,7 +1,7 @@
 import { DecodedToken, ChangeCredentialsModel } from "../../../../src/domain/entities/auth";
 import { UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
-import { ChangePassword } from '../../../../src/domain/use-cases/auth/changePassword';
+import { ChangePassword } from '../../../../src/domain/use-cases/auth/change-password';
 
 /* TESTED HERE */
 // User is not admin : edit password on himself : ok

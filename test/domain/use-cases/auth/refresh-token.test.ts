@@ -1,7 +1,7 @@
 import { UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { AuthRepository } from "../../../../src/domain/interfaces/repositories/auth-repository";
-import { RefreshToken } from '../../../../src/domain/use-cases/auth/refreshToken'
+import { RefreshToken } from '../../../../src/domain/use-cases/auth/refresh-token'
 import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../../../src/domain/entities/auth";
 
 describe("Create User Use Case", () => {
