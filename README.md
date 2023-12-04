@@ -1,6 +1,7 @@
 # ecopart_back
 
 [![Tests CI](https://github.com/ecotaxa/ecopart_back/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/ecotaxa/ecopart_back/actions/workflows/main.yml)
+[![codecov](https://codecov.io/github/ecotaxa/ecopart_back/graph/badge.svg?token=C0I2UCLP07)](https://codecov.io/github/ecotaxa/ecopart_back)
 
 **Backend of the EcoPart application**
 
