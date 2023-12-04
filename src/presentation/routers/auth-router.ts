@@ -96,7 +96,7 @@ export default function AuthRouter(
                 .json({ response: "Password sucessfully changed" });
         } catch (err) {
             console.log(err)
-            if (err.message === "New password must be different from old password") res.status(500).send({ errors: ["New password must be different from old password"] })
+            if (err.message === "New password must be different from old password") res.status(401).send({ errors: ["New password must be different from old password"] })
             else res.status(500).send({ errors: ["Can't change password"] })
         }
     })

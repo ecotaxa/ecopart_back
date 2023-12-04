@@ -1,6 +1,6 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
-import { AuthUserCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
+import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
 import { UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
@@ -494,6 +494,43 @@ describe("User Repository", () => {
                 TEST_VALIDATION_TOKEN_SECRET,
                 { expiresIn: '24h' })
             expect(result).toBe("validation_token")
+
+        });
+    });
+
+    describe("changePassword", () => {
+        test("Should return 1 in nominal case", async () => {
+
+            const credentials: ChangeCredentialsModel = {
+                user_id: 1,
+                password: "current_password",
+                new_password: "new_password"
+            }
+
+            jest.spyOn(mockBcryptAdapter, "hash").mockImplementation(() => Promise.resolve("$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW"))
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+            const result = await userRepository.changePassword(credentials);
+
+            expect(mockBcryptAdapter.hash).toHaveBeenCalledWith("new_password")
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW" })
+            expect(result).toBe(1)
+
+        });
+
+        test("Should return 0 if no user updated", async () => {
+            const credentials: ChangeCredentialsModel = {
+                user_id: 1,
+                password: "current_password",
+                new_password: "new_password"
+            }
+
+            jest.spyOn(mockBcryptAdapter, "hash").mockImplementation(() => Promise.resolve("$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW"))
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+            const result = await userRepository.changePassword(credentials);
+
+            expect(mockBcryptAdapter.hash).toHaveBeenCalledWith("new_password")
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW" })
+            expect(result).toBe(0)
 
         });
     });

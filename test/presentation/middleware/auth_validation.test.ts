@@ -4,7 +4,7 @@ import 'dotenv/config'
 import server from '../../../src/server'
 import AuthRouter from '../../../src/presentation/routers/auth-router'
 
-import { AuthJwtRefreshedResponseModel, AuthJwtResponseModel, AuthUserCredentialsModel } from "../../../src/domain/entities/auth";
+import { AuthJwtRefreshedResponseModel, AuthJwtResponseModel, AuthUserCredentialsModel, ChangeCredentialsModel } from "../../../src/domain/entities/auth";
 import { UserResponseModel } from "../../../src/domain/entities/user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
@@ -132,6 +132,96 @@ describe("User Router", () => {
             expect(mockLoginUserUseCase.execute).not.toBeCalled()
             expect(response.body).toStrictEqual(OutputData)
             expect(response.headers['set-cookie']).not.toBeDefined(); // Check if cookies are set
+        });
+    })
+    describe("Test auth router change password", () => {
+        test("Change password with valid id, current and new password", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials: ChangeCredentialsModel = {
+                user_id: 1,
+                password: "Test123!",
+                new_password: "Test123!!"
+            }
+
+            const expectedResponse = { response: "Password sucessfully changed" }
+
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            try {
+                const response = await request(server)
+                    .post("/auth/password/change")
+                    .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                    .send(credentials);
+                expect(response.status).toBe(200);
+                expect(response.body).toStrictEqual(expectedResponse);
+            } catch (err) {
+                console.log(err.message)
+                expect(true).toBe(false)
+            }
+        });
+
+        test("Change password with valid id and current password and invalid new password", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: "1",
+                password: "Test123!",
+                new_password: "badpassword"
+            }
+
+            const expectedResponse = { errors: ["Invalid credentials or missing user id"] }
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+            expect(response.status).toBe(422);
+            expect(response.body).toStrictEqual(expectedResponse);
+
+        });
+
+        test("Change password with invalid id, valid current and new password", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: "a",
+                password: "Test123!",
+                new_password: "Test123!!"
+            }
+
+            const expectedResponse = { errors: ["Invalid credentials or missing user id"] }
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+            expect(response.status).toBe(422);
+            expect(response.body).toStrictEqual(expectedResponse);
+
+        });
+
+        test("Change password with empty id, valid current and new password", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: "",
+                password: "Test123!",
+                new_password: "Test123!!"
+            }
+
+            const expectedResponse = { errors: ["Invalid credentials or missing user id"] }
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+            expect(response.status).toBe(422);
+            expect(response.body).toStrictEqual(expectedResponse);
+
         });
     })
 })

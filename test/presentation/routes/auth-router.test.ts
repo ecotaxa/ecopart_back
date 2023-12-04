@@ -68,7 +68,7 @@ describe("User Router", () => {
 
 
     describe("Test user login", () => {
-        test("login with valid credentials ", async () => {
+        test("Login with valid credentials ", async () => {
             const InputData: AuthUserCredentialsModel = {
                 email: "john@gmail.com",
                 password: "test123!"
@@ -87,8 +87,11 @@ describe("User Router", () => {
                 jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkyMjAwNzUwLCJleHAiOjE2OTIyMDI1NTB9.L8JQUooDtZinbbYYHMgPPbmMt_kc4zicELzr5gbxZzI",
                 jwt_refresh: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkyMjAwNzUwLCJleHAiOjE3MjM3NTgzNTB9.sqkt9gfeAAV6YT7J-vuKL7wb0Xh9wtVqyrJocJAhpqc"
             }
+
             jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+
             const response = await request(server).post("/auth/login").send(InputData)
+
             expect(response.status).toBe(200)
             expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(OutputData)
@@ -101,7 +104,9 @@ describe("User Router", () => {
                 password: "test123"
             }
             const expectedResponse = { errors: ["Invalid credentials"] }
+
             jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("Invalid credentials"); })
+
             const response = await request(server).post("/auth/login").send(InputData)
 
             expect(response.status).toBe(401)
@@ -116,7 +121,9 @@ describe("User Router", () => {
                 password: "test123"
             }
             const expectedResponse = { errors: ["User email not verified"] }
+
             jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("User email not verified"); })
+
             const response = await request(server).post("/auth/login").send(InputData)
 
             expect(response.status).toBe(403)
@@ -131,7 +138,9 @@ describe("User Router", () => {
                 password: "test123"
             }
             const expectedResponse = { errors: ["Can't login"] }
+
             jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error(); })
+
             const response = await request(server).post("/auth/login").send(InputData)
 
             expect(response.status).toBe(500)
@@ -159,6 +168,7 @@ describe("User Router", () => {
                 "exp": 58502005275,
                 "iat": 1698325275
             }
+
             const response = await request(server)
                 .get("/auth/user/me")
                 .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`);
@@ -187,7 +197,9 @@ describe("User Router", () => {
                 jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7fSwiaWF0IjoxNjkzMjE1Njk2LCJleHAiOjE2OTMyMTc0OTZ9.aofgJ6Mu1hWbUDM1dBm2oVj1R9JV8NU0FFFyslbMV_o"
 
             }
+
             jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+
             const response = await request(server)
                 .post("/auth/refreshToken")
                 .set("Cookie", `refresh_token=${valid_refresh_token}; Path=/; HttpOnly;`);
@@ -204,6 +216,7 @@ describe("User Router", () => {
             const expectedResponse = { errors: ["Can't find user"] }
 
             jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("Can't find user"); })
+
             const response = await request(server)
                 .post("/auth/refreshToken")
                 .set("Cookie", `refresh_token=${invalid_refresh_token}; Path=/; HttpOnly;`);
@@ -220,6 +233,7 @@ describe("User Router", () => {
             const expectedResponse = { errors: ["Can't refresh token"] }
 
             jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error(); })
+
             const response = await request(server)
                 .post("/auth/refreshToken")
                 .set("Cookie", `refresh_token=${invalid_refresh_token}; Path=/; HttpOnly;`);
@@ -244,5 +258,78 @@ describe("User Router", () => {
             ]);
         });
 
+    })
+
+    // Change password
+    describe("Test /auth/password/change endpoint", () => {
+        test("Should change password with valid token", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: 1,
+                password: "test123!",
+                new_password: "test123!!"
+            }
+
+            const expectedResponse = { response: "Password sucessfully changed" }
+
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            try {
+                const response = await request(server)
+                    .post("/auth/password/change")
+                    .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                    .send(credentials);
+                expect(response.status).toBe(200);
+                expect(response.body).toStrictEqual(expectedResponse);
+            } catch (err) {
+                console.log(err.message)
+                expect(true).toBe(false)
+            }
+        });
+
+        test("Should handle error during Change password use case and return a 500 response", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: 1,
+                password: "test123!",
+                new_password: "test123!!"
+            }
+
+            const expectedResponse = { errors: ["Can't change password"] }
+
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("Can't find user"); })
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse);
+        });
+
+        test("Should handle error during Change password use case and return a 500 response", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: 1,
+                password: "test123!",
+                new_password: "test123!"
+            }
+
+            const expectedResponse = { errors: ["New password must be different from old password"] }
+
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("New password must be different from old password"); })
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse);
+        });
     })
 })

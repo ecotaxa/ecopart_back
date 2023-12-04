@@ -17,7 +17,7 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
             .matches(/[a-z]/)
             .matches(/[A-Z]/)
             .matches(/[@!#$%^&*()_+.,;:]/)
-            .bail(),
+            .withMessage('Invalid credentials'),
 
         // New password Validation
         check('new_password')
@@ -26,7 +26,7 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
             .matches(/[a-z]/)
             .matches(/[A-Z]/)
             .matches(/[@!#$%^&*()_+.,;:]/)
-            .bail(),
+            .withMessage('New password must be at least 8 characters long, contain at least a number, a lowercase letter, an uppercase letter and a special character.'),
 
         //check that password_hash is not defined
         check('password_hash')
@@ -37,7 +37,7 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 // Centralized error handling for validation errors
-                return res.status(401).json({ errors: ["Invalid credentials"] });
+                return res.status(422).json({ errors: ["Invalid credentials or missing user id"] });
             }
             next();
         },
