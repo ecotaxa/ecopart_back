@@ -71,5 +71,23 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
         },
     ];
 
+    rulesRequestResetPassword = [
+        // Email Validation
+        check('email')
+            .trim()
+            .normalizeEmail()
+            .isEmail()
+            .bail(),
+
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(401).json({ errors: ["Invalid credentials"] });
+            }
+            next();
+        },
+    ];
 
 }

@@ -26,6 +26,7 @@ export class UpdateUser implements UpdateUserUseCase {
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
         if (!updated_user) throw new Error("Can't find updated user");
 
-        return updated_user
+        const publicUser = this.userRepository.toPublicUser(updated_user)
+        return publicUser
     }
 }

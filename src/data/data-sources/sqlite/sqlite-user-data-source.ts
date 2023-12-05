@@ -13,7 +13,7 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     init_user_db() {
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
         this.db.run(sql_create, [])
     }
 
@@ -124,6 +124,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                             last_name: row.last_name,
                             email: row.email,
                             confirmation_code: row.confirmation_code,
+                            reset_password_code: row.reset_password_code,
                             valid_email: row.valid_email == 1 ? true : false,
                             is_admin: row.is_admin == 1 ? true : false,
                             organisation: row.organisation,

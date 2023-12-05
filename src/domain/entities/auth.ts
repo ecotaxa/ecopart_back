@@ -25,4 +25,5 @@ export interface ChangeCredentialsModel {
     password: string;
     new_password: string;
     password_hash?: string;
+    reset_password_code?: string | null;
 }

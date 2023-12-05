@@ -10,6 +10,7 @@ export class GetAllUsers implements GetAllUsersUseCase {
 
     async execute(): Promise<UserResponseModel[]> {
         const result = await this.userRepository.getUsers()
-        return result
+        const publicUsers = result.map(user => this.userRepository.toPublicUser(user))
+        return publicUsers
     }
 }

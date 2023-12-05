@@ -51,6 +51,34 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
             }
         });
     }
+
+    async send_reset_password_email(transporter: nodemailer.Transporter, user: UserResponseModel, resetPasswordToken: string): Promise<void> {
+        console.log(user)
+        // Read the HTML file
+        let htmlContent = "error"
+        try {
+            const filePath = path.join(__dirname + "/templates/reset_password_email.html")
+            htmlContent = fs.readFileSync(filePath, 'utf8');
+        } catch (err) {
+            console.error(err)
+        }
+
+        // prepare the custom reset_password_path path
+        const custom_reset_password_path = this.base_url_path + "/auth/password/reset/" + resetPasswordToken
+        const mail_sender = this.mail_sender
+
+        // Send the email
+        transporter.sendMail({
+            from: mail_sender, // sender address
+            to: "julie.coustenoble@imev-mer.fr", // TODO PROD : user.email,// list of receivers
+            subject: "Reset your EcoPart password", // Subject line
+            html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body //TODO DYNAMIC URL
+        }, (err, info) => {
+            if (err) {
+                console.log(err)
+            } else {
+                console.log('Email sent: ' + info.response)
+            }
+        });
+    }
 }
-
-

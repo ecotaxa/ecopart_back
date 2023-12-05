@@ -11,12 +11,14 @@ export class UserRepositoryImpl implements UserRepository {
     userCrypto: CryptoWrapper
     userJwt: JwtWrapper
     VALIDATION_TOKEN_SECRET: string
+    RESET_PASSWORD_TOKEN_SECRET: string
 
-    constructor(userDataSource: UserDataSource, userCrypto: CryptoWrapper, userJwt: JwtWrapper, VALIDATION_TOKEN_SECRET: string) {
+    constructor(userDataSource: UserDataSource, userCrypto: CryptoWrapper, userJwt: JwtWrapper, VALIDATION_TOKEN_SECRET: string, RESET_PASSWORD_TOKEN_SECRET: string) {
         this.userDataSource = userDataSource
         this.userCrypto = userCrypto
         this.userJwt = userJwt
         this.VALIDATION_TOKEN_SECRET = VALIDATION_TOKEN_SECRET
+        this.RESET_PASSWORD_TOKEN_SECRET = RESET_PASSWORD_TOKEN_SECRET
     }
 
     // return number of lines updated
@@ -34,8 +36,9 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     async changePassword(credentials: ChangeCredentialsModel): Promise<number> {
-        const params_password = ["user_id", "password_hash"]
+        const params_password = ["user_id", "password_hash", "reset_password_code"]
         credentials.password_hash = await this.userCrypto.hash(credentials.new_password)
+        credentials.reset_password_code = null
         const nb_of_updated_user = await this.updateUser(credentials, params_password)
         return nb_of_updated_user
     }
@@ -68,6 +71,17 @@ export class UserRepositoryImpl implements UserRepository {
     generateValidationToken(user: UserRequestModel): string {
         const token = this.userJwt.sign({ user_id: user.user_id, confirmation_code: user.confirmation_code }, this.VALIDATION_TOKEN_SECRET, { expiresIn: '24h' })
         return token
+    }
+
+    generateResetPasswordToken(user: UserRequestModel): string {
+        const token = this.userJwt.sign({ user_id: user.user_id, reset_password_code: user.reset_password_code }, this.RESET_PASSWORD_TOKEN_SECRET, { expiresIn: '3h' })
+        return token
+    }
+
+    async setResetPasswordCode(user: UserUpdateModel): Promise<number> {
+        user.reset_password_code = await this.userCrypto.generate_uuid()
+        const nb_of_updated_user = await this.updateUser(user, ["user_id", "reset_password_code"])
+        return nb_of_updated_user
     }
 
     async getUsers(): Promise<UserResponseModel[]> {
@@ -119,6 +133,23 @@ export class UserRepositoryImpl implements UserRepository {
         const user = await this.userDataSource.getOne({ user_id: user_id })
         if (!user) return false
         return user.is_admin
+    }
+
+    toPublicUser(createdUser: UserResponseModel): UserResponseModel {
+        const publicUser: UserResponseModel = {
+            user_id: createdUser.user_id,
+            first_name: createdUser.first_name,
+            last_name: createdUser.last_name,
+            email: createdUser.email,
+            valid_email: createdUser.valid_email,
+            is_admin: createdUser.is_admin,
+            organisation: createdUser.organisation,
+            country: createdUser.country,
+            user_planned_usage: createdUser.user_planned_usage,
+            user_creation_date: ""
+        }
+
+        return publicUser
     }
 
 }

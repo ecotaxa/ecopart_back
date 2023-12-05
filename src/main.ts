@@ -12,6 +12,7 @@ import { LoginUser } from './domain/use-cases/auth/login'
 import { RefreshToken } from './domain/use-cases/auth/refresh-token'
 import { ChangePassword } from './domain/use-cases/auth/change-password'
 import { ValidUser } from './domain/use-cases/user/valid-user'
+import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -34,6 +35,7 @@ const config = {
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
     VALIDATION_TOKEN_SECRET: process.env.VALIDATION_TOKEN_SECRET || '',
+    RESET_PASSWORD_TOKEN_SECRET: process.env.RESET_PASSWORD_TOKEN_SECRET || '',
 
     MAIL_HOST: process.env.MAIL_HOST || '',
     MAIL_PORT: parseInt(process.env.MAIL_PORT as string, 10),
@@ -79,18 +81,18 @@ async function getSQLiteDS() {
     const userMiddleWare = UserRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareUserValidation(countriesAdapter),
-        new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
-        new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), transporter, mailerAdapter),
-        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
-        new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
+        new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
+        new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
+        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
+        new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
     )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareAuthValidation(),
-        new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
-        new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
-        new ChangePassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET)),
-        // new ResetPassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET), transporter, mailerAdapter),
+        new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
+        new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
+        new ChangePassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
+        new ResetPasswordRequest(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
     )
 
     server.use("/users", userMiddleWare)

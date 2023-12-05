@@ -7,4 +7,5 @@ export interface MailerWrapper {
     // createTransport(transporter_options: TransportOptions): Promise<Transporter>;
     // sendMail(plaintext: string, digest: string): Promise<>;
     send_confirmation_email(transporter: Transporter, created_user: UserResponseModel, confirmation_code: string): Promise<void>
+    send_reset_password_email(transporter: Transporter, user: UserResponseModel, resetPasswordToken: string): Promise<void>;
 }

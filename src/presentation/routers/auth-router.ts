@@ -2,12 +2,13 @@ import express, { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareAuthValidation } from '../interfaces/middleware/auth-validation'
+
 import { CustomRequest } from '../../domain/entities/auth'
 
 import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'
 import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refresh-token'
 import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/change-password'
-//import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
+import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
 
 // password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
@@ -16,7 +17,7 @@ export default function AuthRouter(
     loginUserUseCase: LoginUserUseCase,
     refreshTokenUseCase: RefreshTokenUseCase,
     changePasswordUseCase: ChangePasswordUseCase,
-    //resetPasswordUseCase: ResetPasswordUseCase,
+    resetPasswordRequestUseCase: ResetPasswordRequestUseCase,
 
 
 ) {
@@ -101,18 +102,22 @@ export default function AuthRouter(
         }
     })
 
-    // // reset password request
-    // router.post('/password/reset', async (req: Request, res: Response) => {
-    //     try {
-    //         const token = await resetPasswordUseCase.execute(req.body)
-    //         res.statusCode = 200// to check
-    //         res.json(token)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "") res.status(500).send({ errors: [""] })
-    //         else res.status(500).send({ errors: ["Can't reset password"] })
-    //     }
-    // })
+    // reset password request
+    router.post('/password/reset', middlewareAuthValidation.rulesRequestResetPassword, async (req: Request, res: Response) => {
+        try {
+            await resetPasswordRequestUseCase.execute(req.body)
+            res
+                .status(200)
+                .json({ response: "Reset password request email sent." });
+        } catch (err) {
+            console.log(err)
+            if (err.message === "User does not exist") res.status(200).send({ errors: ["Reset password request email sent."] })
+            else if (err.message === "User email is not validated") res.status(200).send({ errors: ["Reset password request email sent."] })
+            else if (err.message === "Can't set password reset code") res.status(500).send({ errors: ["Can't reset password"] })
+            else if (err.message === "Can't find updated user") res.status(500).send({ errors: ["Can't reset password"] })
+            else res.status(500).send({ errors: ["Can't reset password"] })
+        }
+    })
 
     // // reset password confirm
     // router.put('/password/reset', async (req: Request, res: Response) => {

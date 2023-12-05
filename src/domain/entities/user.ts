@@ -22,6 +22,7 @@ export interface UserRequestModel {
     email?: string;
     valid_email?: boolean;
     confirmation_code?: string | null;
+    reset_password_code?: string | null;
     is_admin?: boolean;
     organisation?: string;
     country?: string;
@@ -36,6 +37,7 @@ export interface UserUpdateModel {
     email?: string;
     valid_email?: boolean;
     confirmation_code?: string | null;
+    reset_password_code?: string | null;
     password_hash?: string;
     is_admin?: boolean;
     organisation?: string;
@@ -52,6 +54,7 @@ export interface UserResponseModel {
     email: string;
     valid_email: boolean;
     confirmation_code?: string | null;
+    reset_password_code?: string | null; //TODO UTILE?
     is_admin: boolean;
     organisation: string;
     country: string;

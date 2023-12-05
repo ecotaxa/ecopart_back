@@ -31,9 +31,11 @@ export class CreateUser implements CreateUserUseCase {
                 if (!updatedUser) { throw new Error("Can't find updated preexistent user"); }
 
                 await this.generateTokenAndSendEmail(updatedUser)
+
                 // Remove the confirmation code from the user object before sending it
-                delete updatedUser.confirmation_code;
-                return updatedUser;
+                const publicUser = this.userRepository.toPublicUser(updatedUser)
+
+                return publicUser;
             } else {
                 // If the user exists and has already validated their email
                 throw new Error("Valid user already exists");
@@ -49,15 +51,14 @@ export class CreateUser implements CreateUserUseCase {
 
         this.generateTokenAndSendEmail(createdUser)
         // Remove the confirmation code from the user object before sending it
-        delete createdUser.confirmation_code;
-        return createdUser;
+        const publicUser = this.userRepository.toPublicUser(createdUser)
+        return publicUser;
     }
 
     private async generateTokenAndSendEmail(user: UserResponseModel): Promise<void> {
         // Generate a new confirmation token for the user
         const confirmationToken = this.userRepository.generateValidationToken(user);
-        // Remove the confirmation code from the user object before sending it
-        delete user.confirmation_code;
+
         // Send a confirmation email to the user
         this.mailer.send_confirmation_email(this.transporter, user, confirmationToken);
     }
