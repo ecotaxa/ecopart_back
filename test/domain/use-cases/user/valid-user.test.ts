@@ -6,6 +6,18 @@ import { ValidUser } from '../../../../src/domain/use-cases/user/valid-user'
 describe("Valid Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
+        generateResetPasswordToken(): string {
+            throw new Error("Method not implemented.");
+        }
+        verifyResetPasswordToken(): DecodedToken | null {
+            throw new Error("Method not implemented.");
+        }
+        setResetPasswordCode(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        toPublicUser(): UserResponseModel {
+            throw new Error("Method not implemented.");
+        }
         changePassword(): Promise<number> {
             throw new Error("Method not implemented.");
         }

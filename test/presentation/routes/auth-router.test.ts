@@ -11,6 +11,8 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { LoginUserUseCase } from "../../../src/domain/interfaces/use-cases/auth/login";
 import { RefreshTokenUseCase } from '../../../src/domain/interfaces/use-cases/auth/refresh-token'
 import { ChangePasswordUseCase } from "../../../src/domain/interfaces/use-cases/auth/change-password";
+import { ResetPasswordRequestUseCase } from "../../../src/domain/interfaces/use-cases/auth/reset-password-request";
+import { ResetPasswordUseCase } from "../../../src/domain/interfaces/use-cases/auth/reset-password";
 
 import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth-cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
@@ -28,6 +30,7 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     }
 }
 class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
+    rulesRequestResetPassword: [];
     rulesPassword = []
     rulesAuthUserCredentialsModel = [];
 }
@@ -36,7 +39,16 @@ class MockChangePasswordUseCase implements ChangePasswordUseCase {
         throw new Error("Method not implemented.")
     }
 }
-
+class MockResetPasswordRequestUseCase implements ResetPasswordRequestUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
+class MockResetPasswordUseCase implements ResetPasswordUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
 describe("User Router", () => {
     // let mockMiddlewareAuth: MockMiddlewareAuth;
     let mockMiddlewareAuth: MiddlewareAuth;
@@ -45,6 +57,8 @@ describe("User Router", () => {
     let mockChangePasswordUseCase: MockChangePasswordUseCase;
     let mockJwtAdapter: JwtAdapter;
     let mockMiddlewareAuthValidation: MockMiddlewareAuthValidation;
+    let mockResetPasswordRequestUseCase: MockResetPasswordRequestUseCase;
+    let mockResetPasswordUseCase: MockResetPasswordUseCase;
 
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
@@ -58,8 +72,10 @@ describe("User Router", () => {
         mockLoginUserUseCase = new MockLoginUserUseCase()
         mockRefreshTokenUseCase = new MockRefreshTokenUseCase()
         mockChangePasswordUseCase = new MockChangePasswordUseCase()
+        mockResetPasswordRequestUseCase = new MockResetPasswordRequestUseCase()
+        mockResetPasswordUseCase = new MockResetPasswordUseCase()
 
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase))
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase))
     })
 
     beforeEach(() => {

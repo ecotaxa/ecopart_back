@@ -49,6 +49,7 @@ class MockJwtAdapter extends JwtAdapter {
 }
 
 const TEST_VALIDATION_TOKEN_SECRET = process.env.TEST_VALIDATION_TOKEN_SECRET || ''
+const TEST_RESET_PASSWORD_TOKEN_SECRET = process.env.TEST_RESET_PASSWORD_TOKEN_SECRET || ''
 
 describe("User Repository", () => {
     let mockUserDataSource: UserDataSource;
@@ -61,7 +62,7 @@ describe("User Repository", () => {
         mockUserDataSource = new MockUserDataSource()
         mockBcryptAdapter = new MockBcryptAdapter()
         jwtAdapter = new MockJwtAdapter()
-        userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET)
+        userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET, TEST_RESET_PASSWORD_TOKEN_SECRET)
     })
 
     describe("GetAllUsers", () => {
