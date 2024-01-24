@@ -13,6 +13,7 @@ import { RefreshToken } from './domain/use-cases/auth/refresh-token'
 import { ChangePassword } from './domain/use-cases/auth/change-password'
 import { ValidUser } from './domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
+import { ResetPassword } from './domain/use-cases/auth/reset-password'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -93,6 +94,7 @@ async function getSQLiteDS() {
         new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
         new ChangePassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
         new ResetPasswordRequest(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
+        new ResetPassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
     )
 
     server.use("/users", userMiddleWare)

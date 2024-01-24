@@ -14,6 +14,7 @@ export interface UserRepository {
     generateValidationToken(user: UserRequestModel): string;
     verifyValidationToken(confirmation_token: string): DecodedToken | null;
     generateResetPasswordToken(user: UserRequestModel): string;
+    verifyResetPasswordToken(reset_password_token: string): DecodedToken | null;
     setResetPasswordCode(user: UserUpdateModel): Promise<number>;
     toPublicUser(createdUser: UserResponseModel): UserResponseModel;
 }

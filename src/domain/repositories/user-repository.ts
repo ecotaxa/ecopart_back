@@ -111,11 +111,20 @@ export class UserRepositoryImpl implements UserRepository {
             return false;
         }
     }
-    // TODO IMPROVE ERROR HANDLING
+
     verifyValidationToken(confirmation_token: string): DecodedToken | null {
+        return this.verifyToken(confirmation_token, this.VALIDATION_TOKEN_SECRET)
+    }
+
+    verifyResetPasswordToken(reset_password_token: string): DecodedToken | null {
+        return this.verifyToken(reset_password_token, this.RESET_PASSWORD_TOKEN_SECRET)
+    }
+
+    // TODO IMPROVE ERROR HANDLING
+    verifyToken(token: string, secret: string): DecodedToken | null {
         try {
-            // Verify the token using the refresh secret key
-            const decoded = this.userJwt.verify(confirmation_token, this.VALIDATION_TOKEN_SECRET)
+            // Verify the token 
+            const decoded = this.userJwt.verify(token, secret)
 
             // Attach the decoded token to the request object
             const decoded_token = (decoded as DecodedToken);
@@ -124,7 +133,7 @@ export class UserRepositoryImpl implements UserRepository {
         } catch (error) {
             // An error occurred while fetching or comparing, log the error and return null
             console.log(error);
-            console.log(" Validation token invalid or expired.");
+            console.log("Token invalid or expired.");
             return null;
         }
     }

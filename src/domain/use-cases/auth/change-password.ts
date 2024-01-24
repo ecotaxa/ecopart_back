@@ -7,11 +7,10 @@ export class ChangePassword implements ChangePasswordUseCase {
 
     constructor(userRepository: UserRepository) {
         this.userRepository = userRepository
-
     }
+
     async execute(current_user: DecodedToken, credentials: ChangeCredentialsModel): Promise<void> {
         let nb_of_updated_user: number = 0
-
 
         // admin can update anyone password without old password
         if (await this.userRepository.isAdmin(current_user.user_id)) {
@@ -31,6 +30,5 @@ export class ChangePassword implements ChangePasswordUseCase {
         } else {
             throw new Error("Logged user cannot update this property or user");
         }
-
     }
 }

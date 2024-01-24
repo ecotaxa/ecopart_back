@@ -9,6 +9,7 @@ import { LoginUserUseCase } from '../../domain/interfaces/use-cases/auth/login'
 import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refresh-token'
 import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/change-password'
 import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
+import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
 
 // password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
@@ -18,8 +19,7 @@ export default function AuthRouter(
     refreshTokenUseCase: RefreshTokenUseCase,
     changePasswordUseCase: ChangePasswordUseCase,
     resetPasswordRequestUseCase: ResetPasswordRequestUseCase,
-
-
+    resetPasswordUseCase: ResetPasswordUseCase
 ) {
     const router = express.Router()
 
@@ -70,7 +70,6 @@ export default function AuthRouter(
         }
     })
 
-
     router.post('/logout', async (req: Request, res: Response) => {
         try {
             res
@@ -119,19 +118,22 @@ export default function AuthRouter(
         }
     })
 
-    // // reset password confirm
-    // router.put('/password/reset', async (req: Request, res: Response) => {
-    //     try {
-    //         const token = await resetPasswordUseCase.execute(req.body)
-    //         res.statusCode = 200// to check
-    //         res.json(token)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "") res.status(500).send({ errors: [""] })
-    //         else res.status(500).send({ errors: ["Can't reset password"] })
-    //     }
-    //})
-
+    // reset password confirm
+    router.put('/password/reset', async (req: Request, res: Response) => {
+        try {
+            console.log("req.body", req.body)
+            await resetPasswordUseCase.execute(req.body)
+            res
+                .status(200)
+                .json({ response: "Password sucessfully reset, please login" });
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't change password"] })
+            if (err.message === "User does not exist or token is not valid") res.status(404).send({ errors: ["Can't change password"] })
+            if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't change password"] })
+            else res.status(500).send({ errors: ["Can't reset password"] })
+        }
+    })
 
     return router
 }
