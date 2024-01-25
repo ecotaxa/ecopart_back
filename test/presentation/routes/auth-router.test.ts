@@ -30,7 +30,7 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     }
 }
 class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
-    rulesRequestResetPassword: [];
+    rulesRequestResetPassword = [];
     rulesPassword = []
     rulesAuthUserCredentialsModel = [];
 }

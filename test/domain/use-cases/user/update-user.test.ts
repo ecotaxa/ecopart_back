@@ -98,6 +98,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => OutputData)
+
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
@@ -106,6 +108,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
+        expect(mockUserRepository.toPublicUser).toBeCalled();
     });
 
     test("User is not admin : edit admin property on himself : nok", async () => {
@@ -136,6 +139,7 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         try {
@@ -149,6 +153,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
         expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
 
@@ -180,6 +185,7 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         try {
@@ -192,6 +198,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
 
@@ -224,6 +231,7 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         try {
@@ -236,12 +244,9 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
-
-
-
-
 
 
     // ADMIN 
@@ -271,6 +276,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => OutputData)
+
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
@@ -279,6 +286,8 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
+        expect(mockUserRepository.toPublicUser).toBeCalled();
+
     });
 
     test("User is admin : edit admin property on himself : ok", async () => {
@@ -307,6 +316,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => OutputData)
+
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
@@ -315,7 +326,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
-
+        expect(mockUserRepository.toPublicUser).toBeCalled();
     });
 
     test("User is admin : edit someone else regular properties : ok", async () => {
@@ -344,6 +355,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => OutputData)
+
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
@@ -352,6 +365,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
+        expect(mockUserRepository.toPublicUser).toBeCalled();
     });
 
 
@@ -381,6 +395,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => OutputData)
+
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
@@ -389,6 +405,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
+        expect(mockUserRepository.toPublicUser).toBeCalled();
 
     });
 
@@ -409,6 +426,8 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "toPublicUser")
+
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         try {
@@ -421,6 +440,8 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
+
 
     });
     test("Nothing to update on an admin user", async () => {
@@ -439,6 +460,7 @@ describe("Update User Use Case", () => {
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
         try {
@@ -451,6 +473,8 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
+
 
     });
 

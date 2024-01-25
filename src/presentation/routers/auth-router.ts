@@ -129,6 +129,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't change password"] })
+            if (err.message === "No token provided") res.status(401).send({ errors: ["Can't change password"] })
             if (err.message === "User does not exist or token is not valid") res.status(404).send({ errors: ["Can't change password"] })
             if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't change password"] })
             else res.status(500).send({ errors: ["Can't reset password"] })

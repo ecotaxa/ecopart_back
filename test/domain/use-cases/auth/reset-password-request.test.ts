@@ -3,8 +3,8 @@ import { DecodedToken } from "../../../../src/domain/entities/auth";
 import { UserRequestModel, UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { ResetPasswordRequest } from '../../../../src/domain/use-cases/auth/reset-password-request'
-import { Transporter } from "nodemailer";
 
+import { Transporter } from "nodemailer";
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
 import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
 

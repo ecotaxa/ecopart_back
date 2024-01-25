@@ -17,8 +17,8 @@ export class ChangePassword implements ChangePasswordUseCase {
             nb_of_updated_user = await this.userRepository.changePassword(credentials)
             if (nb_of_updated_user == 0) throw new Error("Can't change password");
         } else if (current_user.user_id == credentials.user_id) {
-            // Check if new password is different from old password
-            if (credentials.password === credentials.new_password) throw new Error("New password must be different from old password");
+            // Check if new password exist and is different from old password
+            if (!credentials.password || credentials.password === credentials.new_password) throw new Error("New password must be different from old password");
             // Check if old password is correct
             const verifyed = await this.userRepository.verifyUserLogin({ email: current_user.email, password: credentials.password })
             if (verifyed) {

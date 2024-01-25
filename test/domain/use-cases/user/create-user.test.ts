@@ -130,6 +130,7 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(-1))
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
         const result = await createUserUseCase.execute(InputData);
@@ -139,7 +140,8 @@ describe("Create User Use Case", () => {
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
         expect(mockUserRepository.generateValidationToken).toHaveBeenCalledWith(created_user);
-        expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, OutputData, "token");
+        expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, created_user, "token");
+        expect(mockUserRepository.toPublicUser).toHaveBeenCalledWith(created_user);
 
         expect(result).toStrictEqual(OutputData);
     });
@@ -198,6 +200,7 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
         const result = await createUserUseCase.execute(InputData);
@@ -207,7 +210,8 @@ describe("Create User Use Case", () => {
         expect(mockUserRepository.standardUpdateUser).toHaveBeenCalledWith(preexistant_user);
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
         expect(mockUserRepository.generateValidationToken).toHaveBeenCalledWith(updated_user);
-        expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, OutputData, "token");
+        expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, updated_user, "token");
+        expect(mockUserRepository.toPublicUser).toHaveBeenCalledWith(updated_user);
 
         expect(result).toStrictEqual(OutputData);
     });
@@ -244,6 +248,7 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "") // not called
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve()) // not called
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
         try {
@@ -257,6 +262,7 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
+            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }
@@ -295,6 +301,7 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token") // not called
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve()) // not called
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter);
         try {
@@ -307,6 +314,7 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.standardUpdateUser).toHaveBeenCalledWith(preexistant_user);
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
+            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }
@@ -343,6 +351,7 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token") // not called
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())// not called
+        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter);
         try {
@@ -356,6 +365,7 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
+            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }

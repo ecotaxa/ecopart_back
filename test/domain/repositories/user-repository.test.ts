@@ -513,7 +513,7 @@ describe("User Repository", () => {
             const result = await userRepository.changePassword(credentials);
 
             expect(mockBcryptAdapter.hash).toHaveBeenCalledWith("new_password")
-            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW" })
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW", reset_password_code: null })
             expect(result).toBe(1)
 
         });
@@ -530,7 +530,7 @@ describe("User Repository", () => {
             const result = await userRepository.changePassword(credentials);
 
             expect(mockBcryptAdapter.hash).toHaveBeenCalledWith("new_password")
-            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW" })
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, password_hash: "$2b$12$mMHjmPmUFsTrYFa3WUEVs.T1vaMz4q55FTfgpB.rNiL4GTt85BRkW", reset_password_code: null })
             expect(result).toBe(0)
 
         });

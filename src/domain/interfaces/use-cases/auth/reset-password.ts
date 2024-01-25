@@ -1,4 +1,4 @@
-import { ChangeCredentialsModel } from "../../../entities/auth";
+import { ResetCredentialsModel } from "../../../entities/auth";
 export interface ResetPasswordUseCase {
-    execute(credentials: ChangeCredentialsModel): Promise<void>;
+    execute(credentials: ResetCredentialsModel): Promise<void>;
 }

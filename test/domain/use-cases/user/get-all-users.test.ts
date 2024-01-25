@@ -61,7 +61,7 @@ describe("Get All Users Use Case", () => {
     })
     // TODO TEST when non user
     test("Should return data", async () => {
-        const ExpectedResult: UserResponseModel[] = [{
+        const ExpectedResult: UserResponseModel = {
             user_id: 1,
             last_name: "Smith",
             first_name: "John",
@@ -72,13 +72,13 @@ describe("Get All Users Use Case", () => {
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             user_creation_date: '2023-08-01 10:30:00'
-        }]
+        }
 
-        jest.spyOn(mockUserRepository, "getUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
+        jest.spyOn(mockUserRepository, "getUsers").mockImplementation(() => Promise.resolve([ExpectedResult]))
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return ExpectedResult })
         const getAllUsersUse = new GetAllUsers(mockUserRepository)
         const result = await getAllUsersUse.execute();
-        expect(result).toStrictEqual(ExpectedResult)
+        expect(result).toStrictEqual([ExpectedResult])
 
     });
-
 })

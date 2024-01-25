@@ -24,9 +24,13 @@ export interface CustomRequest extends Request {
 
 export interface ChangeCredentialsModel {
     user_id: number;
-    password: string;
+    password?: string;
     new_password: string;
     password_hash?: string;
     reset_password_code?: string | null;
     reset_password_token?: string | null;
+}
+export interface ResetCredentialsModel {
+    new_password: string;
+    reset_password_token: string | null;
 }
