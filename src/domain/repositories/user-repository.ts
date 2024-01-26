@@ -2,7 +2,7 @@
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../entities/auth";
-import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel } from "../entities/user";
+import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
 
@@ -144,8 +144,8 @@ export class UserRepositoryImpl implements UserRepository {
         return user.is_admin
     }
 
-    toPublicUser(createdUser: UserResponseModel): UserResponseModel {
-        const publicUser: UserResponseModel = {
+    toPublicUser(createdUser: PrivateUserModel): PublicUserModel {
+        const publicUser: PublicUserModel = {
             user_id: createdUser.user_id,
             first_name: createdUser.first_name,
             last_name: createdUser.last_name,
@@ -155,7 +155,7 @@ export class UserRepositoryImpl implements UserRepository {
             organisation: createdUser.organisation,
             country: createdUser.country,
             user_planned_usage: createdUser.user_planned_usage,
-            user_creation_date: ""
+            user_creation_date: createdUser.user_creation_date
         }
 
         return publicUser

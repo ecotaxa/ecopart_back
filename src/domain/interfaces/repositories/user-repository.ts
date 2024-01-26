@@ -1,6 +1,6 @@
 
 import { AuthUserCredentialsModel, DecodedToken, ChangeCredentialsModel } from "../../entities/auth";
-import { UserRequesCreationtModel, UserResponseModel, UserRequestModel, UserUpdateModel } from "../../entities/user";
+import { UserRequesCreationtModel, UserResponseModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../../entities/user";
 export interface UserRepository {
     changePassword(user_to_update: ChangeCredentialsModel): Promise<number>;
     getUser(user: UserRequestModel): Promise<UserResponseModel | null>;
@@ -16,5 +16,5 @@ export interface UserRepository {
     generateResetPasswordToken(user: UserRequestModel): string;
     verifyResetPasswordToken(reset_password_token: string): DecodedToken | null;
     setResetPasswordCode(user: UserUpdateModel): Promise<number>;
-    toPublicUser(createdUser: UserResponseModel): UserResponseModel;
+    toPublicUser(createdUser: PrivateUserModel): PublicUserModel;
 }

@@ -4,7 +4,7 @@ import 'dotenv/config'
 import server from '../../../src/server'
 import AuthRouter from '../../../src/presentation/routers/auth-router'
 
-import { AuthJwtRefreshedResponseModel, AuthJwtResponseModel, AuthUserCredentialsModel } from "../../../src/domain/entities/auth";
+import { AuthJwtRefreshedResponseModel, AuthJwtResponseModel, AuthUserCredentialsModel, ResetCredentialsModel } from "../../../src/domain/entities/auth";
 import { UserResponseModel } from "../../../src/domain/entities/user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
@@ -347,5 +347,191 @@ describe("User Router", () => {
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse);
         });
+    })
+
+    // reset password request
+    describe("Test POST /auth/password/reset endpoint", () => {
+        test("Should send email", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+
+            const expectedResponse = { response: "Reset password request email sent." }
+
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("Should handle error seamlessly if user already exist and return 200", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+
+            const expectedResponse = { response: "Reset password request email sent." }
+
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User does not exist")))
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("Should handle error seamlessly if user account not validated and return 200", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+
+            const expectedResponse = { response: "Reset password request email sent." }
+
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User email is not validated")))
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("Should handle internal errors and handle it explicitely and return a 500 response", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            // Can't set password reset code
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't set password reset code")))
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+            expect(response.status).toBe(500)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+
+            //can't find updated user
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't set password reset code")))
+            const response_2 = await request(server).post("/auth/password/reset").send(InputData)
+            expect(response_2.status).toBe(500)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(2)
+            expect(response_2.body).toStrictEqual(expectedResponse)
+
+            // can't reset password
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
+            const response_3 = await request(server).post("/auth/password/reset").send(InputData)
+            expect(response_3.status).toBe(500)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(3)
+            expect(response_3.body).toStrictEqual(expectedResponse)
+
+
+        });
+    })
+    // reset password 
+    describe("Test PUT /auth/password/reset endpoint", () => {
+        test("Should update password", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!",
+                reset_password_token: "reset_password_token",
+            }
+            const expectedResponse = { response: "Password sucessfully reset, please login" }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+
+        test("Should handle error if Token is not valid and return 401", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "BAD_reset_password_token",
+            }
+            const error_message = "Token is not valid"
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Should handle error if Token is missing and return 401", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: null,
+            }
+            const error_message = "No token provided"
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Should handle error if ser does not exist or token is not valid and return 404", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "reset_password_token",
+            }
+            const error_message = "User does not exist or token is not valid"
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Should handle error if User email is not validated and return 403", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "reset_password_token",
+            }
+            const error_message = "User email is not validated"
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Should handle any other error and return 500", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "reset_password_token",
+            }
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
     })
 })

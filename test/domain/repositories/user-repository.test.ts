@@ -1,7 +1,7 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
-import { UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
+import { PrivateUserModel, PublicUserModel, UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
@@ -213,14 +213,55 @@ describe("User Repository", () => {
 
             const result = await userRepository.verifyValidationToken(InputData);
             expect(result).toBe(OutputData)
-
+            expect(jwtAdapter.verify).toHaveBeenCalledWith(InputData, TEST_VALIDATION_TOKEN_SECRET)
         });
+
         test("should handle error and return null", async () => {
             const InputData: string = "validation_token"
 
             jest.spyOn(jwtAdapter, "verify").mockImplementation(() => { throw new Error() })
 
             const result = await userRepository.verifyValidationToken(InputData);
+            expect(result).toBe(null)
+
+        });
+    });
+
+    describe("verifyResetPasswordToken", () => {
+        test("Should decode token and return it", async () => {
+            const InputData: string = "validation_token"
+
+            const OutputData: DecodedToken = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: false,
+                confirmation_code: "123456",
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+
+                iat: 1693237789,
+                exp: 1724795389
+            }
+
+            jest.spyOn(jwtAdapter, "verify").mockImplementation(() => Promise.resolve(OutputData))
+
+            const result = await userRepository.verifyResetPasswordToken(InputData);
+            expect(result).toBe(OutputData)
+            expect(jwtAdapter.verify).toHaveBeenCalledWith(InputData, TEST_RESET_PASSWORD_TOKEN_SECRET)
+
+        });
+
+        test("should handle error and return null", async () => {
+            const InputData: string = "validation_token"
+
+            jest.spyOn(jwtAdapter, "verify").mockImplementation(() => { throw new Error() })
+
+            const result = await userRepository.verifyResetPasswordToken(InputData);
             expect(result).toBe(null)
 
         });
@@ -499,6 +540,39 @@ describe("User Repository", () => {
         });
     });
 
+    describe("GenerateResetPasswordToken", () => {
+        test("Should return generated token ", async () => {
+            const User: UserRequestModel = {
+                user_id: 1,
+                reset_password_code: "123456",
+            }
+
+            jest.spyOn(jwtAdapter, "sign").mockImplementation(() => { return "reset_password_token" })
+
+            const result = await userRepository.generateResetPasswordToken(User);
+
+            expect(jwtAdapter.sign).toHaveBeenCalledWith(
+                { user_id: 1, reset_password_code: "123456" },
+                TEST_RESET_PASSWORD_TOKEN_SECRET,
+                { expiresIn: '3h' })
+            expect(result).toBe("reset_password_token")
+
+        });
+    });
+
+    describe("setResetPasswordCode", () => {
+        test("Should set reset password code", async () => {
+            const inputData: UserUpdateModel = {
+                user_id: 1,
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+            const result = await userRepository.setResetPasswordCode(inputData);
+            expect(result).toBe(1)
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith({ user_id: 1, reset_password_code: expect.any(String) })
+        });
+    });
+
     describe("changePassword", () => {
         test("Should return 1 in nominal case", async () => {
 
@@ -536,4 +610,38 @@ describe("User Repository", () => {
         });
     });
 
+    describe("toPublicUser", () => {
+        test("Should return one user", async () => {
+            const inputData: PrivateUserModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: true,
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+                password_hash: "code",
+                confirmation_code: "code",
+                reset_password_code: "code"
+            }
+
+            const expectedData: PublicUserModel = {
+                user_id: 1,
+                first_name: 'John',
+                last_name: 'Smith',
+                email: 'john@gmail.com',
+                valid_email: true,
+                is_admin: false,
+                organisation: 'LOV',
+                country: 'France',
+                user_planned_usage: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            const result: PublicUserModel = userRepository.toPublicUser(inputData);
+            expect(result).toStrictEqual(expectedData)
+        });
+    })
 })

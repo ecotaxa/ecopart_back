@@ -110,8 +110,8 @@ export default function AuthRouter(
                 .json({ response: "Reset password request email sent." });
         } catch (err) {
             console.log(err)
-            if (err.message === "User does not exist") res.status(200).send({ errors: ["Reset password request email sent."] })
-            else if (err.message === "User email is not validated") res.status(200).send({ errors: ["Reset password request email sent."] })
+            if (err.message === "User does not exist") res.status(200).send({ response: "Reset password request email sent." })
+            else if (err.message === "User email is not validated") res.status(200).send({ response: "Reset password request email sent." })
             else if (err.message === "Can't set password reset code") res.status(500).send({ errors: ["Can't reset password"] })
             else if (err.message === "Can't find updated user") res.status(500).send({ errors: ["Can't reset password"] })
             else res.status(500).send({ errors: ["Can't reset password"] })
@@ -121,17 +121,16 @@ export default function AuthRouter(
     // reset password confirm
     router.put('/password/reset', async (req: Request, res: Response) => {
         try {
-            console.log("req.body", req.body)
             await resetPasswordUseCase.execute(req.body)
             res
                 .status(200)
                 .json({ response: "Password sucessfully reset, please login" });
         } catch (err) {
             console.log(err)
-            if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't change password"] })
-            if (err.message === "No token provided") res.status(401).send({ errors: ["Can't change password"] })
-            if (err.message === "User does not exist or token is not valid") res.status(404).send({ errors: ["Can't change password"] })
-            if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't change password"] })
+            if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't reset password"] })
+            if (err.message === "No token provided") res.status(401).send({ errors: ["Can't reset password"] })
+            if (err.message === "User does not exist or token is not valid") res.status(404).send({ errors: ["Can't reset password"] })
+            if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't reset password"] })
             else res.status(500).send({ errors: ["Can't reset password"] })
         }
     })
