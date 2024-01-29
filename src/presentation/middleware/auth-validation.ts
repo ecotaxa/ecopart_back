@@ -90,4 +90,23 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
         },
     ];
 
+    rulesResetPassword = [
+        // New password Validation
+        check('new_password')
+            .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.')
+            .matches(/\d/).withMessage('Password must contain a number.')
+            .matches(/[a-z]/).withMessage('Password must contain a lowercase letter.')
+            .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter.')
+            .matches(/[@!#$%^&*()_+.,;:]/).withMessage('Password must contain a special character.')
+            .bail(),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
 }

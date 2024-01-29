@@ -30,6 +30,7 @@ class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     }
 }
 class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
+    rulesResetPassword = [];
     rulesRequestResetPassword = [];
     rulesPassword = []
     rulesAuthUserCredentialsModel = [];
@@ -488,7 +489,7 @@ describe("User Router", () => {
                 new_password: "test123!!!!!!!",
                 reset_password_token: "reset_password_token",
             }
-            const error_message = "User does not exist or token is not valid"
+            const error_message = "User does not exist or reset_password_code is not valid"
             const expectedResponse = { errors: ["Can't reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))

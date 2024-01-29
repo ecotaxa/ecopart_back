@@ -27,7 +27,7 @@ export class ResetPassword implements ResetPasswordUseCase {
             }
         )
         // if the user does not exist or the reset_password_code is not valid
-        if (!preexistant_user) throw new Error("User does not exist or token is not valid");
+        if (!preexistant_user) throw new Error("User does not exist or reset_password_code is not valid");
 
         // is the user validated ?
         if (!preexistant_user.valid_email) throw new Error("User email is not validated");

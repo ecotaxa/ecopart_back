@@ -53,31 +53,26 @@ describe("PG DataSource", () => {
         expect(result).toStrictEqual([OutputData])
     })
 
-    // TODO
-    test("create", async () => {
-        const InputData: UserRequesCreationtModel = {
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            password: "test123!",
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-        }
 
-        const ds = new SQLiteUserDataSource(mockDatabase);
-        const inputData: UserRequesCreationtModel = {
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            password: "123test!",
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-        }
-        await ds.create(inputData);
-        expect(mockDatabase.run).toHaveBeenCalledWith("INSERT INTO user (name) VALUES ($1)", ["Smith"])
-    })
+    describe('create method', () => {
+        test('should insert a user into the database', async () => {
+            const ds = new SQLiteUserDataSource(mockDatabase);
+            const inputData: UserRequesCreationtModel = {
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                password: "123test!",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            }
+            await ds.create(inputData);
+            expect(mockDatabase.run).toHaveBeenCalledWith("INSERT INTO user (name) VALUES ($1)", ["Smith"])
+        });
+
+
+    });
+
 
     // test("deleteOne", async () => {
     //     const ds = new SQLiteUserDataSource(mockDatabase);

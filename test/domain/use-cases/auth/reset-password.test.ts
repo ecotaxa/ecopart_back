@@ -200,7 +200,7 @@ describe("Change password Use Case", () => {
                 await reset_password.execute(InputData);
             }
             catch (error) {
-                expect(error.message).toBe("User does not exist or token is not valid");
+                expect(error.message).toBe("User does not exist or reset_password_code is not valid");
             }
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);

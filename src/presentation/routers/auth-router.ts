@@ -119,7 +119,7 @@ export default function AuthRouter(
     })
 
     // reset password confirm
-    router.put('/password/reset', async (req: Request, res: Response) => {
+    router.put('/password/reset', middlewareAuthValidation.rulesResetPassword, async (req: Request, res: Response) => {
         try {
             await resetPasswordUseCase.execute(req.body)
             res
@@ -128,9 +128,9 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't reset password"] })
-            if (err.message === "No token provided") res.status(401).send({ errors: ["Can't reset password"] })
-            if (err.message === "User does not exist or token is not valid") res.status(404).send({ errors: ["Can't reset password"] })
-            if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't reset password"] })
+            else if (err.message === "No token provided") res.status(401).send({ errors: ["Can't reset password"] })
+            else if (err.message === "User does not exist or reset_password_code is not valid") res.status(404).send({ errors: ["Can't reset password"] })
+            else if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't reset password"] })
             else res.status(500).send({ errors: ["Can't reset password"] })
         }
     })
