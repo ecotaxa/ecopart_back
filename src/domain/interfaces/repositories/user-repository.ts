@@ -17,4 +17,6 @@ export interface UserRepository {
     verifyResetPasswordToken(reset_password_token: string): DecodedToken | null;
     setResetPasswordCode(user: UserUpdateModel): Promise<number>;
     toPublicUser(createdUser: PrivateUserModel): PublicUserModel;
+    deleteUser(user: UserUpdateModel): Promise<number>;
+    isDeleted(user_id: number): Promise<boolean>;
 }

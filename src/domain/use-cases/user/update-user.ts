@@ -11,6 +11,9 @@ export class UpdateUser implements UpdateUserUseCase {
     async execute(current_user: UserUpdateModel, user_to_update: UserUpdateModel): Promise<UserResponseModel> {
         let nb_of_updated_user: number = 0
 
+        // User should not be deleted
+        if (await this.userRepository.isDeleted(user_to_update.user_id)) throw new Error("User is deleted");
+
         // update admin can update anyone 
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.adminUpdateUser(user_to_update)

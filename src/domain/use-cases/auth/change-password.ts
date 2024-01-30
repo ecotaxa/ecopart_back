@@ -12,6 +12,9 @@ export class ChangePassword implements ChangePasswordUseCase {
     async execute(current_user: DecodedToken, credentials: ChangeCredentialsModel): Promise<void> {
         let nb_of_updated_user: number = 0
 
+        // User should not be deleted
+        if (await this.userRepository.isDeleted(credentials.user_id)) throw new Error("User is deleted");
+
         // admin can update anyone password without old password
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.changePassword(credentials)

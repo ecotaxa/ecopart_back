@@ -14,6 +14,7 @@ import { ChangePassword } from './domain/use-cases/auth/change-password'
 import { ValidUser } from './domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
 import { ResetPassword } from './domain/use-cases/auth/reset-password'
+import { DeleteUser } from './domain/use-cases/user/delete-user'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -86,6 +87,7 @@ async function getSQLiteDS() {
         new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
         new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
         new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
+        new DeleteUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
     )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),

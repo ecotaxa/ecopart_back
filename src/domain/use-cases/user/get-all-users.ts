@@ -9,6 +9,10 @@ export class GetAllUsers implements GetAllUsersUseCase {
     }
 
     async execute(): Promise<UserResponseModel[]> {
+        // TODO 
+        // User should not be deleted
+        //if (await this.userRepository.isDeleted(userAuth.user_id)) throw new Error("User is deleted");
+
         const result = await this.userRepository.getUsers()
         const publicUsers = result.map(user => this.userRepository.toPublicUser(user))
         return publicUsers

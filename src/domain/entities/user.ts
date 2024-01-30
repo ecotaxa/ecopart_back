@@ -4,7 +4,6 @@ export enum UserStatus {
     Anonym = "ANONYM"
 }
 
-// the user request model 
 export interface UserRequesCreationtModel {
     password: string;
     first_name: string;
@@ -28,6 +27,7 @@ export interface UserRequestModel {
     country?: string;
     user_planned_usage?: string;
     user_creation_date?: string;
+    deleted?: string;
 }
 export interface UserUpdateModel {
     [key: string]: any;
@@ -44,10 +44,11 @@ export interface UserUpdateModel {
     country?: string;
     user_planned_usage?: string;
     user_creation_date?: string;
+    deleted?: string;
 }
 
-// the user response model
 export interface UserResponseModel extends PublicUserModel {
+    deleted?: string;
     confirmation_code?: string | null;
     reset_password_code?: string | null;
 }

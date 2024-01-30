@@ -14,6 +14,9 @@ export class ValidUser implements ValidUserUseCase {
         if (!decoded_token) throw new Error("Invalid confirmation token");
         // Check if user_id in token is the same as user_id in params
         if (decoded_token.user_id != user_id) throw new Error("User vallidation forbidden");
+        // User should not be deleted
+        if (await this.userRepository.isDeleted(decoded_token.user_id)) throw new Error("User is deleted");
+
 
         // Find user with confirmation code and user_id
         const user_to_update = await this.userRepository.getUser({ user_id: user_id, confirmation_code: decoded_token.confirmation_code })

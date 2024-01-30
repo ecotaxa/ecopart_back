@@ -17,6 +17,8 @@ export class ResetPassword implements ResetPasswordUseCase {
         if (credentials.reset_password_token) {
             decoded_token = this.userRepository.verifyResetPasswordToken(credentials.reset_password_token)
             if (!decoded_token) throw new Error("Token is not valid");
+            // User should not be deleted
+            if (await this.userRepository.isDeleted(decoded_token.user_id)) throw new Error("User is deleted");
         } else throw new Error("No token provided");
 
         // does the user bind to reset_password_code exist ?

@@ -7,6 +7,7 @@ import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create
 import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-all-users'
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
+import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
 import { CustomRequest } from '../../domain/entities/auth'
 
 export default function UsersRouter(
@@ -15,7 +16,8 @@ export default function UsersRouter(
     getAllUsersUseCase: GetAllUsersUseCase,
     createUserUseCase: CreateUserUseCase,
     updateUserUseCase: UpdateUserUseCase,
-    validUserUseCase: ValidUserUseCase
+    validUserUseCase: ValidUserUseCase,
+    deleteUserUseCase: DeleteUserUseCase
 ) {
     const router = express.Router()
 
@@ -73,5 +75,19 @@ export default function UsersRouter(
             else res.status(500).send({ errors: ["Can't welcome user"] })
         }
     })
+
+    router.delete('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const deleted_user = await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
+            res.status(200).send(deleted_user)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Logged user cannot delete this user") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Can't find user to delete") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Can't find deleted user") res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't delete user"] })
+        }
+    })
+
     return router
 }

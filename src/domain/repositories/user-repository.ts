@@ -161,4 +161,34 @@ export class UserRepositoryImpl implements UserRepository {
         return publicUser
     }
 
+    async isDeleted(user_id: number): Promise<boolean> {
+        const user = await this.userDataSource.getOne({ user_id: user_id })
+        if (!user) return false
+        return user.deleted ? true : false
+    }
+
+    async deleteUser(user: UserUpdateModel): Promise<number> {
+        const params = ["user_id", "first_name", "last_name", "email", "valid_email", "confirmation_code", "is_admin", "organisation", "country", "user_planned_usage", "password_hash", "reset_password_code", "deleted"]
+        const anonymized_user: UserUpdateModel = {
+            user_id: user.user_id,
+            first_name: "anonym_" + user.user_id,
+            last_name: "anonym_" + user.user_id,
+            email: "anonym_" + user.user_id,
+            valid_email: false,
+            confirmation_code: null,
+            is_admin: false,
+            organisation: "anonymized",
+            country: "anonymized",
+            user_planned_usage: "anonymized",
+            password_hash: "anonymized",
+            reset_password_code: null,
+            // Deleted : current date time
+            deleted: new Date().toISOString()
+        }
+        console.log(anonymized_user)
+
+        const nb_of_updated_user = await this.updateUser(anonymized_user, params)
+        return nb_of_updated_user
+
+    }
 }

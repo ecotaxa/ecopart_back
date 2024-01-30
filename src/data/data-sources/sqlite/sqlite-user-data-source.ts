@@ -13,7 +13,7 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     init_user_db() {
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted TIMESTAMP DEFAULT NULL);"
         this.db.run(sql_create, [])
     }
 
@@ -53,19 +53,12 @@ export class SQLiteUserDataSource implements UserDataSource {
                         country: row.country,
                         user_planned_usage: row.user_planned_usage,
                         user_creation_date: row.user_creation_date,
+                        deleted: row.deleted
                     }));
                     resolve(result);
                 }
             });
         })
-    }
-    //TODO 
-    // async deleteOne(user_id: String) {
-    //     await this.db.run(`delete ${DB_TABLE} where user_id = $1`, [user_id])
-    // }
-    deleteOne(user_id: string): void {
-        console.log(user_id)
-        throw new Error("Method not implemented.");
     }
 
     // Returns the number of lines updates
@@ -131,6 +124,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                             country: row.country,
                             user_planned_usage: row.user_planned_usage,
                             user_creation_date: row.user_creation_date,
+                            deleted: row.deleted
                         };
                         resolve(result);
                     }
