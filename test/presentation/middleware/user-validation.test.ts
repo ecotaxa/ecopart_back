@@ -9,6 +9,7 @@ import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user
 import { GetAllUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/get-all-users";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
 import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
+import { DeleteUserUseCase } from "../../../src/domain/interfaces/use-cases/user/delete-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
@@ -49,6 +50,12 @@ class MockMiddlewareAuth implements MiddlewareAuth {
     }
 }
 
+class MockDeleteUserUseCase implements DeleteUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
+
 describe("User Router", () => {
     let countriesAdapter: CountriesAdapter
     let mockMiddlewareAuth: MockMiddlewareAuth;
@@ -57,6 +64,7 @@ describe("User Router", () => {
     let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
     let mockValidUserUseCase: ValidUserUseCase;
+    let mockDeleteUserUseCase: DeleteUserUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -66,9 +74,10 @@ describe("User Router", () => {
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
+        mockDeleteUserUseCase = new MockDeleteUserUseCase()
 
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase))
     })
 
     beforeEach(() => {

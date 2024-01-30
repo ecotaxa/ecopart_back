@@ -14,6 +14,7 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
+import { DeleteUserUseCase } from "../../../src/domain/interfaces/use-cases/user/delete-user";
 
 class MockGetAllUsersUseCase implements GetAllUsersUseCase {
     execute(): Promise<UserResponseModel[]> {
@@ -46,6 +47,11 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         throw new Error("Method not implemented.")
     }
 }
+class MockDeleteUserUseCase implements DeleteUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented.")
+    }
+}
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesUserRequesCreationtModel = []
     rulesUserRequestModel = []
@@ -61,6 +67,7 @@ describe("User Router", () => {
     let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
     let mockValidUserUseCase: ValidUserUseCase;
+    let mockDeleteUserUseCase: DeleteUserUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -68,10 +75,10 @@ describe("User Router", () => {
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
+        mockDeleteUserUseCase = new MockDeleteUserUseCase()
         mockMiddlewareUserValidation = new MockMiddlewareUserValidation()
 
-
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase))
     })
 
     beforeEach(() => {

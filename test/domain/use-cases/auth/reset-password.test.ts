@@ -6,6 +6,12 @@ import { ResetPassword } from '../../../../src/domain/use-cases/auth/reset-passw
 
 describe("Change password Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -100,6 +106,7 @@ describe("Change password Use Case", () => {
             const nb_of_updated_user = 1
 
             jest.spyOn(mockUserRepository, "verifyResetPasswordToken").mockImplementation(() => { return decoded_token })
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(preexistant_user))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
@@ -108,6 +115,7 @@ describe("Change password Use Case", () => {
             await reset_password.execute(InputData);
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).toHaveBeenCalledWith({ ...preexistant_user, ...InputData });
         });
@@ -191,6 +199,7 @@ describe("Change password Use Case", () => {
             const nb_of_updated_user = 0
 
             jest.spyOn(mockUserRepository, "verifyResetPasswordToken").mockImplementation(() => { return decoded_token })
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
@@ -204,6 +213,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).not.toHaveBeenCalled()
         })
@@ -248,6 +258,7 @@ describe("Change password Use Case", () => {
             const nb_of_updated_user = 0
 
             jest.spyOn(mockUserRepository, "verifyResetPasswordToken").mockImplementation(() => { return decoded_token })
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(preexistant_user))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
@@ -261,6 +272,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).not.toHaveBeenCalled()
         })
@@ -304,6 +316,7 @@ describe("Change password Use Case", () => {
             const nb_of_updated_user = 0
 
             jest.spyOn(mockUserRepository, "verifyResetPasswordToken").mockImplementation(() => { return decoded_token })
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(preexistant_user))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
@@ -317,6 +330,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).toHaveBeenCalledWith({ ...preexistant_user, ...InputData });
         })

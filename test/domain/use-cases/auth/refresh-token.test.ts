@@ -6,6 +6,12 @@ import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../../../src/dom
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -106,6 +112,8 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         const result = await loginUserUseCase.execute(InputUserData);
         expect(result).toStrictEqual(OutputAuthData);
@@ -130,6 +138,8 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         try {
             const result = await loginUserUseCase.execute(InputUserData);

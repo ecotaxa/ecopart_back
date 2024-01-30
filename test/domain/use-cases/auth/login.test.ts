@@ -6,6 +6,12 @@ import { AuthJwtResponseModel, AuthUserCredentialsModel, DecodedToken } from "..
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -94,6 +100,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -121,6 +128,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -153,6 +161,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)

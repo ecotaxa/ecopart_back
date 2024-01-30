@@ -10,6 +10,12 @@ import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
 
 describe("Change password Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -128,6 +134,7 @@ describe("Change password Use Case", () => {
             const generated_token = "token"
 
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(goten_user_1)).mockImplementationOnce(() => Promise.resolve(goten_user_2))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "setResetPasswordCode").mockImplementation(() => Promise.resolve(1))
             jest.spyOn(mockUserRepository, "generateResetPasswordToken").mockImplementation(() => { return generated_token })
             jest.spyOn(mockMailerAdapter, "send_reset_password_email").mockImplementation(() => Promise.resolve())
@@ -137,6 +144,7 @@ describe("Change password Use Case", () => {
             await reset_password_request.execute(InputData);
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.setResetPasswordCode).toHaveBeenCalledWith({ user_id: 1 });
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
             expect(mockUserRepository.generateResetPasswordToken).toHaveBeenCalledWith(goten_user_2);
@@ -194,6 +202,7 @@ describe("Change password Use Case", () => {
             const generated_token = "token"
 
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(goten_user_1)).mockImplementationOnce(() => Promise.resolve(null))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "setResetPasswordCode").mockImplementation(() => Promise.resolve(0))
             jest.spyOn(mockUserRepository, "generateResetPasswordToken").mockImplementation(() => { return generated_token })
             jest.spyOn(mockMailerAdapter, "send_reset_password_email").mockImplementation(() => Promise.resolve())
@@ -206,6 +215,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.setResetPasswordCode).not.toHaveBeenCalled();
             expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
             expect(mockUserRepository.generateResetPasswordToken).not.toHaveBeenCalled();
@@ -234,6 +244,7 @@ describe("Change password Use Case", () => {
             const generated_token = "token"
 
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(goten_user_1)).mockImplementationOnce(() => Promise.resolve(null))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "setResetPasswordCode").mockImplementation(() => Promise.resolve(0))
             jest.spyOn(mockUserRepository, "generateResetPasswordToken").mockImplementation(() => { return generated_token })
             jest.spyOn(mockMailerAdapter, "send_reset_password_email").mockImplementation(() => Promise.resolve())
@@ -246,6 +257,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.setResetPasswordCode).toHaveBeenCalledWith({ user_id: 1 });
             expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
             expect(mockUserRepository.generateResetPasswordToken).not.toHaveBeenCalled();
@@ -274,6 +286,7 @@ describe("Change password Use Case", () => {
             const generated_token = "token"
 
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(goten_user_1)).mockImplementationOnce(() => Promise.resolve(null))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "setResetPasswordCode").mockImplementation(() => Promise.resolve(1))
             jest.spyOn(mockUserRepository, "generateResetPasswordToken").mockImplementation(() => { return generated_token })
             jest.spyOn(mockMailerAdapter, "send_reset_password_email").mockImplementation(() => Promise.resolve())
@@ -286,6 +299,7 @@ describe("Change password Use Case", () => {
             }
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.setResetPasswordCode).toHaveBeenCalledWith({ user_id: 1 });
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
             expect(mockUserRepository.generateResetPasswordToken).not.toHaveBeenCalled();

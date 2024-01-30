@@ -6,6 +6,12 @@ import { GetAllUsers } from '../../../../src/domain/use-cases/user/get-all-users
 describe("Get All Users Use Case", () => {
 
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }

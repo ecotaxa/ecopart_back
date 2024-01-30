@@ -8,6 +8,12 @@ import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -196,6 +202,7 @@ describe("Create User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
@@ -206,6 +213,7 @@ describe("Create User Use Case", () => {
         const result = await createUserUseCase.execute(InputData);
 
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+        expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
         expect(mockUserRepository.createUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toHaveBeenCalledWith(preexistant_user);
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
@@ -244,6 +252,7 @@ describe("Create User Use Case", () => {
         const expectedResponse = new Error("Valid user already exists");
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(preexistant_user))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))// not called
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "") // not called
@@ -257,6 +266,7 @@ describe("Create User Use Case", () => {
 
         } catch (err) {
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
             expect(mockUserRepository.createUser).not.toBeCalled();
             expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
@@ -297,6 +307,7 @@ describe("Create User Use Case", () => {
         const expectedResponse = new Error("Can't update preexistent user");
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token") // not called
@@ -311,6 +322,7 @@ describe("Create User Use Case", () => {
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
             expect(mockUserRepository.createUser).not.toBeCalled();
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.standardUpdateUser).toHaveBeenCalledWith(preexistant_user);
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
@@ -347,6 +359,7 @@ describe("Create User Use Case", () => {
         const expectedResponse = new Error("Can't find updated preexistent user");
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token") // not called
@@ -360,6 +373,7 @@ describe("Create User Use Case", () => {
         } catch (err) {
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
             expect(mockUserRepository.createUser).not.toBeCalled();
             expect(mockUserRepository.standardUpdateUser).toHaveBeenCalledWith(preexistant_user);
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });

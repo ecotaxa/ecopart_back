@@ -16,6 +16,12 @@ import { ChangePassword } from '../../../../src/domain/use-cases/auth/change-pas
 
 describe("Change password Use Case", () => {
     class MockUserRepository implements UserRepository {
+        deleteUser(): Promise<number> {
+            throw new Error("Method not implemented.");
+        }
+        isDeleted(): Promise<boolean> {
+            throw new Error("Method not implemented.");
+        }
         generateResetPasswordToken(): string {
             throw new Error("Method not implemented.");
         }
@@ -95,6 +101,7 @@ describe("Change password Use Case", () => {
             }
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
@@ -102,6 +109,7 @@ describe("Change password Use Case", () => {
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).toBeCalledWith({ email: current_user.email, password: credentials.password });
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             } catch (err) {
@@ -136,6 +144,7 @@ describe("Change password Use Case", () => {
 
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
@@ -146,6 +155,7 @@ describe("Change password Use Case", () => {
             } catch (err) {
                 expect(err).toStrictEqual(expectedResponse);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(2);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).not.toBeCalled();
             }
@@ -178,6 +188,7 @@ describe("Change password Use Case", () => {
 
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
@@ -188,6 +199,7 @@ describe("Change password Use Case", () => {
             } catch (err) {
                 expect(err).toStrictEqual(expectedResponse);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).not.toBeCalled();
             }
@@ -220,6 +232,7 @@ describe("Change password Use Case", () => {
 
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
@@ -230,6 +243,7 @@ describe("Change password Use Case", () => {
             } catch (err) {
                 expect(err).toStrictEqual(expectedResponse);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).toBeCalledWith({ email: current_user.email, password: credentials.password });
                 expect(mockUserRepository.changePassword).not.toBeCalled();
             }
@@ -261,6 +275,7 @@ describe("Change password Use Case", () => {
             const expectedResponse = new Error("Can't change password");
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
@@ -271,6 +286,7 @@ describe("Change password Use Case", () => {
             } catch (err) {
                 expect(err).toStrictEqual(expectedResponse);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).toBeCalledWith({ email: current_user.email, password: credentials.password });
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             }
@@ -302,6 +318,7 @@ describe("Change password Use Case", () => {
             }
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
@@ -309,6 +326,7 @@ describe("Change password Use Case", () => {
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             } catch (err) {
@@ -341,6 +359,7 @@ describe("Change password Use Case", () => {
             }
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
@@ -348,6 +367,7 @@ describe("Change password Use Case", () => {
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(2);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             } catch (err) {
@@ -380,6 +400,7 @@ describe("Change password Use Case", () => {
             }
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
@@ -387,6 +408,7 @@ describe("Change password Use Case", () => {
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             } catch (err) {
@@ -419,6 +441,7 @@ describe("Change password Use Case", () => {
             const expectedResponse = new Error("Can't change password");
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
@@ -429,6 +452,7 @@ describe("Change password Use Case", () => {
             } catch (err) {
                 expect(err).toStrictEqual(expectedResponse);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
+                expect(mockUserRepository.isDeleted).toBeCalledWith(1);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
             }
