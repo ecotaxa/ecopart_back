@@ -23,6 +23,10 @@ export class LoginUser implements LoginUserUseCase {
 
             // If can't find user
             if (full_user === null) throw new Error("Can't find user");
+
+            // If founded user is deleted
+            if (await this.userRepository.isDeleted(full_user.user_id)) throw new Error("User is deleted");
+
             // If founded user email is not verified
             if (!full_user.valid_email) throw new Error("User email not verified");
 

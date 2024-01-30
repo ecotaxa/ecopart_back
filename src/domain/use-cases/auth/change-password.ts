@@ -14,6 +14,7 @@ export class ChangePassword implements ChangePasswordUseCase {
 
         // User should not be deleted
         if (await this.userRepository.isDeleted(credentials.user_id)) throw new Error("User is deleted");
+        if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
 
         // admin can update anyone password without old password
         if (await this.userRepository.isAdmin(current_user.user_id)) {

@@ -23,7 +23,10 @@ export class RefreshToken implements RefreshTokenUseCase {
         // If can't find user
         if (full_user === null) throw new Error("Can't find user");
 
-        // Get authorisation access token
+        // If founded user is deleted
+        if (await this.userRepository.isDeleted(full_user.user_id)) throw new Error("User is deleted");
+
+        // Get authorisation access token //TODO CHECK if generated token based on public user
         const refreshed_token = { jwt: this.authRepository.generateAccessToken(full_user) }
         return refreshed_token
     }

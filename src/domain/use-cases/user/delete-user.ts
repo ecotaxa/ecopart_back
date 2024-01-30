@@ -19,6 +19,8 @@ export class DeleteUser implements DeleteUserUseCase {
         if (!user_to_update_exist) throw new Error("Can't find user to delete");
         // User should not be deleted
         if (await this.userRepository.isDeleted(user_to_update_exist.user_id)) throw new Error("User is deleted");
+        if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
+
 
         // Check that current_user is admin or is the user to update
         if (await this.userRepository.isAdmin(current_user.user_id) || current_user.user_id == user_to_update.user_id) {

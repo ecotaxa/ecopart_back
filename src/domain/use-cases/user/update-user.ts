@@ -13,6 +13,7 @@ export class UpdateUser implements UpdateUserUseCase {
 
         // User should not be deleted
         if (await this.userRepository.isDeleted(user_to_update.user_id)) throw new Error("User is deleted");
+        if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
 
         // update admin can update anyone 
         if (await this.userRepository.isAdmin(current_user.user_id)) {
