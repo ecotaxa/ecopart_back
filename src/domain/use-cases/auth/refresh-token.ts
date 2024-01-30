@@ -14,8 +14,6 @@ export class RefreshToken implements RefreshTokenUseCase {
     }
 
     async execute(userAuth: DecodedToken): Promise<AuthJwtRefreshedResponseModel> {
-        // User should not be deleted
-        if (await this.userRepository.isDeleted(userAuth.user_id)) throw new Error("User is deleted");
 
         // Get full user based on decoded token user's email
         const full_user = await this.userRepository.getUser({ email: userAuth.email })

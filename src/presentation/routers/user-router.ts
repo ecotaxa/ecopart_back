@@ -38,6 +38,7 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Can't create user"] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't update preexistent user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't find updated preexistent user") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Can't find created user") res.status(404).send({ errors: [err.message] })
@@ -52,6 +53,7 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't update user"] })
         }
@@ -67,6 +69,7 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Invalid confirmation token") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Invalid confirmation code") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User vallidation forbidden") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't update user") res.status(500).send({ errors: [err.message] })
@@ -78,12 +81,20 @@ export default function UsersRouter(
 
     router.delete('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            const deleted_user = await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
-            res.status(200).send(deleted_user)
+            await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
+            if ((req as CustomRequest).token.user_id == parseInt(req.params.user_id)) {
+                res
+                    .clearCookie("access_token")
+                    .clearCookie("refresh_token")
+                    .status(200)
+                    .json({ response: "You have been Logged Out and permanently deleted" });
+            } else
+                res.status(200).send({ message: "User successfully deleted" })
         } catch (err) {
             console.log(err)
             if (err.message === "Logged user cannot delete this user") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Can't find user to delete") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't find deleted user") res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't delete user"] })
         }

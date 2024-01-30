@@ -31,7 +31,6 @@ export class DeleteUser implements DeleteUserUseCase {
         }
 
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
-        console.log(updated_user)
         if (!updated_user) throw new Error("Can't find deleted user");
 
     }

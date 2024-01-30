@@ -40,6 +40,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Invalid credentials") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User email not verified") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't login"] })
         }
@@ -47,7 +48,7 @@ export default function AuthRouter(
 
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            // TODO check if user valid?
+            // TODO check if user valid
             res.status(200).send((req as CustomRequest).token)
         } catch (err) {
             console.log(err.message)
@@ -66,6 +67,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Can't find user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't refresh token"] })
         }
     })
@@ -97,6 +99,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "New password must be different from old password") res.status(401).send({ errors: ["New password must be different from old password"] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't change password"] })
         }
     })
@@ -111,6 +114,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User does not exist") res.status(200).send({ response: "Reset password request email sent." })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User email is not validated") res.status(200).send({ response: "Reset password request email sent." })
             else if (err.message === "Can't set password reset code") res.status(500).send({ errors: ["Can't reset password"] })
             else if (err.message === "Can't find updated user") res.status(500).send({ errors: ["Can't reset password"] })
@@ -128,6 +132,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't reset password"] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "No token provided") res.status(401).send({ errors: ["Can't reset password"] })
             else if (err.message === "User does not exist or reset_password_code is not valid") res.status(404).send({ errors: ["Can't reset password"] })
             else if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't reset password"] })

@@ -67,7 +67,6 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             // If token is missing, send a 401 Unauthorized response
             if (!token) return res.status(401).send({ errors: ['Refresh token missing. Please authenticate.'] })
 
-
             // Verify the token using the refresh secret key
             const decoded = this.jwt.verify(token, this.SECRET_KEY_REFRESH);
 
