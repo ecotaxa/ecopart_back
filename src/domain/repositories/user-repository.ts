@@ -185,7 +185,6 @@ export class UserRepositoryImpl implements UserRepository {
             // Deleted : current date time
             deleted: new Date().toISOString()
         }
-        console.log(anonymized_user)
 
         const nb_of_updated_user = await this.updateUser(anonymized_user, params)
         return nb_of_updated_user

@@ -53,7 +53,6 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
     }
 
     async send_reset_password_email(transporter: nodemailer.Transporter, user: UserResponseModel, resetPasswordToken: string): Promise<void> {
-        console.log(user)
         // Read the HTML file
         let htmlContent = "error"
         try {
