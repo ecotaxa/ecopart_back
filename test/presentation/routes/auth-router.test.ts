@@ -268,7 +268,7 @@ describe("User Router", () => {
             const response = await request(server).post("/auth/logout").send();
 
             expect(response.status).toBe(200)
-            expect(response.body).toEqual({ response: "You are Logged Out" });
+            expect(response.body).toEqual({ message: "You are Logged Out" });
             expect(response.header['set-cookie']).toEqual([
                 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
                 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
@@ -288,7 +288,7 @@ describe("User Router", () => {
                 new_password: "test123!!"
             }
 
-            const expectedResponse = { response: "Password sucessfully changed" }
+            const expectedResponse = { message: "Password sucessfully changed" }
 
             jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
 
@@ -357,7 +357,7 @@ describe("User Router", () => {
                 "email": "john@gmail.com",
             }
 
-            const expectedResponse = { response: "Reset password request email sent." }
+            const expectedResponse = { message: "Reset password request email sent." }
 
             jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.resolve())
 
@@ -373,7 +373,7 @@ describe("User Router", () => {
                 "email": "john@gmail.com",
             }
 
-            const expectedResponse = { response: "Reset password request email sent." }
+            const expectedResponse = { message: "Reset password request email sent." }
 
             jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User does not exist")))
 
@@ -389,7 +389,7 @@ describe("User Router", () => {
                 "email": "john@gmail.com",
             }
 
-            const expectedResponse = { response: "Reset password request email sent." }
+            const expectedResponse = { message: "Reset password request email sent." }
 
             jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User email is not validated")))
 
@@ -438,7 +438,7 @@ describe("User Router", () => {
                 new_password: "test123!",
                 reset_password_token: "reset_password_token",
             }
-            const expectedResponse = { response: "Password sucessfully reset, please login" }
+            const expectedResponse = { message: "Password sucessfully reset, please login" }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
 

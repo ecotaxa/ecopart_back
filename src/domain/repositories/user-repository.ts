@@ -182,7 +182,6 @@ export class UserRepositoryImpl implements UserRepository {
             user_planned_usage: "anonymized",
             password_hash: "anonymized",
             reset_password_code: null,
-            // Deleted : current date time
             deleted: new Date().toISOString()
         }
 

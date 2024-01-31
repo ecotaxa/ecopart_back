@@ -87,7 +87,7 @@ export default function UsersRouter(
                     .clearCookie("access_token")
                     .clearCookie("refresh_token")
                     .status(200)
-                    .json({ response: "You have been Logged Out and permanently deleted" });
+                    .json({ message: "You have been Logged Out and permanently deleted" });
             } else
                 res.status(200).send({ message: "User successfully deleted" })
         } catch (err) {

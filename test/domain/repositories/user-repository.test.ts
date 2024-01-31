@@ -644,4 +644,114 @@ describe("User Repository", () => {
             expect(result).toStrictEqual(expectedData)
         });
     })
+    describe("IsDeleted", () => {
+        test("Should return true for a deleted user", async () => {
+            const deletedUser: UserResponseModel = {
+                user_id: 1,
+                last_name: "anonym_1",
+                first_name: "anonym_1",
+                email: "anonym_1",
+                valid_email: false,
+                is_admin: false,
+                organisation: "anonymized",
+                country: "anonymized",
+                user_planned_usage: "anonymized",
+                user_creation_date: '2023-08-01 10:30:00',
+                deleted: '2023-08-01 10:30:00',
+            }
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(deletedUser))
+
+            const result = await userRepository.isDeleted(1);
+            expect(result).toBe(true)
+        });
+        test("Should return false for a non deleted user", async () => {
+            const nonDeletedUser: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: true,
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonDeletedUser))
+
+            const result = await userRepository.isDeleted(1);
+            expect(result).toBe(false)
+        });
+
+        test("Should return false for a non existing user", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(null))
+            const result = await userRepository.isDeleted(1);
+            expect(result).toBe(false)
+        });
+    });
+
+    describe("DeleteUser", () => {
+
+        test("user deletion is a sucess", async () => {
+            const deletedUser: UserUpdateModel = {
+                user_id: 1,
+                last_name: "anonym_1",
+                first_name: "anonym_1",
+                email: "anonym_1",
+                valid_email: false,
+                confirmation_code: null,
+                is_admin: false,
+                organisation: "anonymized",
+                country: "anonymized",
+                user_planned_usage: "anonymized",
+                password_hash: "anonymized",
+                reset_password_code: null,
+                deleted: "2021-08-10T00:00:00.000Z"
+            }
+            const nonDeletedUser: UserUpdateModel = {
+                user_id: 1,
+
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(1))
+            jest.spyOn(Date, "now").mockImplementation(() => 1628580000000)
+            jest.spyOn(Date.prototype, "toISOString").mockImplementation(() => "2021-08-10T00:00:00.000Z")
+
+            const result = await userRepository.deleteUser(nonDeletedUser);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(deletedUser)
+            expect(result).toBe(1)
+        });
+
+        test("user deletion is a failure", async () => {
+            const deletedUser: UserUpdateModel = {
+                user_id: 1,
+                last_name: "anonym_1",
+                first_name: "anonym_1",
+                email: "anonym_1",
+                valid_email: false,
+                confirmation_code: null,
+                is_admin: false,
+                organisation: "anonymized",
+                country: "anonymized",
+                user_planned_usage: "anonymized",
+                password_hash: "anonymized",
+                reset_password_code: null,
+                deleted: "2021-08-10T00:00:00.000Z"
+            }
+            const nonDeletedUser: UserUpdateModel = {
+                user_id: 1,
+
+            }
+
+            jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
+            jest.spyOn(Date, "now").mockImplementation(() => 1628580000000)
+            jest.spyOn(Date.prototype, "toISOString").mockImplementation(() => "2021-08-10T00:00:00.000Z")
+
+            const result = await userRepository.deleteUser(nonDeletedUser);
+
+            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(deletedUser)
+            expect(result).toBe(0)
+        });
+    });
 })

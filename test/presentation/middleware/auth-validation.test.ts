@@ -159,7 +159,7 @@ describe("User Router", () => {
                 new_password: "Test123!!"
             }
 
-            const expectedResponse = { response: "Password sucessfully changed" }
+            const expectedResponse = { message: "Password sucessfully changed" }
 
             jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
 

@@ -12,13 +12,12 @@ export class DeleteUser implements DeleteUserUseCase {
         let nb_of_deleted_user: number = 0
         //TODO LATER : check if user_to_update have no progects where he is manager or member
         // const user_to_update_projects = await this.userRepository.getUserProjects(user_to_update.user_id)
-        // if (user_to_update_projects.length > 0) throw new Error("User have projects")
 
         // Check that user to upadate exist
         const user_to_update_exist = await this.userRepository.getUser({ user_id: user_to_update.user_id })
         if (!user_to_update_exist) throw new Error("Can't find user to delete");
         // User should not be deleted
-        if (await this.userRepository.isDeleted(user_to_update_exist.user_id)) throw new Error("User is deleted");
+        if (user_to_update_exist.deleted) throw new Error("User is deleted");
         if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
 
 
@@ -29,9 +28,6 @@ export class DeleteUser implements DeleteUserUseCase {
         } else {
             throw new Error("Logged user cannot delet this user");
         }
-
-        const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
-        if (!updated_user) throw new Error("Can't find deleted user");
 
     }
 }
