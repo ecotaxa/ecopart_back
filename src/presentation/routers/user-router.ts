@@ -23,7 +23,7 @@ export default function UsersRouter(
 
     router.get('/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            const users = await getAllUsersUseCase.execute()
+            const users = await getAllUsersUseCase.execute((req as CustomRequest).token, { ...req.query });
             res.status(200).send(users)
         } catch (err) {
             console.log(err)

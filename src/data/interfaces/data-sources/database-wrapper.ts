@@ -8,7 +8,7 @@ export interface SQLiteDatabaseWrapper {
     //get<T>(sql: string, params: any, callback?: (this: Statement, err: Error | null, row: T) => void): this;
     //get(sql: string, ...params: any[]): this;
 
-    all(sql: string, callback?: (this: any, err: Error | null, rows: any[]) => void): void;
+    all(sql: string, params: any, callback?: (this: any, err: Error | null, rows: any[]) => void): void;
     //all<T>(sql: string, params: any, callback?: (this: Statement, err: Error | null, rows: T[]) => void): this;
     //all(sql: string, ...params: any[]): this;
 

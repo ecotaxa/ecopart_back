@@ -2,6 +2,7 @@ import { UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpda
 import { AuthUserCredentialsModel, } from "../../../domain/entities/auth";
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
+import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
 // const DB_TABLE = "user"
 export class SQLiteUserDataSource implements UserDataSource {
@@ -40,26 +41,81 @@ export class SQLiteUserDataSource implements UserDataSource {
             });
         })
     }
-    async getAll(): Promise<UserResponseModel[]> {
-        const sql = "SELECT * from user"
+    // async getAll(): Promise<UserResponseModel[]> {
+    //     let sql = `SELECT * FROM user;`
+    //     return await new Promise((resolve, reject) => {
+    //         this.db.all(sql, (err, rows) => {
+    //             if (err) {
+    //                 reject(err);
+    //             } else {
+    //                 const result = rows.map(row => ({
+    //                     user_id: row.user_id,
+    //                     first_name: row.first_name,
+    //                     last_name: row.last_name,
+    //                     email: row.email,
+    //                     valid_email: row.valid_email == 1 ? true : false,
+    //                     is_admin: row.is_admin == 1 ? true : false,
+    //                     organisation: row.organisation,
+    //                     country: row.country,
+    //                     user_planned_usage: row.user_planned_usage,
+    //                     user_creation_date: row.user_creation_date,
+    //                     deleted: row.deleted
+    //                 }));
+    //                 resolve(result);
+    //             }
+    //         });
+    //     })
+    // }
+    async getAll(options: PreparedSearchOptions): Promise<SearchResult> {
+        // Get the limited rows and the total count of rows //  WHERE your_condition
+        let sql = `SELECT *, (SELECT COUNT(*) FROM user) AS total_count FROM user`
+        const params: any[] = []
+
+        // // Add filtering
+        // if (options.filter) {
+        //     const params = options.filter.map(() => '(?)').join(',');
+        //     const placeholders = params.map(() => '(?)').join(',');
+        //     sql += ` WHERE  LIKE ?`; // Replace 'someColumn' with the actual column
+        // }
+
+        // // Add sorting
+        // if (options.sort) {
+        //     sql += ` ORDER BY ${options.sort}`; // Be cautious of SQL injection
+        // }
+
+        // Add pagination
+        const page = options.page;
+        const limit = options.limit;
+        const offset = (page - 1) * limit;
+        sql += ` LIMIT (?) OFFSET (?)`;
+        params.push(limit, offset);
+
+        // Add final ;
+        sql += `;`
+
         return await new Promise((resolve, reject) => {
-            this.db.all(sql, (err, rows) => {
+            this.db.all(sql, params, (err, rows) => {
                 if (err) {
                     reject(err);
                 } else {
-                    const result = rows.map(row => ({
-                        user_id: row.user_id,
-                        first_name: row.first_name,
-                        last_name: row.last_name,
-                        email: row.email,
-                        valid_email: row.valid_email == 1 ? true : false,
-                        is_admin: row.is_admin == 1 ? true : false,
-                        organisation: row.organisation,
-                        country: row.country,
-                        user_planned_usage: row.user_planned_usage,
-                        user_creation_date: row.user_creation_date,
-                        deleted: row.deleted
-                    }));
+                    if (rows === undefined) resolve({ users: [], total: 0 });
+                    console.log("rows", rows)
+                    const result: SearchResult = {
+                        users: rows.map(row => ({
+                            user_id: row.user_id,
+                            first_name: row.first_name,
+                            last_name: row.last_name,
+                            email: row.email,
+                            valid_email: row.valid_email == 1 ? true : false,
+                            is_admin: row.is_admin == 1 ? true : false,
+                            organisation: row.organisation,
+                            country: row.country,
+                            user_planned_usage: row.user_planned_usage,
+                            user_creation_date: row.user_creation_date,
+                            deleted: row.deleted
+                        })),
+                        total: rows[0].total_count
+                    };
                     resolve(result);
                 }
             });

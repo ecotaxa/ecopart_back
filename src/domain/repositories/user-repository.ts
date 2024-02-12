@@ -5,6 +5,7 @@ import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "
 import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
+import { PreparedSearchOptions, SearchOptions, SearchResult } from "../entities/search";
 
 export class UserRepositoryImpl implements UserRepository {
     userDataSource: UserDataSource
@@ -84,8 +85,44 @@ export class UserRepositoryImpl implements UserRepository {
         return nb_of_updated_user
     }
 
-    async getUsers(): Promise<UserResponseModel[]> {
-        const result = await this.userDataSource.getAll()
+    adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
+        //can be filtered by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        //const prepared_options = this.prepare_options(options)
+
+        return this.userDataSource.getAll(options)
+    }
+
+    standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
+        //can be filtered by ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date"]
+        //const prepared_options = this.prepare_options(options)
+        // if option 
+        // prepared_options.filter.deleted = undefined;
+        // prepared_options.filter.valid_email = true;
+        return this.userDataSource.getAll(options)
+    }
+
+    // prepare_options(options: SearchOptions): PreparedSearchOptions {
+    //     const preparedOptions: PreparedSearchOptions = {
+    //         // filter: options.filter || {}, // Use the provided filter or an empty object if not specified
+    //         // sort: options.sort || [], // Use the provided sort or an empty array if not specified
+    //         page: options.page,
+    //         limit: options.limit
+    //     }
+    //     return preparedOptions;
+    // }
+
+    async getUsers(options: SearchOptions): Promise<SearchResult> {
+        //can be filtered by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        //can be ordred by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        console.log("options", options)
+        const preparedOptions: PreparedSearchOptions = {
+            // filter: [],
+            // sort: [],
+            page: options.page || 1, // Add pagination support, Default to page 1 if not specified
+            limit: options.limit || 10 // Set limit for pagination, Default to 10 items per page if not specified
+        }
+        const result = await this.userDataSource.getAll(preparedOptions)
+
         return result;
     }
 
