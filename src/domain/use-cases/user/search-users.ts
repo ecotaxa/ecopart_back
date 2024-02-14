@@ -1,15 +1,21 @@
-import { PreparedSearchOptions, SearchInfo, SearchOptions } from "../../entities/search";
+import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions } from "../../entities/search";
 import { UserResponseModel, UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { GetAllUsersUseCase } from "../../interfaces/use-cases/user/get-all-users";
+import { SearchUsersUseCase } from "../../interfaces/use-cases/user/search-user";
 
-export class GetAllUsers implements GetAllUsersUseCase {
+export class SearchUsers implements SearchUsersUseCase {
     userRepository: UserRepository
     constructor(userRepository: UserRepository) {
         this.userRepository = userRepository
     }
 
-    async execute(current_user: UserUpdateModel, options: SearchOptions): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
+        // TODO throw errors if unauthorize opion is used
+        // TODO handle empty result
+        // TODO define wanted cases sensitivity
+        // TODO handle add info about the filtering 
+        // TODO add info about sorting
+
         // User should not be deleted
         if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
 
@@ -36,9 +42,14 @@ export class GetAllUsers implements GetAllUsersUseCase {
             // Default to 10 items per page if not specified
             options.limit = 10
         }
-
-        // Set filters to empty in get all case
-        options.filter = [];
+        if (filters && filters.length > 0) {
+            // Check if filters objects contains filed, operator and value
+            options.filter = filters.filter(filter => filter.field && filter.operator && filter.value);
+            console.log(options.filter)
+        } else {
+            // Set no filter by default
+            options.filter = [];
+        }
 
         // Check that options.sort_by is string and format it to PreparedSortingSearchOptions[]
         if (options.sort_by) {
@@ -52,18 +63,17 @@ export class GetAllUsers implements GetAllUsersUseCase {
         let result;
         let users: UserResponseModel[] = [];
 
-        // if admin, can search for deleted users
+        // If admin, can search for deleted users
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             result = await this.userRepository.adminGetUsers(options as PreparedSearchOptions);
             users = result.users;
-            //const total =result.total; // Total number of users matching the filter
+            // Const total =result.total; // Total number of users matching the filter
         } else {
             result = await this.userRepository.standardGetUsers(options as PreparedSearchOptions);
-            //const total =result.total; // Total number of users matching the filter
+            // Const total =result.total; // Total number of users matching the filter
             users = result.users.map(user => this.userRepository.toPublicUser(user));
         }
 
-        // Prepare info for pagination
         const search_info: SearchInfo = {
             total: result.total,
             limit: options.limit || 10, // Default to 10 items per page if not specified

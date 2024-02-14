@@ -1,5 +1,5 @@
-import { SearchInfo, SearchOptions } from "../../../entities/search";
+import { SearchInfo, PaginedSearchOptions } from "../../../entities/search";
 import { UserResponseModel, UserUpdateModel } from "../../../entities/user";
 export interface GetAllUsersUseCase {
-    execute(current_user: UserUpdateModel, options: SearchOptions): Promise<{ users: UserResponseModel[], search_info: SearchInfo }>;
+    execute(current_user: UserUpdateModel, options: PaginedSearchOptions): Promise<{ users: UserResponseModel[], search_info: SearchInfo }>;
 }

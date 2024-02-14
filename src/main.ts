@@ -6,6 +6,7 @@ import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 
 import { GetAllUsers } from './domain/use-cases/user/get-all-users'
+import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
 import { UpdateUser } from './domain/use-cases/user/update-user'
 import { LoginUser } from './domain/use-cases/auth/login'
@@ -79,24 +80,27 @@ async function getSQLiteDS() {
         },
 
     })
-
-    const userMiddleWare = UserRouter(
-        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-        new MiddlewareUserValidation(countriesAdapter),
-        new GetAllUsers(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
-        new CreateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
-        new UpdateUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
-        new ValidUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
-        new DeleteUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
-    )
+    const user_repo = new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
+    const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
+    const userMiddleWare =
+        UserRouter(
+            new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+            new MiddlewareUserValidation(countriesAdapter),
+            new GetAllUsers(user_repo),
+            new CreateUser(user_repo, transporter, mailerAdapter),
+            new UpdateUser(user_repo),
+            new ValidUser(user_repo),
+            new DeleteUser(user_repo),
+            new SearchUsers(user_repo),
+        )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareAuthValidation(),
-        new LoginUser(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
-        new RefreshToken(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)),
-        new ChangePassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
-        new ResetPasswordRequest(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET), transporter, mailerAdapter),
-        new ResetPassword(new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)),
+        new LoginUser(user_repo, auth_repo),
+        new RefreshToken(user_repo, auth_repo),
+        new ChangePassword(user_repo),
+        new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
+        new ResetPassword(user_repo),
     )
 
     server.use("/users", userMiddleWare)

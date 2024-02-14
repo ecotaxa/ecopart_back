@@ -68,20 +68,60 @@ export class SQLiteUserDataSource implements UserDataSource {
     // }
     async getAll(options: PreparedSearchOptions): Promise<SearchResult> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT *, (SELECT COUNT(*) FROM user) AS total_count FROM user`
+        let sql = `SELECT *, (SELECT COUNT(*) FROM user`
         const params: any[] = []
+        let filtering_sql = ""
+        const params_filtering: any[] = []
+        // Add filtering
+        if (options.filter.length > 0) {
+            filtering_sql += ` WHERE `;
+            // For each filter, add to filtering_sql and params_filtering
+            for (const filter of options.filter) {
+                // If value is undefined, null or empty, and operator =, set to is null
+                if (filter.value == undefined || filter.value == null || filter.value == "") {
+                    if (filter.operator == "=") {
+                        filtering_sql += filter.field + ` IS NULL`;
+                    } else if (filter.operator == "!=") {
+                        filtering_sql += filter.field + ` IS NOT NULL`;
+                    }
+                }
+                // If value is true or false, set to 1 or 0
+                else if (filter.value == true) {
+                    filtering_sql += filter.field + ` = 1`;
+                }
+                else if (filter.value == false) {
+                    filtering_sql += filter.field + ` = 0`;
+                }
+                else {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?) `
+                    params_filtering.push(filter.value)
+                }
+                filtering_sql += ` AND `;
+            }
+            // remove last AND
+            filtering_sql = filtering_sql.slice(0, -4);
+        }
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
 
-        // // Add filtering
-        // if (options.filter) {
-        //     const params = options.filter.map(() => '(?)').join(',');
-        //     const placeholders = params.map(() => '(?)').join(',');
-        //     sql += ` WHERE  LIKE ?`; // Replace 'someColumn' with the actual column
-        // }
+        sql += `) AS total_count FROM user`
 
-        // // Add sorting
-        // if (options.sort) {
-        //     sql += ` ORDER BY ${options.sort}`; // Be cautious of SQL injection
-        // }
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        // Add sorting
+        if (options.sort_by.length > 0) {
+            sql += ` ORDER BY`;
+            for (const sort of options.sort_by) {
+                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+            }
+            // remove last ,
+            sql = sql.slice(0, -1);
+        }
 
         // Add pagination
         const page = options.page;
@@ -114,7 +154,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                             user_creation_date: row.user_creation_date,
                             deleted: row.deleted
                         })),
-                        total: rows[0].total_count
+                        total: rows[0]?.total_count || 0
                     };
                     resolve(result);
                 }

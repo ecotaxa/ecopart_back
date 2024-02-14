@@ -8,6 +8,7 @@ import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-a
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
+import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
 import { CustomRequest } from '../../domain/entities/auth'
 
 export default function UsersRouter(
@@ -17,13 +18,26 @@ export default function UsersRouter(
     createUserUseCase: CreateUserUseCase,
     updateUserUseCase: UpdateUserUseCase,
     validUserUseCase: ValidUserUseCase,
-    deleteUserUseCase: DeleteUserUseCase
+    deleteUserUseCase: DeleteUserUseCase,
+    searchUsersUseCase: SearchUsersUseCase
 ) {
     const router = express.Router()
 
+    // pagined list of users and sorted
     router.get('/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const users = await getAllUsersUseCase.execute((req as CustomRequest).token, { ...req.query });
+            res.status(200).send(users)
+        } catch (err) {
+            console.log(err)
+            res.status(500).send({ errors: ["Can't get users"] })
+        }
+    })
+
+    router.post('/searches', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            // TODO Clean .filters
+            const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query }, req.body as any[]);
             res.status(200).send(users)
         } catch (err) {
             console.log(err)

@@ -5,7 +5,7 @@ import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "
 import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
-import { PreparedSearchOptions, SearchOptions, SearchResult } from "../entities/search";
+import { PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../entities/search";
 
 export class UserRepositoryImpl implements UserRepository {
     userDataSource: UserDataSource
@@ -13,6 +13,8 @@ export class UserRepositoryImpl implements UserRepository {
     userJwt: JwtWrapper
     VALIDATION_TOKEN_SECRET: string
     RESET_PASSWORD_TOKEN_SECRET: string
+    order_by_allow_params: string[] = ["asc", "desc"]
+    filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE", "BETWEEN"]
 
     constructor(userDataSource: UserDataSource, userCrypto: CryptoWrapper, userJwt: JwtWrapper, VALIDATION_TOKEN_SECRET: string, RESET_PASSWORD_TOKEN_SECRET: string) {
         this.userDataSource = userDataSource
@@ -85,45 +87,59 @@ export class UserRepositoryImpl implements UserRepository {
         return nb_of_updated_user
     }
 
-    adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
-        //can be filtered by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+    async adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
+        //can be filtered by 
+        const filter_params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        // Can be sort_by
+        const sort_param_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
         //const prepared_options = this.prepare_options(options)
-
-        return this.userDataSource.getAll(options)
+        return await this.getUsers(options, filter_params_admin, sort_param_admin, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
-    standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
-        //can be filtered by ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date"]
-        //const prepared_options = this.prepare_options(options)
-        // if option 
-        // prepared_options.filter.deleted = undefined;
-        // prepared_options.filter.valid_email = true;
-        return this.userDataSource.getAll(options)
+    async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
+        //can be filtered by 
+        const filter_params_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "valid_email", "deleted"] // Add valid_email and deleted to force default filter
+        // Can be sort_by 
+        const sort_param_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date"]
+
+        // If valid email or deleted dilter delet them
+        options.filter.filter(filter => filter.field === "valid_email" || filter.field === "deleted")
+
+        options.filter.push({ field: "valid_email", operator: "=", value: true });
+        options.filter.push({ field: "deleted", operator: "=", value: null });
+
+        return await this.getUsers(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
-    // prepare_options(options: SearchOptions): PreparedSearchOptions {
-    //     const preparedOptions: PreparedSearchOptions = {
-    //         // filter: options.filter || {}, // Use the provided filter or an empty object if not specified
-    //         // sort: options.sort || [], // Use the provided sort or an empty array if not specified
-    //         page: options.page,
-    //         limit: options.limit
-    //     }
-    //     return preparedOptions;
-    // }
+    formatSortBy(raw_sort_by: string): PreparedSortingSearchOptions[] {
+        // Split the raw_sort_by string by commas to get individual sorting statements
+        const prepared_sort_by = raw_sort_by.split(",").map(statement => {
+            // Split the statement by "(" to separate order_by and sort_by
+            const [order_by, sort_by] = statement.split("(");
+            // Extract the sort_by string and remove the closing ")"
+            const clean_sort_by = sort_by.slice(0, -1).toLowerCase();
+            // Return an object with sort_by and order_by keys if both are non-empty
+            if (clean_sort_by && order_by) {
+                return { sort_by: clean_sort_by, order_by: order_by.toLowerCase() };
+            }
+            // Otherwise, return null
+            return null;
+        }).filter(Boolean); // Filter out null values
+        return prepared_sort_by as PreparedSortingSearchOptions[];
+    }
 
-    async getUsers(options: SearchOptions): Promise<SearchResult> {
-        //can be filtered by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
-        //can be ordred by ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
-        console.log("options", options)
-        const preparedOptions: PreparedSearchOptions = {
-            // filter: [],
-            // sort: [],
-            page: options.page || 1, // Add pagination support, Default to page 1 if not specified
-            limit: options.limit || 10 // Set limit for pagination, Default to 10 items per page if not specified
-        }
-        const result = await this.userDataSource.getAll(preparedOptions)
+    private async getUsers(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult> {
+        // Filter options.sort_by by sorting params 
+        options.sort_by = options.sort_by.filter(sort_by =>
+            sort_by_params.includes(sort_by.sort_by) && order_by_params.includes(sort_by.order_by)
+        );
 
-        return result;
+        // Filter options.filters by filtering params
+        options.filter = options.filter.filter(filter =>
+            filtering_params.includes(filter.field) && filter_operator_params.includes(filter.operator)
+        );
+        //TODO check value? or juste prepared statement after
+        return await this.userDataSource.getAll(options);
     }
 
     async getUser(user: UserRequestModel): Promise<UserResponseModel | null> {
