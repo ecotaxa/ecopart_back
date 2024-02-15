@@ -14,7 +14,7 @@ export class SearchUsers implements SearchUsersUseCase {
         // TODO handle empty result
         // TODO define wanted cases sensitivity
         // TODO handle add info about the filtering 
-        // TODO add info about sorting
+        // TODO add info about sorting Or trow errors if unauthorize opion is used
 
         // User should not be deleted
         if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
@@ -44,7 +44,7 @@ export class SearchUsers implements SearchUsersUseCase {
         }
         if (filters && filters.length > 0) {
             // Check if filters objects contains filed, operator and value
-            options.filter = filters.filter(filter => filter.field && filter.operator && filter.value);
+            options.filter = this.userRepository.formatFilters(filters);
             console.log(options.filter)
         } else {
             // Set no filter by default

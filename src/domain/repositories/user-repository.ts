@@ -5,7 +5,7 @@ import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "
 import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
-import { PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../entities/search";
+import { FilterSearchOptions, PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../entities/search";
 
 export class UserRepositoryImpl implements UserRepository {
     userDataSource: UserDataSource
@@ -14,7 +14,7 @@ export class UserRepositoryImpl implements UserRepository {
     VALIDATION_TOKEN_SECRET: string
     RESET_PASSWORD_TOKEN_SECRET: string
     order_by_allow_params: string[] = ["asc", "desc"]
-    filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE", "BETWEEN"]
+    filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
 
     constructor(userDataSource: UserDataSource, userCrypto: CryptoWrapper, userJwt: JwtWrapper, VALIDATION_TOKEN_SECRET: string, RESET_PASSWORD_TOKEN_SECRET: string) {
         this.userDataSource = userDataSource
@@ -22,6 +22,20 @@ export class UserRepositoryImpl implements UserRepository {
         this.userJwt = userJwt
         this.VALIDATION_TOKEN_SECRET = VALIDATION_TOKEN_SECRET
         this.RESET_PASSWORD_TOKEN_SECRET = RESET_PASSWORD_TOKEN_SECRET
+    }
+
+    formatFilters(filters: FilterSearchOptions[]): FilterSearchOptions[] {
+        // TODO Choose if we throw errors or just remove unvalid filters and homogenize the others
+
+        // Check if filters objects contains filed, operator and value and delete it if not
+        const formated_filters = filters.filter(filter => filter.field && filter.operator && filter.value);
+        // Check that when operator is IN, value is an arrayand delete it if not
+        formated_filters.filter(filter => { !(filter.operator === "IN" && !Array.isArray(filter.value)) });
+        // Check that when operator is LIKE, value is a string and delete it if not
+        formated_filters.filter(filter => { !(filter.operator === "LIKE" && typeof filter.value === "string") });
+        // Check that when operator is =, >, <, >=, <=, <>, value is a string or a number or boolean and delete it if not
+        formated_filters.filter(filter => { !(["=", ">", "<", ">=", "<=", "<>"].includes(filter.operator) && (typeof filter.value === "string" || typeof filter.value === "number" || typeof filter.value === "boolean")) });
+        return formated_filters
     }
 
     // return number of lines updated

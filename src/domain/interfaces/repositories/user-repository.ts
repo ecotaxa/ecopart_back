@@ -1,8 +1,9 @@
 
 import { AuthUserCredentialsModel, DecodedToken, ChangeCredentialsModel } from "../../entities/auth";
-import { PreparedPaginedSearchOptions, PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../../entities/search";
+import { FilterSearchOptions, PreparedPaginedSearchOptions, PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../../entities/search";
 import { UserRequesCreationtModel, UserResponseModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../../entities/user";
 export interface UserRepository {
+    formatFilters(filters: FilterSearchOptions[]): FilterSearchOptions[];
     formatSortBy(sort_by: string): PreparedSortingSearchOptions[];
     changePassword(user_to_update: ChangeCredentialsModel): Promise<number>;
     getUser(user: UserRequestModel): Promise<UserResponseModel | null>;

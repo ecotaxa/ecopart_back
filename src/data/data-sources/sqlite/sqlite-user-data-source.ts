@@ -77,8 +77,16 @@ export class SQLiteUserDataSource implements UserDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
+                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                    // if array do not contains null or undefined
+                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
+                        // for eatch value in filter.value, add to filtering_sql and params_filtering
+                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        params_filtering.push(...filter.value)
+                    }
+                }
                 // If value is undefined, null or empty, and operator =, set to is null
-                if (filter.value == undefined || filter.value == null || filter.value == "") {
+                else if (filter.value == undefined || filter.value == null || filter.value == "") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
                     } else if (filter.operator == "!=") {
@@ -93,10 +101,10 @@ export class SQLiteUserDataSource implements UserDataSource {
                     filtering_sql += filter.field + ` = 0`;
                 }
                 else {
-                    filtering_sql += filter.field + ` ` + filter.operator + ` (?) `
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
                     params_filtering.push(filter.value)
                 }
-                filtering_sql += ` AND `;
+                filtering_sql += `AND `;
             }
             // remove last AND
             filtering_sql = filtering_sql.slice(0, -4);
