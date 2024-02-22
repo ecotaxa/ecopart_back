@@ -1,6 +1,6 @@
 
 import { AuthUserCredentialsModel, DecodedToken, ChangeCredentialsModel } from "../../entities/auth";
-import { FilterSearchOptions, PreparedPaginedSearchOptions, PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../../entities/search";
+import { FilterSearchOptions, PaginedSearchOptions, PreparedSearchOptions, PreparedSortingSearchOptions, SearchResult } from "../../entities/search";
 import { UserRequesCreationtModel, UserResponseModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../../entities/user";
 export interface UserRepository {
     formatFilters(filters: FilterSearchOptions[]): FilterSearchOptions[];
@@ -11,8 +11,8 @@ export interface UserRepository {
     standardUpdateUser(user: UserUpdateModel): Promise<number>;
     verifyUserLogin(user: AuthUserCredentialsModel): Promise<boolean>;
     createUser(user: UserRequesCreationtModel): Promise<number>;
-    adminGetUsers(options: PreparedSearchOptions | PreparedPaginedSearchOptions): Promise<SearchResult>;
-    standardGetUsers(options: PreparedSearchOptions | PreparedPaginedSearchOptions): Promise<SearchResult>;
+    adminGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult>;
+    standardGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult>;
     isAdmin(user_id: number): Promise<boolean>;
     validUser(user: UserRequestModel): Promise<number>;
     generateValidationToken(user: UserRequestModel): string;

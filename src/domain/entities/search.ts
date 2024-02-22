@@ -1,35 +1,29 @@
-//import { UserRequestModel } from "./user";
-
 import { UserResponseModel } from "./user";
 
 
 // Raw data
 export interface SearchOptions extends PaginedSearchOptions {
     filter?: FilterSearchOptions[]; // Add filtering support
-    sort_by?: PreparedSortingSearchOptions[] | string; // Add sorting support
+    sort_by: PreparedSortingSearchOptions[] | string; // Add sorting support
 }
 
 export interface PaginedSearchOptions {
-    page?: number; // Pagination support, Default to page 1 if not specified
-    limit?: number; // Set limit for pagination, Default to 10 items per page if not specified
+    page: number; // Pagination support, Default to page 1 if not specified
+    limit: number; // Set limit for pagination, Default to 10 items per page if not specified
 }
 
 export interface FilterSearchOptions {
     field: string;
-    operator: string; // TODO =, !=, >, >=, <, <=, IN, NOT IN, LIKE, NOT LIKE, // TODO BETWEEN, NOT BETWEEN
+    operator: string; // DONE =, !=, >, >=, <, <=, IN, LIKE, // TODO BETWEEN, NOT BETWEEN  NOT LIKE,NOT IN,
     value: string | number | boolean | Date | null | undefined | any[];
 }
 
 // Prepared data
-export interface PreparedSearchOptions extends PreparedPaginedSearchOptions {
+export interface PreparedSearchOptions extends PaginedSearchOptions {
     filter: FilterSearchOptions[];
     sort_by: PreparedSortingSearchOptions[];
 }
 
-export interface PreparedPaginedSearchOptions {
-    page: number; // Pagination support, Default to page 1 if not specified
-    limit: number; // Set limit for pagination, Default to 10 items per page if not specified
-}
 
 export interface PreparedSortingSearchOptions {
     sort_by: string;

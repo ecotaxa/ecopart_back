@@ -41,31 +41,7 @@ export class SQLiteUserDataSource implements UserDataSource {
             });
         })
     }
-    // async getAll(): Promise<UserResponseModel[]> {
-    //     let sql = `SELECT * FROM user;`
-    //     return await new Promise((resolve, reject) => {
-    //         this.db.all(sql, (err, rows) => {
-    //             if (err) {
-    //                 reject(err);
-    //             } else {
-    //                 const result = rows.map(row => ({
-    //                     user_id: row.user_id,
-    //                     first_name: row.first_name,
-    //                     last_name: row.last_name,
-    //                     email: row.email,
-    //                     valid_email: row.valid_email == 1 ? true : false,
-    //                     is_admin: row.is_admin == 1 ? true : false,
-    //                     organisation: row.organisation,
-    //                     country: row.country,
-    //                     user_planned_usage: row.user_planned_usage,
-    //                     user_creation_date: row.user_creation_date,
-    //                     deleted: row.deleted
-    //                 }));
-    //                 resolve(result);
-    //             }
-    //         });
-    //     })
-    // }
+
     async getAll(options: PreparedSearchOptions): Promise<SearchResult> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
         let sql = `SELECT *, (SELECT COUNT(*) FROM user`
@@ -104,7 +80,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                     filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
                     params_filtering.push(filter.value)
                 }
-                filtering_sql += `AND `;
+                filtering_sql += ` AND `;
             }
             // remove last AND
             filtering_sql = filtering_sql.slice(0, -4);

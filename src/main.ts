@@ -5,7 +5,6 @@ import { MiddlewareUserValidation } from './presentation/middleware/user-validat
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 
-import { GetAllUsers } from './domain/use-cases/user/get-all-users'
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
 import { UpdateUser } from './domain/use-cases/user/update-user'
@@ -86,7 +85,6 @@ async function getSQLiteDS() {
         UserRouter(
             new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
             new MiddlewareUserValidation(countriesAdapter),
-            new GetAllUsers(user_repo),
             new CreateUser(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),

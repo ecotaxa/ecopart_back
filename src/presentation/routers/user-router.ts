@@ -4,7 +4,6 @@ import { Request, Response } from 'express'
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation'
 import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create-user'
-import { GetAllUsersUseCase } from '../../domain/interfaces/use-cases/user/get-all-users'
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
@@ -14,7 +13,6 @@ import { CustomRequest } from '../../domain/entities/auth'
 export default function UsersRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareUserValidation: IMiddlewareUserValidation,
-    getAllUsersUseCase: GetAllUsersUseCase,
     createUserUseCase: CreateUserUseCase,
     updateUserUseCase: UpdateUserUseCase,
     validUserUseCase: ValidUserUseCase,
@@ -23,25 +21,32 @@ export default function UsersRouter(
 ) {
     const router = express.Router()
 
-    // pagined list of users and sorted
-    router.get('/', middlewareAuth.auth, async (req: Request, res: Response) => {
+    // Pagined and sorted list of all users
+    router.get('/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
         try {
-            const users = await getAllUsersUseCase.execute((req as CustomRequest).token, { ...req.query });
+            const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(users)
         } catch (err) {
             console.log(err)
-            res.status(500).send({ errors: ["Can't get users"] })
+            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't get users"] })
         }
     })
 
-    router.post('/searches', middlewareAuth.auth, async (req: Request, res: Response) => {
+    // Pagined and sorted list of filtered users
+    router.post('/searches', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
         try {
-            // TODO Clean .filters
-            const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query }, req.body as any[]);
+            const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
             res.status(200).send(users)
         } catch (err) {
             console.log(err)
-            res.status(500).send({ errors: ["Can't get users"] })
+            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't search users"] })
         }
     })
 
@@ -69,16 +74,17 @@ export default function UsersRouter(
             if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't update user"] })
         }
     })
 
     router.get('/:user_id/welcome/:confirmation_token', async (req: Request, res: Response) => {
         try {
-            // call usecase validate user email
+            // Call usecase validate user email
             await validUserUseCase.execute(parseInt(req.params.user_id), req.params.confirmation_token)
 
-            // redirect to login page // TODO?
+            // Redirect to login page // TODO?
             res.status(200).send({ message: "Account activated, please login" })
         } catch (err) {
             console.log(err)

@@ -13,6 +13,8 @@ export class UserRepositoryImpl implements UserRepository {
     userJwt: JwtWrapper
     VALIDATION_TOKEN_SECRET: string
     RESET_PASSWORD_TOKEN_SECRET: string
+
+    // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
 
@@ -24,32 +26,34 @@ export class UserRepositoryImpl implements UserRepository {
         this.RESET_PASSWORD_TOKEN_SECRET = RESET_PASSWORD_TOKEN_SECRET
     }
 
-    formatFilters(filters: FilterSearchOptions[]): FilterSearchOptions[] {
-        // TODO Choose if we throw errors or just remove unvalid filters and homogenize the others
-
-        // Check if filters objects contains filed, operator and value and delete it if not
-        const formated_filters = filters.filter(filter => filter.field && filter.operator && filter.value);
-        // Check that when operator is IN, value is an arrayand delete it if not
-        formated_filters.filter(filter => { !(filter.operator === "IN" && !Array.isArray(filter.value)) });
-        // Check that when operator is LIKE, value is a string and delete it if not
-        formated_filters.filter(filter => { !(filter.operator === "LIKE" && typeof filter.value === "string") });
-        // Check that when operator is =, >, <, >=, <=, <>, value is a string or a number or boolean and delete it if not
-        formated_filters.filter(filter => { !(["=", ">", "<", ">=", "<=", "<>"].includes(filter.operator) && (typeof filter.value === "string" || typeof filter.value === "number" || typeof filter.value === "boolean")) });
-        return formated_filters
-    }
-
-    // return number of lines updated
+    // Return number of lines updated
     private async updateUser(user: UserUpdateModel, params: string[]): Promise<number> {
-        const filtred_user: UserUpdateModel = Object.keys(user).reduce((acc: any, key: string) => {
-            if (params.includes(key)) {
-                acc[key] = user[key];
+        const filteredUser: Partial<UserUpdateModel> = {};
+        const unauthorizedParams: string[] = [];
+
+        // Filter the user object based on authorized parameters
+        Object.keys(user).forEach(key => {
+            if (key === 'user_id') {
+                filteredUser[key] = user[key];
+            } else if (params.includes(key)) {
+                filteredUser[key] = user[key];
+            } else {
+                unauthorizedParams.push(key);
             }
-            return acc;
-        }, {});
-        if (Object.keys(filtred_user).length > 1) {
-            const updated_user_nb = await this.userDataSource.updateOne(filtred_user);
-            return updated_user_nb;
-        } else return 0
+        });
+
+        // If unauthorized params are found, throw an error
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+
+        // If there are valid parameters, update the user
+        if (Object.keys(filteredUser).length > 0) {
+            const updatedUserCount = await this.userDataSource.updateOne(filteredUser as UserUpdateModel);
+            return updatedUserCount;
+        } else {
+            return 0; // No valid parameters to update
+        }
     }
 
     async changePassword(credentials: ChangeCredentialsModel): Promise<number> {
@@ -102,57 +106,164 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     async adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
-        //can be filtered by 
+        // Can be filtered by 
         const filter_params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
         // Can be sort_by
         const sort_param_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
-        //const prepared_options = this.prepare_options(options)
+        // Const prepared_options = this.prepare_options(options)
         return await this.getUsers(options, filter_params_admin, sort_param_admin, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
-    async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
-        //can be filtered by 
+    async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> { //TODO
+        // Can be filtered by 
         const filter_params_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "valid_email", "deleted"] // Add valid_email and deleted to force default filter
         // Can be sort_by 
         const sort_param_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date"]
 
-        // If valid email or deleted dilter delet them
-        options.filter.filter(filter => filter.field === "valid_email" || filter.field === "deleted")
+        // If valid_email or deleted throw errors
+        if (options.filter.find(filter => filter.field === "valid_email")) {
+            throw new Error("Unauthorized or unexisting parameters : filter field : valid_email")
+        }
+        if (options.filter.find(filter => filter.field === "deleted")) {
+            throw new Error("Unauthorized or unexisting parameters : filter field : deleted")
+        }
 
+        // Add valid_email and deleted to force default filter
         options.filter.push({ field: "valid_email", operator: "=", value: true });
         options.filter.push({ field: "deleted", operator: "=", value: null });
 
         return await this.getUsers(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
+    //TODO move to a search repository
     formatSortBy(raw_sort_by: string): PreparedSortingSearchOptions[] {
+        // Array to store error messages
+        const errors: string[] = [];
+
         // Split the raw_sort_by string by commas to get individual sorting statements
         const prepared_sort_by = raw_sort_by.split(",").map(statement => {
-            // Split the statement by "(" to separate order_by and sort_by
+            // Split each statement by "(" to separate order_by and sort_by
             const [order_by, sort_by] = statement.split("(");
-            // Extract the sort_by string and remove the closing ")"
-            const clean_sort_by = sort_by.slice(0, -1).toLowerCase();
-            // Return an object with sort_by and order_by keys if both are non-empty
-            if (clean_sort_by && order_by) {
-                return { sort_by: clean_sort_by, order_by: order_by.toLowerCase() };
+
+            // Check if sort_by or order_by is missing or if sort_by doesn't end with ")"
+            if (!sort_by || sort_by.slice(-1) !== ")") {
+                // Add an error message to the errors array
+                errors.push(statement);
+                console.log("error" + statement)
+                return null;
             }
-            // Otherwise, return null
-            return null;
+
+            // Extract the sort_by string and convert it to lowercase
+            const clean_sort_by = sort_by.slice(0, -1).toLowerCase();
+
+            // Check if clean_sort_by or order_by is empty
+            if (!clean_sort_by || !order_by) {
+                // Add an error message to the errors array
+                errors.push(statement);
+                console.log("error" + statement)
+
+                return null;
+            }
+
+            // Return an object with sort_by and order_by keys
+            return { sort_by: clean_sort_by, order_by: order_by.toLowerCase() };
         }).filter(Boolean); // Filter out null values
+
+        // If there are errors, throw an error containing all error messages
+        if (errors.length > 0) {
+            throw new Error(`Invalid sorting statement : '${errors.join(', ')}'`);
+        }
+
+        // Return the prepared_sort_by array
         return prepared_sort_by as PreparedSortingSearchOptions[];
     }
 
-    private async getUsers(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult> {
-        // Filter options.sort_by by sorting params 
-        options.sort_by = options.sort_by.filter(sort_by =>
-            sort_by_params.includes(sort_by.sort_by) && order_by_params.includes(sort_by.order_by)
-        );
+    //TODO move to a search repository
+    formatFilters(filters: FilterSearchOptions[]): FilterSearchOptions[] {
+        const errors: string[] = [];
 
+        // Filter out filters that do not have field, operator, and value
+        const formatted_filters = filters.filter(filter => {
+            if (!filter.field || !filter.operator || filter.value === undefined) {
+                errors.push(`Missing field, operator, or value in filter: ${JSON.stringify(filter)}`);
+                return false;
+            }
+            return true;
+        });
+
+        // Check specific conditions for certain operators
+        formatted_filters.filter(filter => {
+            // If filters not in the list of filter_operator_allow_params
+            if (!this.filter_operator_allow_params.includes(filter.operator)) {
+                errors.push(`Invalid operator in filter : ${JSON.stringify(formatted_filters)}`);
+                return false;
+            }
+            else if (filter.operator === "IN" && !Array.isArray(filter.value)) {
+                errors.push(`Value for operator 'IN' must be an array in filter: ${JSON.stringify(filter)}`);
+                return false;
+            }
+            else if (filter.operator === "LIKE" && typeof filter.value !== "string") {
+                errors.push(`Value for operator 'LIKE' must be a string in filter: ${JSON.stringify(filter)}`);
+                return false;
+            }
+            else if ([">", "<", ">=", "<="].includes(filter.operator) && typeof filter.value !== "number") {
+                errors.push(`Value for operator ${filter.operator} must be type of number: ${JSON.stringify(filter)}`);
+                return false;
+            }
+            else if (["=", "<>"].includes(filter.operator) && !(typeof filter.value === "string" || typeof filter.value === "number" || typeof filter.value === "boolean")) {
+                errors.push(`Value for operator ${filter.operator} must be type of string or number or boolean: ${JSON.stringify(filter)}`);
+                return false;
+            }
+            else {
+                return true;
+            }
+        });
+
+        // If there are errors, throw an error containing all error messages
+        if (errors.length > 0) {
+            throw new Error(`Invalid filter statement : '${errors.join(', ')}'`);
+        }
+        return formatted_filters;
+    }
+
+
+    private async getUsers(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult> {
+        const unauthorizedParams: string[] = [];
+        //TODO move to a search repository
+        // Filter options.sort_by by sorting params 
+        options.sort_by = options.sort_by.filter(sort_by => {
+            let is_valid = true;
+            if (!sort_by_params.includes(sort_by.sort_by)) {
+                unauthorizedParams.push(`Unauthorized sort_by: ${sort_by.sort_by}`);
+                is_valid = false;
+            }
+            if (!order_by_params.includes(sort_by.order_by)) {
+                unauthorizedParams.push(`Unauthorized order_by: ${sort_by.order_by}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+
+        //TODO move to a search repository
         // Filter options.filters by filtering params
-        options.filter = options.filter.filter(filter =>
-            filtering_params.includes(filter.field) && filter_operator_params.includes(filter.operator)
-        );
-        //TODO check value? or juste prepared statement after
+        options.filter = options.filter.filter(filter => {
+            let is_valid = true;
+            if (!filtering_params.includes(filter.field)) {
+                unauthorizedParams.push(`Filter field: ${filter.field}`);
+                is_valid = false;
+            }
+            if (!filter_operator_params.includes(filter.operator)) {
+                unauthorizedParams.push(`Filter operator: ${filter.operator}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+
+        //TODO move to a search repository
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+
         return await this.userDataSource.getAll(options);
     }
 
