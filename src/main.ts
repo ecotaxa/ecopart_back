@@ -18,6 +18,7 @@ import { DeleteUser } from './domain/use-cases/user/delete-user'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
+import { SearchRepositoryImpl } from './domain/repositories/search-repository'
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
 import sqlite3 from 'sqlite3'
 
@@ -81,6 +82,8 @@ async function getSQLiteDS() {
     })
     const user_repo = new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
+    const search_repo = new SearchRepositoryImpl()
+
     const userMiddleWare =
         UserRouter(
             new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
@@ -89,7 +92,7 @@ async function getSQLiteDS() {
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
             new DeleteUser(user_repo),
-            new SearchUsers(user_repo),
+            new SearchUsers(user_repo, search_repo),
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
