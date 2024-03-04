@@ -16,11 +16,19 @@ export class SQLiteUserDataSource implements UserDataSource {
     init_user_db() {
         // Create table if not exist
         const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted TIMESTAMP DEFAULT NULL);"
-        this.db.run(sql_create, [])
+        this.db.run(sql_create, [], function (err) {
+            if (err) {
+                console.log("DB error--", err)
+            }
+        })
 
         // Create admin user if not exist
         const sql_admin = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('admin', 'admin', 'julie.coustenoble@imev-mer.fr', 'admin', 1, 1, 'admin', 'admin', 'admin');"
-        this.db.run(sql_admin, [])
+        this.db.run(sql_admin, [], function (err) {
+            if (err) {
+                console.log("DB error--", err)
+            }
+        })
     }
 
     async create(user: UserRequesCreationtModel): Promise<number> {
@@ -61,6 +69,13 @@ export class SQLiteUserDataSource implements UserDataSource {
                         params_filtering.push(...filter.value)
                     }
                 }
+                // If value is true or false, set to 1 or 0
+                else if (filter.value == true || filter.value == "true") {
+                    filtering_sql += filter.field + ` = 1`;
+                }
+                else if (filter.value == false || filter.value == "false") {
+                    filtering_sql += filter.field + ` = 0`;
+                }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value == undefined || filter.value == null || filter.value == "") {
                     if (filter.operator == "=") {
@@ -69,13 +84,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                         filtering_sql += filter.field + ` IS NOT NULL`;
                     }
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true) {
-                    filtering_sql += filter.field + ` = 1`;
-                }
-                else if (filter.value == false) {
-                    filtering_sql += filter.field + ` = 0`;
-                }
+
                 else {
                     filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
                     params_filtering.push(filter.value)
