@@ -5,9 +5,16 @@ import { UserRepository } from "../../../../src/domain/interfaces/repositories/u
 import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
 import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
+import { SearchResult } from "../../../../src/domain/entities/search";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
+        standardGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
         deleteUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

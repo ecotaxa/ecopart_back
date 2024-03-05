@@ -3,9 +3,16 @@ import { UserRepository } from "../../../../src/domain/interfaces/repositories/u
 import { AuthRepository } from "../../../../src/domain/interfaces/repositories/auth-repository";
 import { RefreshToken } from '../../../../src/domain/use-cases/auth/refresh-token'
 import { AuthJwtRefreshedResponseModel, DecodedToken } from "../../../../src/domain/entities/auth";
+import { SearchResult } from "../../../../src/domain/entities/search";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
+        standardGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
         deleteUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

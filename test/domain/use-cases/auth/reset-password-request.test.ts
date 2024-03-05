@@ -7,9 +7,16 @@ import { ResetPasswordRequest } from '../../../../src/domain/use-cases/auth/rese
 import { Transporter } from "nodemailer";
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
 import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
+import { SearchResult } from "../../../../src/domain/entities/search";
 
 describe("Change password Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
+        standardGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
         deleteUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }

@@ -1,10 +1,17 @@
 import { DecodedToken } from "../../../../src/domain/entities/auth";
+import { SearchResult } from "../../../../src/domain/entities/search";
 import { UserResponseModel, UserUpdateModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { DeleteUser } from '../../../../src/domain/use-cases/user/delete-user'
 
 describe("Delete User Use Case", () => {
     class MockUserRepository implements UserRepository {
+        adminGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
+        standardGetUsers(): Promise<SearchResult> {
+            throw new Error("Method not implemented.");
+        }
         deleteUser(): Promise<number> {
             throw new Error("Method not implemented.");
         }
