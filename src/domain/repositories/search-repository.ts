@@ -38,6 +38,14 @@ export class SearchRepositoryImpl implements SearchRepository {
                 return null;
             }
 
+            //check that order_by is either asc or desc
+            if (!this.order_by_allow_params.includes(order_by.toLowerCase())) {
+                // Add an error message to the errors array
+                errors.push(order_by);
+                console.log("error" + order_by)
+                return null;
+            }
+
             // Return an object with sort_by and order_by keys
             return { sort_by: clean_sort_by, order_by: order_by.toLowerCase() };
         }).filter(Boolean); // Filter out null values

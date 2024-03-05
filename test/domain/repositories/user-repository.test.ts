@@ -2,6 +2,7 @@
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
 import { PrivateUserModel, PublicUserModel, UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
+import { SearchResult } from "../../../src/domain/entities/search";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
 import { BcryptAdapter } from "../../../src/infra/cryptography/bcript"
@@ -19,7 +20,7 @@ class MockUserDataSource implements UserDataSource {
     create(): Promise<number> {
         throw new Error("Method not implemented.");
     }
-    getAll(): Promise<UserResponseModel[]> {
+    getAll(): Promise<SearchResult> {
         throw new Error("Method not implemented.");
     }
     getOne(): Promise<UserResponseModel> {
@@ -65,25 +66,193 @@ describe("User Repository", () => {
         userRepository = new UserRepositoryImpl(mockUserDataSource, mockBcryptAdapter, jwtAdapter, TEST_VALIDATION_TOKEN_SECRET, TEST_RESET_PASSWORD_TOKEN_SECRET)
     })
 
+    // TODO split between admin and standard user
     describe("GetAllUsers", () => {
-        test("Should return data", async () => {
-            const expectedData: UserResponseModel[] = [{
-                user_id: 1,
-                last_name: "Smith",
-                first_name: "John",
-                email: "john@gmail.com",
-                valid_email: true,
-                is_admin: false,
-                organisation: "LOV",
-                country: "France",
-                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
-            }]
+
+        test("Should return data for admin users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = { page: 1, limit: 10, sort_by: [], filter: [] }
 
             jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
-            const result = await userRepository.getUsers();
+            const result = await userRepository.adminGetUsers(options);
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).toHaveBeenCalledWith(options)
             expect(result).toBe(expectedData)
         });
+
+        test("Should not return data with bad options even for admin users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: [{ sort_by: "field1", order_by: "asyc" }],
+                filter: [{ field: "pasword_hash", operator: "SELECT", value: "%" }]
+            }
+
+            jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
+            try {
+                await userRepository.adminGetUsers(options);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : Unauthorized sort_by: field1, Unauthorized order_by: asyc, Filter field: pasword_hash, Filter operator: SELECT")
+            }
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).not.toBeCalled()
+        });
+        test("Should return cleaned data for standard users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: false,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = { page: 1, limit: 10, sort_by: [], filter: [] }
+            const options_used = { page: 1, limit: 10, sort_by: [], filter: [{ field: "valid_email", operator: "=", value: true }, { field: "deleted", operator: "=", value: null }] }
+
+            jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
+            const result = await userRepository.standardGetUsers(options);
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).toHaveBeenCalledWith(options_used)
+            expect(result).toBe(expectedData)
+        });
+
+        test("Should not return data with bad options for standard users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: [{ sort_by: "field1", order_by: "asyc" }],
+                filter: [{ field: "pasword_hash", operator: "SELECT", value: "%" }]
+            }
+
+            jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
+            try {
+                await userRepository.standardGetUsers(options);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : Unauthorized sort_by: field1, Unauthorized order_by: asyc, Filter field: pasword_hash, Filter operator: SELECT")
+            }
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).not.toBeCalled()
+        });
+        test("Should not return data with bad options for standard users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: [],
+                filter: [{ field: "valid_email", operator: "=", value: "true" }]
+            }
+
+            jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
+            try {
+                await userRepository.standardGetUsers(options);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : filter field : valid_email")
+            }
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).not.toBeCalled()
+        });
+        test("Should not return data with bad options for standard users", async () => {
+            const expectedData: SearchResult = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    valid_email: true,
+                    is_admin: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                total: 1
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: [],
+                filter: [{ field: "deleted", operator: "=", value: "true" }]
+            }
+
+            jest.spyOn(mockUserDataSource, "getAll").mockImplementation(() => Promise.resolve(expectedData))
+            try {
+                await userRepository.standardGetUsers(options);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : filter field : deleted")
+            }
+            // exceptget all have been called with
+            expect(mockUserDataSource.getAll).not.toBeCalled()
+        });
+
     })
 
     describe("CreateUser", () => {
@@ -327,6 +496,7 @@ describe("User Repository", () => {
             expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
             expect(result).toBe(1)
         });
+
         //TODO ID != USER_ID
         test("Nothing to update : admin user try to edit existing property that could not be acess", async () => {
             const user_to_update: UserUpdateModel = {
@@ -336,11 +506,14 @@ describe("User Repository", () => {
             }
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
-
-            const result = await userRepository.adminUpdateUser(user_to_update);
-
+            try {
+                await userRepository.adminUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : id, password_hash")
+            }
             expect(mockUserDataSource.updateOne).not.toBeCalled();
-            expect(result).toBe(0)
         });
 
         test("Nothing to update : admin user try to edit existing property that don't exist", async () => {
@@ -352,10 +525,14 @@ describe("User Repository", () => {
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
 
-            const result = await userRepository.adminUpdateUser(user_to_update);
-
+            try {
+                await userRepository.adminUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : toto, tutu")
+            }
             expect(mockUserDataSource.updateOne).not.toBeCalled();
-            expect(result).toBe(0)
         });
 
         test("Some things to update : Mix between allowed and unallowed property", async () => {
@@ -366,18 +543,18 @@ describe("User Repository", () => {
                 toto: "ZERTYU",
                 password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
             }
-            const filtred_user: UserUpdateModel = {
-                user_id: 2,
-                valid_email: true,
-                last_name: "Smith"
-            }
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
 
-            const result = await userRepository.adminUpdateUser(user_to_update);
+            try {
+                await userRepository.adminUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : toto, password_hash")
+            }
 
-            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
-            expect(result).toBe(0)
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
         });
 
         test("Things to update : standard user try do edit admin property", async () => {
@@ -389,10 +566,14 @@ describe("User Repository", () => {
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
 
-            const result = await userRepository.standardUpdateUser(user_to_update);
-
+            try {
+                await userRepository.standardUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : status, is_admin")
+            }
             expect(mockUserDataSource.updateOne).not.toBeCalled();
-            expect(result).toBe(0)
         });
         test("Things to update : standard user try to edit standard property", async () => {
             const user_to_update: UserUpdateModel = {
@@ -423,10 +604,14 @@ describe("User Repository", () => {
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
 
-            const result = await userRepository.standardUpdateUser(user_to_update);
-
+            try {
+                await userRepository.standardUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : id, password_hash")
+            }
             expect(mockUserDataSource.updateOne).not.toBeCalled();
-            expect(result).toBe(0)
         });
 
         test("Nothing to update : standard user try to edit existing property that don't exist", async () => {
@@ -438,10 +623,15 @@ describe("User Repository", () => {
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
 
-            const result = await userRepository.standardUpdateUser(user_to_update);
+            try {
+                await userRepository.standardUpdateUser(user_to_update);
+            }
+            catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : toto, tutu")
+            }
 
             expect(mockUserDataSource.updateOne).not.toBeCalled();
-            expect(result).toBe(0)
         });
 
         test("Some things to update : Mix between allowed and unallowed property", async () => {
@@ -452,17 +642,15 @@ describe("User Repository", () => {
                 toto: "ZERTYU",
                 password_hash: "$2b$12$AiyRbTXIq/XHx49nOOUsreHPUB79yBqOy0P5CJY83pONscWYDQyOy",
             }
-            const filtred_user: UserUpdateModel = {
-                user_id: 2,
-                last_name: "Smith"
-            }
 
             jest.spyOn(mockUserDataSource, "updateOne").mockImplementation(() => Promise.resolve(0))
-
-            const result = await userRepository.standardUpdateUser(user_to_update);
-
-            expect(mockUserDataSource.updateOne).toHaveBeenCalledWith(filtred_user)
-            expect(result).toBe(0)
+            try {
+                await userRepository.standardUpdateUser(user_to_update);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("Unauthorized or unexisting parameters : status, toto, password_hash")
+            }
+            expect(mockUserDataSource.updateOne).not.toBeCalled();
         });
 
     });

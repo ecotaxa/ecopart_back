@@ -58,9 +58,13 @@ export class UserRepositoryImpl implements UserRepository {
 
     async changePassword(credentials: ChangeCredentialsModel): Promise<number> {
         const params_password = ["user_id", "password_hash", "reset_password_code"]
-        credentials.password_hash = await this.userCrypto.hash(credentials.new_password)
-        credentials.reset_password_code = null
-        const nb_of_updated_user = await this.updateUser(credentials, params_password)
+        const user_to_update = {
+            user_id: credentials.user_id,
+            password_hash: await this.userCrypto.hash(credentials.new_password),
+            reset_password_code: null
+        }
+
+        const nb_of_updated_user = await this.updateUser(user_to_update, params_password)
         return nb_of_updated_user
     }
 
