@@ -48,6 +48,7 @@ export interface UserUpdateModel {
 }
 
 export interface UserResponseModel extends PublicUserModel {
+    valid_email?: boolean;
     deleted?: string;
     confirmation_code?: string | null;
     reset_password_code?: string | null;
@@ -57,7 +58,7 @@ export interface PublicUserModel {
     first_name: string;
     last_name: string;
     email: string;
-    valid_email: boolean;
+    // valid_email: boolean;
     is_admin: boolean;
     organisation: string;
     country: string;

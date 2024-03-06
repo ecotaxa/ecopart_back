@@ -240,7 +240,7 @@ export class UserRepositoryImpl implements UserRepository {
             first_name: createdUser.first_name,
             last_name: createdUser.last_name,
             email: createdUser.email,
-            valid_email: createdUser.valid_email,
+            //TODO is this needed ? //valid_email: createdUser.valid_email,
             is_admin: createdUser.is_admin,
             organisation: createdUser.organisation,
             country: createdUser.country,

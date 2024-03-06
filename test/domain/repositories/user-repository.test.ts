@@ -821,7 +821,6 @@ describe("User Repository", () => {
                 first_name: 'John',
                 last_name: 'Smith',
                 email: 'john@gmail.com',
-                valid_email: true,
                 is_admin: false,
                 organisation: 'LOV',
                 country: 'France',
