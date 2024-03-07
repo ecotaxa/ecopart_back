@@ -6,10 +6,10 @@ import UserRouter from '../../../src/presentation/routers/user-router'
 import { UserResponseModel, UserRequesCreationtModel } from "../../../src/domain/entities/user";
 
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
-import { GetAllUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/get-all-users";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
 import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
 import { DeleteUserUseCase } from "../../../src/domain/interfaces/use-cases/user/delete-user";
+import { SearchUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/search-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
@@ -17,12 +17,6 @@ import { MiddlewareUserValidation } from "../../../src/presentation/middleware/u
 
 import { Request, Response, NextFunction } from "express";
 import { CountriesAdapter } from "../../../src/infra/countries/country";
-
-class MockGetAllUsersUseCase implements GetAllUsersUseCase {
-    execute(): Promise<UserResponseModel[]> {
-        throw new Error("Method not implemented.")
-    }
-}
 
 class MockCreateUserUseCase implements CreateUserUseCase {
     execute(): Promise<UserResponseModel> {
@@ -56,28 +50,33 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
     }
 }
 
+class MockSearchUsersUseCase implements SearchUsersUseCase {
+    execute(): Promise<{ users: UserResponseModel[]; search_info: any; }> {
+        throw new Error("Method not implemented.")
+    }
+}
 describe("User Router", () => {
     let countriesAdapter: CountriesAdapter
     let mockMiddlewareAuth: MockMiddlewareAuth;
     let middlewareUserValidation: IMiddlewareUserValidation;
     let mockCreateUserUseCase: CreateUserUseCase;
-    let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
     let mockValidUserUseCase: ValidUserUseCase;
     let mockDeleteUserUseCase: DeleteUserUseCase;
+    let mockSearchUsersUseCase: SearchUsersUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
         countriesAdapter = new CountriesAdapter()
         middlewareUserValidation = new MiddlewareUserValidation(countriesAdapter)
-        mockGetAllUsersUseCase = new MockGetAllUsersUseCase()
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
         mockDeleteUserUseCase = new MockDeleteUserUseCase()
+        mockSearchUsersUseCase = new MockSearchUsersUseCase()
 
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockSearchUsersUseCase))
     })
 
     beforeEach(() => {
