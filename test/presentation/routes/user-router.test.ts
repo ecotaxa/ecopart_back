@@ -4,21 +4,22 @@ import server from '../../../src/server'
 import UserRouter from '../../../src/presentation/routers/user-router'
 
 import { UserResponseModel, UserRequesCreationtModel } from "../../../src/domain/entities/user";
+import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
+import { SearchInfo } from "../../../src/domain/entities/search";
 
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
-import { GetAllUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/get-all-users";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
 import { ValidUserUseCase } from "../../../src/domain/interfaces/use-cases/user/valid-user";
+import { DeleteUserUseCase } from "../../../src/domain/interfaces/use-cases/user/delete-user";
+import { SearchUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/search-user";
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { DeleteUserUseCase } from "../../../src/domain/interfaces/use-cases/user/delete-user";
-import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 
-class MockGetAllUsersUseCase implements GetAllUsersUseCase {
-    execute(): Promise<UserResponseModel[]> {
+class MockSearchUsersUseCase implements SearchUsersUseCase {
+    execute(): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented.")
     }
 }
@@ -58,7 +59,6 @@ class MockMiddlewareAuth implements MiddlewareAuth {
             iat: 1693237789,
             exp: 1724795389
         } as DecodedToken);
-        // Continue to the next middleware
         next();
     }
     auth_refresh(): void {
@@ -75,28 +75,28 @@ class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesUserRequestModel = []
     rulesUserUpdateModel = []
     rulesUserResponseModel = []
-    constructor() { }
+    rulesGetUsers = []
 }
 
 describe("User Router", () => {
     let mockMiddlewareAuth: MockMiddlewareAuth;
     let mockMiddlewareUserValidation: MockMiddlewareUserValidation;
     let mockCreateUserUseCase: CreateUserUseCase;
-    let mockGetAllUsersUseCase: GetAllUsersUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
     let mockValidUserUseCase: ValidUserUseCase;
     let mockDeleteUserUseCase: DeleteUserUseCase;
+    let mockSearchUsersUseCase: SearchUsersUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
-        mockGetAllUsersUseCase = new MockGetAllUsersUseCase()
         mockCreateUserUseCase = new MockCreateUserUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
         mockDeleteUserUseCase = new MockDeleteUserUseCase()
         mockMiddlewareUserValidation = new MockMiddlewareUserValidation()
+        mockSearchUsersUseCase = new MockSearchUsersUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockGetAllUsersUseCase, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockSearchUsersUseCase))
     })
 
     beforeEach(() => {
@@ -104,50 +104,182 @@ describe("User Router", () => {
     })
 
     describe("Tests for GET /users", () => {
-
         test("Should return 200 with data", async () => {
-            const ExpectedData: UserResponseModel[] = [{
-                user_id: 1,
-                last_name: "Smith",
-                first_name: "John",
-                email: "john@gmail.com",
-                is_admin: false,
-                valid_email: true,
-                organisation: "LOV",
-                country: "France",
-                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
-            }, {
-                user_id: 2,
-                last_name: "Smith",
-                first_name: "Jim",
-                email: "jim@gmail.com",
-                is_admin: false,
-                valid_email: true,
-                organisation: "LOV",
-                country: "France",
-                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
-            }];
-            jest.spyOn(mockGetAllUsersUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))
+            const ExpectedData = {
+                users:
+                    [{
+                        user_id: 1,
+                        last_name: "Smith",
+                        first_name: "John",
+                        email: "john@gmail.com",
+                        is_admin: false,
+                        valid_email: true,
+                        organisation: "LOV",
+                        country: "France",
+                        user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                        user_creation_date: '2023-08-01 10:30:00'
+                    }, {
+                        user_id: 2,
+                        last_name: "Smith",
+                        first_name: "Jim",
+                        email: "jim@gmail.com",
+                        is_admin: false,
+                        valid_email: true,
+                        organisation: "LOV",
+                        country: "France",
+                        user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                        user_creation_date: '2023-08-01 10:30:00'
+                    }],
+                search_info: {
+                    total: 2,
+                    limit: 10,
+                    total_on_page: 2,
+                    page: 1,
+                    pages: 1
+                }
+            };
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))
             jest.spyOn(mockMiddlewareAuth, "auth")
             const response = await request(server).get("/users")
 
             expect(response.status).toBe(200)
-            expect(mockGetAllUsersUseCase.execute).toBeCalledTimes(1)
-            //  expect(mockMiddlewareAuth.auth).toBeCalledTimes(1)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(ExpectedData)
 
         });
 
+        test("failed if current user is deleted", async () => {
+            const expectedResponse = { errors: ["User is deleted"] }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const response = await request(server).get("/users")
+
+            expect(response.status).toBe(403)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("failed if unexisting or unauthorized parameters", async () => {
+            const expectedResponse = "Unauthorized or unexisting parameters"
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
+            const response = await request(server).get("/users")
+
+            expect(response.status).toBe(401)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
+        });
+
+        test("failed if invalid sorting statement", async () => {
+            const expectedResponse = "Invalid sorting statement"
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
+            const response = await request(server).get("/users")
+
+            expect(response.status).toBe(401)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
+        });
+
         test("Get users fail for unexepted reason", async () => {
             const expectedResponse = { errors: ["Can't get users"] }
-            jest.spyOn(mockGetAllUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
-            jest.spyOn(mockMiddlewareAuth, "auth")
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
             const response = await request(server).get("/users")
 
             expect(response.status).toBe(500)
-            expect(mockGetAllUsersUseCase.execute).toBeCalledTimes(1)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+    })
+
+    describe("Tests for POST /users/searches", () => {
+        test("Should return 200 with data", async () => {
+            const ExpectedData = {
+                users: [{
+                    user_id: 1,
+                    last_name: "Smith",
+                    first_name: "John",
+                    email: "john@gmail.com",
+                    is_admin: false,
+                    valid_email: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }, {
+                    user_id: 2,
+                    last_name: "Smith",
+                    first_name: "Jim",
+                    email: "jim@gmail.com",
+                    is_admin: false,
+                    valid_email: true,
+                    organisation: "LOV",
+                    country: "France",
+                    user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                    user_creation_date: '2023-08-01 10:30:00'
+                }],
+                search_info: {
+                    total: 2,
+                    limit: 10,
+                    total_on_page: 2,
+                    page: 1,
+                    pages: 1
+                }
+            };
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(200)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(ExpectedData)
+        });
+
+        test("failed if current user is deleted", async () => {
+            const expectedResponse = { errors: ["User is deleted"] }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(403)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("failed if unexisting or unauthorized parameters", async () => {
+            const expectedResponse = "Unauthorized or unexisting parameters"
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(401)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
+        });
+
+        test("failed if invalid sorting statement", async () => {
+            const expectedResponse = "Invalid sorting statement"
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(401)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
+        });
+
+        test("failed if Invalid filter statement ", async () => {
+            const expectedResponse = "Invalid filter statement"
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid filter statement Value for operator 'IN' must be an array in filter: {field: user_id, operator: IN, value:1 } ") })
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(401)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
+        });
+
+        test("Get users fail for unexepted reason", async () => {
+            const expectedResponse = { errors: ["Can't search users"] }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).post("/users/searches")
+
+            expect(response.status).toBe(500)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
     })
@@ -270,6 +402,7 @@ describe("User Router", () => {
             expect(mockCreateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+
         test("POST /users fail for Can't find updated preexistent user reason", async () => {
             const InputData: UserRequesCreationtModel = {
                 last_name: "Smith",
@@ -291,6 +424,7 @@ describe("User Router", () => {
             expect(mockCreateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+
         test("POST /users fail for Can't find created user reason", async () => {
             const InputData: UserRequesCreationtModel = {
                 last_name: "Smith",
@@ -346,14 +480,12 @@ describe("User Router", () => {
             }
             const expectedResponse = { errors: ["Can't update user"] }
 
-
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
             const response = await request(server).patch("/users/2").send(user_to_update)
 
             expect(response.status).toBe(500)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
         test("PATCH /users fail for Logged user cannot update this property or user reason", async () => {
@@ -370,7 +502,6 @@ describe("User Router", () => {
             expect(response.status).toBe(401)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
         test("PATCH /users fail for User is deleted", async () => {
@@ -387,7 +518,20 @@ describe("User Router", () => {
             expect(response.status).toBe(403)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
+        });
 
+        test("PATCH /users fail for Unauthorized or unexisting parameters reason", async () => {
+            const user_to_update = {
+                last_name: "Smith",
+                first_name: "John"
+            }
+            const expectedResponse = "Unauthorized or unexisting parameters"
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters") })
+            const response = await request(server).patch("/users/2").send(user_to_update)
+
+            expect(response.status).toBe(401)
+            expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse))
         });
 
         test("PATCH /users fail for Can't find updated user reason", async () => {
@@ -404,7 +548,6 @@ describe("User Router", () => {
             expect(response.status).toBe(404)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
     })
@@ -514,11 +657,9 @@ describe("User Router", () => {
     describe("DELETE /users/:user_id", () => {
 
         test("DELETE /users by non admin", async () => {
-
             const expectedResponse = { message: "You have been Logged Out and permanently deleted" }
 
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.resolve())
-
 
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(200)
@@ -526,58 +667,54 @@ describe("User Router", () => {
         });
 
         test("DELETE /users by admin", async () => {
-
             const expectedResponse = { message: "User successfully deleted" }
-
 
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.resolve())
             const response = await request(server).delete("/users/2")
             expect(response.status).toBe(200)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
 
 
         test("DELETE /users fail for Logged user cannot delete this users hould return 401", async () => {
-
             const expectedResponse = { errors: ["Logged user cannot delete this user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot delete this user")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
         test("DELETE /users fail for Can't find user to delete sould return 404", async () => {
-
             const expectedResponse = { errors: ["Can't find user to delete"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find user to delete")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
-
-
         });
 
         test("DELETE /users fail for User is deleted sould return 403", async () => {
-
             const expectedResponse = { errors: ["User is deleted"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User is deleted")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
+        });
 
+        test("DELETE /users fail for Can't find deleted user sould return 500", async () => {
+            const expectedResponse = { errors: ["Can't find deleted user"] }
+            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find deleted user")))
+            const response = await request(server).delete("/users/1")
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
         });
 
         test("DELETE /users fail for Can't delete user sould return 500", async () => {
-
             const expectedResponse = { errors: ["Can't delete user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
-
         });
 
     })
