@@ -20,8 +20,17 @@ function initializeUserDB() {
 }
 
 function cleanUserDB() {
-    // delete db file
-    fs.unlinkSync(config.TEST_DBSOURCE);
+    try {
+        // Delete db file
+        fs.unlinkSync(config.TEST_DBSOURCE);
+        console.log("Database file deleted successfully.");
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            console.log("Database file does not exist. No action needed.");
+        } else {
+            console.error("Error occurred while deleting database file:", error);
+        }
+    }
 }
 
 describe('SQLiteUserDataSource', () => {
