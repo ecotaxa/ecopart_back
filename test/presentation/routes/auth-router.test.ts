@@ -165,6 +165,23 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
             expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
         });
+
+        test("Login but user is deleted", async () => {
+            const InputData: AuthUserCredentialsModel = {
+                email: "john@gmail.com",
+                password: "test123"
+            }
+            const expectedResponse = { errors: ["User is deleted"] }
+
+            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+
+            const response = await request(server).post("/auth/login").send(InputData)
+
+            expect(response.status).toBe(403)
+            expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
+        });
     })
 
     // /users/me
@@ -244,6 +261,23 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).toBeUndefined();
         });
 
+        test("Refresh token but user is deleted", async () => {
+            const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
+            const expectedResponse = { errors: ["User is deleted"] }
+
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+
+            const response = await request(server)
+                .post("/auth/refreshToken")
+                .set("Cookie", `refresh_token=${valid_refresh_token}; Path=/; HttpOnly;`);
+
+            expect(response.status).toBe(403)
+            expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
+        });
+
+
         test("Should handle error during refresh token use case and return a 404 response", async () => {
             // Can't refresh token
             const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
@@ -303,6 +337,28 @@ describe("User Router", () => {
                 console.log(err.message)
                 expect(true).toBe(false)
             }
+        });
+
+        test("should return error id user is deleted", async () => {
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const credentials = {
+                user_id: 1,
+                password: "test123!",
+                new_password: "test123!!"
+            }
+
+            const expectedResponse = { errors: ["User is deleted"] }
+
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+
+            const response = await request(server)
+                .post("/auth/password/change")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse);
         });
 
         test("Should handle error during Change password use case and return a 500 response", async () => {
@@ -383,6 +439,21 @@ describe("User Router", () => {
             expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("should return error if user is deleted", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+
+            const expectedResponse = { errors: ["User is deleted"] }
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User is deleted")))
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(403)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
 
         test("Should handle error seamlessly if user account not validated and return 200", async () => {
             const InputData = {
@@ -396,6 +467,21 @@ describe("User Router", () => {
             const response = await request(server).post("/auth/password/reset").send(InputData)
 
             expect(response.status).toBe(200)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("Can't find updated user", async () => {
+            const InputData = {
+                "email": "john@gmail.com",
+            }
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find updated user")))
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(500)
             expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -449,6 +535,23 @@ describe("User Router", () => {
             expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
         });
 
+        test("Should handle error if Token is not valid and return 401", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "BAD_reset_password_token",
+            }
+            const error_message = "Token is not valid"
+            const expectedResponse = { errors: ["Can't reset password"] }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
 
         test("Should handle error if Token is not valid and return 401", async () => {
             const InputData: ResetCredentialsModel = {
@@ -463,6 +566,25 @@ describe("User Router", () => {
             const response = await request(server).put("/auth/password/reset").send(InputData)
 
             expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Should handle error if user is deleted", async () => {
+            const InputData: ResetCredentialsModel = {
+                new_password: "test123!!!!!!!",
+                reset_password_token: "reset_password_token",
+            }
+            const error_message = "User is deleted"
+            const expectedResponse = {
+                errors: ["User is deleted"]
+            }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
+
+            const response = await request(server).put("/auth/password/reset").send(InputData)
+
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
             expect(mockResetPasswordUseCase.execute).toBeCalledTimes(1)
         });

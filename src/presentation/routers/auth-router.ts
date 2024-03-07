@@ -47,13 +47,9 @@ export default function AuthRouter(
     })
 
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
-        try {
-            // TODO check if user valid
-            res.status(200).send((req as CustomRequest).token)
-        } catch (err) {
-            console.log(err.message)
-            res.status(500).send({ errors: ["Can't get user me"] })
-        }
+
+        res.status(200).send((req as CustomRequest).token)
+
     })
 
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
@@ -73,16 +69,12 @@ export default function AuthRouter(
     })
 
     router.post('/logout', async (req: Request, res: Response) => {
-        try {
-            res
-                .clearCookie("access_token")
-                .clearCookie("refresh_token")
-                .status(200)
-                .json({ message: "You are Logged Out" });
-        } catch (err) {
-            console.log(err)
-            res.status(500).send({ errors: ["Can't logout"] })
-        }
+        res
+            .clearCookie("access_token")
+            .clearCookie("refresh_token")
+            .status(200)
+            .json({ message: "You are Logged Out" });
+
     })
 
     /* PASSWORD MANAGEMENT */
