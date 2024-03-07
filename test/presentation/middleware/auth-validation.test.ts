@@ -149,7 +149,34 @@ describe("User Router", () => {
             expect(response.headers['set-cookie']).not.toBeDefined(); // Check if cookies are set
         });
     })
+
     describe("Test auth router change password", () => {
+        test("Ask for password reset with valid email", async () => {
+            const InputData = {
+                email: "julile.coustenoble@imev-mer.fr"
+            }
+            const OutputData = { message: "Reset password request email sent." }
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+            expect(response.status).toBe(200)
+            expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+
+        test("Ask for password reset with invalid email", async () => {
+            const InputData = {
+                email: "julile.coustenobleimev-mer.fr"
+            }
+            const OutputData = { errors: ["Invalid credentials"] }
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => { throw new Error() })
+
+            const response = await request(server).post("/auth/password/reset").send(InputData)
+            expect(response.status).toBe(401)
+            expect(mockResetPasswordRequestUseCase.execute).not.toBeCalled()
+            expect(response.body).toStrictEqual(OutputData)
+        });
+
         test("Change password with valid id, current and new password", async () => {
             const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
 
@@ -238,5 +265,70 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse);
 
         });
+
+        test("confirm password reset with valid token and password", async () => {
+            const credentials = {
+                new_password: "Test123!!"
+            }
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const expectedResponse = { message: "Password sucessfully reset, please login" }
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server)
+                .put("/auth/password/reset")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+            expect(response.status).toBe(200);
+            expect(response.body).toStrictEqual(expectedResponse);
+        });
+
+        test("confirm password reset with invalid password format", async () => {
+            const credentials = {
+                new_password: "b"
+            }
+            const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
+
+            const expectedResponse = {
+                "errors": [{
+                    location: "body",
+                    msg: "Password must be at least 8 characters long.",
+                    path: "new_password",
+                    type: "field",
+                    value: "b",
+                },
+                {
+                    location: "body",
+                    msg: "Password must contain a number.",
+                    path: "new_password",
+                    type: "field",
+                    value: "b",
+                },
+                {
+                    location: "body",
+                    msg: "Password must contain an uppercase letter.",
+                    path: "new_password",
+                    type: "field",
+                    value: "b",
+                },
+                {
+                    location: "body",
+                    msg: "Password must contain a special character.",
+                    path: "new_password",
+                    type: "field",
+                    value: "b",
+                }]
+            }
+
+            jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server)
+                .put("/auth/password/reset")
+                .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
+                .send(credentials);
+            expect(response.status).toBe(422);
+            expect(response.body).toStrictEqual(expectedResponse);
+        });
+
     })
 })

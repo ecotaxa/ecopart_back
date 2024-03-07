@@ -17,6 +17,7 @@ import { MiddlewareUserValidation } from "../../../src/presentation/middleware/u
 
 import { Request, Response, NextFunction } from "express";
 import { CountriesAdapter } from "../../../src/infra/countries/country";
+import { SearchInfo } from "../../../src/domain/entities/search";
 
 class MockCreateUserUseCase implements CreateUserUseCase {
     execute(): Promise<UserResponseModel> {
@@ -240,7 +241,8 @@ describe("User Router", () => {
         test("update user all params are valid", async () => {
             const user_to_update = {
                 last_name: "Smith",
-                first_name: "John"
+                first_name: "John",
+                country: "FR"
             }
             const OutputData: UserResponseModel = {
                 user_id: 1,
@@ -313,4 +315,115 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(OutputData)
         });
     })
+    describe("Test user router rules GetUsers", () => {
+        test("Get users all params are valid", async () => {
+            const OutputData: { users: UserResponseModel[], search_info: SearchInfo } = {
+                users: [
+                    {
+                        user_id: 1,
+                        last_name: "Smith",
+                        first_name: "John",
+                        email: "john@gmail.com",
+                        is_admin: false,
+                        valid_email: true,
+                        organisation: "LOV",
+                        country: "France",
+                        user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                        user_creation_date: '2023-08-01 10:30:00'
+                    }],
+                search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
+
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: "asc(user_id)"
+            }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).get("/users").query(options)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Get users with invalid page", async () => {
+            const options = {
+                page: "a",
+                limit: 10,
+                sort_by: "asc(user_id)"
+            }
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "query",
+                        "msg": "Page must be a number and must be greater than 0.",
+                        "path": "page",
+                        "type": "field",
+                        "value": "a"
+                    }
+                ]
+            }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).get("/users").query(options)
+
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockSearchUsersUseCase.execute).not.toBeCalled()
+        });
+
+        test("Get users with invalid limit", async () => {
+            const options = {
+                page: 1,
+                limit: "a",
+                sort_by: "asc(user_id)"
+            }
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "query",
+                        "msg": "Limit must be a number and must be greater than 0.",
+                        "path": "limit",
+                        "type": "field",
+                        "value": "a"
+                    }
+                ]
+            }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).get("/users").query(options)
+
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockSearchUsersUseCase.execute).not.toBeCalled()
+        });
+
+        test("get user with default params", async () => {
+            const OutputData: { users: UserResponseModel[], search_info: SearchInfo } = {
+                users: [
+                    {
+                        user_id: 1,
+                        last_name: "Smith",
+                        first_name: "John",
+                        email: "john@gmail.com",
+                        is_admin: false,
+                        valid_email: true,
+                        organisation: "LOV",
+                        country: "France",
+                        user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                        user_creation_date: '2023-08-01 10:30:00'
+                    }],
+                search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
+
+            }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).get("/users")
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
+
+        });
+
+    });
+
 })
