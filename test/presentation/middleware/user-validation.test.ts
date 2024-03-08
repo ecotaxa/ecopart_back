@@ -292,19 +292,74 @@ describe("User Router", () => {
             expect(mockUpdateUserUseCase.execute).toBeCalledWith(undefined, sanitizedInputData)
             expect(response.body).toStrictEqual(OutputData)
         });
-        test("update user all params are valid", async () => {
+        test("update user invalid country", async () => {
             const user_to_update = {
                 country: "FR56GG",
             }
             const OutputData = {
-                "errors": [
+                errors: [
                     {
-                        "location": "body",
-                        "msg": "Invalid country. Please select from the list.",
-                        "path": "country",
-                        "type": "field",
-                        "value": "FR56GG",
-                    },
+                        type: 'alternative',
+                        msg: 'At least one valid field must be updated.',
+                        nestedErrors: [
+                            {
+                                type: 'field',
+                                value: 'FR56GG',
+                                msg: 'Invalid country. Please select from the list.',
+                                path: 'country',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'email',
+                                location: 'body'
+                            },
+
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'first_name',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'last_name',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'valid_email',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'is_admin',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'confirmation_code',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'organisation',
+                                location: 'body'
+                            },
+                            {
+                                type: 'field',
+                                msg: 'No value provided.',
+                                path: 'user_planned_usage',
+                                location: 'body'
+                            }
+                        ]
+                    }
                 ]
             }
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => { throw new Error() })
@@ -312,6 +367,7 @@ describe("User Router", () => {
 
             expect(response.status).toBe(422)
             expect(mockCreateUserUseCase.execute).not.toBeCalled()
+            console.log("******344*******")
             expect(response.body).toStrictEqual(OutputData)
         });
     })

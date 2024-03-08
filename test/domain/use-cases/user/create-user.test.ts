@@ -159,6 +159,83 @@ describe("Create User Use Case", () => {
         expect(result).toStrictEqual(OutputData);
     });
 
+    test("Try to add a user that already exist but is deleted", async () => {
+        const InputData: UserRequesCreationtModel = {
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            password: "test123!",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        }
+        const preexistant_user: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: false,
+            confirmation_code: "confirmation_code",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+        const updated_user: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: false,
+            confirmation_code: "new_confirmation_code",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+        const OutputData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: false,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+
+        jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
+        jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(-1)) // not called
+        jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
+        jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
+
+        try {
+            const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
+            await createUserUseCase.execute(InputData);
+            expect(true).toBe(false);
+        }
+        catch (err) {
+            expect(err).toStrictEqual(new Error("User is deleted"));
+
+            expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
+            expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(1);
+            expect(mockUserRepository.createUser).not.toBeCalled();
+            expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
+            expect(mockUserRepository.generateValidationToken).not.toBeCalled();
+            expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
+            expect(mockUserRepository.toPublicUser).not.toBeCalled();
+        }
+
+    });
+
     test("Try to add a user that already exist with unvalidated email", async () => {
         const InputData: UserRequesCreationtModel = {
             last_name: "Smith",
@@ -284,6 +361,66 @@ describe("Create User Use Case", () => {
             expect(err).toStrictEqual(expectedResponse);
         }
 
+
+    });
+    test("Can't find created user", async () => {
+        const InputData: UserRequesCreationtModel = {
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            password: "test123!",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        }
+        const created_user: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: false,
+            confirmation_code: "confirmation_code",
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+        const OutputData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: false,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+
+        jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(null)).mockImplementationOnce(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(1))
+        jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(-1))
+        jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
+        jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
+
+        try {
+            const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
+            await createUserUseCase.execute(InputData);
+            expect(true).toBe(false);
+        } catch (err) {
+            expect(err).toStrictEqual(new Error("Can't find created user"));
+
+            expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.createUser).toHaveBeenCalledWith(InputData);
+            expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
+            expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
+            expect(mockUserRepository.generateValidationToken).not.toBeCalled();
+            expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
+            expect(mockUserRepository.toPublicUser).not.toBeCalled();
+        }
 
     });
 

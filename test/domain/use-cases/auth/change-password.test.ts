@@ -84,6 +84,94 @@ describe("Change password Use Case", () => {
     })
 
     describe("Not admin user", () => {
+
+        test("User is not admin : and try to change password of deleted user", async () => {
+            const current_user: DecodedToken = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: true,
+                confirmation_code: null,
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+
+                iat: 1693237789,
+                exp: 1724795389
+            }
+            const credentials: ChangeCredentialsModel = {
+                user_id: 2,
+                password: "good_current_password",
+                new_password: "new_password"
+            }
+            const expectedResponse = new Error("User is deleted");
+
+
+            jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(true)).mockImplementationOnce(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
+
+            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            try {
+                await changePasswordUseCase.execute(current_user, credentials);
+                expect(true).toBe(false)
+            } catch (err) {
+                expect(err).toStrictEqual(expectedResponse);
+                expect(mockUserRepository.isAdmin).not.toBeCalled();
+                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
+                expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
+                expect(mockUserRepository.changePassword).not.toBeCalled();
+            }
+
+        });
+        test("User is not admin : and is deleted", async () => {
+            const current_user: DecodedToken = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: true,
+                confirmation_code: null,
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+
+                iat: 1693237789,
+                exp: 1724795389
+            }
+            const credentials: ChangeCredentialsModel = {
+                user_id: 2,
+                password: "good_current_password",
+                new_password: "new_password"
+            }
+            const expectedResponse = new Error("User is deleted");
+
+
+            jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(false)).mockImplementationOnce(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
+            jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
+
+            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            try {
+                await changePasswordUseCase.execute(current_user, credentials);
+                expect(true).toBe(false)
+            } catch (err) {
+                expect(err).toStrictEqual(expectedResponse);
+                expect(mockUserRepository.isAdmin).not.toBeCalled();
+                expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
+                expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
+                expect(mockUserRepository.changePassword).not.toBeCalled();
+            }
+
+        });
+
         test("User is not admin : edit password on himself : ok", async () => {
             const current_user: DecodedToken = {
                 user_id: 1,

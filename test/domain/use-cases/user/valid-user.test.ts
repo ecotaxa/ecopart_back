@@ -260,6 +260,72 @@ describe("Valid Users Use Case", () => {
                 expect(e.message).toBe("User vallidation forbidden")
             }
         });
+        test("User is deleted", async () => {
+            const user_id = 1
+            const confirmation_token = "token"
+
+            const decoded_token: DecodedToken = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                valid_email: false,
+                confirmation_code: "confirmation_code",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00',
+
+                iat: 1693237789,
+                exp: 1724795389
+            }
+            const user_to_update: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                valid_email: false,
+                confirmation_code: "confirmation_code",
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            const updated_user: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                is_admin: false,
+                valid_email: true,
+                confirmation_code: null,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+
+
+            jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
+            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+            jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
+            jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
+
+            const getAllUsersUse = new ValidUser(mockUserRepository)
+            try {
+                await getAllUsersUse.execute(user_id, confirmation_token);
+                expect(true).toBe(false)
+            } catch (e) {
+                expect(e.message).toBe("User is deleted")
+                expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
+                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
+                expect(mockUserRepository.getUser).not.toBeCalled();
+                expect(mockUserRepository.validUser).not.toBeCalled();
+            }
+
+        });
 
         test("Can't find user with confirmation code", async () => {
 

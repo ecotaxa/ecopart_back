@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { check, validationResult, query } from 'express-validator';
+import { check, validationResult, query, oneOf } from 'express-validator';
 import { CountriesAdapter } from '../../infra/countries/country';
 import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation';
 
@@ -76,50 +76,50 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
     ];
 
     rulesUserUpdateModel = [
+        oneOf([
+            // Country Validation
+            check('country').exists().withMessage('No value provided.').bail()
+                .trim()
+                .custom(value => {
+                    if (!this.countries.isValid(value)) {
+                        throw new Error('Invalid country. Please select from the list.');
+                    }
+                    return true;
+                }),
+            // Email Validation
+            check('email').exists().withMessage('No value provided.').bail()
+                .trim()
+                .normalizeEmail()
+                .isEmail().withMessage('Email must be a valid email address.'),
+            // First Name Validation
+            check('first_name').exists().withMessage('No value provided.')
+                .trim(),
 
-        // First Name Validation
-        check('first_name').optional()
-            .trim(),
+            // Last Name Validation
+            check('last_name').exists().withMessage('No value provided.')
+                .trim(),
 
-        // Last Name Validation
-        check('last_name').optional()
-            .trim(),
 
-        // Email Validation
-        check('email').optional()
-            .trim()
-            .normalizeEmail()
-            .isEmail().withMessage('Email must be a valid email address.')
-            .bail(),
+            // Valid email Validation
+            check('valid_email').exists().withMessage('No value provided.')
+                .trim(),
 
-        // Valid email Validation
-        check('valid_email').optional()
-            .trim(),
+            // Is Admin Validation
+            check('is_admin').exists().withMessage('No value provided.')
+                .trim(),
 
-        // Is Admin Validation
-        check('is_admin').optional()
-            .trim(),
+            // Confirmation Code Validation (optional field)
+            check('confirmation_code').exists().withMessage('No value provided.'),
 
-        // Confirmation Code Validation (optional field)
-        check('confirmation_code').optional(),
+            // Organisation Validation
+            check('organisation').exists().withMessage('No value provided.')
+                .trim(),
 
-        // Organisation Validation
-        check('organisation').optional()
-            .trim(),
+            // User Planned Usage Validation
+            check('user_planned_usage').exists().withMessage('No value provided.')
+                .trim(),
 
-        // Country Validation
-        check('country').optional()
-            .trim()
-            .custom(value => {
-                if (!this.countries.isValid(value)) {
-                    throw new Error('Invalid country. Please select from the list.');
-                }
-                return true;
-            }),
-
-        // User Planned Usage Validation
-        check('user_planned_usage').optional()
-            .trim(),
+        ], { errorType: 'flat', message: 'At least one valid field must be updated.' }),
         // User Creation Date Validation
         check('user_creation_date')
             .isEmpty().withMessage('User creation date cannot be set manually.'),
@@ -132,7 +132,7 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
             }
             next();
         },
-    ];
+    ]
 
     rulesGetUsers = [
         query('page').default(1)

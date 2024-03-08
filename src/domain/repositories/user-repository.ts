@@ -48,12 +48,8 @@ export class UserRepositoryImpl implements UserRepository {
         }
 
         // If there are valid parameters, update the user
-        if (Object.keys(filteredUser).length > 0) {
-            const updatedUserCount = await this.userDataSource.updateOne(filteredUser as UserUpdateModel);
-            return updatedUserCount;
-        } else {
-            return 0; // No valid parameters to update
-        }
+        const updatedUserCount = await this.userDataSource.updateOne(filteredUser as UserUpdateModel);
+        return updatedUserCount;
     }
 
     async changePassword(credentials: ChangeCredentialsModel): Promise<number> {

@@ -201,4 +201,36 @@ describe("Create User Use Case", () => {
         }
     });
 
+    test("Should handle deleted user and throw error", async () => {
+        const InputData: AuthUserCredentialsModel = {
+            email: "test@email.com",
+            password: "good_password"
+        }
+        const OutputUserData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
+
+        jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
+        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
+        jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
+        const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
+        try {
+            const result = await loginUserUseCase.execute(InputData);
+            // Should not go there
+            expect(result).toBe(true);
+        } catch (err) {
+            expect(err.message).toBe("User is deleted");
+        }
+    });
 })
