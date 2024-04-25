@@ -84,7 +84,7 @@ export class UserRepositoryImpl implements UserRepository {
 
     async createUser(user: UserRequesCreationtModel): Promise<number> {
         user.password = await this.userCrypto.hash(user.password)
-        user.confirmation_code = await this.userCrypto.generate_uuid()
+        user.confirmation_code = this.userCrypto.generate_uuid()
         const result = await this.userDataSource.create(user)
         return result;
     }
@@ -100,7 +100,7 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     async setResetPasswordCode(user: UserUpdateModel): Promise<number> {
-        user.reset_password_code = await this.userCrypto.generate_uuid()
+        user.reset_password_code = this.userCrypto.generate_uuid()
         const nb_of_updated_user = await this.updateUser(user, ["user_id", "reset_password_code"])
         return nb_of_updated_user
     }
