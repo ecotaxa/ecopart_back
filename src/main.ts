@@ -2,8 +2,10 @@ import server from './server'
 import { MiddlewareAuthCookie } from './presentation/middleware/auth-cookie'
 import { MiddlewareAuthValidation } from './presentation/middleware/auth-validation'
 import { MiddlewareUserValidation } from './presentation/middleware/user-validation'
+import { MiddlewareProjectValidation } from './presentation/middleware/project-validation'
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
+import ProjectRouter from './presentation/routers/project-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -15,12 +17,19 @@ import { ValidUser } from './domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
 import { ResetPassword } from './domain/use-cases/auth/reset-password'
 import { DeleteUser } from './domain/use-cases/user/delete-user'
+import { CreateProject } from './domain/use-cases/project/create-project'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
 import { SearchRepositoryImpl } from './domain/repositories/search-repository'
+import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
+
+
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import sqlite3 from 'sqlite3'
+
+
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -28,6 +37,7 @@ import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
 
 import 'dotenv/config'
+import { DeleteProject } from './domain/use-cases/project/delete-project'
 
 sqlite3.verbose()
 
@@ -59,16 +69,19 @@ async function getSQLiteDS() {
         }
     });
 
-    return new SQLiteUserDataSource(db)
+    return db
 }
 
 (async () => {
-    const dataSource = await getSQLiteDS();
+    const db = await getSQLiteDS();
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
     const mailerAdapter = new NodemailerAdapter((config.BASE_URL + config.PORT), config.MAIL_SENDER)
     const countriesAdapter = new CountriesAdapter()
+
+    const user_dataSource = new SQLiteUserDataSource(db)
+    const project_dataSource = new SQLiteProjectDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -80,9 +93,10 @@ async function getSQLiteDS() {
         },
 
     })
-    const user_repo = new UserRepositoryImpl(dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
+    const user_repo = new UserRepositoryImpl(user_dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
     const search_repo = new SearchRepositoryImpl()
+    const project_repo = new ProjectRepositoryImpl(project_dataSource)
 
     const userMiddleWare =
         UserRouter(
@@ -103,9 +117,16 @@ async function getSQLiteDS() {
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
     )
+    const projectMiddleWare = ProjectRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareProjectValidation(),
+        new CreateProject(user_repo, project_repo),
+        new DeleteProject(user_repo, project_repo),
+    )
 
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
+    server.use("/projects", projectMiddleWare)
 
     server.listen(config.PORT, () => console.log("Running on ", config.BASE_URL, config.PORT))
 
