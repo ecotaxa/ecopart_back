@@ -1,4 +1,4 @@
-import { UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../domain/entities/user";
+import { UserRequestCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../domain/entities/user";
 import { AuthUserCredentialsModel, } from "../../../domain/entities/auth";
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
@@ -16,22 +16,27 @@ export class SQLiteUserDataSource implements UserDataSource {
     init_user_db() {
         // Create table if not exist
         const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted TIMESTAMP DEFAULT NULL);"
-        this.db.run(sql_create, [], function (err) {
+        const db_tables = this.db
+        db_tables.run(sql_create, [], function (err: Error | null) {
             if (err) {
-                console.log("DB error--", err)
+                console.log("DB error--", err);
+                return; // Return early if there's an error creating the table
             }
-        })
+            else {
 
-        // Create admin user if not exist
-        const sql_admin = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('admin', 'admin', 'julie.coustenoble@imev-mer.fr', 'admin', 1, 1, 'admin', 'admin', 'admin');"
-        this.db.run(sql_admin, [], function (err) {
-            if (err) {
-                console.log("DB error--", err)
+                // Create admin user if not exist
+                const sql_admin = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('admin', 'admin', 'julie.coustenoble@imev-mer.fr', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 1, 'admin', 'admin', 'admin');"
+
+                db_tables.run(sql_admin, [], function (err: Error | null) {
+                    if (err) {
+                        console.log("DB error--", err);
+                    }
+                });
             }
-        })
+        });
     }
 
-    async create(user: UserRequesCreationtModel): Promise<number> {
+    async create(user: UserRequestCreationtModel): Promise<number> {
         const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
         const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `);`;
