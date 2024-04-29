@@ -1,5 +1,5 @@
 import { Transporter } from "nodemailer";
-import { UserRequesCreationtModel, UserResponseModel } from "../../entities/user";
+import { UserRequestCreationtModel, UserResponseModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { CreateUserUseCase } from "../../interfaces/use-cases/user/create-user";
 import { MailerWrapper } from "../../../infra/mailer/nodemailer-wrapper";
@@ -14,7 +14,7 @@ export class CreateUser implements CreateUserUseCase {
         this.userRepository = userRepository
         this.mailer = mailer
     }
-    async execute(user: UserRequesCreationtModel): Promise<UserResponseModel> {
+    async execute(user: UserRequestCreationtModel): Promise<UserResponseModel> {
         // Retrieve a pre-existing user by email
         const preexistentUser = await this.userRepository.getUser({ email: user.email });
 

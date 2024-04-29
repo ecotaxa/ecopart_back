@@ -3,7 +3,7 @@ import server from '../../../src/server'
 
 import UserRouter from '../../../src/presentation/routers/user-router'
 
-import { UserResponseModel, UserRequesCreationtModel } from "../../../src/domain/entities/user";
+import { UserResponseModel, UserRequestCreationtModel } from "../../../src/domain/entities/user";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
@@ -71,7 +71,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
     }
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
-    rulesUserRequesCreationtModel = []
+    rulesUserRequestCreationtModel = []
     rulesUserRequestModel = []
     rulesUserUpdateModel = []
     rulesUserResponseModel = []
@@ -287,7 +287,7 @@ describe("User Router", () => {
     describe("POST /users", () => {
 
         test("POST /users", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -316,7 +316,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for unexepted reason", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -338,7 +338,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for Valid user already exist reason", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -360,7 +360,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for User is deleted", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -382,7 +382,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for Can't update preexistent user reason", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -404,7 +404,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for Can't find updated preexistent user reason", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -426,7 +426,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for Can't find created user reason", async () => {
-            const InputData: UserRequesCreationtModel = {
+            const InputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",

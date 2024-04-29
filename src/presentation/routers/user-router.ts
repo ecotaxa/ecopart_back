@@ -50,7 +50,7 @@ export default function UsersRouter(
         }
     })
 
-    router.post('/', middlewareUserValidation.rulesUserRequesCreationtModel, async (req: Request, res: Response) => {
+    router.post('/', middlewareUserValidation.rulesUserRequestCreationtModel, async (req: Request, res: Response) => {
         try {
             const created_user = await createUserUseCase.execute(req.body)
             res.status(201).send(created_user)

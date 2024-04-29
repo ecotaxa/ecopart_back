@@ -2,7 +2,7 @@
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../entities/auth";
-import { UserResponseModel, UserRequesCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
+import { UserResponseModel, UserRequestCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -82,7 +82,7 @@ export class UserRepositoryImpl implements UserRepository {
         return updated_user_nb
     }
 
-    async createUser(user: UserRequesCreationtModel): Promise<number> {
+    async createUser(user: UserRequestCreationtModel): Promise<number> {
         user.password = await this.userCrypto.hash(user.password)
         user.confirmation_code = this.userCrypto.generate_uuid()
         const result = await this.userDataSource.create(user)

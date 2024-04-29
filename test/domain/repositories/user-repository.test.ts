@@ -1,7 +1,7 @@
 //test/domain/repositories/user-repository.test.ts
 import { UserDataSource } from "../../../src/data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../../../src/domain/entities/auth";
-import { PrivateUserModel, PublicUserModel, UserRequesCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
+import { PrivateUserModel, PublicUserModel, UserRequestCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../src/domain/entities/user";
 import { SearchResult } from "../../../src/domain/entities/search";
 import { UserRepository } from "../../../src/domain/interfaces/repositories/user-repository";
 import { UserRepositoryImpl } from "../../../src/domain/repositories/user-repository";
@@ -257,7 +257,7 @@ describe("User Repository", () => {
 
     describe("CreateUser", () => {
         test("Should return created user user_id", async () => {
-            const inputData: UserRequesCreationtModel = {
+            const inputData: UserRequestCreationtModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",

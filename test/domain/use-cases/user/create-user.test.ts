@@ -1,6 +1,6 @@
 import { Transporter } from "nodemailer";
 import { DecodedToken } from "../../../../src/domain/entities/auth";
-import { UserRequesCreationtModel, UserResponseModel } from "../../../../src/domain/entities/user";
+import { UserRequestCreationtModel, UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
@@ -103,7 +103,7 @@ describe("Create User Use Case", () => {
     })
 
     test("Try to add a user return created user", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -160,7 +160,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist but is deleted", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -237,7 +237,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist with unvalidated email", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -309,7 +309,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist with validated email", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -364,7 +364,7 @@ describe("Create User Use Case", () => {
 
     });
     test("Can't find created user", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -425,7 +425,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Can't update preexistent user", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -477,7 +477,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Can't find updated preexistent user", async () => {
-        const InputData: UserRequesCreationtModel = {
+        const InputData: UserRequestCreationtModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",

@@ -4,7 +4,7 @@ export enum UserStatus {
     Anonym = "ANONYM"
 }
 
-export interface UserRequesCreationtModel {
+export interface UserRequestCreationtModel {
     password: string;
     first_name: string;
     last_name: string;
