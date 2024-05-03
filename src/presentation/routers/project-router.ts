@@ -6,7 +6,7 @@ import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-v
 import { CreateProjectUseCase } from '../../domain/interfaces/use-cases/project/create-project'
 import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/delete-project'
 import { CustomRequest } from '../../domain/entities/auth'
-// import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
+import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
 // import { ValidProjectUseCase } from '../../domain/interfaces/use-cases/project/valid-project'
 // import { SearchProjectUseCase } from '../../domain/interfaces/use-cases/project/search-project'
 // import { CustomRequest } from '../../domain/entities/auth'
@@ -16,13 +16,13 @@ export default function ProjectRouter(
     middlewareProjectValidation: IMiddlewareProjectValidation,
     createProjectUseCase: CreateProjectUseCase,
     deleteProjectUseCase: DeleteProjectUseCase,
-    // updateProjectUseCase: UpdateProjectUseCase,
+    updateProjectUseCase: UpdateProjectUseCase,
     // validProjectUseCase: ValidProjectUseCase,
     // searchProjectUseCase: SearchProjectUseCase
 ) {
     const router = express.Router()
 
-    // // Pagined and sorted list of all project
+    // Pagined and sorted list of all project
     // router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProject, async (req: Request, res: Response) => {
     //     try {
     //         const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
@@ -63,19 +63,20 @@ export default function ProjectRouter(
         }
     })
 
-    // router.patch('/:project_id/', middlewareProjectValidation.rulesProjectUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
-    //     try {
-    //         const updated_project = await updateProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
-    //         res.status(200).send(updated_project)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "Logged project cannot update this property or project") res.status(401).send({ errors: [err.message] })
-    //         else if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
-    //         else if (err.message === "Can't find updated project") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-    //         else res.status(500).send({ errors: ["Can't update project"] })
-    //     }
-    // })
+    router.patch('/:project_id/', middlewareProjectValidation.rulesProjectUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const updated_project = await updateProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
+            res.status(200).send(updated_project)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot update this property or project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Can't find updated project") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Please provide at least one valid parameter to update") res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't update project"] })
+        }
+    })
 
     router.delete('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {

@@ -29,6 +29,30 @@ export interface ProjectRequestModel {
     project_id: number;
 }
 
+export interface ProjectUpdateModel {
+    [key: string]: any;
+    project_id: number;
+    root_folder_path?: string;
+    project_title?: string;
+    project_acronym?: string;
+    project_description?: string;
+    project_information?: string;
+    cruise?: string;
+    ship?: string[];
+    data_owner_name?: string;
+    data_owner_email?: string;
+    operator_name?: string;
+    operator_email?: string;
+    chief_scientist_name?: string;
+    chief_scientist_email?: string;
+    override_depth_offset?: number;
+    enable_descent_filter?: boolean;
+    privacy_duration?: number;
+    visible_duration?: number;
+    public_duration?: number;
+    instrument?: string; //TODO link it to the InstrumentModel
+}
+
 // // FOR acess permissions LATER
 // export interface ProjectVisibility {
 //     visibility_id: number;

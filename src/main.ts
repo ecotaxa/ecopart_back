@@ -18,6 +18,8 @@ import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-req
 import { ResetPassword } from './domain/use-cases/auth/reset-password'
 import { DeleteUser } from './domain/use-cases/user/delete-user'
 import { CreateProject } from './domain/use-cases/project/create-project'
+import { DeleteProject } from './domain/use-cases/project/delete-project'
+import { UpdateProject } from './domain/use-cases/project/update-project'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -29,15 +31,12 @@ import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-dat
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import sqlite3 from 'sqlite3'
 
-
-
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
 
 import 'dotenv/config'
-import { DeleteProject } from './domain/use-cases/project/delete-project'
 
 sqlite3.verbose()
 
@@ -122,6 +121,7 @@ async function getSQLiteDS() {
         new MiddlewareProjectValidation(),
         new CreateProject(user_repo, project_repo),
         new DeleteProject(user_repo, project_repo),
+        new UpdateProject(user_repo, project_repo),
     )
 
     server.use("/users", userMiddleWare)

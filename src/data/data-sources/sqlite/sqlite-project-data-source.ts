@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel } from "../../../domain/entities/project";
+import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../../domain/entities/project";
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
 
 // const DB_TABLE = "project"
@@ -102,6 +102,37 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                     reject(err);
                 } else {
                     const result = this.changes; //RETURN NB OF CHANGES
+                    resolve(result);
+                }
+            });
+        })
+    }
+
+    // Returns the number of lines updates
+    updateOne(project: ProjectUpdateModel): Promise<number> {
+        const { project_id, ...projectData } = project; // Destructure the project object
+
+        const params: any[] = []
+        let placeholders: string = ""
+        for (const [key, value] of Object.entries(projectData)) {
+            if (key == "enable_descent_filter") { // TODO somewhere else? serializer?
+                params.push(value == true || value == "true" ? 1 : 0) // TODO clean
+            } else {
+                params.push(value)
+            }
+            placeholders = placeholders + key + "=(?),"
+        }
+        placeholders = placeholders.slice(0, -1);
+        params.push(project_id)
+
+        const sql = `UPDATE project SET ` + placeholders + ` WHERE project_id=(?);`;
+        return new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) {
+                    console.log("DB error--", err)
+                    reject(err);
+                } else {
+                    const result = this.changes //RETURN NB OF CHANGES
                     resolve(result);
                 }
             });

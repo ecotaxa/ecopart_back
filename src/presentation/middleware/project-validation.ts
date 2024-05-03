@@ -115,38 +115,86 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
 
     rulesProjectUpdateModel = [
         oneOf([
-            // Email Validation
-            check('email').exists().withMessage('No value provided.').bail()
+            // Root Folder Path Validation
+            check('root_folder_path').exists().withMessage('No value provided.')
+                .trim(),
+            // Project Title Validation
+            check('project_title').exists().withMessage('No value provided.')
+                .trim(),
+            // Project acrony Validation
+            check('project_acronym').exists().withMessage('No value provided.')
+                .trim(),
+            // Project description Validation
+            check('project_description').exists().withMessage('No value provided.')
+                .trim(),
+            // Project information Validation
+            check('project_information').exists().withMessage('No value provided.')
+                .trim(),
+
+            // Project cruise Validation
+            check('cruise').exists().withMessage('No value provided.')
+                .trim(),
+
+            // Project ship Validation 
+            check('ship').exists().withMessage('No value provided.').trim(),
+
+            // Data owner name Validation
+            check('data_owner_name')
+                .trim()
+                .not().isEmpty().withMessage('Data owner name is required.'),
+
+            //  Data owner email Validation
+            check('data_owner_email').exists().withMessage('No value provided.')
                 .trim()
                 .normalizeEmail()
-                .isEmail().withMessage('Email must be a valid email address.'),
-            // First Name Validation
-            check('first_name').exists().withMessage('No value provided.')
+                .isEmail().withMessage('Data owner email must be a valid email address.')
+                .bail(),
+
+            // Operator name Validation
+            check('operator_name').exists().withMessage('No value provided.')
+                .trim(),
+            // Operator email Validation
+            check('operator_email').exists().withMessage('No value provided.')
+                .trim()
+                .normalizeEmail()
+                .isEmail().withMessage('Operator email must be a valid email address.')
+                .bail(),
+
+            // Chief scientist name Validation
+            check('chief_scientist_name').exists().withMessage('No value provided.')
                 .trim(),
 
-            // Last Name Validation
-            check('last_name').exists().withMessage('No value provided.')
-                .trim(),
+            // Chief scientist email Validation
+            check('chief_scientist_email').exists().withMessage('No value provided.')
+                .trim()
+                .normalizeEmail()
+                .isEmail().withMessage('Chief scientist email must be a valid email address.')
+                .bail(),
 
+            // Override depth offset Validation 
+            check('override_depth_offset').optional().exists().withMessage('No value provided.')
+                .isFloat().withMessage('Override depth offset must be a float value.'),
 
-            // Valid email Validation
-            check('valid_email').exists().withMessage('No value provided.')
-                .trim(),
+            // Enable descent filter Validation
+            check('enable_descent_filter').exists().withMessage('No value provided.')
+                .trim()
+                .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
 
-            // Is Admin Validation
-            check('is_admin').exists().withMessage('No value provided.')
-                .trim(),
+            // Privacy duration Validation
+            check('privacy_duration').exists().withMessage('No value provided.')
+                .isInt({ min: 0 }).withMessage('Privacy duration must be a number and must be greater than 0.'),
 
-            // Confirmation Code Validation (optional field)
-            check('confirmation_code').exists().withMessage('No value provided.'),
+            // Visible duration Validation 
+            check('visible_duration').exists().withMessage('No value provided.')
+                .isInt({ min: 0 }).withMessage('Visible duration must be a number and must be greater than 0.'),
 
-            // Organisation Validation
-            check('organisation').exists().withMessage('No value provided.')
-                .trim(),
+            // Public duration Validation 
+            check('public_duration').exists().withMessage('No value provided.')
+                .isInt({ min: 0 }).withMessage('Public duration must be a number and must be greater than 0.'),
 
-            // Project Planned Usage Validation
-            check('user_planned_usage').exists().withMessage('No value provided.')
-                .trim(),
+            // Instrument Validation 
+            check('instrument').exists().withMessage('No value provided.') // TODO next sprin check this is an authorized instrument
+                .trim()
 
         ], { errorType: 'flat', message: 'At least one valid field must be updated.' }),
         // Project Creation Date Validation
