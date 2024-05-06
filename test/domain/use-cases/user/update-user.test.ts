@@ -17,10 +17,10 @@ import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
 
 describe("Update User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult> {
+        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
-        standardGetUsers(): Promise<SearchResult> {
+        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
         deleteUser(): Promise<number> {

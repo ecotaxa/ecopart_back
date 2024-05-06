@@ -1,6 +1,3 @@
-import { UserResponseModel } from "./user";
-
-
 // Raw data
 export interface SearchOptions extends PaginedSearchOptions {
     filter?: FilterSearchOptions[]; // Add filtering support
@@ -37,8 +34,7 @@ export interface SearchInfo {
     page: number; // Current page
     pages: number; // Total number of pages
 }
-
-export interface SearchResult {
-    users: UserResponseModel[],
-    total: number
-} 
+export interface SearchResult<T> {
+    items: T[];
+    total: number;
+}

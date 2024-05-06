@@ -9,8 +9,8 @@ export interface UserRepository {
     standardUpdateUser(user: UserUpdateModel): Promise<number>;
     verifyUserLogin(user: AuthUserCredentialsModel): Promise<boolean>;
     createUser(user: UserRequestCreationtModel): Promise<number>;
-    adminGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult>;
-    standardGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult>;
+    adminGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult<UserResponseModel>>;
+    standardGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult<UserResponseModel>>;
     isAdmin(user_id: number): Promise<boolean>;
     validUser(user: UserRequestModel): Promise<number>;
     generateValidationToken(user: UserRequestModel): string;

@@ -150,10 +150,4 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
             next();
         },
     ];
-
-    rulesUserRequestModel = [
-    ]
-
-    rulesUserResponseModel = [
-    ]
 }

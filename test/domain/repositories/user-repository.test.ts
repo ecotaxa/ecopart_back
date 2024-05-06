@@ -20,7 +20,7 @@ class MockUserDataSource implements UserDataSource {
     create(): Promise<number> {
         throw new Error("Method not implemented.");
     }
-    getAll(): Promise<SearchResult> {
+    getAll(): Promise<SearchResult<UserResponseModel>> {
         throw new Error("Method not implemented.");
     }
     getOne(): Promise<UserResponseModel> {
@@ -70,8 +70,8 @@ describe("User Repository", () => {
     describe("GetAllUsers", () => {
 
         test("Should return data for admin users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",
@@ -95,8 +95,8 @@ describe("User Repository", () => {
         });
 
         test("Should not return data with bad options even for admin users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",
@@ -128,8 +128,8 @@ describe("User Repository", () => {
             expect(mockUserDataSource.getAll).not.toBeCalled()
         });
         test("Should return cleaned data for standard users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",
@@ -154,8 +154,8 @@ describe("User Repository", () => {
         });
 
         test("Should not return data with bad options for standard users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",
@@ -187,8 +187,8 @@ describe("User Repository", () => {
             expect(mockUserDataSource.getAll).not.toBeCalled()
         });
         test("Should not return data with bad options for standard users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",
@@ -220,8 +220,8 @@ describe("User Repository", () => {
             expect(mockUserDataSource.getAll).not.toBeCalled()
         });
         test("Should not return data with bad options for standard users", async () => {
-            const expectedData: SearchResult = {
-                users: [{
+            const expectedData: SearchResult<UserResponseModel> = {
+                items: [{
                     user_id: 1,
                     last_name: "Smith",
                     first_name: "John",

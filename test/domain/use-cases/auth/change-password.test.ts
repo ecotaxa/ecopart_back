@@ -17,10 +17,10 @@ import { ChangePassword } from '../../../../src/domain/use-cases/auth/change-pas
 
 describe("Change password Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult> {
+        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
-        standardGetUsers(): Promise<SearchResult> {
+        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
         deleteUser(): Promise<number> {

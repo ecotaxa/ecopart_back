@@ -105,7 +105,7 @@ export class UserRepositoryImpl implements UserRepository {
         return nb_of_updated_user
     }
 
-    async adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult> {
+    async adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>> {
         // Can be filtered by 
         const filter_params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
         // Can be sort_by
@@ -114,7 +114,7 @@ export class UserRepositoryImpl implements UserRepository {
         return await this.getUsers(options, filter_params_admin, sort_param_admin, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
-    async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult> { //TODO
+    async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>> {
         // Can be filtered by 
         const filter_params_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "valid_email", "deleted"] // Add valid_email and deleted to force default filter
         // Can be sort_by 
@@ -135,7 +135,7 @@ export class UserRepositoryImpl implements UserRepository {
         return await this.getUsers(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
-    private async getUsers(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult> {
+    private async getUsers(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult<UserResponseModel>> {
         const unauthorizedParams: string[] = [];
         //TODO move to a search repository
         // Filter options.sort_by by sorting params 

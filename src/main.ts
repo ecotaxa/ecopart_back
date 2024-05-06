@@ -20,6 +20,7 @@ import { DeleteUser } from './domain/use-cases/user/delete-user'
 import { CreateProject } from './domain/use-cases/project/create-project'
 import { DeleteProject } from './domain/use-cases/project/delete-project'
 import { UpdateProject } from './domain/use-cases/project/update-project'
+import { SearchProject } from './domain/use-cases/project/search-projects'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -122,6 +123,7 @@ async function getSQLiteDS() {
         new CreateProject(user_repo, project_repo),
         new DeleteProject(user_repo, project_repo),
         new UpdateProject(user_repo, project_repo),
+        new SearchProject(user_repo, project_repo, search_repo),
     )
 
     server.use("/users", userMiddleWare)

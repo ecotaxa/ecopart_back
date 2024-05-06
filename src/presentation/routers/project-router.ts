@@ -3,13 +3,13 @@ import { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-validation'
+
 import { CreateProjectUseCase } from '../../domain/interfaces/use-cases/project/create-project'
 import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/delete-project'
-import { CustomRequest } from '../../domain/entities/auth'
 import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
-// import { ValidProjectUseCase } from '../../domain/interfaces/use-cases/project/valid-project'
-// import { SearchProjectUseCase } from '../../domain/interfaces/use-cases/project/search-project'
-// import { CustomRequest } from '../../domain/entities/auth'
+
+import { CustomRequest } from '../../domain/entities/auth'
+import { SearchProjectUseCase } from '../../domain/interfaces/use-cases/project/search-project'
 
 export default function ProjectRouter(
     middlewareAuth: MiddlewareAuth,
@@ -17,39 +17,38 @@ export default function ProjectRouter(
     createProjectUseCase: CreateProjectUseCase,
     deleteProjectUseCase: DeleteProjectUseCase,
     updateProjectUseCase: UpdateProjectUseCase,
-    // validProjectUseCase: ValidProjectUseCase,
-    // searchProjectUseCase: SearchProjectUseCase
+    searchProjectUseCase: SearchProjectUseCase
 ) {
     const router = express.Router()
 
-    // Pagined and sorted list of all project
-    // router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProject, async (req: Request, res: Response) => {
-    //     try {
-    //         const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
-    //         res.status(200).send(project)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
-    //         else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-    //         else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-    //         else res.status(500).send({ errors: ["Can't get project"] })
-    //     }
-    // })
+    //Pagined and sorted list of all project
+    router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {
+        try {
+            const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
+            res.status(200).send(project)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't get projects"] })
+        }
+    })
 
-    // // Pagined and sorted list of filtered project
-    // router.post('/searches', middlewareAuth.auth, middlewareProjectValidation.rulesGetProject, async (req: Request, res: Response) => {
-    //     try {
-    //         const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
-    //         res.status(200).send(project)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
-    //         else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-    //         else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-    //         else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
-    //         else res.status(500).send({ errors: ["Can't search project"] })
-    //     }
-    // })
+    // Pagined and sorted list of filtered project
+    router.post('/searches', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {
+        try {
+            const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
+            res.status(200).send(project)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Can't search projects"] })
+        }
+    })
 
     router.post('/', middlewareAuth.auth, middlewareProjectValidation.rulesProjectRequestCreationtModel, async (req: Request, res: Response) => {
         try {

@@ -55,7 +55,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         })
     }
 
-    async getAll(options: PreparedSearchOptions): Promise<SearchResult> {
+    async getAll(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
         let sql = `SELECT *, (SELECT COUNT(*) FROM user`
         const params: any[] = []
@@ -136,10 +136,10 @@ export class SQLiteUserDataSource implements UserDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (rows === undefined) resolve({ users: [], total: 0 });
+                    if (rows === undefined) resolve({ items: [], total: 0 });
                     console.log("rows", rows)
-                    const result: SearchResult = {
-                        users: rows.map(row => ({
+                    const result: SearchResult<UserResponseModel> = {
+                        items: rows.map(row => ({
                             user_id: row.user_id,
                             first_name: row.first_name,
                             last_name: row.last_name,

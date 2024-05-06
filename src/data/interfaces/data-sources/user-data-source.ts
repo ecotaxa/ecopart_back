@@ -4,7 +4,7 @@ import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/se
 
 export interface UserDataSource {
     create(user: UserRequestCreationtModel): Promise<number>;
-    getAll(options: PreparedSearchOptions): Promise<SearchResult>;
+    getAll(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>>;
     updateOne(user: UserUpdateModel): Promise<number>;
     getOne(user: UserRequestModel): Promise<UserResponseModel | null>;
     getUserLogin(email: string): Promise<AuthUserCredentialsModel | null>;

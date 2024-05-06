@@ -9,10 +9,10 @@ import { SearchResult } from "../../../../src/domain/entities/search";
 
 describe("Create User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult> {
+        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
-        standardGetUsers(): Promise<SearchResult> {
+        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
         deleteUser(): Promise<number> {

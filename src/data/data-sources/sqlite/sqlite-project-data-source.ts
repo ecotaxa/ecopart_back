@@ -2,6 +2,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 
 import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../../domain/entities/project";
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
+import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
 // const DB_TABLE = "project"
 export class SQLiteProjectDataSource implements ProjectDataSource {
@@ -138,6 +139,121 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             });
         })
     }
+    async getAll(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
+        // Get the limited rows and the total count of rows //  WHERE your_condition
+        let sql = `SELECT *, (SELECT COUNT(*) FROM project`
+        const params: any[] = []
+        let filtering_sql = ""
+        const params_filtering: any[] = []
+        // Add filtering
+        if (options.filter.length > 0) {
+            filtering_sql += ` WHERE `;
+            // For each filter, add to filtering_sql and params_filtering
+            for (const filter of options.filter) {
+                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                    // if array do not contains null or undefined
+                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
+                        // for eatch value in filter.value, add to filtering_sql and params_filtering
+                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        params_filtering.push(...filter.value)
+                    }
+                }
+                // If value is true or false, set to 1 or 0
+                else if (filter.value == true || filter.value == "true") {
+                    filtering_sql += filter.field + ` = 1`;
+                }
+                else if (filter.value == false || filter.value == "false") {
+                    filtering_sql += filter.field + ` = 0`;
+                }
+                // If value is undefined, null or empty, and operator =, set to is null
+                else if (filter.value == undefined || filter.value == null || filter.value == "") {
+                    if (filter.operator == "=") {
+                        filtering_sql += filter.field + ` IS NULL`;
+                    } else if (filter.operator == "!=") {
+                        filtering_sql += filter.field + ` IS NOT NULL`;
+                    }
+                }
+
+                else {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
+                    params_filtering.push(filter.value)
+                }
+                filtering_sql += ` AND `;
+            }
+            // remove last AND
+            filtering_sql = filtering_sql.slice(0, -4);
+        }
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        sql += `) AS total_count FROM project`
+
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        // Add sorting
+        if (options.sort_by.length > 0) {
+            sql += ` ORDER BY`;
+            for (const sort of options.sort_by) {
+                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+            }
+            // remove last ,
+            sql = sql.slice(0, -1);
+        }
+
+        // Add pagination
+        const page = options.page;
+        const limit = options.limit;
+        const offset = (page - 1) * limit;
+        sql += ` LIMIT (?) OFFSET (?)`;
+        params.push(limit, offset);
+
+        // Add final ;
+        sql += `;`
+
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (rows === undefined) resolve({ items: [], total: 0 });
+                    console.log("rows", rows)
+                    const result: SearchResult<ProjectResponseModel> = {
+                        items: rows.map(row => ({
+                            project_id: row.project_id,
+                            root_folder_path: row.root_folder_path,
+                            project_title: row.project_title,
+                            project_acronym: row.project_acronym,
+                            project_description: row.project_description,
+                            project_information: row.project_information,
+                            cruise: row.cruise,
+                            ship: row.ship,
+                            data_owner_name: row.data_owner_name,
+                            data_owner_email: row.data_owner_email,
+                            operator_name: row.operator_name,
+                            operator_email: row.operator_email,
+                            chief_scientist_name: row.chief_scientist_name,
+                            chief_scientist_email: row.chief_scientist_email,
+                            override_depth_offset: row.override_depth_offset,
+                            enable_descent_filter: row.enable_descent_filter == 1 ? true : false,
+                            privacy_duration: row.privacy_duration,
+                            visible_duration: row.visible_duration,
+                            public_duration: row.public_duration,
+                            instrument: row.instrument,
+                            project_creation_date: row.project_creation_date
+                        })),
+                        total: rows[0]?.total_count || 0
+                    };
+                    resolve(result);
+                }
+            });
+        })
+    }
+
 
 }
 

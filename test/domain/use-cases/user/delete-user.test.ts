@@ -6,10 +6,10 @@ import { DeleteUser } from '../../../../src/domain/use-cases/user/delete-user'
 
 describe("Delete User Use Case", () => {
     class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult> {
+        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
-        standardGetUsers(): Promise<SearchResult> {
+        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
             throw new Error("Method not implemented.");
         }
         deleteUser(): Promise<number> {

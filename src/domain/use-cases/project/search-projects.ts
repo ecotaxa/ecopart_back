@@ -1,19 +1,22 @@
-import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions } from "../../entities/search";
-import { UserResponseModel, UserUpdateModel } from "../../entities/user";
+import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions, SearchResult } from "../../entities/search";
+import { UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { SearchRepository } from "../../interfaces/repositories/search-repository";
-import { SearchUsersUseCase } from "../../interfaces/use-cases/user/search-user";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
+import { SearchProjectUseCase } from "../../interfaces/use-cases/project/search-project";
+import { ProjectResponseModel } from "../../entities/project";
 
-export class SearchUsers implements SearchUsersUseCase {
+export class SearchProject implements SearchProjectUseCase {
     userRepository: UserRepository
+    projectRepository: ProjectRepository
     searchRepository: SearchRepository
 
-    constructor(userRepository: UserRepository, searchRepository: SearchRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, searchRepository: SearchRepository) {
         this.userRepository = userRepository
+        this.projectRepository = projectRepository
         this.searchRepository = searchRepository
     }
-
-    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ projects: ProjectResponseModel[], search_info: SearchInfo }> {
         // DONE define wanted cases sensitivity : = is perfect match and LIKE is case insensitive
 
         // User should not be deleted
@@ -30,26 +33,18 @@ export class SearchUsers implements SearchUsersUseCase {
             options.sort_by = this.searchRepository.formatSortBy(options.sort_by as string);
         }
 
-        let result;
-        let users: UserResponseModel[] = [];
+        const result: SearchResult<ProjectResponseModel> = await this.projectRepository.standardGetProjects(options as PreparedSearchOptions);
+        const projects: ProjectResponseModel[] = result.items//.map(user => this.userRepository.toPublicUser(user));
 
-        // If admin, can search for deleted users
-        if (await this.userRepository.isAdmin(current_user.user_id)) {
-            result = await this.userRepository.adminGetUsers(options as PreparedSearchOptions);
-            users = result.items;
-        } else {
-            result = await this.userRepository.standardGetUsers(options as PreparedSearchOptions);
-            users = result.items.map(user => this.userRepository.toPublicUser(user));
-        }
 
         const search_info: SearchInfo = {
             total: result.total,
             limit: parseInt(options.limit.toString()),
-            total_on_page: users.length,
+            total_on_page: projects.length,
             page: parseInt(options.page.toString()),
             pages: Math.ceil(result.total / options.limit) || 1
         };
 
-        return { search_info, users };
+        return { search_info, projects };
     }
 }
