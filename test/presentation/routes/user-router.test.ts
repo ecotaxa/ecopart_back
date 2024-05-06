@@ -685,7 +685,7 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't find user to delete sould return 404", async () => {
+        test("DELETE /users fail for Can't find user to delete should return 404", async () => {
             const expectedResponse = { errors: ["Can't find user to delete"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find user to delete")))
             const response = await request(server).delete("/users/1")
@@ -693,7 +693,7 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for User is deleted sould return 403", async () => {
+        test("DELETE /users fail for User is deleted should return 403", async () => {
             const expectedResponse = { errors: ["User is deleted"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User is deleted")))
             const response = await request(server).delete("/users/1")
@@ -701,7 +701,7 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't find deleted user sould return 500", async () => {
+        test("DELETE /users fail for Can't find deleted user should return 500", async () => {
             const expectedResponse = { errors: ["Can't find deleted user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find deleted user")))
             const response = await request(server).delete("/users/1")
@@ -709,7 +709,7 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't delete user sould return 500", async () => {
+        test("DELETE /users fail for Can't delete user should return 500", async () => {
             const expectedResponse = { errors: ["Can't delete user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
             const response = await request(server).delete("/users/1")
