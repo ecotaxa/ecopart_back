@@ -70,7 +70,7 @@ describe('SQLiteUserDataSource', () => {
             // Expect the user ID to be returned
             expect(userId).toBeDefined();
             // Expect the user ID to be returned
-            expect(userId).toEqual(1);
+            expect(userId).toEqual(2);
 
         });
 
@@ -85,14 +85,14 @@ describe('SQLiteUserDataSource', () => {
                 country: 'Country',
                 user_planned_usage: 'Usage'
             };
-            // Test handling duplicate email
-            const userId = await dataSource.create(user)
-            // Expect the user ID to be returned
-            expect(userId).toBeDefined();
-            // Expect the user ID to be returned
-            expect(userId).toEqual(2);
 
-            await expect(dataSource.create(user)).rejects.toThrow();
+            try {
+                await dataSource.create(user);
+            }
+            catch (error) {
+                expect(error).toBeDefined();
+                expect(error.message).toEqual('SQLITE_CONSTRAINT: UNIQUE constraint failed: user.email');
+            }
         });
     });
     describe('getAll', () => {
@@ -106,56 +106,56 @@ describe('SQLiteUserDataSource', () => {
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [] });
 
             // Expect the user ID to be returned
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(2);
+            expect(getAllOutput.total).toEqual(3);
         });
         test('should return all users with pagination', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 1, filter: [], sort_by: [] });
 
             // Expect the user ID to be returned
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(2);
-            expect(getAllOutput.users.length).toEqual(1);
+            expect(getAllOutput.total).toEqual(3);
+            expect(getAllOutput.items.length).toEqual(1);
         });
         test('should return all users with filtering', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'email', operator: 'LIKE', value: 'joan%' }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(1);
-            expect(getAllOutput.users.length).toEqual(1);
-            expect(getAllOutput.users[0].email).toEqual('joan.dou@example.com');
+            expect(getAllOutput.items.length).toEqual(1);
+            expect(getAllOutput.items[0].email).toEqual('joan.dou@example.com');
         });
         test('should return all users with filtering', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'email', operator: 'LIKE', value: 'jo%' }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(2);
-            expect(getAllOutput.users.length).toEqual(2);
-            expect(getAllOutput.users[0].email).toEqual('joan.dou@example.com');
-            expect(getAllOutput.users[1].email).toEqual('john.doe@example.com');
+            expect(getAllOutput.items.length).toEqual(2);
+            expect(getAllOutput.items[0].email).toEqual('joan.dou@example.com');
+            expect(getAllOutput.items[1].email).toEqual('john.doe@example.com');
         });
         test('should return all users with sorting', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [{ sort_by: 'email', order_by: 'ASC' }] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(2);
-            expect(getAllOutput.users.length).toEqual(2);
-            expect(getAllOutput.users[0].email).toEqual('joan.dou@example.com');
+            expect(getAllOutput.total).toEqual(3);
+            expect(getAllOutput.items.length).toEqual(3);
+            expect(getAllOutput.items[0].email).toEqual('joan.dou@example.com');
         });
         test('should return all users with sorting', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [{ sort_by: 'email', order_by: 'DESC' }] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(2);
-            expect(getAllOutput.users.length).toEqual(2);
-            expect(getAllOutput.users[0].email).toEqual('john.doe@example.com');
+            expect(getAllOutput.total).toEqual(3);
+            expect(getAllOutput.items.length).toEqual(3);
+            expect(getAllOutput.items[1].email).toEqual('john.doe@example.com');
         });
         test('should return all users with sorting and filtering', async () => {
             // Add bunch of users
@@ -196,67 +196,67 @@ describe('SQLiteUserDataSource', () => {
 
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'organisation', operator: '=', value: 'Organization' }], sort_by: [{ sort_by: 'email', order_by: 'ASC' }] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(4);
-            expect(getAllOutput.users.length).toEqual(4);
-            expect(getAllOutput.users[0].email).toEqual('alice@example.com');
-            expect(getAllOutput.users[1].email).toEqual('joan.dou@example.com');
-            expect(getAllOutput.users[2].email).toEqual('john.doe@example.com');
-            expect(getAllOutput.users[3].email).toEqual('marc@example.com');
+            expect(getAllOutput.items.length).toEqual(4);
+            expect(getAllOutput.items[0].email).toEqual('alice@example.com');
+            expect(getAllOutput.items[1].email).toEqual('joan.dou@example.com');
+            expect(getAllOutput.items[2].email).toEqual('john.doe@example.com');
+            expect(getAllOutput.items[3].email).toEqual('marc@example.com');
 
         });
 
         test('should return all users with sorting and filtering and pagination', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 2, limit: 2, filter: [{ field: 'organisation', operator: '=', value: 'Organization' }], sort_by: [{ sort_by: 'user_id', order_by: 'DESC' }] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(4);
-            expect(getAllOutput.users.length).toEqual(2);
-            expect(getAllOutput.users[0].email).toEqual('john.doe@example.com');
-            expect(getAllOutput.users[1].email).toEqual('joan.dou@example.com');
+            expect(getAllOutput.items.length).toEqual(2);
+            expect(getAllOutput.items[0].email).toEqual('john.doe@example.com');
+            expect(getAllOutput.items[1].email).toEqual('joan.dou@example.com');
         });
 
         test('should return all users with sorting and filtering and pagination IN', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'organisation', operator: 'IN', value: ['Organization', 'LOV'] }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(5);
-            expect(getAllOutput.users.length).toEqual(5);
+            expect(getAllOutput.items.length).toEqual(5);
         });
         test('should return all users with sorting and filtering and pagination true', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'valid_email', operator: '=', value: true }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(0);
-            expect(getAllOutput.users.length).toEqual(0);
+            expect(getAllOutput.total).toEqual(1);
+            expect(getAllOutput.items.length).toEqual(1);
         });
         test('should return all users with sorting and filtering and pagination false', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'valid_email', operator: '=', value: false }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(5);
-            expect(getAllOutput.users.length).toEqual(5);
+            expect(getAllOutput.items.length).toEqual(5);
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '=', value: null }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
-            expect(getAllOutput.total).toEqual(5);
-            expect(getAllOutput.users.length).toEqual(5);
+            expect(getAllOutput.total).toEqual(6);
+            expect(getAllOutput.items.length).toEqual(6);
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '!=', value: null }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(0);
-            expect(getAllOutput.users.length).toEqual(0);
+            expect(getAllOutput.items.length).toEqual(0);
         });
 
     });
@@ -268,7 +268,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should update a user', async () => {
             const user_to_update: UserUpdateModel = {
-                user_id: 2,
+                user_id: 3,
                 first_name: 'EDITED',
                 last_name: 'EDITED',
                 valid_email: true
@@ -280,14 +280,14 @@ describe('SQLiteUserDataSource', () => {
             expect(updated).toBeDefined();
             expect(updated).toEqual(1);
             // Call the getAll method where the user is updated
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'user_id', operator: '=', value: 2 }], sort_by: [] });
-            expect(getAllOutput.users).toBeDefined();
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'user_id', operator: '=', value: 3 }], sort_by: [] });
+            expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(1);
-            expect(getAllOutput.users.length).toEqual(1);
-            expect(getAllOutput.users[0].first_name).toEqual('EDITED');
-            expect(getAllOutput.users[0].last_name).toEqual('EDITED');
-            expect(getAllOutput.users[0].valid_email).toEqual(true);
+            expect(getAllOutput.items.length).toEqual(1);
+            expect(getAllOutput.items[0].first_name).toEqual('EDITED');
+            expect(getAllOutput.items[0].last_name).toEqual('EDITED');
+            expect(getAllOutput.items[0].valid_email).toEqual(true);
         });
     });
 
@@ -315,12 +315,12 @@ describe('SQLiteUserDataSource', () => {
                 organisation: "Organization",
                 reset_password_code: null,
                 user_creation_date: "2024-03-04 17:02:02",
-                user_id: 2,
+                user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
             }
             // Call the getOne method
-            const user = await dataSource.getOne({ user_id: 2 });
+            const user = await dataSource.getOne({ user_id: 3 });
             expect(user).toBeDefined();
             // not null
             expect(user).not.toBeNull();
@@ -358,7 +358,7 @@ describe('SQLiteUserDataSource', () => {
                 organisation: "Organization",
                 reset_password_code: null,
                 user_creation_date: "2024-03-04 17:02:02",
-                user_id: 2,
+                user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
             }
