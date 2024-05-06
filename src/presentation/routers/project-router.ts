@@ -9,7 +9,7 @@ import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/
 import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
 
 import { CustomRequest } from '../../domain/entities/auth'
-import { SearchProjectUseCase } from '../../domain/interfaces/use-cases/project/search-project'
+import { SearchProjectsUseCase } from '../../domain/interfaces/use-cases/project/search-project'
 
 export default function ProjectRouter(
     middlewareAuth: MiddlewareAuth,
@@ -17,7 +17,7 @@ export default function ProjectRouter(
     createProjectUseCase: CreateProjectUseCase,
     deleteProjectUseCase: DeleteProjectUseCase,
     updateProjectUseCase: UpdateProjectUseCase,
-    searchProjectUseCase: SearchProjectUseCase
+    searchProjectUseCase: SearchProjectsUseCase
 ) {
     const router = express.Router()
 
@@ -28,7 +28,7 @@ export default function ProjectRouter(
             res.status(200).send(project)
         } catch (err) {
             console.log(err)
-            if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't get projects"] })
@@ -42,7 +42,7 @@ export default function ProjectRouter(
             res.status(200).send(project)
         } catch (err) {
             console.log(err)
-            if (err.message === "Project is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
@@ -85,7 +85,7 @@ export default function ProjectRouter(
             console.log(err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Can't find project to delete") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this project") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Can't delete project"] })
         }
     })

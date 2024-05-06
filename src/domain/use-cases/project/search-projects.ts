@@ -3,10 +3,10 @@ import { UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { SearchRepository } from "../../interfaces/repositories/search-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
-import { SearchProjectUseCase } from "../../interfaces/use-cases/project/search-project";
+import { SearchProjectsUseCase } from "../../interfaces/use-cases/project/search-project";
 import { ProjectResponseModel } from "../../entities/project";
 
-export class SearchProject implements SearchProjectUseCase {
+export class SearchProject implements SearchProjectsUseCase {
     userRepository: UserRepository
     projectRepository: ProjectRepository
     searchRepository: SearchRepository
