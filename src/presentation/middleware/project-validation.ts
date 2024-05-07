@@ -82,7 +82,6 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Enable descent filter Validation
         check('enable_descent_filter')
             .exists().withMessage('Enable descent filter is required.')
-            .trim()
             .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
 
         // Privacy duration Validation
@@ -177,7 +176,6 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
 
             // Enable descent filter Validation
             check('enable_descent_filter').exists().withMessage('No value provided.')
-                .trim()
                 .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
 
             // Privacy duration Validation
