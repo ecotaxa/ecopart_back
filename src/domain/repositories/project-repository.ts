@@ -16,7 +16,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async createProject(project: ProjectRequestCreationtModel): Promise<number> {
-
         const result = await this.projectDataSource.create(project)
         return result;
     }
@@ -25,7 +24,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         const result = await this.projectDataSource.getOne(project)
         return result;
     }
-
+    // TODO REFACTOR RETHINK THIS
     computeDefaultDepthOffset(instrument: string): number | undefined {
         if (instrument === undefined) throw new Error("Instrument is required")
         if (instrument === "uvp5") return 1.2
@@ -36,6 +35,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         const result = await this.projectDataSource.deleteOne(project)
         return result;
     }
+
     private async updateProject(project: ProjectUpdateModel, params: string[]): Promise<number> {
         const filteredProject: Partial<ProjectUpdateModel> = {};
         const unauthorizedParams: string[] = [];

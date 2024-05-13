@@ -1,73 +1,12 @@
 import { Transporter } from "nodemailer";
-import { DecodedToken } from "../../../../src/domain/entities/auth";
 import { UserRequestCreationtModel, UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
 import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
-import { SearchResult } from "../../../../src/domain/entities/search";
+import { MockUserRepository } from "../../../mocks/user-mock";
 
 describe("Create User Use Case", () => {
-    class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        deleteUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isDeleted(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        generateResetPasswordToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyResetPasswordToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-        setResetPasswordCode(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        toPublicUser(): UserResponseModel {
-            throw new Error("Method not implemented.");
-        }
-        changePassword(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        adminUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        standardUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isAdmin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        createUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        getUsers(): Promise<UserResponseModel[]> {
-            throw new Error("Method not implemented.");
-        }
-        getUser(): Promise<UserResponseModel | null> {
-            throw new Error("Method not implemented.");
-        }
-        verifyUserLogin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        validUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        generateValidationToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyValidationToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-    }
-
     let mockUserRepository: UserRepository;
     let mockTransporter: Transporter;
     let mockMailerAdapter: MailerWrapper;
@@ -372,19 +311,6 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-        }
-        const created_user: UserResponseModel = {
-            user_id: 1,
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            is_admin: false,
-            valid_email: false,
-            confirmation_code: "confirmation_code",
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
         }
         const OutputData: UserResponseModel = {
             user_id: 1,

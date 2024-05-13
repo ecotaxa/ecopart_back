@@ -17,7 +17,7 @@ import { MiddlewareProjectValidation } from "../../../src/presentation/middlewar
 
 import { Request, Response, NextFunction } from "express";
 import { SearchInfo } from "../../../src/domain/entities/search";
-import { projectRequestCreationtModel, projectRequestCreationtModel_withDataSanitized, projectRequestCreationtModel_withDataToSanitize, projectRequestCreationtModel_withmissingData, projectResponseModel, projectUpdateModel, projectUpdateModel_toSanatize } from "../../entities/project";
+import { partial_projectUpdateModel_toSanatize, projectRequestCreationtModel, projectRequestCreationtModel_withDataSanitized, projectRequestCreationtModel_withDataToSanitize, projectRequestCreationtModel_withmissingData, projectResponseModel, partial_projectUpdateModel } from "../../entities/project";
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
     execute(): Promise<ProjectResponseModel> {
@@ -140,7 +140,7 @@ describe("Project Router", () => {
 
     describe("Test project router update project validation", () => {
         test("update project all params are valid", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
             const OutputData: ProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
@@ -153,8 +153,8 @@ describe("Project Router", () => {
         });
 
         test("Sanitize last_name and first_name", async () => {
-            const project_to_update = projectUpdateModel_toSanatize
-            const sanitizedInputData = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel_toSanatize
+            const sanitizedInputData = partial_projectUpdateModel
 
             const OutputData: ProjectResponseModel = projectResponseModel
 

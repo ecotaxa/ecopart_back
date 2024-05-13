@@ -10,7 +10,7 @@ export const projectRequestCreationtModel: ProjectRequestCreationtModel = {
     project_description: 'project_description',
     project_information: 'project_information',
     cruise: 'cruise',
-    ship: ['ship1', 'ship2'],
+    ship: "['ship1', 'ship2']",
     data_owner_name: 'data_owner_name',
     data_owner_email: 'data_owner_email@email.fr',
     operator_name: 'operator_name',
@@ -25,6 +25,112 @@ export const projectRequestCreationtModel: ProjectRequestCreationtModel = {
     instrument: 'instrument'
 }
 
+export const projectRequestCreationtModel_2: ProjectRequestCreationtModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'joan project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: false,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'instrument'
+}
+export const projectRequestCreationtModel_3: ProjectRequestCreationtModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'john project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'instrument'
+}
+export const projectRequestCreationtModel_4: ProjectRequestCreationtModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'alice project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'instrument'
+}
+export const projectRequestCreationtModel_5: ProjectRequestCreationtModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'marc project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'instrument'
+}
+export const projectRequestCreationtModel_6: ProjectRequestCreationtModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'julie project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'uvp5'
+}
+
 export const projectRequestCreationtModel_withDataToSanitize: ProjectRequestCreationtModel = {
     root_folder_path: ' root_folder_path',
     project_title: ' project_title',
@@ -32,7 +138,7 @@ export const projectRequestCreationtModel_withDataToSanitize: ProjectRequestCrea
     project_description: ' project_description',
     project_information: ' project_information',
     cruise: ' cruise',
-    ship: ['ship1', 'ship2'],
+    ship: "['ship1', 'ship2']",
     data_owner_name: ' Data_owner_name',
     data_owner_email: 'Data_owner_email@email.fr',
     operator_name: ' operator_name',
@@ -54,7 +160,7 @@ export const projectRequestCreationtModel_withDataSanitized: ProjectRequestCreat
     project_description: 'project_description',
     project_information: 'project_information',
     cruise: 'cruise',
-    ship: ['ship1', 'ship2'],
+    ship: "['ship1', 'ship2']",
     data_owner_name: 'Data_owner_name',
     data_owner_email: 'data_owner_email@email.fr',
     operator_name: 'operator_name',
@@ -75,7 +181,7 @@ export const projectRequestCreationtModel_withmissingData = {
     project_description: 'project_description',
     project_information: 'project_information',
     cruise: 'cruise',
-    ship: ['ship1', 'ship2'],
+    ship: "['ship1', 'ship2']",
     data_owner_email: 'data_owner_email@email.fr',
     operator_name: 'operator_name',
     operator_email: 'operator_email@email.fr',
@@ -89,6 +195,26 @@ export const projectRequestCreationtModel_withmissingData = {
     instrument: 'instrument'
 }
 
+export const projectRequestCreationtModel_withmissingOverrideDepthOffset = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument: 'instrument'
+}
 export const projectResponseModel: ProjectResponseModel = {
     ...projectRequestCreationtModel,
     project_id: 1,
@@ -107,14 +233,26 @@ export const projectRequestModel: ProjectRequestModel = {
     project_id: 1
 }
 
-export const projectUpdateModel_toSanatize: Partial<ProjectUpdateModel> = {
+export const partial_projectUpdateModel_toSanatize: Partial<ProjectUpdateModel> = {
     operator_email: " EdiTed_user@email.com   ",
     operator_name: "  Edited name  "
 }
 
-export const projectUpdateModel: Partial<ProjectUpdateModel> = {
+export const partial_projectUpdateModel: Partial<ProjectUpdateModel> = {
     operator_email: "edited_user@email.com",
     operator_name: "Edited name"
 }
+
+export const projectUpdateModel: ProjectUpdateModel = {
+    operator_email: "edited_user@email.com",
+    operator_name: "Edited name",
+    project_id: 1
+}
+
+export const projectUpdateModel_withBadData: ProjectUpdateModel = {
+    project_id: 1,
+    unauthorized_param: "unauthorized_param"
+}
+
 // define unvalid example of project entities to use in the tests
 

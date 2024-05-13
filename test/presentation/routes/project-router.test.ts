@@ -16,7 +16,7 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareProjectValidation } from "../../../src/presentation/interfaces/middleware/project-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { projectRequestCreationtModel, projectResponseModel, projectResponseModelArray, projectUpdateModel } from "../../entities/project";
+import { projectRequestCreationtModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
     execute(): Promise<{ projects: ProjectResponseModel[], search_info: SearchInfo }> {
@@ -294,7 +294,7 @@ describe("Project Router", () => {
     describe("PATCH /projects", () => {
 
         test("PATCH /projects", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const OutputData: ProjectResponseModel = projectResponseModel
 
@@ -304,7 +304,7 @@ describe("Project Router", () => {
         });
 
         test("PATCH /projects fail for unexepted reason", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = { errors: ["Can't update project"] }
 
@@ -317,7 +317,7 @@ describe("Project Router", () => {
         });
 
         test("PATCH /projects fail for User is deleted", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = { errors: ["User is deleted"] }
 
@@ -331,7 +331,7 @@ describe("Project Router", () => {
         });
 
         test("PATCH /projects fail for Logged user cannot update this property or project reason", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = { errors: ["Logged user cannot update this property or project"] }
 
@@ -346,7 +346,7 @@ describe("Project Router", () => {
 
 
         test("PATCH /projects fail for Can't find updated project reason", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = { errors: ["Can't find updated project"] }
 
@@ -360,7 +360,7 @@ describe("Project Router", () => {
         });
 
         test("PATCH /projects fail for Unauthorized or unexisting parameters reason", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = "Unauthorized or unexisting parameters"
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters") })
@@ -372,7 +372,7 @@ describe("Project Router", () => {
         });
 
         test("PATCH /projects fail for Please provide at least one valid parameter to update reason", async () => {
-            const project_to_update = projectUpdateModel
+            const project_to_update = partial_projectUpdateModel
 
             const expectedResponse = { errors: ["Please provide at least one valid parameter to update"] }
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error("Please provide at least one valid parameter to update") })

@@ -7,7 +7,7 @@ export interface ProjectRequestCreationtModel {
     project_description: string;
     project_information?: string;
     cruise: string;
-    ship: string[];
+    ship: string;
     data_owner_name: string;
     data_owner_email: string;
     operator_name: string;
@@ -38,7 +38,7 @@ export interface ProjectUpdateModel {
     project_description?: string;
     project_information?: string;
     cruise?: string;
-    ship?: string[];
+    ship?: string;
     data_owner_name?: string;
     data_owner_email?: string;
     operator_name?: string;

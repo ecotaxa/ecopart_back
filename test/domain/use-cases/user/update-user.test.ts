@@ -1,8 +1,7 @@
-import { DecodedToken } from "../../../../src/domain/entities/auth";
-import { SearchResult } from "../../../../src/domain/entities/search";
 import { UserResponseModel, UserUpdateModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
+import { MockUserRepository } from "../../../mocks/user-mock";
 
 /* TESTED HERE */
 // User is not admin : edit regular properties on himself : ok
@@ -16,65 +15,6 @@ import { UpdateUser } from '../../../../src/domain/use-cases/user/update-user'
 // user is admin : edit someone else adminproperty : ok
 
 describe("Update User Use Case", () => {
-    class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        deleteUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isDeleted(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        generateResetPasswordToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyResetPasswordToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-        setResetPasswordCode(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        toPublicUser(): UserResponseModel {
-            throw new Error("Method not implemented.");
-        }
-        changePassword(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        adminUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        standardUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isAdmin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        createUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        getUsers(): Promise<UserResponseModel[]> {
-            throw new Error("Method not implemented.");
-        }
-        getUser(): Promise<UserResponseModel | null> {
-            throw new Error("Method not implemented.");
-        }
-        verifyUserLogin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        validUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        generateValidationToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyValidationToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-    }
 
     let mockUserRepository: UserRepository;
 

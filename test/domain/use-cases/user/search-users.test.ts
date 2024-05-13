@@ -1,71 +1,12 @@
-import { DecodedToken } from "../../../../src/domain/entities/auth";
-import { FilterSearchOptions, SearchOptions, SearchResult } from "../../../../src/domain/entities/search";
-import { UserResponseModel, UserUpdateModel, } from "../../../../src/domain/entities/user";
+import { FilterSearchOptions, SearchOptions } from "../../../../src/domain/entities/search";
+import { UserUpdateModel, } from "../../../../src/domain/entities/user";
 import { SearchRepository } from "../../../../src/domain/interfaces/repositories/search-repository";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { SearchUsers } from '../../../../src/domain/use-cases/user/search-users'
+import { MockUserRepository } from "../../../mocks/user-mock";
 
 describe("Get All Users Use Case", () => {
 
-    class MockUserRepository implements UserRepository {
-        adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        standardGetUsers(): Promise<SearchResult<UserResponseModel>> {
-            throw new Error("Method not implemented.");
-        }
-        deleteUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isDeleted(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        generateResetPasswordToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyResetPasswordToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-        setResetPasswordCode(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        toPublicUser(): UserResponseModel {
-            throw new Error("Method not implemented.");
-        }
-        changePassword(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        adminUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        standardUpdateUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        isAdmin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        createUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        getUsers(): Promise<UserResponseModel[]> {
-            throw new Error("Method not implemented.");
-        }
-        getUser(): Promise<UserResponseModel | null> {
-            throw new Error("Method not implemented.");
-        }
-        verifyUserLogin(): Promise<boolean> {
-            throw new Error("Method not implemented.");
-        }
-        validUser(): Promise<number> {
-            throw new Error("Method not implemented.");
-        }
-        generateValidationToken(): string {
-            throw new Error("Method not implemented.");
-        }
-        verifyValidationToken(): DecodedToken | null {
-            throw new Error("Method not implemented.");
-        }
-    }
     class MockSearchRepository implements SearchRepository {
         formatFilters(): any {
             throw new Error("Method not implemented.");
@@ -141,7 +82,7 @@ describe("Get All Users Use Case", () => {
         }
 
         const ExpectedResult = {
-            users: [private_user, private_user],
+            items: [private_user, private_user],
             total: 2
         }
         const expectedResponse = {
@@ -202,7 +143,7 @@ describe("Get All Users Use Case", () => {
         }
 
         const ExpectedResult = {
-            users: [private_user, private_user],
+            items: [private_user, private_user],
             total: 2
         }
         const expectedResponse = {
@@ -257,7 +198,7 @@ describe("Get All Users Use Case", () => {
         }
 
         const ExpectedResult = {
-            users: [private_user, private_user],
+            items: [private_user, private_user],
             total: 2
         }
         const expectedResponse = {
@@ -288,7 +229,7 @@ describe("Get All Users Use Case", () => {
     });
     test("No data to return", async () => {
         const ExpectedResult = {
-            users: [],
+            items: [],
             total: 0
         }
         const expectedResponse = {
