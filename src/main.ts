@@ -5,6 +5,7 @@ import { MiddlewareUserValidation } from './presentation/middleware/user-validat
 import { MiddlewareProjectValidation } from './presentation/middleware/project-validation'
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
+import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
@@ -21,14 +22,18 @@ import { CreateProject } from './domain/use-cases/project/create-project'
 import { DeleteProject } from './domain/use-cases/project/delete-project'
 import { UpdateProject } from './domain/use-cases/project/update-project'
 import { SearchProject } from './domain/use-cases/project/search-projects'
+import { GetOneInstrumentModel } from './domain/use-cases/instrument_model/get-one-instrument_model'
+import { SearchInstrumentModels } from './domain/use-cases/instrument_model/search-instrument_model'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
 import { SearchRepositoryImpl } from './domain/repositories/search-repository'
+import { InstrumentModelRepositoryImpl } from './domain/repositories/instrument_model-repository'
 import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import sqlite3 from 'sqlite3'
 
@@ -68,6 +73,7 @@ async function getSQLiteDS() {
             console.log('Connected to the SQLite database.')
         }
     });
+    db.get("PRAGMA foreign_keys = ON")
 
     return db
 }
@@ -81,6 +87,7 @@ async function getSQLiteDS() {
     const countriesAdapter = new CountriesAdapter()
 
     const user_dataSource = new SQLiteUserDataSource(db)
+    const instrument_model_dataSource = new SQLiteInstrumentModelDataSource(db)
     const project_dataSource = new SQLiteProjectDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
@@ -96,6 +103,7 @@ async function getSQLiteDS() {
     const user_repo = new UserRepositoryImpl(user_dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
     const search_repo = new SearchRepositoryImpl()
+    const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource)
 
     const userMiddleWare =
@@ -117,17 +125,22 @@ async function getSQLiteDS() {
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
     )
+    const instrumentModelMiddleWare = InstrumentModelRouter(
+        new GetOneInstrumentModel(instrument_model_repo),
+        new SearchInstrumentModels(instrument_model_repo, search_repo)
+    )
     const projectMiddleWare = ProjectRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
-        new CreateProject(user_repo, project_repo),
+        new CreateProject(user_repo, project_repo, instrument_model_repo),
         new DeleteProject(user_repo, project_repo),
-        new UpdateProject(user_repo, project_repo),
-        new SearchProject(user_repo, project_repo, search_repo),
+        new UpdateProject(user_repo, project_repo, instrument_model_repo),
+        new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo),
     )
 
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
+    server.use("/instrument_models", instrumentModelMiddleWare)
     server.use("/projects", projectMiddleWare)
 
     server.listen(config.PORT, () => console.log("Running on ", config.BASE_URL, config.PORT))

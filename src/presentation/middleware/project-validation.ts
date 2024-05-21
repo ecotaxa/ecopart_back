@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { check, validationResult, query, oneOf } from 'express-validator';
+import { check, validationResult, query } from 'express-validator';
 import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-validation';
 
 
@@ -97,9 +97,15 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .isInt({ min: 0 }).withMessage('Public duration must be a number and must be greater than 0.'),
 
         // Instrument Validation 
-        check('instrument') // TODO next sprin check this is an authorized instrument
+        check('instrument_model')
+            .exists().withMessage('Instrument model is required.')
+            .isString()
+            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE'])
+            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE']."),
+        // Serial number Validation
+        check('serial_number').optional()
             .trim()
-            .not().isEmpty().withMessage('Instrument is required.'),
+            .not().isEmpty().withMessage('Serial number is required.'),
 
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
@@ -113,91 +119,105 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
     ];
 
     rulesProjectUpdateModel = [
-        oneOf([
-            // Root Folder Path Validation
-            check('root_folder_path').exists().withMessage('No value provided.')
-                .trim(),
-            // Project Title Validation
-            check('project_title').exists().withMessage('No value provided.')
-                .trim(),
-            // Project acrony Validation
-            check('project_acronym').exists().withMessage('No value provided.')
-                .trim(),
-            // Project description Validation
-            check('project_description').exists().withMessage('No value provided.')
-                .trim(),
-            // Project information Validation
-            check('project_information').exists().withMessage('No value provided.')
-                .trim(),
+        // Root Folder Path Validation
+        check('root_folder_path').optional()
+            .trim()
+            .not().isEmpty().withMessage('Root Folder Path value cannot be empty.'),
+        // Project Title Validation
+        check('project_title').optional()
+            .trim()
+            .not().isEmpty().withMessage('Project title cannot be empty.'),
+        // Project acrony Validation
+        check('project_acronym').optional()
+            .trim()
+            .not().isEmpty().withMessage('Project acronym cannot be empty.'),
+        // Project description Validation
+        check('project_description').optional()
+            .trim()
+            .not().isEmpty().withMessage('Project description cannot be empty.'),
+        // Project information Validation
+        check('project_information').optional()
+            .trim()
+            .not().isEmpty().withMessage('Project information cannot be empty.'),
 
-            // Project cruise Validation
-            check('cruise').exists().withMessage('No value provided.')
-                .trim(),
+        // Project cruise Validation
+        check('cruise').optional()
+            .trim()
+            .not().isEmpty().withMessage('Cruise name cannot be empty.'),
 
-            // Project ship Validation 
-            check('ship').exists().withMessage('No value provided.').trim(),
+        // Project ship Validation 
+        check('ship').optional().trim()
+            .not().isEmpty().withMessage('Ship name cannot be empty.'),
 
-            // Data owner name Validation
-            check('data_owner_name')
-                .trim()
-                .not().isEmpty().withMessage('Data owner name is required.'),
+        // Data owner name Validation
+        check('data_owner_name').optional()
+            .trim()
+            .not().isEmpty().withMessage('Data owner name cannot be empty.'),
 
-            //  Data owner email Validation
-            check('data_owner_email').exists().withMessage('No value provided.')
-                .trim()
-                .normalizeEmail()
-                .isEmail().withMessage('Data owner email must be a valid email address.')
-                .bail(),
+        //  Data owner email Validation
+        check('data_owner_email').optional()
+            .trim()
+            .normalizeEmail()
+            .isEmail().withMessage('Data owner email must be a valid email address.')
+            .bail(),
 
-            // Operator name Validation
-            check('operator_name').exists().withMessage('No value provided.')
-                .trim(),
-            // Operator email Validation
-            check('operator_email').exists().withMessage('No value provided.')
-                .trim()
-                .normalizeEmail()
-                .isEmail().withMessage('Operator email must be a valid email address.')
-                .bail(),
+        // Operator name Validation
+        check('operator_name').optional()
+            .trim(),
+        // Operator email Validation
+        check('operator_email').optional()
+            .trim()
+            .normalizeEmail()
+            .isEmail().withMessage('Operator email must be a valid email address.')
+            .bail(),
 
-            // Chief scientist name Validation
-            check('chief_scientist_name').exists().withMessage('No value provided.')
-                .trim(),
+        // Chief scientist name Validation
+        check('chief_scientist_name').optional()
+            .trim()
+            .not().isEmpty().withMessage('Chief scientist name cannot be empty.'),
 
-            // Chief scientist email Validation
-            check('chief_scientist_email').exists().withMessage('No value provided.')
-                .trim()
-                .normalizeEmail()
-                .isEmail().withMessage('Chief scientist email must be a valid email address.')
-                .bail(),
+        // Chief scientist email Validation
+        check('chief_scientist_email').optional()
+            .trim()
+            .normalizeEmail()
+            .isEmail().withMessage('Chief scientist email must be a valid email address.')
+            .bail(),
 
-            // Override depth offset Validation 
-            check('override_depth_offset').optional().exists().withMessage('No value provided.')
-                .isFloat().withMessage('Override depth offset must be a float value.'),
+        // Override depth offset Validation 
+        check('override_depth_offset').optional().optional()
+            .isFloat().withMessage('Override depth offset must be a float value.'),
 
-            // Enable descent filter Validation
-            check('enable_descent_filter').exists().withMessage('No value provided.')
-                .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
+        // Enable descent filter Validation
+        check('enable_descent_filter').optional()
+            .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
 
-            // Privacy duration Validation
-            check('privacy_duration').exists().withMessage('No value provided.')
-                .isInt({ min: 0 }).withMessage('Privacy duration must be a number and must be greater than 0.'),
+        // Privacy duration Validation
+        check('privacy_duration').optional()
+            .isInt({ min: 0 }).withMessage('Privacy duration must be a number and must be greater than 0.'),
 
-            // Visible duration Validation 
-            check('visible_duration').exists().withMessage('No value provided.')
-                .isInt({ min: 0 }).withMessage('Visible duration must be a number and must be greater than 0.'),
+        // Visible duration Validation 
+        check('visible_duration').optional()
+            .isInt({ min: 0 }).withMessage('Visible duration must be a number and must be greater than 0.'),
 
-            // Public duration Validation 
-            check('public_duration').exists().withMessage('No value provided.')
-                .isInt({ min: 0 }).withMessage('Public duration must be a number and must be greater than 0.'),
+        // Public duration Validation 
+        check('public_duration').optional()
+            .isInt({ min: 0 }).withMessage('Public duration must be a number and must be greater than 0.'),
 
-            // Instrument Validation 
-            check('instrument').exists().withMessage('No value provided.') // TODO next sprin check this is an authorized instrument
-                .trim()
+        // Instrument Validation 
+        check('instrument_model').optional()
+            .isString()
+            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE'])
+            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE']."),
 
-        ], { errorType: 'flat', message: 'At least one valid field must be updated.' }),
+        // Serial number Validation,
+        check('serial_number').optional()
+            .trim()
+            .not().isEmpty().withMessage('Serial number cannot be empty.')
+        ,
         // Project Creation Date Validation
         check('user_creation_date')
             .isEmpty().withMessage('Project creation date cannot be set manually.'),
+
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);

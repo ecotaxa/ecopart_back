@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../../domain/entities/project";
+import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectResponseModel } from "../../../domain/entities/project";
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
@@ -15,7 +15,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
 
     init_project_db() {
         // Create table if not exist
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'project' (project_id INTEGER PRIMARY KEY AUTOINCREMENT, root_folder_path TEXT NOT NULL, project_title TEXT NOT NULL, project_acronym TEXT NOT NULL, project_description TEXT, project_information TEXT, cruise TEXT NOT NULL, ship TEXT NOT NULL, data_owner_name TEXT NOT NULL, data_owner_email TEXT NOT NULL, operator_name TEXT NOT NULL, operator_email TEXT NOT NULL, chief_scientist_name TEXT NOT NULL, chief_scientist_email TEXT NOT NULL, override_depth_offset REAL, enable_descent_filter BOOLEAN NOT NULL, privacy_duration INTEGER NOT NULL, visible_duration INTEGER NOT NULL, public_duration INTEGER NOT NULL, instrument TEXT NOT NULL, project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'project' (project_id INTEGER PRIMARY KEY AUTOINCREMENT, root_folder_path TEXT NOT NULL, project_title TEXT NOT NULL, project_acronym TEXT NOT NULL, project_description TEXT, project_information TEXT, cruise TEXT NOT NULL, ship TEXT NOT NULL, data_owner_name TEXT NOT NULL, data_owner_email TEXT NOT NULL, operator_name TEXT NOT NULL, operator_email TEXT NOT NULL, chief_scientist_name TEXT NOT NULL, chief_scientist_email TEXT NOT NULL, override_depth_offset REAL, enable_descent_filter BOOLEAN NOT NULL, privacy_duration INTEGER NOT NULL, visible_duration INTEGER NOT NULL, public_duration INTEGER NOT NULL, instrument_model INTEGER, serial_number TEXT NOT NULL, project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id));"
 
         this.db.run(sql_create, [], function (err) {
             if (err) {
@@ -25,15 +25,14 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
     async create(project: ProjectRequestCreationtModel): Promise<number> {
-        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument]
+        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument) VALUES  (` + placeholders + `);`;
+        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
                 if (err) {
-                    if (err.message == "SQLITE_CONSTRAINT: UNIQUE constraint failed: user.email")
-                        console.log("DB error--", err)
+                    console.log("DB error--", err)
                     reject(err);
                 } else {
                     const result = this.lastID;
@@ -44,7 +43,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
 
-    async getOne(project: ProjectRequestModel): Promise<ProjectResponseModel | null> {
+    async getOne(project: ProjectRequestModel): Promise<PublicProjectResponseModel | null> {
         const params: any[] = []
         let placeholders: string = ""
         // generate sql and params
@@ -55,7 +54,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         // remove last AND
         placeholders = placeholders.slice(0, -4);
         // form final sql
-        const sql = `SELECT * FROM project WHERE ` + placeholders + `LIMIT 1;`;
+        const sql = `SELECT project.* , instrument_model.instrument_model_name FROM project LEFT JOIN instrument_model ON project.instrument_model = instrument_model.instrument_model_id WHERE ` + placeholders + `LIMIT 1;`;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -83,7 +82,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             privacy_duration: row.privacy_duration,
                             visible_duration: row.visible_duration,
                             public_duration: row.public_duration,
-                            instrument: row.instrument,
+                            instrument_model: row.instrument_model_name,
+                            serial_number: row.serial_number,
                             project_creation_date: row.project_creation_date
                         };
                         resolve(result);
@@ -139,9 +139,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             });
         })
     }
-    async getAll(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
+    async getAll(options: PreparedSearchOptions): Promise<SearchResult<PublicProjectResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT *, (SELECT COUNT(*) FROM project`
+        let sql = `SELECT project.*, instrument_model.instrument_model_name, (SELECT COUNT(*) FROM project`
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -150,7 +150,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
@@ -188,7 +188,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         // Add params_filtering to params
         params.push(...params_filtering)
 
-        sql += `) AS total_count FROM project`
+        sql += `) AS total_count FROM project LEFT JOIN instrument_model ON project.instrument_model = instrument_model.instrument_model_id`
+
 
         // Add filtering_sql to sql
         sql += filtering_sql
@@ -222,7 +223,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                 } else {
                     if (rows === undefined) resolve({ items: [], total: 0 });
                     console.log("rows", rows)
-                    const result: SearchResult<ProjectResponseModel> = {
+                    const result: SearchResult<PublicProjectResponseModel> = {
                         items: rows.map(row => ({
                             project_id: row.project_id,
                             root_folder_path: row.root_folder_path,
@@ -243,7 +244,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             privacy_duration: row.privacy_duration,
                             visible_duration: row.visible_duration,
                             public_duration: row.public_duration,
-                            instrument: row.instrument,
+                            instrument_model: row.instrument_model_name,
+                            serial_number: row.serial_number,
                             project_creation_date: row.project_creation_date
                         })),
                         total: rows[0]?.total_count || 0
