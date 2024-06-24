@@ -100,8 +100,8 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         check('instrument_model')
             .exists().withMessage('Instrument model is required.')
             .isString()
-            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE'])
-            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE']."),
+            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF'])
+            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']"),
         // Serial number Validation
         check('serial_number').optional()
             .trim()
@@ -249,8 +249,8 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Instrument Validation 
         check('instrument_model').optional()
             .isString()
-            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE'])
-            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6', 'UVP6_REMOTE', 'UVP6M', 'UVP6M_REMOTE']."),
+            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF'])
+            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']"),
 
         // Serial number Validation,
         check('serial_number').optional()

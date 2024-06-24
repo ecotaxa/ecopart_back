@@ -23,7 +23,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
             }
             else {
 
-                const sql_admin = "INSERT OR IGNORE INTO instrument_model (instrument_model_name, bodc_url) VALUES ('UVP5HD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5SD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5Z', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP6','https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6_REMOTE','https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6M', 'UVP6M not registred for now.'), ('UVP6M_REMOTE', 'UVP6M not registred for now.');"
+                const sql_admin = "INSERT OR IGNORE INTO instrument_model (instrument_model_name, bodc_url) VALUES ('UVP5HD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5SD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5Z', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP6LP', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6HF', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6MHP','Not registred in BODC for now'), ('UVP6MHF', 'Not registred in BODC for now');"
 
                 db_tables.run(sql_admin, [], function (err: Error | null) {
                     if (err) {
