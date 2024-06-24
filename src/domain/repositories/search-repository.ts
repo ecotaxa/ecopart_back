@@ -1,12 +1,23 @@
 
 import { SearchRepository } from "../interfaces/repositories/search-repository";
-import { FilterSearchOptions, PreparedSortingSearchOptions } from "../entities/search";
+import { FilterSearchOptions, PreparedSortingSearchOptions, SearchInfo, SearchOptions, SearchResult } from "../entities/search";
 
 export class SearchRepositoryImpl implements SearchRepository {
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
 
     constructor() {
+    }
+
+    formatSearchInfo(result: SearchResult<any>, options: SearchOptions): SearchInfo {
+        const search_info: SearchInfo = {
+            total: result.total,
+            limit: parseInt(options.limit.toString()),
+            total_on_page: result.items.length,
+            page: parseInt(options.page.toString()),
+            pages: Math.ceil(result.total / options.limit) || 1
+        };
+        return search_info;
     }
 
     formatSortBy(raw_sort_by: string): PreparedSortingSearchOptions[] {
@@ -38,7 +49,7 @@ export class SearchRepositoryImpl implements SearchRepository {
                 return null;
             }
 
-            //check that order_by is either asc or desc
+            // Check that order_by is either asc or desc
             if (!this.order_by_allow_params.includes(order_by.toLowerCase())) {
                 // Add an error message to the errors array
                 errors.push(order_by);

@@ -1,4 +1,4 @@
-import { UserRequestCreationtModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../domain/entities/user";
+import { UserRequestCreationModel, UserRequestModel, UserResponseModel, UserUpdateModel } from "../../../domain/entities/user";
 import { AuthUserCredentialsModel, } from "../../../domain/entities/auth";
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
@@ -36,7 +36,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         });
     }
 
-    async create(user: UserRequestCreationtModel): Promise<number> {
+    async create(user: UserRequestCreationModel): Promise<number> {
         const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
         const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `);`;
@@ -137,7 +137,6 @@ export class SQLiteUserDataSource implements UserDataSource {
                     reject(err);
                 } else {
                     if (rows === undefined) resolve({ items: [], total: 0 });
-                    console.log("rows", rows)
                     const result: SearchResult<UserResponseModel> = {
                         items: rows.map(row => ({
                             user_id: row.user_id,

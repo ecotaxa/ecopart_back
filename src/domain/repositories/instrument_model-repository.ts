@@ -25,7 +25,7 @@ export class InstrumentModelRepositoryImpl implements InstrumentModelRepository 
         const filter_params_restricted: string[] = ["instrument_model_name"]
 
         // Can be sort_by 
-        const sort_param_restricted: string[] = ["instrument_model_id", "instrument_model_name", "instrument_model_creation_date"]
+        const sort_param_restricted: string[] = ["instrument_model_id", "instrument_model_name", "bodc_url", "instrument_model_creation_date"]
 
         return await this.getInstrumentModels(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -69,6 +69,13 @@ export class InstrumentModelRepositoryImpl implements InstrumentModelRepository 
         }
 
         return await this.instrument_modelDataSource.getAll(options);
+    }
+
+    // Get instrument by its model name
+    async getInstrumentByName(instrumentModelName: string): Promise<InstrumentModelResponseModel> {
+        const instrument = await this.getOneInstrumentModel({ instrument_model_name: instrumentModelName });
+        if (!instrument) throw new Error("Instrument not found");
+        return instrument;
     }
 
 

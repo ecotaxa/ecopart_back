@@ -13,13 +13,13 @@ export class ChangePassword implements ChangePasswordUseCase {
         let nb_of_updated_user: number = 0
 
         // User should not be deleted
-        if (await this.userRepository.isDeleted(credentials.user_id)) throw new Error("User is deleted");
-        if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
+        await this.userRepository.ensureUserCanBeUsed(credentials.user_id);
+        await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        // admin can update anyone password without old password
+        // Admin can update anyone password without old password
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.changePassword(credentials)
-            if (nb_of_updated_user == 0) throw new Error("Can't change password");
+            if (nb_of_updated_user == 0) throw new Error("Cannot change password");
         } else if (current_user.user_id == credentials.user_id) {
             // Check if new password exist and is different from old password
             if (!credentials.password || credentials.password === credentials.new_password) throw new Error("New password must be different from old password");
@@ -27,7 +27,7 @@ export class ChangePassword implements ChangePasswordUseCase {
             const verifyed = await this.userRepository.verifyUserLogin({ email: current_user.email, password: credentials.password })
             if (verifyed) {
                 nb_of_updated_user = await this.userRepository.changePassword(credentials)
-                if (nb_of_updated_user == 0) throw new Error("Can't change password");
+                if (nb_of_updated_user == 0) throw new Error("Cannot change password");
             } else {
                 throw new Error("Invalid credentials");
             }

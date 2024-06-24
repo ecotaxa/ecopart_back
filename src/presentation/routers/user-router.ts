@@ -28,10 +28,10 @@ export default function UsersRouter(
             res.status(200).send(users)
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't get users"] })
+            else res.status(500).send({ errors: ["Cannot get users"] })
         }
     })
 
@@ -42,26 +42,26 @@ export default function UsersRouter(
             res.status(200).send(users)
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't search users"] })
+            else res.status(500).send({ errors: ["Cannot search users"] })
         }
     })
 
-    router.post('/', middlewareUserValidation.rulesUserRequestCreationtModel, async (req: Request, res: Response) => {
+    router.post('/', middlewareUserValidation.rulesUserRequestCreationModel, async (req: Request, res: Response) => {
         try {
             const created_user = await createUserUseCase.execute(req.body)
             res.status(201).send(created_user)
         } catch (err) {
             console.log(err)
-            if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Can't create user"] })
+            if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Cannot create user"] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't update preexistent user") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't find updated preexistent user") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Can't find created user") res.status(404).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't create user"] })
+            else if (err.message === "Cannot update preexistent user") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated preexistent user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find created user") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot create user"] })
         }
     })
 
@@ -72,10 +72,11 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated user") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't update user"] })
+            else res.status(500).send({ errors: ["Cannot update user"] })
         }
     })
 
@@ -89,13 +90,13 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Invalid confirmation token") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Invalid confirmation code") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User vallidation forbidden") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't update user") res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Can't find updated user") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Can't validate user") res.status(500).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't welcome user"] })
+            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find user with confirmation code") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot update user") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot validate user") res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot welcome user"] })
         }
     })
 
@@ -113,10 +114,11 @@ export default function UsersRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Logged user cannot delete this user") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Can't find user to delete") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find user to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't find deleted user") res.status(500).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't delete user"] })
+            else if (err.message === "Cannot find deleted user") res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot delete user"] })
         }
     })
 

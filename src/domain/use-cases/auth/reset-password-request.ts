@@ -17,23 +17,23 @@ export class ResetPasswordRequest implements ResetPasswordRequestUseCase {
 
     async execute(user: UserRequestModel): Promise<void> {
 
-        // does the user exist ?
+        // Does the user exist ?
         const preexistant_user = await this.userRepository.getUser(user)
         if (!preexistant_user) throw new Error("User does not exist");
 
         // User should not be deleted
-        if (await this.userRepository.isDeleted(preexistant_user.user_id)) throw new Error("User is deleted");
+        await this.userRepository.ensureUserCanBeUsed(preexistant_user.user_id);
 
-        // is the user validated ?
+        // Is the user validated ?
         if (!preexistant_user.valid_email) throw new Error("User email is not validated");
 
-        // generate a reset password token and add it to the user
+        // Generate a reset password token and add it to the user
         const updateCount = await this.userRepository.setResetPasswordCode({ user_id: preexistant_user.user_id })
-        if (updateCount === 0) throw new Error("Can't set password reset code");
+        if (updateCount === 0) throw new Error("Cannot set password reset code");
 
         // Retrieve the updated user information
         const updatedUser = await this.userRepository.getUser({ user_id: preexistant_user.user_id });
-        if (!updatedUser) throw new Error("Can't find updated user");
+        if (!updatedUser) throw new Error("Cannot find updated user");
 
         // Generate token and send reset password email
         this.generateTokenAndSendEmail(updatedUser)

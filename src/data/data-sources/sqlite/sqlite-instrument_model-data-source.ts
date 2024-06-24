@@ -1,4 +1,4 @@
-import { InstrumentModelRequestCreationtModel, InstrumentModelRequestModel, InstrumentModelResponseModel, InstrumentModelUpdateModel } from "../../../domain/entities/instrument_model";
+import { InstrumentModelRequestCreationModel, InstrumentModelRequestModel, InstrumentModelResponseModel, InstrumentModelUpdateModel } from "../../../domain/entities/instrument_model";
 import { InstrumentModelDataSource } from "../../interfaces/data-sources/instrument_model-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -14,7 +14,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
 
     init_instrument_db() {
         // Create table if not exist
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'instrument_model' (instrument_model_id INTEGER PRIMARY KEY AUTOINCREMENT, instrument_model_name TEXT NOT NULL UNIQUE, instrument_model_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
+        const sql_create = "CREATE TABLE IF NOT EXISTS 'instrument_model' (instrument_model_id INTEGER PRIMARY KEY AUTOINCREMENT, instrument_model_name TEXT NOT NULL UNIQUE, bodc_url TEXT NOT NULL, instrument_model_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
         const db_tables = this.db
         db_tables.run(sql_create, [], function (err: Error | null) {
             if (err) {
@@ -23,7 +23,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
             }
             else {
 
-                const sql_admin = "INSERT OR IGNORE INTO instrument_model (instrument_model_name) VALUES ('UVP5HD'), ('UVP5SD'), ('UVP5Z'), ('UVP6'), ('UVP6_REMOTE'), ('UVP6M'), ('UVP6M_REMOTE');"
+                const sql_admin = "INSERT OR IGNORE INTO instrument_model (instrument_model_name, bodc_url) VALUES ('UVP5HD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5SD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5Z', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP6','https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6_REMOTE','https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6M', 'UVP6M not registred for now.'), ('UVP6M_REMOTE', 'UVP6M not registred for now.');"
 
                 db_tables.run(sql_admin, [], function (err: Error | null) {
                     if (err) {
@@ -34,10 +34,10 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
         });
     }
 
-    async create(instrument_model: InstrumentModelRequestCreationtModel): Promise<number> {
-        const params = [instrument_model.instrument_model_name];
+    async create(instrument_model: InstrumentModelRequestCreationModel): Promise<number> {
+        const params = [instrument_model.instrument_model_name, instrument_model.bodc_url];
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO instrument_model (instrument_model) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO instrument_model (instrument_model, bodc_url) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -134,11 +134,11 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                     reject(err);
                 } else {
                     if (rows === undefined) resolve({ items: [], total: 0 });
-                    console.log("rows", rows)
                     const result: SearchResult<InstrumentModelResponseModel> = {
                         items: rows.map(row => ({
                             instrument_model_id: row.instrument_model_id,
                             instrument_model_name: row.instrument_model_name,
+                            bodc_url: row.bodc_url,
                             instrument_model_creation_date: row.instrument_model_creation_date
                         })),
                         total: rows[0]?.total_count || 0
@@ -181,7 +181,6 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
     async getOne(instrument_model: InstrumentModelRequestModel): Promise<InstrumentModelResponseModel | null> {
         const params: any[] = []
         let placeholders: string = ""
-        console.log("instrument_model", instrument_model)
         // generate sql and params
         for (const [key, value] of Object.entries(instrument_model)) {
             params.push(value)
@@ -191,8 +190,6 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
         placeholders = placeholders.slice(0, -4);
         // form final sql
         const sql = `SELECT * FROM instrument_model WHERE ` + placeholders + `;`;
-        console.log("sql", sql)
-        console.log("params", params)
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -203,6 +200,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                         const result = {
                             instrument_model_id: row.instrument_model_id,
                             instrument_model_name: row.instrument_model_name,
+                            bodc_url: row.bodc_url,
                             instrument_model_creation_date: row.instrument_model_creation_date
                         };
                         resolve(result);

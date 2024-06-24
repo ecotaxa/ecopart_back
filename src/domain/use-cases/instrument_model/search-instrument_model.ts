@@ -14,28 +14,26 @@ export class SearchInstrumentModels implements SearchInstrumentModelsUseCase {
     }
 
     async execute(options: SearchOptions): Promise<{ instrument_models: InstrumentModelResponseModel[], search_info: SearchInfo }> {
+        // Empty the filter array
         options.filter = [];
 
-        // Check that options.sort_by is string and format it to PreparedSortingSearchOptions[]
+        // Check that options.sort_by are asked and format them if they are
         if (options.sort_by) {
             options.sort_by = this.searchRepository.formatSortBy(options.sort_by as string);
         }
 
-        let instrument_models: InstrumentModelResponseModel[] = [];
+        try {
+            // Fetch the instrument models from the repository using the prepared search options
+            const result = await this.instrument_modelRepository.standardGetInstrumentModels(options as PreparedSearchOptions);
+            const instrument_models: InstrumentModelResponseModel[] = result.items;
 
+            // Format the search information using the search repository
+            const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, options);
 
-        const result = await this.instrument_modelRepository.standardGetInstrumentModels(options as PreparedSearchOptions);
-        instrument_models = result.items;
+            return { search_info, instrument_models };
+        } catch (error) {
+            throw new Error("Cannot search instrument models");
+        }
 
-
-        const search_info: SearchInfo = {
-            total: result.total,
-            limit: parseInt(options.limit.toString()),
-            total_on_page: instrument_models.length,
-            page: parseInt(options.page.toString()),
-            pages: Math.ceil(result.total / options.limit) || 1
-        };
-
-        return { search_info, instrument_models };
     }
 }

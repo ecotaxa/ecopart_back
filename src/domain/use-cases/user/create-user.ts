@@ -1,5 +1,5 @@
 import { Transporter } from "nodemailer";
-import { UserRequestCreationtModel, UserResponseModel } from "../../entities/user";
+import { UserRequestCreationModel, UserResponseModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { CreateUserUseCase } from "../../interfaces/use-cases/user/create-user";
 import { MailerWrapper } from "../../../infra/mailer/nodemailer-wrapper";
@@ -14,24 +14,33 @@ export class CreateUser implements CreateUserUseCase {
         this.userRepository = userRepository
         this.mailer = mailer
     }
-    async execute(user: UserRequestCreationtModel): Promise<UserResponseModel> {
+    async execute(user: UserRequestCreationModel): Promise<UserResponseModel> {
         // Retrieve a pre-existing user by email
         const preexistentUser = await this.userRepository.getUser({ email: user.email });
 
         // Check if a user with the given email already exists
         if (preexistentUser) {
             // User should not be deleted
-            if (await this.userRepository.isDeleted(preexistentUser.user_id)) throw new Error("User is deleted");
+            if (preexistentUser.deleted) throw new Error("User is deleted");
 
             // If the user exists but hasn't validated their email
             if (!preexistentUser.valid_email) {
                 // Update the preexisting user with new information
-                const updateCount = await this.userRepository.standardUpdateUser(preexistentUser);
-                if (updateCount === 0) { throw new Error("Can't update preexistent user"); }
+                const updateCount = await this.userRepository.standardUpdateUser({
+                    user_id: preexistentUser.user_id,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    organisation: user.organisation,
+                    country: user.country,
+                    user_planned_usage: user.user_planned_usage
+                });
+                if (updateCount === 0) { throw new Error("Cannot update preexistent user"); }
 
+                // Update password
+                await this.userRepository.changePassword({ user_id: preexistentUser.user_id, new_password: user.password })
                 // Retrieve the updated user information
                 const updatedUser = await this.userRepository.getUser({ user_id: preexistentUser.user_id });
-                if (!updatedUser) { throw new Error("Can't find updated preexistent user"); }
+                if (!updatedUser) { throw new Error("Cannot find updated preexistent user"); }
 
                 await this.generateTokenAndSendEmail(updatedUser)
 
@@ -50,7 +59,7 @@ export class CreateUser implements CreateUserUseCase {
 
         // Retrieve the newly created user information
         const createdUser = await this.userRepository.getUser({ user_id: createdId });
-        if (!createdUser) { throw new Error("Can't find created user"); }
+        if (!createdUser) { throw new Error("Cannot find created user"); }
 
         this.generateTokenAndSendEmail(createdUser)
         // Remove the confirmation code from the user object before sending it

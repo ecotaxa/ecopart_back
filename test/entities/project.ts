@@ -1,9 +1,9 @@
 
 // define an example of project entities to use in the tests
 
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../src/domain/entities/project"
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../src/domain/entities/project"
 
-export const projectRequestCreationtModel: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'project_title',
     project_acronym: 'project_acronym',
@@ -22,10 +22,11 @@ export const projectRequestCreationtModel: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
 
-export const projectRequestCreationtModel_2: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_2: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'joan project_title',
     project_acronym: 'project_acronym',
@@ -44,9 +45,10 @@ export const projectRequestCreationtModel_2: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
-export const projectRequestCreationtModel_3: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_3: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'john project_title',
     project_acronym: 'project_acronym',
@@ -65,9 +67,10 @@ export const projectRequestCreationtModel_3: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
-export const projectRequestCreationtModel_4: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_4: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'alice project_title',
     project_acronym: 'project_acronym',
@@ -86,9 +89,10 @@ export const projectRequestCreationtModel_4: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
-export const projectRequestCreationtModel_5: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_5: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'marc project_title',
     project_acronym: 'project_acronym',
@@ -107,9 +111,10 @@ export const projectRequestCreationtModel_5: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
-export const projectRequestCreationtModel_6: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_6: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'julie project_title',
     project_acronym: 'project_acronym',
@@ -128,10 +133,11 @@ export const projectRequestCreationtModel_6: ProjectRequestCreationtModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'uvp5'
+    instrument_model: 2,
+    serial_number: 'serial_number'
 }
 
-export const projectRequestCreationtModel_withDataToSanitize: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_withDataToSanitize: ProjectRequestCreationModel = {
     root_folder_path: ' root_folder_path',
     project_title: ' project_title',
     project_acronym: ' project_acronym ',
@@ -150,10 +156,11 @@ export const projectRequestCreationtModel_withDataToSanitize: ProjectRequestCrea
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: ' instrument'
+    instrument_model: 1,
+    serial_number: ' serial_number'
 }
 
-export const projectRequestCreationtModel_withDataSanitized: ProjectRequestCreationtModel = {
+export const projectRequestCreationModel_withDataSanitized: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'project_title',
     project_acronym: 'project_acronym',
@@ -172,10 +179,11 @@ export const projectRequestCreationtModel_withDataSanitized: ProjectRequestCreat
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
 
-export const projectRequestCreationtModel_withmissingData = {
+export const projectRequestCreationModel_withmissingData = {
     root_folder_path: 'root_folder_path',
     project_acronym: 'project_acronym',
     project_description: 'project_description',
@@ -192,10 +200,11 @@ export const projectRequestCreationtModel_withmissingData = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
 
-export const projectRequestCreationtModel_withmissingOverrideDepthOffset = {
+export const projectRequestCreationModel_withmissingOverrideDepthOffset = {
     root_folder_path: 'root_folder_path',
     project_title: 'project_title',
     project_acronym: 'project_acronym',
@@ -213,15 +222,16 @@ export const projectRequestCreationtModel_withmissingOverrideDepthOffset = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument: 'instrument'
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
 export const projectResponseModel: ProjectResponseModel = {
-    ...projectRequestCreationtModel,
+    ...projectRequestCreationModel,
     project_id: 1,
     project_creation_date: '2024-04-29 15:43:10'
 }
 export const ProjectResponseModel2: ProjectResponseModel = {
-    ...projectRequestCreationtModel,
+    ...projectRequestCreationModel,
     project_id: 2,
     project_creation_date: '2024-04-30 12:15:11'
 }

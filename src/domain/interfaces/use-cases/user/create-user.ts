@@ -1,5 +1,5 @@
-import { UserRequestCreationtModel, UserResponseModel } from "../../../entities/user";
+import { UserRequestCreationModel, UserResponseModel } from "../../../entities/user";
 export interface CreateUserUseCase {
-    execute(user: UserRequestCreationtModel): Promise<UserResponseModel>;
+    execute(user: UserRequestCreationModel): Promise<UserResponseModel>;
 }
 

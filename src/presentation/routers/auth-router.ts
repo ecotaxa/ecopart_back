@@ -11,7 +11,7 @@ import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/ch
 import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
 import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
 
-// password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
+// Password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareAuthValidation: IMiddlewareAuthValidation,
@@ -40,9 +40,9 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "Invalid credentials") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User email not verified") res.status(403).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't login"] })
+            else res.status(500).send({ errors: ["Cannot login"] })
         }
     })
 
@@ -62,9 +62,9 @@ export default function AuthRouter(
                 .send(token)
         } catch (err) {
             console.log(err)
-            if (err.message === "Can't find user") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't refresh token"] })
+            if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot refresh token"] })
         }
     })
 
@@ -78,7 +78,7 @@ export default function AuthRouter(
     })
 
     /* PASSWORD MANAGEMENT */
-    //change password
+    // Change password
     router.post('/password/change', middlewareAuthValidation.rulesPassword, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
 
@@ -91,12 +91,12 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "New password must be different from old password") res.status(401).send({ errors: ["New password must be different from old password"] })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't change password"] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot change password"] })
         }
     })
 
-    // reset password request
+    // Reset password request
     router.post('/password/reset', middlewareAuthValidation.rulesRequestResetPassword, async (req: Request, res: Response) => {
         try {
             await resetPasswordRequestUseCase.execute(req.body)
@@ -106,15 +106,15 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User does not exist") res.status(200).send({ message: "Reset password request email sent." })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User email is not validated") res.status(200).send({ message: "Reset password request email sent." })
-            else if (err.message === "Can't set password reset code") res.status(500).send({ errors: ["Can't reset password"] })
-            else if (err.message === "Can't find updated user") res.status(500).send({ errors: ["Can't reset password"] })
-            else res.status(500).send({ errors: ["Can't reset password"] })
+            else if (err.message === "Cannot set password reset code") res.status(500).send({ errors: ["Cannot reset password"] })
+            else if (err.message === "Cannot find updated user") res.status(500).send({ errors: ["Cannot reset password"] })
+            else res.status(500).send({ errors: ["Cannot reset password"] })
         }
     })
 
-    // reset password confirm
+    // Reset password confirm
     router.put('/password/reset', middlewareAuthValidation.rulesResetPassword, async (req: Request, res: Response) => {
         try {
             await resetPasswordUseCase.execute(req.body)
@@ -123,12 +123,12 @@ export default function AuthRouter(
                 .json({ message: "Password sucessfully reset, please login" });
         } catch (err) {
             console.log(err)
-            if (err.message === "Token is not valid") res.status(401).send({ errors: ["Can't reset password"] })
-            else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "No token provided") res.status(401).send({ errors: ["Can't reset password"] })
-            else if (err.message === "User does not exist or reset_password_code is not valid") res.status(404).send({ errors: ["Can't reset password"] })
-            else if (err.message === "User email is not validated") res.status(403).send({ errors: ["Can't reset password"] })
-            else res.status(500).send({ errors: ["Can't reset password"] })
+            if (err.message === "Token is not valid") res.status(401).send({ errors: ["Cannot reset password"] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: ["Cannot reset password"] })
+            else if (err.message === "No token provided") res.status(401).send({ errors: ["Cannot reset password"] })
+            else if (err.message === "User does not exist or reset_password_code is not valid") res.status(404).send({ errors: ["Cannot reset password"] })
+            else if (err.message === "User email is not validated") res.status(403).send({ errors: ["Cannot reset password"] })
+            else res.status(500).send({ errors: ["Cannot reset password"] })
         }
     })
 

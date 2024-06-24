@@ -11,7 +11,7 @@ export class GetOneInstrumentModel implements GetOneInstrumentModelUseCase {
 
     async execute(instrument_model_id: number): Promise<InstrumentModelResponseModel> {
         const instrument_model = await this.instrument_model_Repository.getOneInstrumentModel({ instrument_model_id: instrument_model_id });
-        if (!instrument_model) { throw new Error("Can't find instrument_model"); }
+        if (!instrument_model) { throw new Error("Cannot find instrument_model"); }
         return instrument_model;
     }
 }

@@ -35,6 +35,7 @@ import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
 import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
+import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
 import sqlite3 from 'sqlite3'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
@@ -43,6 +44,7 @@ import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
 
 import 'dotenv/config'
+import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
 
 sqlite3.verbose()
 
@@ -89,6 +91,7 @@ async function getSQLiteDS() {
     const user_dataSource = new SQLiteUserDataSource(db)
     const instrument_model_dataSource = new SQLiteInstrumentModelDataSource(db)
     const project_dataSource = new SQLiteProjectDataSource(db)
+    const privilege_dataSource = new SQLitePrivilegeDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -105,6 +108,7 @@ async function getSQLiteDS() {
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource)
+    const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
 
     const userMiddleWare =
         UserRouter(
@@ -113,7 +117,7 @@ async function getSQLiteDS() {
             new CreateUser(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
-            new DeleteUser(user_repo),
+            new DeleteUser(user_repo, privilege_repo),
             new SearchUsers(user_repo, search_repo),
         )
     const authMiddleWare = AuthRouter(
@@ -132,10 +136,10 @@ async function getSQLiteDS() {
     const projectMiddleWare = ProjectRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
-        new CreateProject(user_repo, project_repo, instrument_model_repo),
-        new DeleteProject(user_repo, project_repo),
-        new UpdateProject(user_repo, project_repo, instrument_model_repo),
-        new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo),
+        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
+        new DeleteProject(user_repo, project_repo, privilege_repo),
+        new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
+        new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
     )
 
     server.use("/users", userMiddleWare)

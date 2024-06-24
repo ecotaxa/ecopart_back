@@ -18,11 +18,11 @@ export class RefreshToken implements RefreshTokenUseCase {
         // Get full user based on decoded token user's email
         const full_user = await this.userRepository.getUser({ email: userAuth.email })
 
-        // If can't find user
-        if (full_user === null) throw new Error("Can't find user");
+        // If cannot find user
+        if (full_user === null) throw new Error("Cannot find user");
 
-        // If founded user is deleted
-        if (await this.userRepository.isDeleted(full_user.user_id)) throw new Error("User is deleted");
+        // If founded user is deleted or invalid
+        await this.userRepository.ensureUserCanBeUsed(full_user.user_id);
 
         // Get authorisation access token //TODO CHECK if generated token based on public user
         const refreshed_token = { jwt: this.authRepository.generateAccessToken(full_user) }

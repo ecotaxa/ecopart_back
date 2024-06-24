@@ -21,11 +21,11 @@ export class LoginUser implements LoginUserUseCase {
             // Get full user
             const full_user = await this.userRepository.getUser({ email: user.email })
 
-            // If can't find user
-            if (full_user === null) throw new Error("Can't find user");
+            // If cannot find user
+            if (full_user === null) throw new Error("Cannot find user");
 
-            // If founded user is deleted
-            if (await this.userRepository.isDeleted(full_user.user_id)) throw new Error("User is deleted");
+            // If founded user is deleted or not validated
+            await this.userRepository.ensureUserCanBeUsed(full_user.user_id);
 
             // If founded user email is not verified
             if (!full_user.valid_email) throw new Error("User email not verified");

@@ -1,6 +1,8 @@
 
 import { ProjectDataSource } from "../../data/interfaces/data-sources/project-data-source";
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectResponseModel } from "../entities/project";
+import { InstrumentModelResponseModel } from "../entities/instrument_model";
+import { PublicPrivilege } from "../entities/privilege";
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../entities/project";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
 
@@ -15,12 +17,12 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         this.projectDataSource = projectDataSource
     }
 
-    async createProject(project: ProjectRequestCreationtModel): Promise<number> {
+    async createProject(project: ProjectRequestCreationModel): Promise<number> {
         const result = await this.projectDataSource.create(project)
         return result;
     }
 
-    async getProject(project: ProjectRequestModel): Promise<PublicProjectResponseModel | null> {
+    async getProject(project: ProjectRequestModel): Promise<ProjectResponseModel | null> {
         const result = await this.projectDataSource.getOne(project)
         return result;
     }
@@ -43,7 +45,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         // Filter the project object based on authorized parameters
         Object.keys(project).forEach(key => {
-            console.log(key)
             if (key === 'project_id') {
                 filteredProject[key] = project[key];
             } else if (params.includes(key)) {
@@ -57,7 +58,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         if (unauthorizedParams.length > 0) {
             throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
         }
-        console.log(filteredProject)
         // If there are valid parameters, update the project
         if (Object.keys(filteredProject).length <= 1) {
             throw new Error('Please provide at least one valid parameter to update');
@@ -72,7 +72,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         return updated_project_nb
     }
 
-    async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<PublicProjectResponseModel>> { //TODO
+    async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
         const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
 
@@ -83,7 +83,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     //TODO MOVE TO SEARCH REPOSITORY
-    private async getProjects(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult<PublicProjectResponseModel>> {
+    private async getProjects(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult<ProjectResponseModel>> {
         const unauthorizedParams: string[] = [];
         //TODO move to a search repository
         // Filter options.sort_by by sorting params 
@@ -122,4 +122,65 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         return await this.projectDataSource.getAll(options);
     }
+
+    formatProjectRequestCreationModel(public_project: PublicProjectRequestCreationModel, instrument: InstrumentModelResponseModel): ProjectRequestCreationModel {
+        const project: ProjectRequestCreationModel = {
+            root_folder_path: public_project.root_folder_path,
+            project_title: public_project.project_title,
+            project_acronym: public_project.project_acronym,
+            project_description: public_project.project_description,
+            project_information: public_project.project_information,
+            cruise: public_project.cruise,
+            ship: public_project.ship,
+            data_owner_name: public_project.data_owner_name,
+            data_owner_email: public_project.data_owner_email,
+            operator_name: public_project.operator_name,
+            operator_email: public_project.operator_email,
+            chief_scientist_name: public_project.chief_scientist_name,
+            chief_scientist_email: public_project.chief_scientist_email,
+            override_depth_offset: public_project.override_depth_offset,
+            enable_descent_filter: public_project.enable_descent_filter,
+            privacy_duration: public_project.privacy_duration,
+            visible_duration: public_project.visible_duration,
+            public_duration: public_project.public_duration,
+            instrument_model: instrument.instrument_model_id,
+            serial_number: public_project.serial_number
+        };
+        return project;
+    }
+
+    toPublicProject(project: ProjectResponseModel, privileges: PublicPrivilege): PublicProjectResponseModel {
+
+        const publicProject: PublicProjectResponseModel = {
+            project_id: project.project_id,
+            root_folder_path: project.root_folder_path,
+            project_title: project.project_title,
+            project_acronym: project.project_acronym,
+            project_description: project.project_description,
+            project_information: project.project_information,
+            cruise: project.cruise,
+            ship: project.ship,
+            data_owner_name: project.data_owner_name,
+            data_owner_email: project.data_owner_email,
+            operator_name: project.operator_name,
+            operator_email: project.operator_email,
+            chief_scientist_name: project.chief_scientist_name,
+            chief_scientist_email: project.chief_scientist_email,
+            override_depth_offset: project.override_depth_offset,
+            enable_descent_filter: project.enable_descent_filter,
+            privacy_duration: project.privacy_duration,
+            visible_duration: project.visible_duration,
+            public_duration: project.public_duration,
+            instrument_model: project.instrument_model,
+            serial_number: project.serial_number,
+            members: privileges.members,
+            managers: privileges.managers,
+            contact: privileges.contact,
+            project_creation_date: project.project_creation_date
+        };
+
+        return publicProject;
+    }
+
+
 }

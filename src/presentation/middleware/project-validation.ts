@@ -4,7 +4,7 @@ import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-v
 
 
 export class MiddlewareProjectValidation implements IMiddlewareProjectValidation {
-    rulesProjectRequestCreationtModel = [
+    rulesProjectRequestCreationModel = [
         // Root Folder Path Validation
         check('root_folder_path')
             .trim()
@@ -106,6 +106,49 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         check('serial_number').optional()
             .trim()
             .not().isEmpty().withMessage('Serial number is required.'),
+        // Project contact Validation
+        check('contact')
+            .exists().withMessage('Contact is required.')
+            .isObject().withMessage('Contact must be an object.')
+            .bail()
+            .custom((value: any) => {
+                if (value.user_id === undefined) {
+                    throw new Error('Contact user_id is required.');
+                }
+                return true;
+            }),
+        // Project members Validation 
+        check('members')
+            .exists().withMessage('Members are required.')
+            .isArray().withMessage('Members must be an array.')
+            .bail()
+            .custom((value: any) => {
+                if (value.length > 0) {
+                    for (const member of value) {
+                        if (member.user_id === undefined) {
+                            throw new Error('Member user_id is required.');
+                        }
+                    }
+                }
+                return true;
+            }),
+        // Project managers Validation 
+        check('managers')
+            .exists().withMessage('Managers are required.')
+            .isArray().withMessage('Managers must be an array.')
+            .bail()
+            .custom((value: any) => {
+                if (value.length === 0) {
+                    throw new Error('At least one user must be a manager');
+                }
+                for (const manager of value) {
+                    if (manager.user_id === undefined) {
+                        throw new Error('Manager user_id is required.');
+                    }
+                }
+                return true;
+            }),
+
 
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {

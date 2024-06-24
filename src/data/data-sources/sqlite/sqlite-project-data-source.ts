@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectResponseModel } from "../../../domain/entities/project";
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel } from "../../../domain/entities/project";
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
@@ -24,7 +24,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         })
     }
 
-    async create(project: ProjectRequestCreationtModel): Promise<number> {
+    async create(project: ProjectRequestCreationModel): Promise<number> {
         const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
         const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number) VALUES  (` + placeholders + `);`;
@@ -43,7 +43,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
 
-    async getOne(project: ProjectRequestModel): Promise<PublicProjectResponseModel | null> {
+    async getOne(project: ProjectRequestModel): Promise<ProjectResponseModel | null> {
         const params: any[] = []
         let placeholders: string = ""
         // generate sql and params
@@ -139,7 +139,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             });
         })
     }
-    async getAll(options: PreparedSearchOptions): Promise<SearchResult<PublicProjectResponseModel>> {
+    async getAll(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
         let sql = `SELECT project.*, instrument_model.instrument_model_name, (SELECT COUNT(*) FROM project`
         const params: any[] = []
@@ -222,8 +222,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                     reject(err);
                 } else {
                     if (rows === undefined) resolve({ items: [], total: 0 });
-                    console.log("rows", rows)
-                    const result: SearchResult<PublicProjectResponseModel> = {
+                    const result: SearchResult<ProjectResponseModel> = {
                         items: rows.map(row => ({
                             project_id: row.project_id,
                             root_folder_path: row.root_folder_path,

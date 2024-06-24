@@ -2,7 +2,7 @@
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../entities/auth";
-import { UserResponseModel, UserRequestCreationtModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
+import { UserResponseModel, UserRequestCreationModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -82,7 +82,7 @@ export class UserRepositoryImpl implements UserRepository {
         return updated_user_nb
     }
 
-    async createUser(user: UserRequestCreationtModel): Promise<number> {
+    async createUser(user: UserRequestCreationModel): Promise<number> {
         user.password = await this.userCrypto.hash(user.password)
         user.confirmation_code = this.userCrypto.generate_uuid()
         const result = await this.userDataSource.create(user)
@@ -247,10 +247,31 @@ export class UserRepositoryImpl implements UserRepository {
         return publicUser
     }
 
-    async isDeleted(user_id: number): Promise<boolean> {
-        const user = await this.userDataSource.getOne({ user_id: user_id })
-        if (!user) return false
+    async isDeleted(user: UserResponseModel | null): Promise<boolean> {
+        if (!user) return false;
         return user.deleted ? true : false
+    }
+
+    async isValidated(user: UserResponseModel | null): Promise<boolean> {
+        if (!user) return false;
+        return user.valid_email ? true : false
+    }
+
+    async canUserBeUse(user_id: number): Promise<boolean> {
+        const user = await this.userDataSource.getOne({ user_id: user_id });
+        return user ? await this.isValidated(user) && !await this.isDeleted(user) : false;
+    }
+
+    async ensureUserCanBeUsed(user_id: number): Promise<void> {
+        if (!await this.canUserBeUse(user_id)) throw new Error("User cannot be used")
+    }
+
+    async ensureTypedUserCanBeUsed(user_id: number, userType: string): Promise<void> {
+        try {
+            await this.ensureUserCanBeUsed(user_id);
+        } catch (error) {
+            throw new Error(`${userType} with ID ${user_id} cannot be used: ${error.message}`);
+        }
     }
 
     async deleteUser(user: UserUpdateModel): Promise<number> {

@@ -21,17 +21,19 @@ export default function ProjectRouter(
 ) {
     const router = express.Router()
 
-    //Pagined and sorted list of all project
+    // Pagined and sorted list of all project
     router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {
         try {
             const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(project)
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't get projects"] })
+            else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get projects"] })
         }
     })
 
@@ -42,23 +44,41 @@ export default function ProjectRouter(
             res.status(200).send(project)
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't search projects"] })
+            else if (err.message.includes("contact should be a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("member should be a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("granted_users should be a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("member should be an array of numbers")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("managers should be a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("managers should be an array of numbers")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("granted_users should be an array of numbers")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("members should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("managers should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("granted_users should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot search projects"] })
         }
     })
 
-    router.post('/', middlewareAuth.auth, middlewareProjectValidation.rulesProjectRequestCreationtModel, async (req: Request, res: Response) => {
+    router.post('/', middlewareAuth.auth, middlewareProjectValidation.rulesProjectRequestCreationModel, async (req: Request, res: Response) => {
         try {
             const created_project = await createProjectUseCase.execute((req as CustomRequest).token, req.body)
             res.status(201).send(created_project)
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't find created project") res.status(404).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't create project"] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes(" cannot be used: ")) res.status(403).send({ errors: [err.message] })
+            else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find created project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot create project"] })
         }
     })
 
@@ -70,10 +90,21 @@ export default function ProjectRouter(
             console.log(err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot update this property or project") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Can't find updated project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Member user cannot be use") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Manager user cannot be use") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Contact user cannot be use") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Contact user must be either in members or managers") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "To update privilege part you must provide members, managers and contact, if you want to manage privileges more granuraly please use privilege endpoints") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Please provide at least one property to update") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Privileges partially created, please check members, managers and contact") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message === "Please provide at least one valid parameter to update") res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't update project"] })
+            else res.status(500).send({ errors: ["Cannot update project"] })
         }
     })
 
@@ -83,10 +114,10 @@ export default function ProjectRouter(
             res.status(200).send({ message: "Project successfully deleted" })
         } catch (err) {
             console.log(err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Can't find project to delete") res.status(404).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this project") res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Can't delete project"] })
+            else res.status(500).send({ errors: ["Cannot delete project"] })
         }
     })
 

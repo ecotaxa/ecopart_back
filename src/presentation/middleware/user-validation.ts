@@ -12,7 +12,7 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
         this.countries = countries.listCountries();
     }
 
-    rulesUserRequestCreationtModel = [
+    rulesUserRequestCreationModel = [
         // Password Validation
         check('password')
             .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long.')

@@ -12,23 +12,25 @@ export class UpdateUser implements UpdateUserUseCase {
         let nb_of_updated_user: number = 0
 
         // User should not be deleted
-        if (await this.userRepository.isDeleted(user_to_update.user_id)) throw new Error("User is deleted");
-        if (await this.userRepository.isDeleted(current_user.user_id)) throw new Error("User is deleted");
+        await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        // update admin can update anyone 
+        const user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
+        if (await this.userRepository.isDeleted(user)) throw new Error("User is deleted");
+
+        // Update admin can update anyone 
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             nb_of_updated_user = await this.userRepository.adminUpdateUser(user_to_update)
-            if (nb_of_updated_user == 0) throw new Error("Can't update user");
+            if (nb_of_updated_user == 0) throw new Error("Cannot update user");
         } else if (current_user.user_id == user_to_update.user_id) {
-            // update classic only on himself 
+            // Update classic only on himself 
             nb_of_updated_user = await this.userRepository.standardUpdateUser(user_to_update)
-            if (nb_of_updated_user == 0) throw new Error("Can't update user");
+            if (nb_of_updated_user == 0) throw new Error("Cannot update user");
         } else {
             throw new Error("Logged user cannot update this property or user");
         }
 
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
-        if (!updated_user) throw new Error("Can't find updated user");
+        if (!updated_user) throw new Error("Cannot find updated user");
 
         const publicUser = this.userRepository.toPublicUser(updated_user)
         return publicUser
