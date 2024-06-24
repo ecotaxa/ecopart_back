@@ -1,5 +1,5 @@
 import { Transporter } from "nodemailer";
-import { UserRequestCreationtModel, UserResponseModel } from "../../../../src/domain/entities/user";
+import { UserRequestCreationModel, UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { CreateUser } from '../../../../src/domain/use-cases/user/create-user'
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
@@ -42,7 +42,7 @@ describe("Create User Use Case", () => {
     })
 
     test("Try to add a user return created user", async () => {
-        const InputData: UserRequestCreationtModel = {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -99,7 +99,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist but is deleted", async () => {
-        const InputData: UserRequestCreationtModel = {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -176,7 +176,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist with unvalidated email", async () => {
-        const InputData: UserRequestCreationtModel = {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -248,7 +248,7 @@ describe("Create User Use Case", () => {
     });
 
     test("Try to add a user that already exist with validated email", async () => {
-        const InputData: UserRequestCreationtModel = {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -302,8 +302,8 @@ describe("Create User Use Case", () => {
 
 
     });
-    test("Can't find created user", async () => {
-        const InputData: UserRequestCreationtModel = {
+    test("Cannot find created user", async () => {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -337,7 +337,7 @@ describe("Create User Use Case", () => {
             await createUserUseCase.execute(InputData);
             expect(true).toBe(false);
         } catch (err) {
-            expect(err).toStrictEqual(new Error("Can't find created user"));
+            expect(err).toStrictEqual(new Error("Cannot find created user"));
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
             expect(mockUserRepository.createUser).toHaveBeenCalledWith(InputData);
@@ -350,8 +350,8 @@ describe("Create User Use Case", () => {
 
     });
 
-    test("Can't update preexistent user", async () => {
-        const InputData: UserRequestCreationtModel = {
+    test("Cannot update preexistent user", async () => {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -374,7 +374,7 @@ describe("Create User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
-        const expectedResponse = new Error("Can't update preexistent user");
+        const expectedResponse = new Error("Cannot update preexistent user");
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
@@ -402,8 +402,8 @@ describe("Create User Use Case", () => {
         }
     });
 
-    test("Can't find updated preexistent user", async () => {
-        const InputData: UserRequestCreationtModel = {
+    test("Cannot find updated preexistent user", async () => {
+        const InputData: UserRequestCreationModel = {
             last_name: "Smith",
             first_name: "John",
             email: "john@gmail.com",
@@ -426,7 +426,7 @@ describe("Create User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
-        const expectedResponse = new Error("Can't find updated preexistent user");
+        const expectedResponse = new Error("Cannot find updated preexistent user");
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))

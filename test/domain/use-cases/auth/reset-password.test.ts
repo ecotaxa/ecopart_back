@@ -268,7 +268,7 @@ describe("Change password Use Case", () => {
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).not.toHaveBeenCalled()
         })
-        test("Can't change password", async () => {
+        test("Cannot change password", async () => {
             const InputData: ResetCredentialsModel = {
                 reset_password_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyZXNldF9wYXNzd29yZF9jb2RlIjoiNjgzMzllZmItMDEwZS00ZjE4LWJhYmQtMjEyNWNiZDA4ZmU2IiwiaWF0IjoxNzA2MTcxNjcxLCJleHAiOjE3MDYxODI0NzF9.cJsCSTVldkPULrzz-i0NxumCerZLIDibbuy3vGXiHMY",
                 new_password: "new_password"
@@ -318,7 +318,7 @@ describe("Change password Use Case", () => {
                 await reset_password.execute(InputData);
             }
             catch (error) {
-                expect(error.message).toBe("Can't change password");
+                expect(error.message).toBe("Cannot change password");
             }
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);

@@ -98,7 +98,7 @@ describe("Delete Project Use Case", () => {
         expect(mockProjectRepository.deleteProject).not.toBeCalled();
     });
 
-    test("Can't find project to delete", async () => {
+    test("Cannot find project to delete", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -116,7 +116,7 @@ describe("Delete Project Use Case", () => {
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
-            expect(err.message).toBe("Can't find project to delete");
+            expect(err.message).toBe("Cannot find project to delete");
         }
 
         expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
@@ -127,7 +127,7 @@ describe("Delete Project Use Case", () => {
 
 
 
-    test("Can't delete project", async () => {
+    test("Cannot delete project", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -145,7 +145,7 @@ describe("Delete Project Use Case", () => {
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
-            expect(err.message).toBe("Can't delete project");
+            expect(err.message).toBe("Cannot delete project");
         }
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
         expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);

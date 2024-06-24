@@ -307,7 +307,7 @@ describe("Change password Use Case", () => {
                 password: "current_password",
                 new_password: "new_password"
             }
-            const expectedResponse = new Error("Can't change password");
+            const expectedResponse = new Error("Cannot change password");
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
@@ -473,7 +473,7 @@ describe("Change password Use Case", () => {
                 password: "password",
                 new_password: "password"
             }
-            const expectedResponse = new Error("Can't change password");
+            const expectedResponse = new Error("Cannot change password");
 
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))

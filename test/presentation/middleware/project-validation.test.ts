@@ -4,7 +4,7 @@ import server from '../../../src/server'
 
 import ProjectRouter from '../../../src/presentation/routers/project-router'
 
-import { ProjectResponseModel, ProjectRequestCreationtModel } from "../../../src/domain/entities/project";
+import { ProjectResponseModel, ProjectRequestCreationModel } from "../../../src/domain/entities/project";
 
 import { CreateProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/create-project";
 import { UpdateProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/update-project";
@@ -17,7 +17,7 @@ import { MiddlewareProjectValidation } from "../../../src/presentation/middlewar
 
 import { Request, Response, NextFunction } from "express";
 import { SearchInfo } from "../../../src/domain/entities/search";
-import { partial_projectUpdateModel_toSanatize, projectRequestCreationtModel, projectRequestCreationtModel_withDataSanitized, projectRequestCreationtModel_withDataToSanitize, projectRequestCreationtModel_withmissingData, projectResponseModel, partial_projectUpdateModel } from "../../entities/project";
+import { partial_projectUpdateModel_toSanatize, projectRequestCreationModel, projectRequestCreationModel_withDataSanitized, projectRequestCreationModel_withDataToSanitize, projectRequestCreationModel_withmissingData, projectResponseModel, partial_projectUpdateModel } from "../../entities/project";
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
     execute(): Promise<ProjectResponseModel> {
@@ -76,7 +76,7 @@ describe("Project Router", () => {
 
     describe("Test project router create project validation", () => {
         test("Create project all params are valid", async () => {
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
 
             const OutputData: ProjectResponseModel = projectResponseModel
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
@@ -90,8 +90,8 @@ describe("Project Router", () => {
 
         test("Sanitize email and organisation", async () => {
             //TODO affine test on sanitized data
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel_withDataToSanitize
-            const sanitizedInputData: ProjectRequestCreationtModel = projectRequestCreationtModel_withDataSanitized
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel_withDataToSanitize
+            const sanitizedInputData: ProjectRequestCreationModel = projectRequestCreationModel_withDataSanitized
 
             const OutputData: ProjectResponseModel = projectResponseModel
 
@@ -107,7 +107,7 @@ describe("Project Router", () => {
 
 
         test("Missing project_title and data_owner_name", async () => {
-            const InputData = projectRequestCreationtModel_withmissingData
+            const InputData = projectRequestCreationModel_withmissingData
             //TODO update test
             const OutputData = {
                 "errors": [

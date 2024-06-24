@@ -3,7 +3,7 @@ import server from '../../../src/server'
 
 import UserRouter from '../../../src/presentation/routers/user-router'
 
-import { UserResponseModel, UserRequestCreationtModel } from "../../../src/domain/entities/user";
+import { UserResponseModel, UserRequestCreationModel } from "../../../src/domain/entities/user";
 
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
@@ -86,7 +86,7 @@ describe("User Router", () => {
 
     describe("Test user router create user validation", () => {
         test("Create user all params are valid", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -119,7 +119,7 @@ describe("User Router", () => {
         });
 
         test("Sanitize email and organisation", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "John@gmail.com",
@@ -128,7 +128,7 @@ describe("User Router", () => {
                 country: "FR",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const sanitizedInputData: UserRequestCreationtModel = {
+            const sanitizedInputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -162,7 +162,7 @@ describe("User Router", () => {
         });
 
         test("Unvalid country code", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "John@gmail.com",

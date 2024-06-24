@@ -157,7 +157,7 @@ describe("Update User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
-        const OutputError = new Error("Can't update user")
+        const OutputError = new Error("Cannot update user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
@@ -448,7 +448,7 @@ describe("Update User Use Case", () => {
     });
 
     // others scenarios (for coverage)
-    test("Can't find updated user", async () => {
+    test("Cannot find updated user", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -458,7 +458,7 @@ describe("Update User Use Case", () => {
             first_name: "Joan"
         }
 
-        const OutputError = new Error("Can't find updated user")
+        const OutputError = new Error("Cannot find updated user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
@@ -496,7 +496,7 @@ describe("Update User Use Case", () => {
             is_admin: true
         }
 
-        const OutputError = new Error("Can't update user")
+        const OutputError = new Error("Cannot update user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))

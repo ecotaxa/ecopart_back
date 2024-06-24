@@ -138,7 +138,7 @@ describe("Create User Use Case", () => {
             // Should not go there
             expect(result).toBe(true);
         } catch (err) {
-            expect(err.message).toBe("Can't find user");
+            expect(err.message).toBe("Cannot find user");
         }
     });
 

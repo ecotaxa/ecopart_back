@@ -267,7 +267,7 @@ describe("Valid Users Use Case", () => {
 
         });
 
-        test("Can't find user with confirmation code", async () => {
+        test("Cannot find user with confirmation code", async () => {
 
             const user_id = 1
             const confirmation_token = "token"
@@ -320,11 +320,11 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
                 expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).not.toBeCalled();
-                expect(e.message).toBe("Can't find user with confirmation code")
+                expect(e.message).toBe("Cannot find user with confirmation code")
             }
         });
 
-        test("Can't find user with confirmation code", async () => {
+        test("Cannot find user with confirmation code", async () => {
 
             const user_id = 1
             const confirmation_token = "token"
@@ -390,11 +390,11 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
 
-                expect(e.message).toBe("Can't update user")
+                expect(e.message).toBe("Cannot update user")
             }
         });
 
-        test("Can't find updated user", async () => {
+        test("Cannot find updated user", async () => {
 
             const user_id = 1
             const confirmation_token = "token"
@@ -447,10 +447,10 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
 
-                expect(e.message).toBe("Can't find updated user")
+                expect(e.message).toBe("Cannot find updated user")
             }
         });
-        test("Can't validate user", async () => {
+        test("Cannot validate user", async () => {
 
             const user_id = 1
             const confirmation_token = "token"
@@ -515,7 +515,7 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
 
-                expect(e.message).toBe("Can't validate user")
+                expect(e.message).toBe("Cannot validate user")
             }
         });
     })

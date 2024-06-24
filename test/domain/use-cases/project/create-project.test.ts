@@ -3,8 +3,8 @@ import { UserRepository } from "../../../../src/domain/interfaces/repositories/u
 import { CreateProject } from '../../../../src/domain/use-cases/project/create-project'
 import { MockUserRepository } from "../../../mocks/user-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
-import { projectRequestCreationtModel, projectRequestCreationtModel_withmissingOverrideDepthOffset, projectResponseModel } from "../../../entities/project";
-import { ProjectRequestCreationtModel, ProjectResponseModel } from "../../../../src/domain/entities/project";
+import { projectRequestCreationModel, projectRequestCreationModel_withmissingOverrideDepthOffset, projectResponseModel } from "../../../entities/project";
+import { ProjectRequestCreationModel, ProjectResponseModel } from "../../../../src/domain/entities/project";
 
 let mockUserRepository: UserRepository;
 let mockProjectRepository: MockProjectRepository;
@@ -17,7 +17,7 @@ beforeEach(async () => {
 })
 
 test("Try to add a project return created project", async () => {
-    const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+    const InputData: ProjectRequestCreationModel = projectRequestCreationModel
     const created_project: ProjectResponseModel = projectResponseModel
     const current_user: UserUpdateModel = {
         user_id: 1
@@ -39,7 +39,7 @@ test("Try to add a project return created project", async () => {
 });
 
 test("Create a project without override_depth_offset", async () => {
-    const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel_withmissingOverrideDepthOffset
+    const InputData: ProjectRequestCreationModel = projectRequestCreationModel_withmissingOverrideDepthOffset
     const created_project: ProjectResponseModel = projectResponseModel
     const current_user: UserUpdateModel = {
         user_id: 1
@@ -55,14 +55,14 @@ test("Create a project without override_depth_offset", async () => {
     const result = await createProjectUseCase.execute(current_user, InputData);
 
     expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(current_user.user_id);
-    expect(mockProjectRepository.computeDefaultDepthOffset).toHaveBeenCalledWith(InputData.instrument);
+    expect(mockProjectRepository.computeDefaultDepthOffset).toHaveBeenCalledWith(InputData.instrument_model);
     expect(mockProjectRepository.createProject).toHaveBeenCalledWith(completedInputData);
     expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
     expect(result).toStrictEqual(created_project);
 });
 
-test("Can't find created project", async () => {
-    const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+test("Cannot find created project", async () => {
+    const InputData: ProjectRequestCreationModel = projectRequestCreationModel
     const current_user: UserUpdateModel = {
         user_id: 1
     }
@@ -73,7 +73,7 @@ test("Can't find created project", async () => {
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository)
-    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Can't find created project");
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Cannot find created project");
 
     expect(mockUserRepository.isDeleted).toHaveBeenCalledWith(current_user.user_id);
     expect(mockProjectRepository.computeDefaultDepthOffset).not.toBeCalled();
@@ -81,9 +81,9 @@ test("Can't find created project", async () => {
     expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
 });
 
-test("Can't create project because user is deleted", async () => {
+test("Cannot create project because user is deleted", async () => {
 
-    const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+    const InputData: ProjectRequestCreationModel = projectRequestCreationModel
     const current_user: UserUpdateModel = {
         user_id: 1
     }

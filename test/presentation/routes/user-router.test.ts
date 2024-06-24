@@ -3,7 +3,7 @@ import server from '../../../src/server'
 
 import UserRouter from '../../../src/presentation/routers/user-router'
 
-import { UserResponseModel, UserRequestCreationtModel } from "../../../src/domain/entities/user";
+import { UserResponseModel, UserRequestCreationModel } from "../../../src/domain/entities/user";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
@@ -71,7 +71,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
     }
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
-    rulesUserRequestCreationtModel = []
+    rulesUserRequestCreationModel = []
     rulesUserRequestModel = []
     rulesUserUpdateModel = []
     rulesUserResponseModel = []
@@ -180,7 +180,7 @@ describe("User Router", () => {
         });
 
         test("Get users fail for unexepted reason", async () => {
-            const expectedResponse = { errors: ["Can't get users"] }
+            const expectedResponse = { errors: ["Cannot get users"] }
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
             const response = await request(server).get("/users")
 
@@ -274,7 +274,7 @@ describe("User Router", () => {
         });
 
         test("Get users fail for unexepted reason", async () => {
-            const expectedResponse = { errors: ["Can't search users"] }
+            const expectedResponse = { errors: ["Cannot search users"] }
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error() })
             const response = await request(server).post("/users/searches")
 
@@ -287,7 +287,7 @@ describe("User Router", () => {
     describe("POST /users", () => {
 
         test("POST /users", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -316,7 +316,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for unexepted reason", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -325,7 +325,7 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const expectedResponse = { errors: ["Can't create user"] }
+            const expectedResponse = { errors: ["Cannot create user"] }
 
 
             jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
@@ -338,7 +338,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for Valid user already exist reason", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -347,7 +347,7 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const expectedResponse = { errors: ["Can't create user"] }
+            const expectedResponse = { errors: ["Cannot create user"] }
 
 
             jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Valid user already exist")))
@@ -360,7 +360,7 @@ describe("User Router", () => {
         });
 
         test("POST /users fail for User is deleted", async () => {
-            const InputData: UserRequestCreationtModel = {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -381,8 +381,8 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("POST /users fail for Can't update preexistent user reason", async () => {
-            const InputData: UserRequestCreationtModel = {
+        test("POST /users fail for Cannot update preexistent user reason", async () => {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -391,10 +391,10 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const expectedResponse = { errors: ["Can't update preexistent user"] }
+            const expectedResponse = { errors: ["Cannot update preexistent user"] }
 
 
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't update preexistent user")))
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot update preexistent user")))
 
             const response = await request(server).post("/users").send(InputData)
 
@@ -403,8 +403,8 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("POST /users fail for Can't find updated preexistent user reason", async () => {
-            const InputData: UserRequestCreationtModel = {
+        test("POST /users fail for Cannot find updated preexistent user reason", async () => {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -413,10 +413,10 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const expectedResponse = { errors: ["Can't find updated preexistent user"] }
+            const expectedResponse = { errors: ["Cannot find updated preexistent user"] }
 
 
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't find updated preexistent user")))
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find updated preexistent user")))
 
             const response = await request(server).post("/users").send(InputData)
 
@@ -425,8 +425,8 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("POST /users fail for Can't find created user reason", async () => {
-            const InputData: UserRequestCreationtModel = {
+        test("POST /users fail for Cannot find created user reason", async () => {
+            const InputData: UserRequestCreationModel = {
                 last_name: "Smith",
                 first_name: "John",
                 email: "john@gmail.com",
@@ -435,10 +435,10 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const expectedResponse = { errors: ["Can't find created user"] }
+            const expectedResponse = { errors: ["Cannot find created user"] }
 
 
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't find created user")))
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find created user")))
 
             const response = await request(server).post("/users").send(InputData)
 
@@ -478,7 +478,7 @@ describe("User Router", () => {
                 last_name: "Smith",
                 first_name: "John"
             }
-            const expectedResponse = { errors: ["Can't update user"] }
+            const expectedResponse = { errors: ["Cannot update user"] }
 
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
             const response = await request(server).patch("/users/2").send(user_to_update)
@@ -534,15 +534,15 @@ describe("User Router", () => {
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse))
         });
 
-        test("PATCH /users fail for Can't find updated user reason", async () => {
+        test("PATCH /users fail for Cannot find updated user reason", async () => {
             const user_to_update = {
                 last_name: "Smith",
                 first_name: "John"
             }
-            const expectedResponse = { errors: ["Can't find updated user"] }
+            const expectedResponse = { errors: ["Cannot find updated user"] }
 
 
-            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't find updated user")))
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find updated user")))
             const response = await request(server).patch("/users/2").send(user_to_update)
 
             expect(response.status).toBe(404)
@@ -567,7 +567,7 @@ describe("User Router", () => {
         });
 
         test("Get users welcome fail for unexepted reason", async () => {
-            const expectedResponse = { errors: ["Can't welcome user"] }
+            const expectedResponse = { errors: ["Cannot welcome user"] }
             jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error() })
 
             const response = await request(server).get("/users/1/welcome/123456789")
@@ -621,9 +621,9 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("Get users welcome fail for Can't update user reason", async () => {
-            const expectedResponse = { errors: ["Can't update user"] }
-            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Can't update user") })
+        test("Get users welcome fail for Cannot update user reason", async () => {
+            const expectedResponse = { errors: ["Cannot update user"] }
+            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Cannot update user") })
 
             const response = await request(server).get("/users/1/welcome/123456789")
 
@@ -632,9 +632,9 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("Get users welcome fail for Can't find updated user reason", async () => {
-            const expectedResponse = { errors: ["Can't find updated user"] }
-            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Can't find updated user") })
+        test("Get users welcome fail for Cannot find updated user reason", async () => {
+            const expectedResponse = { errors: ["Cannot find updated user"] }
+            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find updated user") })
 
             const response = await request(server).get("/users/1/welcome/123456789")
 
@@ -643,9 +643,9 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("Get users welcome fail for Can't validate user reason", async () => {
-            const expectedResponse = { errors: ["Can't validate user"] }
-            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Can't validate user") })
+        test("Get users welcome fail for Cannot validate user reason", async () => {
+            const expectedResponse = { errors: ["Cannot validate user"] }
+            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Cannot validate user") })
 
             const response = await request(server).get("/users/1/welcome/123456789")
 
@@ -685,9 +685,9 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't find user to delete should return 404", async () => {
-            const expectedResponse = { errors: ["Can't find user to delete"] }
-            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find user to delete")))
+        test("DELETE /users fail for Cannot find user to delete should return 404", async () => {
+            const expectedResponse = { errors: ["Cannot find user to delete"] }
+            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find user to delete")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
@@ -701,16 +701,16 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't find deleted user should return 500", async () => {
-            const expectedResponse = { errors: ["Can't find deleted user"] }
-            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find deleted user")))
+        test("DELETE /users fail for Cannot find deleted user should return 500", async () => {
+            const expectedResponse = { errors: ["Cannot find deleted user"] }
+            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find deleted user")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Can't delete user should return 500", async () => {
-            const expectedResponse = { errors: ["Can't delete user"] }
+        test("DELETE /users fail for Cannot delete user should return 500", async () => {
+            const expectedResponse = { errors: ["Cannot delete user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(500)

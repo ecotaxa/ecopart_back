@@ -1,7 +1,7 @@
 import { SQLiteUserDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-user-data-source'
 import sqlite3 from 'sqlite3'
 import 'dotenv/config'
-import { UserRequestCreationtModel, UserUpdateModel } from '../../../../src/domain/entities/user';
+import { UserRequestCreationModel, UserUpdateModel } from '../../../../src/domain/entities/user';
 import fs from 'fs';
 
 const config = {
@@ -53,7 +53,7 @@ describe('SQLiteUserDataSource', () => {
         });
 
         test('should create a new user', async () => {
-            const user: UserRequestCreationtModel = {
+            const user: UserRequestCreationModel = {
                 first_name: 'Joan',
                 last_name: 'dou',
                 email: 'joan.dou@example.com',
@@ -75,7 +75,7 @@ describe('SQLiteUserDataSource', () => {
         });
 
         test('should handle duplicate email', async () => {
-            const user: UserRequestCreationtModel = {
+            const user: UserRequestCreationModel = {
                 first_name: 'John',
                 last_name: 'Doe',
                 email: 'john.doe@example.com',
@@ -159,7 +159,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should return all users with sorting and filtering', async () => {
             // Add bunch of users
-            const user3: UserRequestCreationtModel = {
+            const user3: UserRequestCreationModel = {
                 first_name: 'Alice',
                 last_name: 'Smith',
                 email: 'alice@example.com',
@@ -169,7 +169,7 @@ describe('SQLiteUserDataSource', () => {
                 country: 'Country',
                 user_planned_usage: 'Usage'
             };
-            const user4: UserRequestCreationtModel = {
+            const user4: UserRequestCreationModel = {
                 first_name: 'Marc',
                 last_name: 'smith',
                 email: 'marc@example.com',
@@ -179,7 +179,7 @@ describe('SQLiteUserDataSource', () => {
                 country: 'Country',
                 user_planned_usage: 'Usage'
             };
-            const user5: UserRequestCreationtModel = {
+            const user5: UserRequestCreationModel = {
                 first_name: 'Julie',
                 last_name: 'Doe',
                 email: 'julie.doe@example.com',

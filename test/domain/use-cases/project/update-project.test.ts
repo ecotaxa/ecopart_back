@@ -78,13 +78,13 @@ test("User can update project", async () => {
 
 });
 
-test("Can't update project", async () => {
+test("Cannot update project", async () => {
     const current_user: UserUpdateModel = {
         user_id: 1
     }
     const project_to_update: ProjectUpdateModel = projectUpdateModel
 
-    const OutputError = new Error("Can't update project")
+    const OutputError = new Error("Cannot update project")
 
     jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
@@ -106,13 +106,13 @@ test("Can't update project", async () => {
 
 });
 
-test("Can't find updated project", async () => {
+test("Cannot find updated project", async () => {
     const current_user: UserUpdateModel = {
         user_id: 1
     }
     const project_to_update: ProjectUpdateModel = projectUpdateModel
 
-    const OutputError = new Error("Can't find updated project")
+    const OutputError = new Error("Cannot find updated project")
 
     jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))

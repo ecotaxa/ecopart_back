@@ -66,7 +66,7 @@ describe("Create User Use Case", () => {
         const result = await loginUserUseCase.execute(InputUserData);
         expect(result).toStrictEqual(OutputAuthData);
     });
-    test("Can't find user ", async () => {
+    test("Cannot find user ", async () => {
 
         const InputUserData: DecodedToken = {
             user_id: 1,
@@ -93,7 +93,7 @@ describe("Create User Use Case", () => {
             const result = await loginUserUseCase.execute(InputUserData);
             expect(result).toBe(true);
         } catch (err) {
-            expect(err.message).toBe("Can't find user");
+            expect(err.message).toBe("Cannot find user");
         }
     });
     test("User is deleted", async () => {

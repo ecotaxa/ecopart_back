@@ -168,7 +168,7 @@ describe("Delete User Use Case", () => {
     });
 
     // Other failing scenarios
-    test("Can't find user to delete", async () => {
+    test("Cannot find user to delete", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -186,7 +186,7 @@ describe("Delete User Use Case", () => {
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
-            expect(err.message).toBe("Can't find user to delete");
+            expect(err.message).toBe("Cannot find user to delete");
         }
 
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
@@ -274,7 +274,7 @@ describe("Delete User Use Case", () => {
         expect(mockUserRepository.deleteUser).not.toBeCalled();
     });
 
-    test("Can't delete user", async () => {
+    test("Cannot delete user", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -303,7 +303,7 @@ describe("Delete User Use Case", () => {
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
-            expect(err.message).toBe("Can't delete user");
+            expect(err.message).toBe("Cannot delete user");
         }
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
         expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);

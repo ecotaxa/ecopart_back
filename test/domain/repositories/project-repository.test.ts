@@ -1,10 +1,10 @@
 //test/domain/repositories/project-repository.test.ts
 import { ProjectDataSource } from "../../../src/data/interfaces/data-sources/project-data-source";
-import { ProjectRequestCreationtModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../../src/domain/entities/project";
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../../src/domain/entities/project";
 import { SearchResult } from "../../../src/domain/entities/search";
 import { ProjectRepository } from "../../../src/domain/interfaces/repositories/project-repository";
 import { ProjectRepositoryImpl } from "../../../src/domain/repositories/project-repository";
-import { projectRequestCreationtModel, projectResponseModel, projectResponseModelArray, projectUpdateModel, projectUpdateModel_withBadData } from "../../entities/project";
+import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, projectUpdateModel, projectUpdateModel_withBadData } from "../../entities/project";
 import { MockProjectDataSource } from "../../mocks/project-mock";
 
 import 'dotenv/config'
@@ -23,7 +23,7 @@ describe("Project Repository", () => {
 
     describe("CreateProject", () => {
         test("Should create a project", async () => {
-            const project: ProjectRequestCreationtModel = projectRequestCreationtModel
+            const project: ProjectRequestCreationModel = projectRequestCreationModel
 
             jest.spyOn(mockProjectDataSource, 'create').mockResolvedValue(1)
 
@@ -51,20 +51,20 @@ describe("Project Repository", () => {
 
     describe("ComputeDefaultDepthOffset", () => {
         test("Should compute default depth offset", async () => {
-            const instrument = "uvp5"
-            const result = projectRepository.computeDefaultDepthOffset(instrument)
+            const instrument_model = 1
+            const result = projectRepository.computeDefaultDepthOffset(instrument_model)
 
             expect(result).toBe(1.2)
         })
 
         test("Should throw an error if instrument is undefined", async () => {
-            const instrument = undefined as any
-            expect(() => projectRepository.computeDefaultDepthOffset(instrument)).toThrowError("Instrument is required")
+            const instrument_model = undefined as any
+            expect(() => projectRepository.computeDefaultDepthOffset(instrument_model)).toThrowError("Instrument is required")
         })
 
         test("Should return undefined if instrument is not uvp5", async () => {
-            const instrument = "not uvp5"
-            const result = projectRepository.computeDefaultDepthOffset(instrument)
+            const instrument_model = 50
+            const result = projectRepository.computeDefaultDepthOffset(instrument_model)
 
             expect(result).toBe(undefined)
         })

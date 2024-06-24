@@ -1,9 +1,9 @@
 import { SQLiteProjectDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-project-data-source'
 import sqlite3 from 'sqlite3'
 import 'dotenv/config'
-import { ProjectRequestCreationtModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
+import { ProjectRequestCreationModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
 import fs from 'fs';
-import { projectRequestCreationtModel_2, projectRequestCreationtModel_3, projectRequestCreationtModel_4, projectRequestCreationtModel_5, projectRequestCreationtModel_6, projectUpdateModel } from '../../../entities/project';
+import { projectRequestCreationModel_2, projectRequestCreationModel_3, projectRequestCreationModel_4, projectRequestCreationModel_5, projectRequestCreationModel_6, projectUpdateModel } from '../../../entities/project';
 
 const config = {
     TEST_DBSOURCE: process.env.TEST_DBSOURCE || '',
@@ -54,7 +54,7 @@ describe('SQLiteProjectDataSource', () => {
         });
 
         test('should create a new project', async () => {
-            const project: ProjectRequestCreationtModel = projectRequestCreationtModel_2
+            const project: ProjectRequestCreationModel = projectRequestCreationModel_2
 
             // Call the create method
             const projectId = await dataSource.create(project);
@@ -66,7 +66,7 @@ describe('SQLiteProjectDataSource', () => {
 
         });
         test('should create a new project', async () => {
-            const project: ProjectRequestCreationtModel = projectRequestCreationtModel_3
+            const project: ProjectRequestCreationModel = projectRequestCreationModel_3
 
             // Call the create method
             const projectId = await dataSource.create(project);
@@ -144,16 +144,16 @@ describe('SQLiteProjectDataSource', () => {
 
         test('should return all projects with sorting and filtering', async () => {
             // Add bunch of projects
-            const project3: ProjectRequestCreationtModel = projectRequestCreationtModel_4
-            const project4: ProjectRequestCreationtModel = projectRequestCreationtModel_5
-            const project5: ProjectRequestCreationtModel = projectRequestCreationtModel_6
+            const project3: ProjectRequestCreationModel = projectRequestCreationModel_4
+            const project4: ProjectRequestCreationModel = projectRequestCreationModel_5
+            const project5: ProjectRequestCreationModel = projectRequestCreationModel_6
             await dataSource.create(project3)
             await dataSource.create(project4)
             await dataSource.create(project5)
 
 
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument', operator: '=', value: 'instrument' }], sort_by: [{ sort_by: 'project_title', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument_model', operator: '=', value: 1 }], sort_by: [{ sort_by: 'project_title', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(4);
@@ -167,7 +167,7 @@ describe('SQLiteProjectDataSource', () => {
 
         test('should return all projects with sorting and filtering and pagination', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 2, limit: 2, filter: [{ field: 'instrument', operator: '=', value: 'instrument' }], sort_by: [{ sort_by: 'project_id', order_by: 'DESC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 2, limit: 2, filter: [{ field: 'instrument_model', operator: '=', value: 1 }], sort_by: [{ sort_by: 'project_id', order_by: 'DESC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(4);
@@ -178,7 +178,7 @@ describe('SQLiteProjectDataSource', () => {
 
         test('should return all projects with sorting and filtering and pagination IN', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument', operator: 'IN', value: ['instrument', 'uvp5'] }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument_model', operator: 'IN', value: [1, 2] }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(5);
@@ -239,7 +239,7 @@ describe('SQLiteProjectDataSource', () => {
             expect(project).toBeNull();
         });
         test('get one by project_id', async () => {
-            const project_by_id = { ...projectRequestCreationtModel_3, project_id: 2 }
+            const project_by_id = { ...projectRequestCreationModel_3, project_id: 2 }
             // Call the getOne method
             const project = await dataSource.getOne({ project_id: 2 });
             expect(project).toBeDefined();
@@ -265,7 +265,8 @@ describe('SQLiteProjectDataSource', () => {
                 expect(project.privacy_duration).toEqual(project_by_id.privacy_duration);
                 expect(project.visible_duration).toEqual(project_by_id.visible_duration);
                 expect(project.public_duration).toEqual(project_by_id.public_duration);
-                expect(project.instrument).toEqual(project_by_id.instrument);
+                expect(project.instrument_model).toEqual(project_by_id.instrument_model);
+                expect(project.serial_number).toEqual(project_by_id.serial_number);
 
 
                 // Check for additional keys

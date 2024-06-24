@@ -154,7 +154,7 @@ describe("User Router", () => {
                 email: "john@gmail.com",
                 password: "test123"
             }
-            const expectedResponse = { errors: ["Can't login"] }
+            const expectedResponse = { errors: ["Cannot login"] }
 
             jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error(); })
 
@@ -245,11 +245,11 @@ describe("User Router", () => {
         });
 
         test("Should handle error during refresh token use case and return a 404 response", async () => {
-            // Can't refresh token
+            // Cannot refresh token
             const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
-            const expectedResponse = { errors: ["Can't find user"] }
+            const expectedResponse = { errors: ["Cannot find user"] }
 
-            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("Can't find user"); })
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find user"); })
 
             const response = await request(server)
                 .post("/auth/refreshToken")
@@ -279,9 +279,9 @@ describe("User Router", () => {
 
 
         test("Should handle error during refresh token use case and return a 404 response", async () => {
-            // Can't refresh token
+            // Cannot refresh token
             const invalid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
-            const expectedResponse = { errors: ["Can't refresh token"] }
+            const expectedResponse = { errors: ["Cannot refresh token"] }
 
             jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error(); })
 
@@ -370,9 +370,9 @@ describe("User Router", () => {
                 new_password: "test123!!"
             }
 
-            const expectedResponse = { errors: ["Can't change password"] }
+            const expectedResponse = { errors: ["Cannot change password"] }
 
-            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("Can't find user"); })
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find user"); })
 
             const response = await request(server)
                 .post("/auth/password/change")
@@ -471,13 +471,13 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("Can't find updated user", async () => {
+        test("Cannot find updated user", async () => {
             const InputData = {
                 "email": "john@gmail.com",
             }
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
-            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find updated user")))
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find updated user")))
 
             const response = await request(server).post("/auth/password/reset").send(InputData)
 
@@ -491,23 +491,23 @@ describe("User Router", () => {
                 "email": "john@gmail.com",
             }
 
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
-            // Can't set password reset code
-            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't set password reset code")))
+            // Cannot set password reset code
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot set password reset code")))
             const response = await request(server).post("/auth/password/reset").send(InputData)
             expect(response.status).toBe(500)
             expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
 
-            //can't find updated user
-            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't set password reset code")))
+            //cannot find updated user
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot set password reset code")))
             const response_2 = await request(server).post("/auth/password/reset").send(InputData)
             expect(response_2.status).toBe(500)
             expect(mockResetPasswordRequestUseCase.execute).toBeCalledTimes(2)
             expect(response_2.body).toStrictEqual(expectedResponse)
 
-            // can't reset password
+            // cannot reset password
             jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
             const response_3 = await request(server).post("/auth/password/reset").send(InputData)
             expect(response_3.status).toBe(500)
@@ -541,7 +541,7 @@ describe("User Router", () => {
                 reset_password_token: "BAD_reset_password_token",
             }
             const error_message = "Token is not valid"
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
 
@@ -559,7 +559,7 @@ describe("User Router", () => {
                 reset_password_token: "BAD_reset_password_token",
             }
             const error_message = "Token is not valid"
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
 
@@ -595,7 +595,7 @@ describe("User Router", () => {
                 reset_password_token: null,
             }
             const error_message = "No token provided"
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
 
@@ -612,7 +612,7 @@ describe("User Router", () => {
                 reset_password_token: "reset_password_token",
             }
             const error_message = "User does not exist or reset_password_code is not valid"
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
 
@@ -629,7 +629,7 @@ describe("User Router", () => {
                 reset_password_token: "reset_password_token",
             }
             const error_message = "User email is not validated"
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))
 
@@ -645,7 +645,7 @@ describe("User Router", () => {
                 new_password: "test123!!!!!!!",
                 reset_password_token: "reset_password_token",
             }
-            const expectedResponse = { errors: ["Can't reset password"] }
+            const expectedResponse = { errors: ["Cannot reset password"] }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
 

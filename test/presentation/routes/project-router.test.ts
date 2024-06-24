@@ -3,7 +3,7 @@ import server from '../../../src/server'
 
 import ProjectRouter from '../../../src/presentation/routers/project-router'
 
-import { ProjectRequestCreationtModel, ProjectResponseModel } from "../../../src/domain/entities/project";
+import { ProjectRequestCreationModel, ProjectResponseModel } from "../../../src/domain/entities/project";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
@@ -16,7 +16,7 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareProjectValidation } from "../../../src/presentation/interfaces/middleware/project-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { projectRequestCreationtModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
+import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
     execute(): Promise<{ projects: ProjectResponseModel[], search_info: SearchInfo }> {
@@ -62,7 +62,7 @@ class MockMiddlewareAuth implements MiddlewareAuth {
 
 class MockMiddlewareProjectValidation implements IMiddlewareProjectValidation {
     rulesGetProjects = []
-    rulesProjectRequestCreationtModel = []
+    rulesProjectRequestCreationModel = []
     rulesProjectUpdateModel = []
 }
 
@@ -150,7 +150,7 @@ describe("Project Router", () => {
         });
 
         test("Get projects fail for unexepted reason", async () => {
-            const expectedResponse = { errors: ["Can't get projects"] }
+            const expectedResponse = { errors: ["Cannot get projects"] }
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error() })
             const response = await request(server).get("/projects")
 
@@ -222,7 +222,7 @@ describe("Project Router", () => {
         });
 
         test("Get users fail for unexepted reason", async () => {
-            const expectedResponse = { errors: ["Can't search projects"] }
+            const expectedResponse = { errors: ["Cannot search projects"] }
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error() })
             const response = await request(server).post("/projects/searches")
 
@@ -235,7 +235,7 @@ describe("Project Router", () => {
     describe("POST /projects", () => {
 
         test("POST /projects", async () => {
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
             const OutputData: ProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
@@ -246,9 +246,9 @@ describe("Project Router", () => {
         });
 
         test("POST /projects fail for unexepted reason", async () => {
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
 
-            const expectedResponse = { errors: ["Can't create project"] }
+            const expectedResponse = { errors: ["Cannot create project"] }
 
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
 
@@ -260,7 +260,7 @@ describe("Project Router", () => {
         });
 
         test("POST /projects fail for User is deleted", async () => {
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
             const expectedResponse = { errors: ["User is deleted"] }
 
 
@@ -274,13 +274,13 @@ describe("Project Router", () => {
         });
 
 
-        test("POST /projects fail for Can't find created project reason", async () => {
-            const InputData: ProjectRequestCreationtModel = projectRequestCreationtModel
+        test("POST /projects fail for Cannot find created project reason", async () => {
+            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
 
-            const expectedResponse = { errors: ["Can't find created project"] }
+            const expectedResponse = { errors: ["Cannot find created project"] }
 
 
-            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't find created project")))
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find created project")))
 
             const response = await request(server).post("/projects").send(InputData)
 
@@ -306,7 +306,7 @@ describe("Project Router", () => {
         test("PATCH /projects fail for unexepted reason", async () => {
             const project_to_update = partial_projectUpdateModel
 
-            const expectedResponse = { errors: ["Can't update project"] }
+            const expectedResponse = { errors: ["Cannot update project"] }
 
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error()))
             const response = await request(server).patch("/projects/2").send(project_to_update)
@@ -345,13 +345,13 @@ describe("Project Router", () => {
         });
 
 
-        test("PATCH /projects fail for Can't find updated project reason", async () => {
+        test("PATCH /projects fail for Cannot find updated project reason", async () => {
             const project_to_update = partial_projectUpdateModel
 
-            const expectedResponse = { errors: ["Can't find updated project"] }
+            const expectedResponse = { errors: ["Cannot find updated project"] }
 
 
-            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Can't find updated project")))
+            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find updated project")))
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
             expect(response.status).toBe(404)
@@ -407,9 +407,9 @@ describe("Project Router", () => {
         });
 
 
-        test("DELETE /projects fail for Can't find project to delete should return 404", async () => {
-            const expectedResponse = { errors: ["Can't find project to delete"] }
-            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Can't find project to delete")))
+        test("DELETE /projects fail for Cannot find project to delete should return 404", async () => {
+            const expectedResponse = { errors: ["Cannot find project to delete"] }
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find project to delete")))
             const response = await request(server).delete("/projects/1")
             expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
@@ -423,8 +423,8 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /projects fail for Can't delete project should return 500", async () => {
-            const expectedResponse = { errors: ["Can't delete project"] }
+        test("DELETE /projects fail for Cannot delete project should return 500", async () => {
+            const expectedResponse = { errors: ["Cannot delete project"] }
             jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error()))
             const response = await request(server).delete("/projects/1")
             expect(response.status).toBe(500)

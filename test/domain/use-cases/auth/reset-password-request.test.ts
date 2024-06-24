@@ -208,7 +208,7 @@ describe("Change password Use Case", () => {
             expect(mockUserRepository.generateResetPasswordToken).not.toHaveBeenCalled();
             expect(mockMailerAdapter.send_reset_password_email).not.toHaveBeenCalled();
         });
-        test("Can't set password reset code", async () => {
+        test("Cannot set password reset code", async () => {
             const InputData: UserRequestModel = {
                 email: "john@gmail.com"
             }
@@ -240,7 +240,7 @@ describe("Change password Use Case", () => {
             const reset_password_request = new ResetPasswordRequest(mockUserRepository, mockTransporter, mockMailerAdapter)
             try { await reset_password_request.execute(InputData); }
             catch (err) {
-                expect(err.message).toBe("Can't set password reset code")
+                expect(err.message).toBe("Cannot set password reset code")
             }
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
@@ -250,7 +250,7 @@ describe("Change password Use Case", () => {
             expect(mockUserRepository.generateResetPasswordToken).not.toHaveBeenCalled();
             expect(mockMailerAdapter.send_reset_password_email).not.toHaveBeenCalled();
         });
-        test("Can't find updated user", async () => {
+        test("Cannot find updated user", async () => {
             const InputData: UserRequestModel = {
                 email: "john@gmail.com"
             }
@@ -282,7 +282,7 @@ describe("Change password Use Case", () => {
             const reset_password_request = new ResetPasswordRequest(mockUserRepository, mockTransporter, mockMailerAdapter)
             try { await reset_password_request.execute(InputData); }
             catch (err) {
-                expect(err.message).toBe("Can't find updated user")
+                expect(err.message).toBe("Cannot find updated user")
             }
 
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
