@@ -42,7 +42,7 @@ export class DeleteProject implements DeleteProjectUseCase {
     // Ensure user is admin or has privilege to delete the project
     private async ensureUserCanDelete(current_user: UserUpdateModel, project: ProjectRequestModel): Promise<void> {
         const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        const userHasPrivilege = await this.privilegeRepository.is_granted({
+        const userHasPrivilege = await this.privilegeRepository.isGranted({
             user_id: current_user.user_id,
             project_id: project.project_id
         });

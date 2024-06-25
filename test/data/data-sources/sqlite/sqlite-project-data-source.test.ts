@@ -37,8 +37,6 @@ function cleanProjectDB() {
 describe('SQLiteProjectDataSource', () => {
     let dataSource: SQLiteProjectDataSource;
 
-
-
     beforeAll(() => {
         dataSource = initializeProjectDB();
     });

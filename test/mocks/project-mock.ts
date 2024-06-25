@@ -1,8 +1,14 @@
-import { ProjectResponseModel } from "../../src/domain/entities/project";
+import { ProjectRequestCreationModel, ProjectResponseModel, PublicProjectResponseModel } from "../../src/domain/entities/project";
 import { SearchResult } from "../../src/domain/entities/search";
 import { ProjectRepository } from "../../src/domain/interfaces/repositories/project-repository"
 
 export class MockProjectRepository implements ProjectRepository {
+    formatProjectRequestCreationModel(): ProjectRequestCreationModel {
+        throw new Error("Method not implemented.");
+    }
+    toPublicProject(): PublicProjectResponseModel {
+        throw new Error("Method not implemented.");
+    }
     standardUpdateProject(): Promise<number> {
         throw new Error("Method not implemented : standardUpdateProject");
     }

@@ -105,7 +105,7 @@ export interface PublicProjectUpdateModel {
     contact?: MinimalUserModel;
 }
 export interface PublicProjectRequestCreationModel {
-    project_id: number;
+    //project_id: number;
     root_folder_path: string;
     project_title: string;
     project_acronym: string;

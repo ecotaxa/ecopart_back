@@ -149,10 +149,9 @@ describe("User Router", () => {
         });
 
         test("failed if current user is deleted", async () => {
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
             const response = await request(server).get("/users")
-
             expect(response.status).toBe(403)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
@@ -233,8 +232,8 @@ describe("User Router", () => {
         });
 
         test("failed if current user is deleted", async () => {
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
             const response = await request(server).post("/users/searches")
 
             expect(response.status).toBe(403)
@@ -600,8 +599,8 @@ describe("User Router", () => {
         });
 
         test("Get users welcome fail for Invalid confirmation code reason", async () => {
-            const expectedResponse = { errors: ["Invalid confirmation code"] }
-            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Invalid confirmation code") })
+            const expectedResponse = { errors: ["Invalid confirmation token"] }
+            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Invalid confirmation token") })
 
             const response = await request(server).get("/users/1/welcome/123456789")
 

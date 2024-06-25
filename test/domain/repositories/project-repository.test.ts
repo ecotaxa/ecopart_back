@@ -4,7 +4,7 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel,
 import { SearchResult } from "../../../src/domain/entities/search";
 import { ProjectRepository } from "../../../src/domain/interfaces/repositories/project-repository";
 import { ProjectRepositoryImpl } from "../../../src/domain/repositories/project-repository";
-import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, projectUpdateModel, projectUpdateModel_withBadData } from "../../entities/project";
+import { projectRequestCreationModelForRepository, projectResponseModel, projectResponseModelArray, projectUpdateModel, projectUpdateModel_withBadData } from "../../entities/project";
 import { MockProjectDataSource } from "../../mocks/project-mock";
 
 import 'dotenv/config'
@@ -23,7 +23,7 @@ describe("Project Repository", () => {
 
     describe("CreateProject", () => {
         test("Should create a project", async () => {
-            const project: ProjectRequestCreationModel = projectRequestCreationModel
+            const project: ProjectRequestCreationModel = projectRequestCreationModelForRepository
 
             jest.spyOn(mockProjectDataSource, 'create').mockResolvedValue(1)
 
@@ -51,7 +51,7 @@ describe("Project Repository", () => {
 
     describe("ComputeDefaultDepthOffset", () => {
         test("Should compute default depth offset", async () => {
-            const instrument_model = 1
+            const instrument_model = "UVP5HD"
             const result = projectRepository.computeDefaultDepthOffset(instrument_model)
 
             expect(result).toBe(1.2)
@@ -63,7 +63,7 @@ describe("Project Repository", () => {
         })
 
         test("Should return undefined if instrument is not uvp5", async () => {
-            const instrument_model = 50
+            const instrument_model = "not_uvp5"
             const result = projectRepository.computeDefaultDepthOffset(instrument_model)
 
             expect(result).toBe(undefined)

@@ -26,7 +26,7 @@ describe("Create User Use Case", () => {
     }
     beforeEach(async () => {
         jest.clearAllMocks();
-        mockUserRepository = new MockUserRepository()
+        mockUserRepository = new MockUserRepository();
         mockMailerAdapter = new NodemailerAdapter((config.TEST_BASE_URL + config.TEST_PORT), config.TEST_MAIL_SENDER)
         mockTransporter = await mockMailerAdapter.createTransport({
             host: config.TEST_MAIL_HOST,

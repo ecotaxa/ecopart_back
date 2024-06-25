@@ -3,7 +3,7 @@ import server from '../../../src/server'
 
 import ProjectRouter from '../../../src/presentation/routers/project-router'
 
-import { ProjectRequestCreationModel, ProjectResponseModel } from "../../../src/domain/entities/project";
+import { PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../../src/domain/entities/project";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
@@ -19,18 +19,18 @@ import { Request, Response, NextFunction } from "express";
 import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
-    execute(): Promise<{ projects: ProjectResponseModel[], search_info: SearchInfo }> {
+    execute(): Promise<{ projects: PublicProjectResponseModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented.")
     }
 }
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
-    execute(): Promise<ProjectResponseModel> {
+    execute(): Promise<PublicProjectResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
 class MockUpdateProjectUseCase implements UpdateProjectUseCase {
-    execute(): Promise<ProjectResponseModel> {
+    execute(): Promise<PublicProjectResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
@@ -119,8 +119,8 @@ describe("Project Router", () => {
         });
 
         test("failed if current user is deleted", async () => {
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
             const response = await request(server).get("/projects")
 
             expect(response.status).toBe(403)
@@ -181,8 +181,8 @@ describe("Project Router", () => {
         });
 
         test("failed if current user is deleted", async () => {
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
             const response = await request(server).post("/projects/searches")
 
             expect(response.status).toBe(403)
@@ -235,8 +235,8 @@ describe("Project Router", () => {
     describe("POST /projects", () => {
 
         test("POST /projects", async () => {
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).post("/projects").send(InputData)
@@ -246,7 +246,7 @@ describe("Project Router", () => {
         });
 
         test("POST /projects fail for unexepted reason", async () => {
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
 
             const expectedResponse = { errors: ["Cannot create project"] }
 
@@ -260,11 +260,11 @@ describe("Project Router", () => {
         });
 
         test("POST /projects fail for User is deleted", async () => {
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
-            const expectedResponse = { errors: ["User is deleted"] }
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
+            const expectedResponse = { errors: ["User cannot be used"] }
 
 
-            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("User is deleted")))
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("User cannot be used")))
 
             const response = await request(server).post("/projects").send(InputData)
 
@@ -275,7 +275,7 @@ describe("Project Router", () => {
 
 
         test("POST /projects fail for Cannot find created project reason", async () => {
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
 
             const expectedResponse = { errors: ["Cannot find created project"] }
 
@@ -296,7 +296,7 @@ describe("Project Router", () => {
         test("PATCH /projects", async () => {
             const project_to_update = partial_projectUpdateModel
 
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/projects/1").send(project_to_update)
@@ -399,8 +399,8 @@ describe("Project Router", () => {
         });
 
         test("DELETE /projects fail for User is deleted should return 403", async () => {
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User is deleted")))
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
             const response = await request(server).delete("/projects/1")
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)

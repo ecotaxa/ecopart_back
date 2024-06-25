@@ -106,7 +106,7 @@ export default function AuthRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User does not exist") res.status(200).send({ message: "Reset password request email sent." })
-            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: ["Cannot reset password"] })
             else if (err.message === "User email is not validated") res.status(200).send({ message: "Reset password request email sent." })
             else if (err.message === "Cannot set password reset code") res.status(500).send({ errors: ["Cannot reset password"] })
             else if (err.message === "Cannot find updated user") res.status(500).send({ errors: ["Cannot reset password"] })

@@ -84,7 +84,8 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
                     throw new Error('Invalid country. Please select from the list.');
                 }
                 return true;
-            }),
+            })
+            .bail(),
         // Email Validation
         check('email').optional()
             .trim()

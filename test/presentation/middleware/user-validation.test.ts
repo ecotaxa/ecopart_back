@@ -299,66 +299,11 @@ describe("User Router", () => {
             const OutputData = {
                 errors: [
                     {
-                        type: 'alternative',
-                        msg: 'At least one valid field must be updated.',
-                        nestedErrors: [
-                            {
-                                type: 'field',
-                                value: 'FR56GG',
-                                msg: 'Invalid country. Please select from the list.',
-                                path: 'country',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'email',
-                                location: 'body'
-                            },
-
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'first_name',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'last_name',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'valid_email',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'is_admin',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'confirmation_code',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'organisation',
-                                location: 'body'
-                            },
-                            {
-                                type: 'field',
-                                msg: 'No value provided.',
-                                path: 'user_planned_usage',
-                                location: 'body'
-                            }
-                        ]
+                        type: 'field',
+                        value: 'FR56GG',
+                        msg: 'Invalid country. Please select from the list.',
+                        path: 'country',
+                        location: 'body'
                     }
                 ]
             }
@@ -367,7 +312,7 @@ describe("User Router", () => {
 
             expect(response.status).toBe(422)
             expect(mockCreateUserUseCase.execute).not.toBeCalled()
-            console.log("******344*******")
+            console.log(response.body)
             expect(response.body).toStrictEqual(OutputData)
         });
     })

@@ -1,9 +1,36 @@
 
 // define an example of project entities to use in the tests
 
-import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel } from "../../src/domain/entities/project"
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../src/domain/entities/project"
+import { MinimalUserModel } from "../../src/domain/entities/user"
 
-export const projectRequestCreationModel: ProjectRequestCreationModel = {
+export const projectRequestCreationModel: PublicProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
+
+}
+export const projectRequestCreationModelForRepository: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'project_title',
     project_acronym: 'project_acronym',
@@ -26,7 +53,7 @@ export const projectRequestCreationModel: ProjectRequestCreationModel = {
     serial_number: 'serial_number'
 }
 
-export const projectRequestCreationModel_2: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_2: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'joan project_title',
     project_acronym: 'project_acronym',
@@ -45,10 +72,13 @@ export const projectRequestCreationModel_2: ProjectRequestCreationModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
-export const projectRequestCreationModel_3: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_3: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'john project_title',
     project_acronym: 'project_acronym',
@@ -67,10 +97,13 @@ export const projectRequestCreationModel_3: ProjectRequestCreationModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
-export const projectRequestCreationModel_4: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_4: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'alice project_title',
     project_acronym: 'project_acronym',
@@ -89,10 +122,13 @@ export const projectRequestCreationModel_4: ProjectRequestCreationModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
-export const projectRequestCreationModel_5: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_5: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'marc project_title',
     project_acronym: 'project_acronym',
@@ -111,10 +147,13 @@ export const projectRequestCreationModel_5: ProjectRequestCreationModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
-export const projectRequestCreationModel_6: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_6: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'julie project_title',
     project_acronym: 'project_acronym',
@@ -133,11 +172,14 @@ export const projectRequestCreationModel_6: ProjectRequestCreationModel = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 2,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5SD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
 
-export const projectRequestCreationModel_withDataToSanitize: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_withDataToSanitize: PublicProjectRequestCreationModel = {
     root_folder_path: ' root_folder_path',
     project_title: ' project_title',
     project_acronym: ' project_acronym ',
@@ -156,11 +198,14 @@ export const projectRequestCreationModel_withDataToSanitize: ProjectRequestCreat
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: ' serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: ' serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
 
-export const projectRequestCreationModel_withDataSanitized: ProjectRequestCreationModel = {
+export const projectRequestCreationModel_withDataSanitized: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'project_title',
     project_acronym: 'project_acronym',
@@ -179,8 +224,11 @@ export const projectRequestCreationModel_withDataSanitized: ProjectRequestCreati
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
 
 export const projectRequestCreationModel_withmissingData = {
@@ -200,8 +248,10 @@ export const projectRequestCreationModel_withmissingData = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel]
 }
 
 export const projectRequestCreationModel_withmissingOverrideDepthOffset = {
@@ -222,22 +272,25 @@ export const projectRequestCreationModel_withmissingOverrideDepthOffset = {
     privacy_duration: 1,
     visible_duration: 1,
     public_duration: 1,
-    instrument_model: 1,
-    serial_number: 'serial_number'
+    instrument_model: "UVP5HD",
+    serial_number: 'serial_number',
+    contact: { user_id: 1 } as MinimalUserModel,
+    managers: [{ user_id: 1 } as MinimalUserModel],
+    members: [{ user_id: 2 } as MinimalUserModel],
 }
-export const projectResponseModel: ProjectResponseModel = {
+
+export const projectResponseModel: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 1,
     project_creation_date: '2024-04-29 15:43:10'
 }
-export const ProjectResponseModel2: ProjectResponseModel = {
+export const projectResponseModel2: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 2,
     project_creation_date: '2024-04-30 12:15:11'
 }
 
-
-export const projectResponseModelArray: ProjectResponseModel[] = [projectResponseModel, ProjectResponseModel2]
+export const projectResponseModelArray: PublicProjectResponseModel[] = [projectResponseModel, projectResponseModel2]
 
 export const projectRequestModel: ProjectRequestModel = {
     project_id: 1

@@ -163,7 +163,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         return privileges.items.map(privilege => privilege.project_id);
     }
 
-    async is_granted(privilege: PrivilegeRequestModel): Promise<boolean> {
+    async isGranted(privilege: PrivilegeRequestModel): Promise<boolean> {
         if (!privilege.user_id || !privilege.project_id) {
             throw new Error("Please provide a valid user_id and project_id to check if a privilege is granted for a project and a user")
         }
@@ -186,6 +186,31 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
 
         }
         const privileges = await this.privilegeDataSource.getAll(prepare_options)
+        return privileges.items.length > 0;
+    }
+    async isManager(is_granted_params: PrivilegeRequestModel): Promise<boolean> {
+        if (!is_granted_params.user_id || !is_granted_params.project_id) {
+            throw new Error("Please provide a valid user_id and project_id to check if a user is a manager for a project")
+        }
+        const filter = [
+            {
+                field: "user_id",
+                operator: "=",
+                value: is_granted_params.user_id
+            },
+            {
+                field: "project_id",
+                operator: "=",
+                value: is_granted_params.project_id
+            },
+            {
+                field: "privilege_name",
+                operator: "=",
+                value: "manager"
+            }
+        ]
+
+        const privileges = await this.getPrivilegesByFilter(filter)
         return privileges.items.length > 0;
     }
 

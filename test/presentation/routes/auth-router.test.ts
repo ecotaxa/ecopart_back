@@ -171,9 +171,9 @@ describe("User Router", () => {
                 email: "john@gmail.com",
                 password: "test123"
             }
-            const expectedResponse = { errors: ["User is deleted"] }
+            const expectedResponse = { errors: ["User cannot be used"] }
 
-            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+            jest.spyOn(mockLoginUserUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used"); })
 
             const response = await request(server).post("/auth/login").send(InputData)
 
@@ -263,9 +263,9 @@ describe("User Router", () => {
 
         test("Refresh token but user is deleted", async () => {
             const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
-            const expectedResponse = { errors: ["User is deleted"] }
+            const expectedResponse = { errors: ["User cannot be used"] }
 
-            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used"); })
 
             const response = await request(server)
                 .post("/auth/refreshToken")
@@ -348,9 +348,9 @@ describe("User Router", () => {
                 new_password: "test123!!"
             }
 
-            const expectedResponse = { errors: ["User is deleted"] }
+            const expectedResponse = { errors: ["User cannot be used"] }
 
-            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted"); })
+            jest.spyOn(mockChangePasswordUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used"); })
 
             const response = await request(server)
                 .post("/auth/password/change")
@@ -444,8 +444,8 @@ describe("User Router", () => {
                 "email": "john@gmail.com",
             }
 
-            const expectedResponse = { errors: ["User is deleted"] }
-            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User is deleted")))
+            const expectedResponse = { errors: ["Cannot reset password"] }
+            jest.spyOn(mockResetPasswordRequestUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
 
             const response = await request(server).post("/auth/password/reset").send(InputData)
 
@@ -575,9 +575,9 @@ describe("User Router", () => {
                 new_password: "test123!!!!!!!",
                 reset_password_token: "reset_password_token",
             }
-            const error_message = "User is deleted"
+            const error_message = "User cannot be used"
             const expectedResponse = {
-                errors: ["User is deleted"]
+                errors: ["Cannot reset password"]
             }
 
             jest.spyOn(mockResetPasswordUseCase, "execute").mockImplementation(() => Promise.reject(new Error(error_message)))

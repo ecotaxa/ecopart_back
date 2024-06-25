@@ -50,9 +50,16 @@ export class UpdateProject implements UpdateProjectUseCase {
     // Ensure user is admin or has privilege to update the project
     private async ensureUserCanUpdate(current_user: UserUpdateModel, project: PublicProjectUpdateModel): Promise<void> {
         const is_granted_params: PrivilegeRequestModel = { user_id: current_user.user_id, project_id: project.project_id }
-        const hasPrivilege = await this.privilegeRepository.is_granted(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
+        const hasPrivilege = await this.privilegeRepository.isGranted(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
         if (!hasPrivilege) {
             throw new Error("Logged user cannot update this property or project");
+        }
+        // Only managers or admin can update privileges of a project
+        if (this.isPrivilegeUpdate(project)) {
+            const canUpdatePrivilege = await this.privilegeRepository.isManager(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
+            if (!canUpdatePrivilege) {
+                throw new Error("Logged user cannot update privileges");
+            }
         }
     }
 

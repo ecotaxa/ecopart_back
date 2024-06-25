@@ -4,7 +4,7 @@ import server from '../../../src/server'
 
 import ProjectRouter from '../../../src/presentation/routers/project-router'
 
-import { ProjectResponseModel, ProjectRequestCreationModel } from "../../../src/domain/entities/project";
+import { PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../../../src/domain/entities/project";
 
 import { CreateProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/create-project";
 import { UpdateProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/update-project";
@@ -20,12 +20,12 @@ import { SearchInfo } from "../../../src/domain/entities/search";
 import { partial_projectUpdateModel_toSanatize, projectRequestCreationModel, projectRequestCreationModel_withDataSanitized, projectRequestCreationModel_withDataToSanitize, projectRequestCreationModel_withmissingData, projectResponseModel, partial_projectUpdateModel } from "../../entities/project";
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
-    execute(): Promise<ProjectResponseModel> {
+    execute(): Promise<PublicProjectResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
 class MockUpdateProjectUseCase implements UpdateProjectUseCase {
-    execute(): Promise<ProjectResponseModel> {
+    execute(): Promise<PublicProjectResponseModel> {
         throw new Error("Method not implemented.")
     }
 }
@@ -46,7 +46,7 @@ class MockDeleteProjectUseCase implements DeleteProjectUseCase {
 }
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
-    execute(): Promise<{ projects: ProjectResponseModel[]; search_info: any; }> {
+    execute(): Promise<{ projects: PublicProjectResponseModel[]; search_info: any; }> {
         throw new Error("Method not implemented.")
     }
 }
@@ -76,9 +76,9 @@ describe("Project Router", () => {
 
     describe("Test project router create project validation", () => {
         test("Create project all params are valid", async () => {
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
 
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
 
             const response = await request(server).post("/projects").send(InputData)
@@ -90,10 +90,10 @@ describe("Project Router", () => {
 
         test("Sanitize email and organisation", async () => {
             //TODO affine test on sanitized data
-            const InputData: ProjectRequestCreationModel = projectRequestCreationModel_withDataToSanitize
-            const sanitizedInputData: ProjectRequestCreationModel = projectRequestCreationModel_withDataSanitized
+            const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel_withDataToSanitize
+            const sanitizedInputData: PublicProjectRequestCreationModel = projectRequestCreationModel_withDataSanitized
 
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
 
@@ -124,7 +124,19 @@ describe("Project Router", () => {
                         "path": "data_owner_name",
                         "type": "field",
                         "value": "",
-                    }
+                    },
+                    {
+                        "location": "body",
+                        "msg": "Members are required.",
+                        "path": "members",
+                        "type": "field",
+                    },
+                    {
+                        "location": "body",
+                        "msg": "Members must be an array.",
+                        "path": "members",
+                        "type": "field",
+                    },
                 ]
             }
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
@@ -141,7 +153,7 @@ describe("Project Router", () => {
     describe("Test project router update project validation", () => {
         test("update project all params are valid", async () => {
             const project_to_update = partial_projectUpdateModel
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/projects/1").send(project_to_update)
@@ -156,7 +168,7 @@ describe("Project Router", () => {
             const project_to_update = partial_projectUpdateModel_toSanatize
             const sanitizedInputData = partial_projectUpdateModel
 
-            const OutputData: ProjectResponseModel = projectResponseModel
+            const OutputData: PublicProjectResponseModel = projectResponseModel
 
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/projects/1").send(project_to_update)
@@ -169,7 +181,7 @@ describe("Project Router", () => {
 
     describe("Test project router rules GetProjects", () => {
         test("Get projects all params are valid", async () => {
-            const OutputData: { projects: ProjectResponseModel[], search_info: SearchInfo } = {
+            const OutputData: { projects: PublicProjectResponseModel[], search_info: SearchInfo } = {
                 projects: [projectResponseModel
                 ],
                 search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
@@ -239,7 +251,7 @@ describe("Project Router", () => {
         });
 
         test("get project with default params", async () => {
-            const OutputData: { projects: ProjectResponseModel[], search_info: SearchInfo } = {
+            const OutputData: { projects: PublicProjectResponseModel[], search_info: SearchInfo } = {
                 projects: [projectResponseModel],
                 search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
 
