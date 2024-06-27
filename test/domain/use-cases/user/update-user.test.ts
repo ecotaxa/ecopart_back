@@ -23,7 +23,7 @@ describe("Update User Use Case", () => {
         mockUserRepository = new MockUserRepository()
     })
 
-    test("User is deleted", async () => {
+    test("Current user cannot be used", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -33,10 +33,10 @@ describe("Update User Use Case", () => {
             first_name: "Joan"
         }
 
-        const OutputError = new Error("User is deleted")
+        const OutputError = new Error("User cannot be used")
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(true)).mockImplementationOnce(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(OutputError))
+        jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser")
@@ -50,7 +50,7 @@ describe("Update User Use Case", () => {
             expect(err).toStrictEqual(OutputError);
         }
 
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
         expect(mockUserRepository.isAdmin).not.toBeCalled();
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
@@ -58,7 +58,7 @@ describe("Update User Use Case", () => {
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
     });
 
-    test("User is deleted", async () => {
+    test("User to update don't exist", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1
         }
@@ -68,13 +68,13 @@ describe("Update User Use Case", () => {
             first_name: "Joan"
         }
 
-        const OutputError = new Error("User is deleted")
+        const OutputError = new Error("Cannot find user to update")
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementationOnce(() => Promise.resolve(false)).mockImplementationOnce(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser")
-        jest.spyOn(mockUserRepository, "getUser")
         jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
@@ -85,11 +85,60 @@ describe("Update User Use Case", () => {
             expect(err).toStrictEqual(OutputError);
         }
 
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(1);
+
         expect(mockUserRepository.isAdmin).not.toBeCalled();
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.toPublicUser).not.toBeCalled();
+    });
+    test("User to update is deleted", async () => {
+        const current_user: UserUpdateModel = {
+            user_id: 1
+        }
+        const user_to_update: UserUpdateModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "Joan"
+        }
+        const OutputData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "Joan",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00',
+            deleted: '2023-08-01 10:30:00'
+        }
+
+        const OutputError = new Error("User to update is deleted")
+
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
+
+        jest.spyOn(mockUserRepository, "isAdmin")
+        jest.spyOn(mockUserRepository, "adminUpdateUser")
+        jest.spyOn(mockUserRepository, "standardUpdateUser")
+        jest.spyOn(mockUserRepository, "toPublicUser")
+
+        const updateUserUseCase = new UpdateUser(mockUserRepository)
+        try {
+            await updateUserUseCase.execute(current_user, user_to_update);
+            expect(true).toBe(false)
+        } catch (err) {
+            expect(err).toStrictEqual(OutputError);
+        }
+
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(1);
+        expect(mockUserRepository.isAdmin).not.toBeCalled();
+        expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
+        expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
     });
 
@@ -116,8 +165,8 @@ describe("Update User Use Case", () => {
             user_creation_date: '2023-08-01 10:30:00'
         }
 
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
@@ -127,8 +176,8 @@ describe("Update User Use Case", () => {
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
         expect(mockUserRepository.getUser).toBeCalled();
@@ -159,8 +208,8 @@ describe("Update User Use Case", () => {
 
         const OutputError = new Error("Cannot update user")
 
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
@@ -174,11 +223,11 @@ describe("Update User Use Case", () => {
             expect(err).toStrictEqual(OutputError);
         }
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(1);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
-        expect(mockUserRepository.getUser).not.toBeCalled();
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
@@ -208,7 +257,7 @@ describe("Update User Use Case", () => {
         const OutputError = new Error("Logged user cannot update this property or user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
@@ -221,11 +270,11 @@ describe("Update User Use Case", () => {
         } catch (err) {
             expect(err).toStrictEqual(OutputError);
         }
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).not.toBeCalled();
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
@@ -256,7 +305,7 @@ describe("Update User Use Case", () => {
         const OutputError = new Error("Logged user cannot update this property or user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(getUserOutputData))
@@ -269,11 +318,11 @@ describe("Update User Use Case", () => {
         } catch (err) {
             expect(err).toStrictEqual(OutputError);
         }
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).not.toBeCalled();
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
     });
@@ -303,7 +352,7 @@ describe("Update User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
@@ -313,11 +362,11 @@ describe("Update User Use Case", () => {
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(2);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.toPublicUser).toBeCalled();
 
     });
@@ -345,7 +394,7 @@ describe("Update User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
@@ -355,11 +404,11 @@ describe("Update User Use Case", () => {
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(2);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.toPublicUser).toBeCalled();
     });
 
@@ -386,7 +435,7 @@ describe("Update User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
@@ -396,11 +445,11 @@ describe("Update User Use Case", () => {
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(2);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.toPublicUser).toBeCalled();
     });
 
@@ -428,7 +477,7 @@ describe("Update User Use Case", () => {
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputData))
@@ -438,11 +487,11 @@ describe("Update User Use Case", () => {
         const result = await updateUserUseCase.execute(current_user, user_to_update);
         expect(result).toStrictEqual(OutputData);
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(2);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.toPublicUser).toBeCalled();
 
     });
@@ -457,14 +506,26 @@ describe("Update User Use Case", () => {
             last_name: "Smith",
             first_name: "Joan"
         }
+        const OutputData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "Joan",
+            email: "john@gmail.com",
+            is_admin: true,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
 
         const OutputError = new Error("Cannot find updated user")
 
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(OutputData)).mockImplementationOnce(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "adminUpdateUser")
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
-        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "toPublicUser")
 
 
@@ -477,11 +538,11 @@ describe("Update User Use Case", () => {
             expect(err).toStrictEqual(OutputError);
         }
 
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
+        expect(mockUserRepository.getUser).toBeCalledTimes(2);
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
         expect(mockUserRepository.adminUpdateUser).not.toBeCalled();
         expect(mockUserRepository.standardUpdateUser).toBeCalled();
-        expect(mockUserRepository.getUser).toBeCalled();
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
 
@@ -495,14 +556,26 @@ describe("Update User Use Case", () => {
             status: "Active",
             is_admin: true
         }
+        const OutputData: UserResponseModel = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "Joan",
+            email: "john@gmail.com",
+            is_admin: true,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            user_creation_date: '2023-08-01 10:30:00'
+        }
 
         const OutputError = new Error("Cannot update user")
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "adminUpdateUser").mockImplementation(() => Promise.resolve(0))
         jest.spyOn(mockUserRepository, "standardUpdateUser")
-        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
+        jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(OutputData)).mockImplementationOnce(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "toPublicUser")
 
         const updateUserUseCase = new UpdateUser(mockUserRepository)
@@ -513,14 +586,10 @@ describe("Update User Use Case", () => {
             expect(err).toStrictEqual(OutputError);
         }
         expect(mockUserRepository.isAdmin).toBeCalled();
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(2);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1);
         expect(mockUserRepository.adminUpdateUser).toBeCalled();
         expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).not.toBeCalled();
+        expect(mockUserRepository.getUser).toBeCalledTimes(1);
         expect(mockUserRepository.toPublicUser).not.toBeCalled();
-
-
     });
-
-
 })

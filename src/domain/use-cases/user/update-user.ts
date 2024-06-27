@@ -15,7 +15,8 @@ export class UpdateUser implements UpdateUserUseCase {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
         const user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
-        if (await this.userRepository.isDeleted(user)) throw new Error("User is deleted");
+        if (!user) throw new Error("Cannot find user to update");
+        if (user.deleted !== undefined) throw new Error("User to update is deleted");
 
         // Update admin can update anyone 
         if (await this.userRepository.isAdmin(current_user.user_id)) {

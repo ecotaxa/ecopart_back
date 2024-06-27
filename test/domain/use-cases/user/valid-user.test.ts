@@ -63,7 +63,6 @@ describe("Valid Users Use Case", () => {
 
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
 
@@ -76,10 +75,9 @@ describe("Valid Users Use Case", () => {
                 expect(true).toBe(false)
             }
             expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
-            expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: user_to_update.user_id });
-            expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
+            expect(mockUserRepository.validUser).toHaveBeenCalledWith({ user_id: user_to_update.user_id });
         });
     })
 
@@ -231,7 +229,8 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_date: '2023-08-01 10:30:00',
+                deleted: '2023-08-01 10:31:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: 1,
@@ -249,7 +248,6 @@ describe("Valid Users Use Case", () => {
 
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
 
@@ -260,8 +258,7 @@ describe("Valid Users Use Case", () => {
             } catch (e) {
                 expect(e.message).toBe("User is deleted")
                 expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
-                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
-                expect(mockUserRepository.getUser).not.toBeCalled();
+                expect(mockUserRepository.getUser).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).not.toBeCalled();
             }
 
@@ -306,7 +303,6 @@ describe("Valid Users Use Case", () => {
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
 
             const getAllUsersUse = new ValidUser(mockUserRepository)
@@ -318,7 +314,6 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
                 expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
-                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
                 expect(mockUserRepository.validUser).not.toBeCalled();
                 expect(e.message).toBe("Cannot find user with confirmation code")
             }
@@ -375,7 +370,6 @@ describe("Valid Users Use Case", () => {
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(0))
 
             const getAllUsersUse = new ValidUser(mockUserRepository)
@@ -387,8 +381,7 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
                 expect(mockUserRepository.getUser).toHaveBeenCalledTimes(1);
-                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
-                expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
+                expect(mockUserRepository.validUser).toHaveBeenCalledWith({ user_id: user_to_update.user_id });
 
                 expect(e.message).toBe("Cannot update user")
             }
@@ -432,7 +425,6 @@ describe("Valid Users Use Case", () => {
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
 
             const getAllUsersUse = new ValidUser(mockUserRepository)
@@ -444,8 +436,7 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: user_id });
-                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
-                expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
+                expect(mockUserRepository.validUser).toHaveBeenCalledWith({ user_id: user_to_update.user_id });
 
                 expect(e.message).toBe("Cannot find updated user")
             }
@@ -500,7 +491,6 @@ describe("Valid Users Use Case", () => {
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })
             jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(user_to_update)).mockImplementationOnce(() => Promise.resolve(updated_user))
-            jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "validUser").mockImplementation(() => Promise.resolve(1))
 
             const getAllUsersUse = new ValidUser(mockUserRepository)
@@ -512,13 +502,10 @@ describe("Valid Users Use Case", () => {
                 expect(mockUserRepository.verifyValidationToken).toHaveBeenCalledWith(confirmation_token);
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { user_id: user_id, confirmation_code: decoded_token.confirmation_code });
                 expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: user_id });
-                expect(mockUserRepository.isDeleted).toBeCalledTimes(1);
-                expect(mockUserRepository.validUser).toHaveBeenCalledWith(user_to_update);
+                expect(mockUserRepository.validUser).toHaveBeenCalledWith({ user_id: user_to_update.user_id });
 
                 expect(e.message).toBe("Cannot validate user")
             }
         });
     })
-
-
 })

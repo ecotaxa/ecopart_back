@@ -5,7 +5,7 @@ import { SearchProject } from '../../../../src/domain/use-cases/project/search-p
 
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockUserRepository } from "../../../mocks/user-mock";
-import { MockSearchRepository } from "../../../mocks/search-mocks";
+import { MockSearchRepository } from "../../../mocks/search-mock";
 import { UserUpdateModel } from "../../../../src/domain/entities/user";
 import { FilterSearchOptions, SearchOptions } from "../../../../src/domain/entities/search";
 import { projectResponseModelArray } from "../../../entities/project";

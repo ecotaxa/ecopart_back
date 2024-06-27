@@ -1,4 +1,4 @@
-import { FilterSearchOptions, SearchOptions } from "../../../../src/domain/entities/search";
+import { FilterSearchOptions, SearchInfo, SearchOptions } from "../../../../src/domain/entities/search";
 import { UserUpdateModel, } from "../../../../src/domain/entities/user";
 import { SearchRepository } from "../../../../src/domain/interfaces/repositories/search-repository";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
@@ -8,6 +8,9 @@ import { MockUserRepository } from "../../../mocks/user-mock";
 describe("Get All Users Use Case", () => {
 
     class MockSearchRepository implements SearchRepository {
+        formatSearchInfo(): SearchInfo {
+            throw new Error("Method not implemented.");
+        }
         formatFilters(): any {
             throw new Error("Method not implemented.");
         }
@@ -27,7 +30,7 @@ describe("Get All Users Use Case", () => {
         searchUsersUse = new SearchUsers(mockUserRepository, mockSearchRepository)
     })
 
-    test("deleted user should not be able to search for users", async () => {
+    test("deleted or invalidated user should not be able to search for users", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1,
         }
@@ -37,17 +40,18 @@ describe("Get All Users Use Case", () => {
             sort_by: []
         }
         const filters: FilterSearchOptions[] = []
+        const OutputError = new Error("User cannot be used")
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(OutputError))
         jest.spyOn(mockSearchRepository, "formatFilters")
         jest.spyOn(mockSearchRepository, "formatSortBy")
         jest.spyOn(mockUserRepository, "standardGetUsers")
         jest.spyOn(mockUserRepository, "toPublicUser")
 
 
-        await expect(searchUsersUse.execute(current_user, options, filters)).rejects.toThrow("User is deleted")
+        await expect(searchUsersUse.execute(current_user, options, filters)).rejects.toThrow("User cannot be used")
 
-        expect(mockUserRepository.isDeleted).toBeCalledTimes(1)
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1)
         expect(mockSearchRepository.formatFilters).not.toBeCalled()
         expect(mockSearchRepository.formatSortBy).not.toBeCalled()
         expect(mockUserRepository.standardGetUsers).not.toBeCalled()
@@ -98,13 +102,16 @@ describe("Get All Users Use Case", () => {
             page: 1,
             sort_by: []
         }
+
         const filters: FilterSearchOptions[] = []
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => { return [] })
         jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => { return [] })
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardGetUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
         jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return public_user })
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return { limit: 10, page: 1, pages: 1, total: 2, total_on_page: 2 } })
+
         const result = await searchUsersUse.execute(current_user, options, filters);
         expect(result).toStrictEqual(expectedResponse)
 
@@ -160,12 +167,15 @@ describe("Get All Users Use Case", () => {
             sort_by: []
         }
         const filters: FilterSearchOptions[] = []
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => { return [] })
         jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => { return [] })
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminGetUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
         jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return public_user })
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return { limit: 10, page: 1, pages: 1, total: 2, total_on_page: 2 } })
+
         const result = await searchUsersUse.execute(current_user, options, filters);
         expect(result).toStrictEqual(expectedResponse)
     });
@@ -217,12 +227,14 @@ describe("Get All Users Use Case", () => {
         const filters: FilterSearchOptions[] = [{ field: "pasword_hash", operator: "SELECT", value: "%" }]
 
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => { return [{ field: "pasword_hash", operator: "SELECT", value: "%" }] })
         jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => { return [{ sort_by: "field1", order_by: "asc" }] })
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardGetUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
         jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return public_user })
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return { limit: 10, page: 1, pages: 1, total: 2, total_on_page: 2 } })
+
         const result = await searchUsersUse.execute(current_user, options, filters);
         expect(result).toStrictEqual(expectedResponse)
 
@@ -246,11 +258,18 @@ describe("Get All Users Use Case", () => {
             sort_by: []
         }
         const filters: FilterSearchOptions[] = []
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => { return [] })
         jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => { return [] })
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "standardGetUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => {
+            return {
+                limit: 10, page: 1, pages: 1, total: 0, total_on_page: 0
+            }
+        })
+
         const result = await searchUsersUse.execute(current_user, options, filters);
         expect(result).toStrictEqual(expectedResponse)
 
