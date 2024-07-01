@@ -6,11 +6,11 @@
   "scripts": {
     "test": "jest --watchAll --collectCoverage",
     "test-CI": "jest --collectCoverage",
-    "clean": "rimraf lib/*",
+    "clean": "rimraf dist/*",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
     "dev:build": "npm-run-all clean tsc copy-assets",
-    "dev:serve": "nodemon -e js -w lib lib/main.js",
+    "dev:serve": "nodemon -e js -w dist dist/main.js",
     "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts"
   },
   "keywords": [],
