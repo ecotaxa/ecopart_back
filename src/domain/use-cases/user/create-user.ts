@@ -21,7 +21,6 @@ export class CreateUser implements CreateUserUseCase {
         // Check if a user with the given email already exists
         if (preexistentUser) {
             // User should not be deleted
-            console.log(preexistentUser)
             if (preexistentUser.deleted) throw new Error("User is deleted");
 
             // If the user exists but hasn't validated their email
