@@ -9,13 +9,13 @@ describe("Get All Users Use Case", () => {
 
     class MockSearchRepository implements SearchRepository {
         formatSearchInfo(): SearchInfo {
-            throw new Error("Method not implemented.");
+            throw new Error("Method not implemented for formatSearchInfo");
         }
         formatFilters(): any {
-            throw new Error("Method not implemented.");
+            throw new Error("Method not implemented for formatFilters");
         }
         formatSortBy(): any {
-            throw new Error("Method not implemented.");
+            throw new Error("Method not implemented for formatSortBy");
         }
     }
 

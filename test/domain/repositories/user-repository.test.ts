@@ -13,40 +13,40 @@ import { decodedToken } from "../../entities/auth";
 
 class MockUserDataSource implements UserDataSource {
     deleteOne(): void {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for deleteOne");
     }
     updateOne(): Promise<number> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for updateOne");
     }
     create(): Promise<number> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for create");
     }
     getAll(): Promise<SearchResult<UserResponseModel>> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for getAll");
     }
     getOne(): Promise<UserResponseModel> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for getOne");
     }
     getUserLogin(): Promise<AuthUserCredentialsModel | null> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for getUserLogin");
     }
 
 }
 class MockBcryptAdapter extends BcryptAdapter {
     async hash(): Promise<string> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for hash");
     }
     // compare password
     async compare(): Promise<boolean> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for compare");
     }
 }
 class MockJwtAdapter extends JwtAdapter {
     sign(): string {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for sign");
     }
     verify(): JwtPayload | string {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for verify");
     }
 }
 
@@ -801,8 +801,8 @@ describe("User Repository", () => {
             expect(result).toStrictEqual(expectedData)
         });
     })
-    describe("IsDeleted", () => {
-        test("Should return true for a deleted user", async () => {
+    describe("canUserBeUsed", () => {
+        test("Should return false for a deleted user", async () => {
             const deletedUser: UserResponseModel = {
                 user_id: 1,
                 last_name: "anonym_1",
@@ -818,10 +818,10 @@ describe("User Repository", () => {
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(deletedUser))
 
-            const result = await userRepository.isDeleted(1);
-            expect(result).toBe(true)
+            const result = await userRepository.canUserBeUse(1);
+            expect(result).toBe(false)
         });
-        test("Should return false for a non deleted user", async () => {
+        test("Should return true for a non deleted user", async () => {
             const nonDeletedUser: UserResponseModel = {
                 user_id: 1,
                 last_name: "Smith",
@@ -836,13 +836,31 @@ describe("User Repository", () => {
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonDeletedUser))
 
-            const result = await userRepository.isDeleted(1);
+            const result = await userRepository.canUserBeUse(1);
+            expect(result).toBe(true)
+        });
+        test("Should return false for a unvalid user", async () => {
+            const nonDeletedUser: UserResponseModel = {
+                user_id: 1,
+                last_name: "Smith",
+                first_name: "John",
+                email: "john@gmail.com",
+                valid_email: false,
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                user_creation_date: '2023-08-01 10:30:00'
+            }
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonDeletedUser))
+
+            const result = await userRepository.canUserBeUse(1);
             expect(result).toBe(false)
         });
 
         test("Should return false for a non existing user", async () => {
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(null))
-            const result = await userRepository.isDeleted(1);
+            const result = await userRepository.canUserBeUse(1);
             expect(result).toBe(false)
         });
     });

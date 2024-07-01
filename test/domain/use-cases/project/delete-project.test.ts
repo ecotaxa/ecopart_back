@@ -6,16 +6,19 @@ import { DeleteProject } from '../../../../src/domain/use-cases/project/delete-p
 import { projectResponseModel } from "../../../entities/project";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 
 describe("Delete Project Use Case", () => {
 
     let mockProjectRepository: ProjectRepository;
     let mockUserRepository: UserRepository;
+    let mockPrivilegeRepository: MockPrivilegeRepository;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockProjectRepository = new MockProjectRepository()
         mockUserRepository = new MockUserRepository()
+        mockPrivilegeRepository = new MockPrivilegeRepository()
     })
 
 
@@ -28,17 +31,17 @@ describe("Delete Project Use Case", () => {
         }
         const preexistent_project: ProjectResponseModel = projectResponseModel
 
-
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(preexistent_project))
+        jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
         await deleteProjectUseCase.execute(current_user, project_to_delete);
 
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
-        expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.deleteProject).toBeCalledWith(project_to_delete);
     });
@@ -55,16 +58,17 @@ describe("Delete Project Use Case", () => {
         const preexistent_project: ProjectResponseModel = projectResponseModel
 
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(preexistent_project))
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
         await deleteProjectUseCase.execute(current_user, project_to_delete);
 
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
-        expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.deleteProject).toBeCalledWith(project_to_delete);
     });
@@ -78,21 +82,22 @@ describe("Delete Project Use Case", () => {
         const project_to_delete: ProjectUpdateModel = {
             project_id: 2
         }
+        const errorOutput = new Error("User cannot be used")
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(errorOutput))
         jest.spyOn(mockProjectRepository, "getProject")
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockProjectRepository, "deleteProject")
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
-            expect(err.message).toBe("User is deleted");
+            expect(err.message).toBe(errorOutput.message);
         }
 
 
-        expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.getProject).not.toBeCalled();
         expect(mockUserRepository.isAdmin).not.toBeCalled();
         expect(mockProjectRepository.deleteProject).not.toBeCalled();
@@ -106,12 +111,12 @@ describe("Delete Project Use Case", () => {
             project_id: 2
         }
 
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockProjectRepository, "deleteProject")
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
 
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
@@ -119,7 +124,7 @@ describe("Delete Project Use Case", () => {
             expect(err.message).toBe("Cannot find project to delete");
         }
 
-        expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
         expect(mockUserRepository.isAdmin).not.toBeCalled();
         expect(mockProjectRepository.deleteProject).not.toBeCalled();
@@ -137,18 +142,19 @@ describe("Delete Project Use Case", () => {
         const preexistent_project: ProjectResponseModel = projectResponseModel
 
         jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(preexistent_project))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(0))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
             expect(err.message).toBe("Cannot delete project");
         }
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
-        expect(mockUserRepository.isDeleted).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.deleteProject).toBeCalledWith(project_to_delete);
     });

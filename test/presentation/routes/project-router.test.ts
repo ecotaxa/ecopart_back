@@ -20,18 +20,18 @@ import { projectRequestCreationModel, projectResponseModel, projectResponseModel
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
     execute(): Promise<{ projects: PublicProjectResponseModel[], search_info: SearchInfo }> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for SearchProjectsUseCase");
     }
 }
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
     execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for CreateProjectUseCase");
     }
 }
 class MockUpdateProjectUseCase implements UpdateProjectUseCase {
     execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for UpdateProjectUseCase");
     }
 }
 
@@ -56,7 +56,7 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         next();
     }
     auth_refresh(): void {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for auth_refresh");
     }
 }
 
@@ -69,7 +69,7 @@ class MockMiddlewareProjectValidation implements IMiddlewareProjectValidation {
 
 class MockDeleteProjectUseCase implements DeleteProjectUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for DeleteProjectUseCase");
     }
 }
 

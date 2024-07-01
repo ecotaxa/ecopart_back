@@ -8,10 +8,10 @@ import { MockUserRepository } from "../../../mocks/user-mock";
 describe("Create User Use Case", () => {
     class MockAuthRepository implements AuthRepository {
         generateAccessToken(): string {
-            throw new Error("Method not implemented.");
+            throw new Error("Method not implemented for generateAccessToken");
         }
         generateRefreshToken(): string {
-            throw new Error("Method not implemented.");
+            throw new Error("Method not implemented for generateRefreshToken");
         }
     }
 

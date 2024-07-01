@@ -5,16 +5,16 @@ import { UserRepository } from "../../src/domain/interfaces/repositories/user-re
 
 export class MockUserRepository implements UserRepository {
     isValidated(): Promise<boolean> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for isValidated");
     }
     canUserBeUse(): Promise<boolean> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for canUserBeUse");
     }
     ensureUserCanBeUsed(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for ensureUserCanBeUsed");
     }
     ensureTypedUserCanBeUsed(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for ensureTypedUserCanBeUsed");
     }
     adminGetUsers(): Promise<SearchResult<UserResponseModel>> {
         throw new Error("Method not implemented : adminGetUsers");

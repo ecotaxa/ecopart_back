@@ -21,12 +21,12 @@ import { partial_projectUpdateModel_toSanatize, projectRequestCreationModel, pro
 
 class MockCreateProjectUseCase implements CreateProjectUseCase {
     execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for create project")
     }
 }
 class MockUpdateProjectUseCase implements UpdateProjectUseCase {
     execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for update project")
     }
 }
 
@@ -35,19 +35,19 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         next()
     }
     auth_refresh(): void {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for auth_refresh")
     }
 }
 
 class MockDeleteProjectUseCase implements DeleteProjectUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for delete project")
     }
 }
 
 class MockSearchProjectsUseCase implements SearchProjectsUseCase {
     execute(): Promise<{ projects: PublicProjectResponseModel[]; search_info: any; }> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for search projects")
     }
 }
 describe("Project Router", () => {

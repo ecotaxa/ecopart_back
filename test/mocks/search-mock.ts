@@ -3,7 +3,7 @@ import { SearchRepository } from "../../src/domain/interfaces/repositories/searc
 
 export class MockSearchRepository implements SearchRepository {
     formatSearchInfo(): SearchInfo {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented : formatSearchInfo");
     }
     formatFilters(): any {
         throw new Error("Method not implemented : formatFilters");

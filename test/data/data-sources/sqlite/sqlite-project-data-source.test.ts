@@ -3,7 +3,7 @@ import sqlite3 from 'sqlite3'
 import 'dotenv/config'
 import { ProjectRequestCreationModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
 import fs from 'fs';
-import { projectRequestCreationModel_2, projectRequestCreationModel_3, projectRequestCreationModel_4, projectRequestCreationModel_5, projectRequestCreationModel_6, projectUpdateModel } from '../../../entities/project';
+import { data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4, data_source_projectRequestCreationModel_5, data_source_projectRequestCreationModel_6, projectRequestCreationModel_3, projectUpdateModel } from '../../../entities/project';
 
 const config = {
     TEST_DBSOURCE: process.env.TEST_DBSOURCE || '',
@@ -52,7 +52,7 @@ describe('SQLiteProjectDataSource', () => {
         });
 
         test('should create a new project', async () => {
-            const project: ProjectRequestCreationModel = projectRequestCreationModel_2
+            const project: ProjectRequestCreationModel = data_source_projectRequestCreationModel_2
 
             // Call the create method
             const projectId = await dataSource.create(project);
@@ -64,7 +64,7 @@ describe('SQLiteProjectDataSource', () => {
 
         });
         test('should create a new project', async () => {
-            const project: ProjectRequestCreationModel = projectRequestCreationModel_3
+            const project: ProjectRequestCreationModel = data_source_projectRequestCreationModel_3
 
             // Call the create method
             const projectId = await dataSource.create(project);
@@ -142,9 +142,9 @@ describe('SQLiteProjectDataSource', () => {
 
         test('should return all projects with sorting and filtering', async () => {
             // Add bunch of projects
-            const project3: ProjectRequestCreationModel = projectRequestCreationModel_4
-            const project4: ProjectRequestCreationModel = projectRequestCreationModel_5
-            const project5: ProjectRequestCreationModel = projectRequestCreationModel_6
+            const project3: ProjectRequestCreationModel = data_source_projectRequestCreationModel_4
+            const project4: ProjectRequestCreationModel = data_source_projectRequestCreationModel_5
+            const project5: ProjectRequestCreationModel = data_source_projectRequestCreationModel_6
             await dataSource.create(project3)
             await dataSource.create(project4)
             await dataSource.create(project5)

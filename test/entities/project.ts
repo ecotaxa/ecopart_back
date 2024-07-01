@@ -1,7 +1,7 @@
 
 // define an example of project entities to use in the tests
 
-import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../src/domain/entities/project"
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../src/domain/entities/project"
 import { MinimalUserModel } from "../../src/domain/entities/user"
 
 export const projectRequestCreationModel: PublicProjectRequestCreationModel = {
@@ -78,6 +78,28 @@ export const projectRequestCreationModel_2: PublicProjectRequestCreationModel = 
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
 }
+export const data_source_projectRequestCreationModel_2: ProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'joan project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: false,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: 1,
+    serial_number: 'serial_number'
+}
 export const projectRequestCreationModel_3: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'john project_title',
@@ -102,6 +124,28 @@ export const projectRequestCreationModel_3: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+}
+export const data_source_projectRequestCreationModel_3: ProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'john project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: 1,
+    serial_number: 'serial_number'
 }
 export const projectRequestCreationModel_4: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -128,6 +172,28 @@ export const projectRequestCreationModel_4: PublicProjectRequestCreationModel = 
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
 }
+export const data_source_projectRequestCreationModel_4: ProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'alice project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: 1,
+    serial_number: 'serial_number'
+}
 export const projectRequestCreationModel_5: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'marc project_title',
@@ -153,6 +219,28 @@ export const projectRequestCreationModel_5: PublicProjectRequestCreationModel = 
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
 }
+export const data_source_projectRequestCreationModel_5: ProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'marc project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: 1,
+    serial_number: 'serial_number'
+}
 export const projectRequestCreationModel_6: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
     project_title: 'julie project_title',
@@ -177,6 +265,28 @@ export const projectRequestCreationModel_6: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+}
+export const data_source_projectRequestCreationModel_6: ProjectRequestCreationModel = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'julie project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: 2, //"UVP5SD",
+    serial_number: 'serial_number'
 }
 
 export const projectRequestCreationModel_withDataToSanitize: PublicProjectRequestCreationModel = {
@@ -306,7 +416,7 @@ export const partial_projectUpdateModel: Partial<ProjectUpdateModel> = {
     operator_name: "Edited name"
 }
 
-export const projectUpdateModel: ProjectUpdateModel = {
+export const projectUpdateModel: PublicProjectUpdateModel = {
     operator_email: "edited_user@email.com",
     operator_name: "Edited name",
     project_id: 1

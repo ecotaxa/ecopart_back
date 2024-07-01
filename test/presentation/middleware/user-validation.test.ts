@@ -21,18 +21,18 @@ import { SearchInfo } from "../../../src/domain/entities/search";
 
 class MockCreateUserUseCase implements CreateUserUseCase {
     execute(): Promise<UserResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for CreateUserUseCase");
     }
 }
 class MockUpdateUserUseCase implements UpdateUserUseCase {
     execute(): Promise<UserResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for UpdateUserUseCase");
     }
 }
 
 class MockValidUserUseCase implements ValidUserUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for ValidUserUseCase");
     }
 }
 
@@ -41,19 +41,19 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         next()
     }
     auth_refresh(): void {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for auth_refresh");
     }
 }
 
 class MockDeleteUserUseCase implements DeleteUserUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for DeleteUserUseCase");
     }
 }
 
 class MockSearchUsersUseCase implements SearchUsersUseCase {
     execute(): Promise<{ users: UserResponseModel[]; search_info: any; }> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for SearchUsersUseCase");
     }
 }
 describe("User Router", () => {

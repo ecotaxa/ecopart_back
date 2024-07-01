@@ -21,12 +21,12 @@ import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/
 
 class MockLoginUserUseCase implements LoginUserUseCase {
     execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for LoginUserUseCase");
     }
 }
 class MockRefreshTokenUseCase implements RefreshTokenUseCase {
     execute(): Promise<AuthJwtRefreshedResponseModel> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for RefreshTokenUseCase");
     }
 }
 class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
@@ -37,17 +37,17 @@ class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
 }
 class MockChangePasswordUseCase implements ChangePasswordUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for ChangePasswordUseCase");
     }
 }
 class MockResetPasswordRequestUseCase implements ResetPasswordRequestUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for ResetPasswordRequestUseCase");
     }
 }
 class MockResetPasswordUseCase implements ResetPasswordUseCase {
     execute(): Promise<void> {
-        throw new Error("Method not implemented.")
+        throw new Error("Method not implemented for ResetPasswordUseCase");
     }
 }
 describe("User Router", () => {

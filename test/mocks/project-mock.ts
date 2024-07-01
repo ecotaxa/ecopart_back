@@ -4,10 +4,10 @@ import { ProjectRepository } from "../../src/domain/interfaces/repositories/proj
 
 export class MockProjectRepository implements ProjectRepository {
     formatProjectRequestCreationModel(): ProjectRequestCreationModel {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for formatProjectRequestCreationModel");
     }
     toPublicProject(): PublicProjectResponseModel {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for toPublicProject");
     }
     standardUpdateProject(): Promise<number> {
         throw new Error("Method not implemented : standardUpdateProject");

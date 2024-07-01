@@ -6,10 +6,10 @@ import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 
 class MockJwtAdapter extends JwtAdapter {
     sign(): string {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for sign");
     }
     verify(): JwtPayload | string {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for verify");
     }
 }
 
