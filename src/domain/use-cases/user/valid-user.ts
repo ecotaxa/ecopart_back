@@ -23,7 +23,7 @@ export class ValidUser implements ValidUserUseCase {
         if (!user_to_update) throw new Error("Cannot find user with confirmation code");
 
         // User should not be deleted
-        if (user_to_update.deleted !== undefined) throw new Error("User is deleted");
+        if (user_to_update.deleted) throw new Error("User is deleted");
 
         // Update validation status of the found user
         const nb_updated_user = await this.userRepository.validUser({ user_id: user_to_update.user_id })
