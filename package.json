@@ -2,13 +2,16 @@
   "name": "ecopart_back",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "test": "jest --watchAll --collectCoverage",
     "test-CI": "jest --collectCoverage",
-    "clean": "rimraf dist/*",
+    "clean": "rimraf ./dist",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
+    "prod:build": "npm-run-all clean tsc copy-assets",
+    "prod:serve": "node dist/main.js",
+    "prod:start": "npm run build && node dist/main.js",
     "dev:build": "npm-run-all clean tsc copy-assets",
     "dev:serve": "nodemon -e js -w dist dist/main.js",
     "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts"
