@@ -9,7 +9,7 @@
     "clean": "rimraf ./dist",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
-    "prod:build": "npm-run-all clean tsc copy-assets",
+    "prod:build": " rimraf ./dist && tsc && ts-node tools/copyAssets",
     "prod:serve": "node dist/main.js",
     "prod:start": "npm run prod:build && node dist/main.js",
     "dev:build": "npm-run-all clean tsc copy-assets",
