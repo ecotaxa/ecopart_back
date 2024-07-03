@@ -17,6 +17,7 @@ FROM node:20 AS production
 WORKDIR /src
 
 COPY package*.json .
+COPY .env .
 
 RUN npm ci --only=production
 
