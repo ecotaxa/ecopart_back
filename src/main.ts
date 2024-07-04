@@ -30,6 +30,7 @@ import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
 import { SearchRepositoryImpl } from './domain/repositories/search-repository'
 import { InstrumentModelRepositoryImpl } from './domain/repositories/instrument_model-repository'
 import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
+import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -44,13 +45,14 @@ import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
 
 import 'dotenv/config'
-import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
+import path from 'path'
 
 sqlite3.verbose()
 
 const config = {
     PORT: parseInt(process.env.PORT as string, 10),
-    DBSOURCE: process.env.DBSOURCE || '',
+    DBSOURCE_NAME: process.env.DBSOURCE_NAME || '',
+    DBSOURCE_FOLDER: process.env.DBSOURCE_FOLDER || '',
     BASE_URL: process.env.BASE_URL || '',
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -64,9 +66,9 @@ const config = {
     MAIL_AUTH_PASS: process.env.MAIL_AUTH_PASS || '',
     MAIL_SENDER: process.env.MAIL_SENDER || '',
 }
-
 async function getSQLiteDS() {
-    const db = new sqlite3.Database(config.DBSOURCE, (err) => {
+    console.log(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME))
+    const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
         if (err) {
             // Cannot open database
             console.error(err.message)
