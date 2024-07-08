@@ -9,10 +9,12 @@ import { UserResponseModel } from "../../domain/entities/user";
 export class NodemailerAdapter implements MailerWrapper {//implements sendeamils,  
     base_url_path: string;
     mail_sender: string;
+    node_env: string;
 
-    constructor(base_url_path: string, mail_sender: string) {
+    constructor(base_url_path: string, mail_sender: string, node_env: string) {
         this.base_url_path = base_url_path;
         this.mail_sender = mail_sender;
+        this.node_env = node_env;
     }
 
     // createTransport
@@ -40,7 +42,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: "julie.coustenoble@imev-mer.fr", // TODO PROD : created_user.email,// list of receivers
+            to: this.node_env == "PROD" ? created_user.email : "julie.coustenoble@imev-mer.fr", // TODO PROD : created_user.email,// list of receivers
             subject: "Validate your EcoPart account", // Subject line
             html: htmlContent.replaceAll("{{confirmation_path}}", custom_confirmation_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {
@@ -69,7 +71,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: "julie.coustenoble@imev-mer.fr", // TODO PROD : user.email,// list of receivers
+            to: this.node_env == "PROD" ? user.email : "julie.coustenoble@imev-mer.fr", // list of receivers
             subject: "Reset your EcoPart password", // Subject line
             html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {

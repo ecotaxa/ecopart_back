@@ -1,8 +1,10 @@
 import server from './server'
+
 import { MiddlewareAuthCookie } from './presentation/middleware/auth-cookie'
 import { MiddlewareAuthValidation } from './presentation/middleware/auth-validation'
 import { MiddlewareUserValidation } from './presentation/middleware/user-validation'
 import { MiddlewareProjectValidation } from './presentation/middleware/project-validation'
+
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
@@ -50,10 +52,12 @@ import path from 'path'
 sqlite3.verbose()
 
 const config = {
-    PORT: parseInt(process.env.PORT as string, 10),
     DBSOURCE_NAME: process.env.DBSOURCE_NAME || '',
     DBSOURCE_FOLDER: process.env.DBSOURCE_FOLDER || '',
+
+    PORT: parseInt(process.env.PORT as string, 10),
     BASE_URL: process.env.BASE_URL || '',
+
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
     VALIDATION_TOKEN_SECRET: process.env.VALIDATION_TOKEN_SECRET || '',
@@ -65,9 +69,10 @@ const config = {
     MAIL_AUTH_USER: process.env.MAIL_AUTH_USER || '',
     MAIL_AUTH_PASS: process.env.MAIL_AUTH_PASS || '',
     MAIL_SENDER: process.env.MAIL_SENDER || '',
+
+    NODE_ENV: process.env.NODE_ENV || '',
 }
 async function getSQLiteDS() {
-    console.log(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME))
     const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
         if (err) {
             // Cannot open database
@@ -77,6 +82,7 @@ async function getSQLiteDS() {
             console.log('Connected to the SQLite database.')
         }
     });
+    // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
     return db
@@ -87,7 +93,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL + config.PORT), config.MAIL_SENDER)
+    const mailerAdapter = new NodemailerAdapter((config.BASE_URL + config.PORT), config.MAIL_SENDER, config.NODE_ENV)
     const countriesAdapter = new CountriesAdapter()
 
     const user_dataSource = new SQLiteUserDataSource(db)
