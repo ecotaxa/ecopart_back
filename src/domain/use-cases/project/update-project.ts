@@ -24,7 +24,7 @@ export class UpdateProject implements UpdateProjectUseCase {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         // Ensure the project to delete exists
-        this.ensureProjectExists(public_project_to_update);
+        await this.ensureProjectExists(public_project_to_update);
         // Ensure user has the privilege to update the project
         await this.ensureUserCanUpdate(current_user, public_project_to_update);
         // Prepare the project update model
