@@ -52,8 +52,8 @@ export default function UsersRouter(
 
     router.post('/', middlewareUserValidation.rulesUserRequestCreationModel, async (req: Request, res: Response) => {
         try {
-            const created_user = await createUserUseCase.execute(req.body)
-            res.status(201).send(created_user)
+            await createUserUseCase.execute(req.body)
+            res.status(201).send("User created")
         } catch (err) {
             console.log(err)
             if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Cannot create user"] })

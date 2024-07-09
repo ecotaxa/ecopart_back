@@ -14,7 +14,7 @@ export class CreateUser implements CreateUserUseCase {
         this.userRepository = userRepository
         this.mailer = mailer
     }
-    async execute(user: UserRequestCreationModel): Promise<UserResponseModel> {
+    async execute(user: UserRequestCreationModel): Promise<void> {
         // Retrieve a pre-existing user by email
         const preexistentUser = await this.userRepository.getUser({ email: user.email });
 
@@ -45,9 +45,9 @@ export class CreateUser implements CreateUserUseCase {
                 await this.generateTokenAndSendEmail(updatedUser)
 
                 // Remove the confirmation code from the user object before sending it
-                const publicUser = this.userRepository.toPublicUser(updatedUser)
+                // const publicUser = this.userRepository.toPublicUser(updatedUser)
 
-                return publicUser;
+                // return publicUser;
             } else {
                 // If the user exists and has already validated their email
                 throw new Error("Valid user already exists");
@@ -63,8 +63,8 @@ export class CreateUser implements CreateUserUseCase {
 
         this.generateTokenAndSendEmail(createdUser)
         // Remove the confirmation code from the user object before sending it
-        const publicUser = this.userRepository.toPublicUser(createdUser)
-        return publicUser;
+        //const publicUser = this.userRepository.toPublicUser(createdUser)
+        //return publicUser;
     }
 
     private async generateTokenAndSendEmail(user: UserResponseModel): Promise<void> {
