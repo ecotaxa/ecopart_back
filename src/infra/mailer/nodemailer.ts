@@ -12,6 +12,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
     node_env: string;
 
     constructor(base_url_path: string, mail_sender: string, node_env: string) {
+        console.log("base_url_path : " + base_url_path)
         this.base_url_path = base_url_path;
         this.mail_sender = mail_sender;
         this.node_env = node_env;
