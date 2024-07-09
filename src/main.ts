@@ -55,8 +55,10 @@ const config = {
     DBSOURCE_NAME: process.env.DBSOURCE_NAME || '',
     DBSOURCE_FOLDER: process.env.DBSOURCE_FOLDER || '',
 
-    PORT: parseInt(process.env.PORT as string, 10),
-    BASE_URL: process.env.BASE_URL || '',
+    PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
+    BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
+    PORT_PUBLIC: parseInt(process.env.PORT_LOCAL as string, 10),
+    BASE_URL_PUBLIC: process.env.BASE_URL_PUBLIC || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -93,7 +95,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL + config.PORT), config.MAIL_SENDER, config.NODE_ENV)
+    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV)
     const countriesAdapter = new CountriesAdapter()
 
     const user_dataSource = new SQLiteUserDataSource(db)
@@ -155,6 +157,6 @@ async function getSQLiteDS() {
     server.use("/instrument_models", instrumentModelMiddleWare)
     server.use("/projects", projectMiddleWare)
 
-    server.listen(config.PORT, () => console.log("Running on ", config.BASE_URL, config.PORT))
+    server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))
 
 })()

@@ -20,14 +20,14 @@ describe("Create User Use Case", () => {
         TEST_MAIL_AUTH_USER: "your_username",
         TEST_MAIL_AUTH_PASS: "your_password",
         TEST_MAIL_SENDER: "your@mail.com",
-        TEST_PORT: 3000,
-        TEST_BASE_URL: "http://localhost:"
+        TEST_PORT_LOCAL: 3000,
+        TEST_BASE_URL_LOCAL: "http://localhost:"
 
     }
     beforeEach(async () => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository();
-        mockMailerAdapter = new NodemailerAdapter((config.TEST_BASE_URL + config.TEST_PORT), config.TEST_MAIL_SENDER)
+        mockMailerAdapter = new NodemailerAdapter((config.TEST_BASE_URL_LOCAL + config.TEST_PORT_LOCAL), config.TEST_MAIL_SENDER)
         mockTransporter = await mockMailerAdapter.createTransport({
             host: config.TEST_MAIL_HOST,
             port: config.TEST_MAIL_PORT,
