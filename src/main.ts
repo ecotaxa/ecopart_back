@@ -57,7 +57,7 @@ const config = {
 
     PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
-    PORT_PUBLIC: parseInt(process.env.PORT_LOCAL as string, 10),
+    PORT_PUBLIC: parseInt(process.env.PORT_PUBLIC as string, 10),
     BASE_URL_PUBLIC: process.env.BASE_URL_PUBLIC || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
