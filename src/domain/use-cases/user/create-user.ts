@@ -46,7 +46,7 @@ export class CreateUser implements CreateUserUseCase {
 
                 // Remove the confirmation code from the user object before sending it
                 // const publicUser = this.userRepository.toPublicUser(updatedUser)
-
+                return;
                 // return publicUser;
             } else {
                 // If the user exists and has already validated their email
