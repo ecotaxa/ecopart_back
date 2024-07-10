@@ -1,9 +1,10 @@
 import { SQLiteProjectDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-project-data-source'
+import { SQLiteInstrumentModelDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import sqlite3 from 'sqlite3'
 import 'dotenv/config'
 import { ProjectRequestCreationModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
 import fs from 'fs';
-import { data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4, data_source_projectRequestCreationModel_5, data_source_projectRequestCreationModel_6, projectRequestCreationModel_3, projectUpdateModel } from '../../../entities/project';
+import { data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4, data_source_projectRequestCreationModel_5, data_source_projectRequestCreationModel_6, privateProjectUpdateModel, projectRequestCreationModel_3 } from '../../../entities/project';
 
 const config = {
     TEST_DBSOURCE: process.env.TEST_DBSOURCE || '',
@@ -17,6 +18,7 @@ function initializeProjectDB() {
             throw err
         }
     });
+    new SQLiteInstrumentModelDataSource(db)
     return new SQLiteProjectDataSource(db)
 }
 
@@ -206,7 +208,7 @@ describe('SQLiteProjectDataSource', () => {
             expect(dataSource).toBeDefined();
         });
         test('should update a project', async () => {
-            const project_to_update: ProjectUpdateModel = projectUpdateModel
+            const project_to_update: ProjectUpdateModel = privateProjectUpdateModel
             // Call the updateOne method
             const updated = await dataSource.updateOne(project_to_update);
 

@@ -48,7 +48,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -76,7 +76,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -109,7 +109,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -118,7 +118,7 @@ describe("Create User Use Case", () => {
             // Should not go there
             expect(result).toBe(true);
         } catch (err) {
-            expect(err.message).toBe("User email not verified");
+            expect(err.message).toBe("User cannot be used");
         }
     });
 
@@ -162,7 +162,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
         jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
@@ -171,7 +171,7 @@ describe("Create User Use Case", () => {
             // Should not go there
             expect(result).toBe(true);
         } catch (err) {
-            expect(err.message).toBe("User is deleted");
+            expect(err.message).toBe("User cannot be used");
         }
     });
 })

@@ -4,7 +4,7 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel,
 import { SearchResult } from "../../../src/domain/entities/search";
 import { ProjectRepository } from "../../../src/domain/interfaces/repositories/project-repository";
 import { ProjectRepositoryImpl } from "../../../src/domain/repositories/project-repository";
-import { projectRequestCreationModelForRepository, projectResponseModel, projectResponseModelArray, projectUpdateModel, projectUpdateModel_withBadData } from "../../entities/project";
+import { privateProjectUpdateModel, projectRequestCreationModelForRepository, projectResponseModel, projectResponseModelArray, projectUpdateModel_withBadData } from "../../entities/project";
 import { MockProjectDataSource } from "../../mocks/project-mock";
 
 import 'dotenv/config'
@@ -86,7 +86,7 @@ describe("Project Repository", () => {
     describe("UpdateProject", () => {
         //TODO
         test("Should update a project", async () => {
-            const project: ProjectUpdateModel = projectUpdateModel
+            const project: ProjectUpdateModel = privateProjectUpdateModel
 
             jest.spyOn(mockProjectDataSource, 'updateOne').mockResolvedValue(1)
 

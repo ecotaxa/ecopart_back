@@ -60,7 +60,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
 
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         const result = await loginUserUseCase.execute(InputUserData);
@@ -86,7 +86,7 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(null))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed")
 
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         try {
@@ -128,14 +128,14 @@ describe("Create User Use Case", () => {
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })
         jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(OutputUserData))
-        jest.spyOn(mockUserRepository, "isDeleted").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
 
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         try {
             const result = await loginUserUseCase.execute(InputUserData);
             expect(result).toBe(true);
         } catch (err) {
-            expect(err.message).toBe("User is deleted");
+            expect(err.message).toBe("User cannot be used");
         }
     });
 })

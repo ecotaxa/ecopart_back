@@ -14,6 +14,7 @@ describe("Create User Use Case", () => {
 
     const config = {
         TEST_VALIDATION_TOKEN_SECRET: process.env.TEST_VALIDATION_TOKEN_SECRET || '',
+        TEST_NODE_ENV: process.env.TEST_NODE_ENV || '',
         TEST_MAIL_HOST: 'smtp.example.com',
         TEST_MAIL_PORT: 465,
         TEST_MAIL_SECURE: true,
@@ -27,7 +28,7 @@ describe("Create User Use Case", () => {
     beforeEach(async () => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository();
-        mockMailerAdapter = new NodemailerAdapter((config.TEST_BASE_URL_LOCAL + config.TEST_PORT_LOCAL), config.TEST_MAIL_SENDER)
+        mockMailerAdapter = new NodemailerAdapter((config.TEST_BASE_URL_LOCAL + config.TEST_PORT_LOCAL), config.TEST_MAIL_SENDER, config.TEST_NODE_ENV);
         mockTransporter = await mockMailerAdapter.createTransport({
             host: config.TEST_MAIL_HOST,
             port: config.TEST_MAIL_PORT,
@@ -64,38 +65,26 @@ describe("Create User Use Case", () => {
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             user_creation_date: '2023-08-01 10:30:00'
         }
-        const OutputData: UserResponseModel = {
-            user_id: 1,
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            is_admin: false,
-            valid_email: false,
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
-        }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(null)).mockImplementationOnce(() => Promise.resolve(created_user))
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(-1))
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
-        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
-        const result = await createUserUseCase.execute(InputData);
+        try {
+            await createUserUseCase.execute(InputData);
 
-        expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
-        expect(mockUserRepository.createUser).toHaveBeenCalledWith(InputData);
-        expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
-        expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
-        expect(mockUserRepository.generateValidationToken).toHaveBeenCalledWith(created_user);
-        expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, created_user, "token");
-        expect(mockUserRepository.toPublicUser).toHaveBeenCalledWith(created_user);
-
-        expect(result).toStrictEqual(OutputData);
+            expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
+            expect(mockUserRepository.createUser).toHaveBeenCalledWith(InputData);
+            expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
+            expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
+            expect(mockUserRepository.generateValidationToken).toHaveBeenCalledWith(created_user);
+            expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, created_user, "token");
+        } catch (err) {
+            expect(true).toBe(false);
+        }
     });
 
     test("Try to add a user that already exist but is deleted", async () => {
@@ -135,25 +124,12 @@ describe("Create User Use Case", () => {
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             user_creation_date: '2023-08-01 10:30:00'
         }
-        const OutputData: UserResponseModel = {
-            user_id: 1,
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            is_admin: false,
-            valid_email: false,
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
-        }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "createUser")
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
-        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         try {
             const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
@@ -169,7 +145,6 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
-            expect(mockUserRepository.toPublicUser).not.toBeCalled();
         }
 
     });
@@ -210,18 +185,6 @@ describe("Create User Use Case", () => {
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             user_creation_date: '2023-08-01 10:30:00'
         }
-        const OutputData: UserResponseModel = {
-            user_id: 1,
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            is_admin: false,
-            valid_email: false,
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
-        }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(1))
@@ -229,10 +192,9 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
-        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
-        const result = await createUserUseCase.execute(InputData);
+        await createUserUseCase.execute(InputData);
 
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(1, { email: "john@gmail.com" });
         expect(mockUserRepository.createUser).not.toBeCalled();
@@ -240,9 +202,7 @@ describe("Create User Use Case", () => {
         expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
         expect(mockUserRepository.generateValidationToken).toHaveBeenCalledWith(updated_user);
         expect(mockMailerAdapter.send_confirmation_email).toHaveBeenCalledWith(mockTransporter, updated_user, "token");
-        expect(mockUserRepository.toPublicUser).toHaveBeenCalledWith(updated_user);
 
-        expect(result).toStrictEqual(OutputData);
     });
 
     test("Try to add a user that already exist with validated email", async () => {
@@ -277,7 +237,6 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser")
         jest.spyOn(mockUserRepository, "generateValidationToken")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email")
-        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
         try {
@@ -291,7 +250,6 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.standardUpdateUser).not.toBeCalled();
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
-            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }
@@ -308,25 +266,12 @@ describe("Create User Use Case", () => {
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
         }
-        const OutputData: UserResponseModel = {
-            user_id: 1,
-            last_name: "Smith",
-            first_name: "John",
-            email: "john@gmail.com",
-            is_admin: false,
-            valid_email: false,
-            organisation: "LOV",
-            country: "France",
-            user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
-        }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(null)).mockImplementationOnce(() => Promise.resolve(null))
         jest.spyOn(mockUserRepository, "createUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockUserRepository, "standardUpdateUser").mockImplementation(() => Promise.resolve(-1))
         jest.spyOn(mockUserRepository, "generateValidationToken").mockImplementation(() => "token")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email").mockImplementation(() => Promise.resolve())
-        jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return OutputData })
 
         try {
             const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter)
@@ -341,7 +286,6 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
-            expect(mockUserRepository.toPublicUser).not.toBeCalled();
         }
 
     });
@@ -377,7 +321,6 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser")
         jest.spyOn(mockUserRepository, "generateValidationToken")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email")
-        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter);
         try {
@@ -390,7 +333,6 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.standardUpdateUser).toBeCalledTimes(1);
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
-            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }
@@ -428,7 +370,6 @@ describe("Create User Use Case", () => {
         jest.spyOn(mockUserRepository, "createUser")
         jest.spyOn(mockUserRepository, "generateValidationToken")
         jest.spyOn(mockMailerAdapter, "send_confirmation_email")
-        jest.spyOn(mockUserRepository, "toPublicUser")
 
         const createUserUseCase = new CreateUser(mockUserRepository, mockTransporter, mockMailerAdapter);
         try {
@@ -443,7 +384,6 @@ describe("Create User Use Case", () => {
             expect(mockUserRepository.getUser).toHaveBeenNthCalledWith(2, { user_id: 1 });
             expect(mockUserRepository.generateValidationToken).not.toBeCalled();
             expect(mockMailerAdapter.send_confirmation_email).not.toBeCalled();
-            expect(mockUserRepository.toPublicUser).not.toBeCalled();
 
             expect(err).toStrictEqual(expectedResponse);
         }

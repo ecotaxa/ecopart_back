@@ -274,13 +274,13 @@ describe("Project Router", () => {
         });
 
 
-        test("POST /projects fail for Cannot find created project reason", async () => {
+        test("POST /projects fail for Cannot find the created project. reason", async () => {
             const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
 
-            const expectedResponse = { errors: ["Cannot find created project"] }
+            const expectedResponse = { errors: ["Cannot find the created project."] }
 
 
-            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find created project")))
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find the created project.")))
 
             const response = await request(server).post("/projects").send(InputData)
 

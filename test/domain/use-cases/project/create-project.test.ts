@@ -3,7 +3,7 @@ import { UserRepository } from "../../../../src/domain/interfaces/repositories/u
 import { CreateProject } from '../../../../src/domain/use-cases/project/create-project'
 import { MockUserRepository } from "../../../mocks/user-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
-import { projectRequestCreationModel, projectRequestCreationModelForRepository, projectRequestCreationModel_withmissingOverrideDepthOffset, projectResponseModel } from "../../../entities/project";
+import { privateProjectRequestCreationModel_withmissingOverrideDepthOffset, projectRequestCreationModel, projectRequestCreationModelForRepository, projectRequestCreationModel_withmissingOverrideDepthOffset, projectResponseModel } from "../../../entities/project";
 import { ProjectResponseModel, PublicProjectRequestCreationModel } from "../../../../src/domain/entities/project";
 import { MockInstrumentModelRepository } from "../../../mocks/instrumentModel-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
@@ -58,7 +58,7 @@ test("Create a project without override_depth_offset", async () => {
     const current_user: UserUpdateModel = {
         user_id: 1
     }
-    const completedInputData = { ...InputData, override_depth_offset: 1 }
+    const completedInputData = { ...privateProjectRequestCreationModel_withmissingOverrideDepthOffset, override_depth_offset: 1 }
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "computeDefaultDepthOffset").mockImplementation(() => 100)
@@ -84,7 +84,7 @@ test("Create a project without override_depth_offset", async () => {
     expect(result).toStrictEqual(created_project);
 });
 
-test("Cannot find created project", async () => {
+test("Cannot find the created project.", async () => {
     const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
     const current_user: UserUpdateModel = {
         user_id: 1
@@ -92,15 +92,20 @@ test("Cannot find created project", async () => {
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "computeDefaultDepthOffset")
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockImplementation(() => Promise.resolve(instrument_model_response))
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
+
     jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
-    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Cannot find created project");
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Cannot find the created project.");
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
     expect(mockProjectRepository.computeDefaultDepthOffset).not.toBeCalled();
-    expect(mockProjectRepository.createProject).toHaveBeenCalledWith(InputData);
+    expect(mockProjectRepository.createProject).toHaveBeenCalledWith(projectRequestCreationModelForRepository);
     expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
 });
 

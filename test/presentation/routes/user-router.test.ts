@@ -5,7 +5,6 @@ import UserRouter from '../../../src/presentation/routers/user-router'
 
 import { UserResponseModel, UserRequestCreationModel } from "../../../src/domain/entities/user";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
-import { SearchInfo } from "../../../src/domain/entities/search";
 
 import { CreateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/create-user";
 import { UpdateUserUseCase } from "../../../src/domain/interfaces/use-cases/user/update-user";
@@ -17,29 +16,9 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
+import { MockCreateUserUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
 
-class MockSearchUsersUseCase implements SearchUsersUseCase {
-    execute(): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
-        throw new Error("Method not implemented for SearchUsersUseCase");
-    }
-}
 
-class MockCreateUserUseCase implements CreateUserUseCase {
-    execute(): Promise<UserResponseModel> {
-        throw new Error("Method not implemented for CreateUserUseCase");
-    }
-}
-class MockUpdateUserUseCase implements UpdateUserUseCase {
-    execute(): Promise<UserResponseModel> {
-        throw new Error("Method not implemented for UpdateUserUseCase");
-    }
-}
-
-class MockValidUserUseCase implements ValidUserUseCase {
-    execute(): Promise<void> {
-        throw new Error("Method not implemented for ValidUserUseCase");
-    }
-}
 
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(req: Request, __: Response, next: NextFunction): void {
@@ -295,20 +274,11 @@ describe("User Router", () => {
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
             }
-            const OutputData: UserResponseModel = {
-                user_id: 1,
-                last_name: "Smith",
-                first_name: "John",
-                email: "john@gmail.com",
-                is_admin: false,
-                valid_email: false,
-                organisation: "LOV",
-                country: "France",
-                user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
-            }
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const OutputData = { "message": "User sucessfully created." }
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.resolve())
+
             const response = await request(server).post("/users").send(InputData)
+
             expect(response.status).toBe(201)
             expect(mockCreateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(OutputData)

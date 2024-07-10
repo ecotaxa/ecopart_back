@@ -2,6 +2,14 @@ import { DecodedToken } from "../../src/domain/entities/auth";
 import { SearchResult } from "../../src/domain/entities/search";
 import { UserResponseModel } from "../../src/domain/entities/user";
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
+import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
+import { UpdateUserUseCase } from "../../src/domain/interfaces/use-cases/user/update-user";
+import { ValidUserUseCase } from "../../src/domain/interfaces/use-cases/user/valid-user";
+import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/auth";
+import { DeleteUserUseCase } from "../../src/domain/interfaces/use-cases/user/delete-user";
+import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/search-user";
+
+import { Request, Response, NextFunction } from "express";
 
 export class MockUserRepository implements UserRepository {
     isValidated(): Promise<boolean> {
@@ -72,5 +80,44 @@ export class MockUserRepository implements UserRepository {
     }
     verifyValidationToken(): DecodedToken | null {
         throw new Error("Method not implemented : verifyValidationToken");
+    }
+}
+
+
+export class MockCreateUserUseCase implements CreateUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for CreateUserUseCase");
+    }
+}
+export class MockUpdateUserUseCase implements UpdateUserUseCase {
+    execute(): Promise<UserResponseModel> {
+        throw new Error("Method not implemented for UpdateUserUseCase");
+    }
+}
+
+export class MockValidUserUseCase implements ValidUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for ValidUserUseCase");
+    }
+}
+
+export class MockMiddlewareAuth implements MiddlewareAuth {
+    auth(_: Request, __: Response, next: NextFunction): void {
+        next()
+    }
+    auth_refresh(): void {
+        throw new Error("Method not implemented for auth_refresh");
+    }
+}
+
+export class MockDeleteUserUseCase implements DeleteUserUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for DeleteUserUseCase");
+    }
+}
+
+export class MockSearchUsersUseCase implements SearchUsersUseCase {
+    execute(): Promise<{ users: UserResponseModel[]; search_info: any; }> {
+        throw new Error("Method not implemented for SearchUsersUseCase");
     }
 }
