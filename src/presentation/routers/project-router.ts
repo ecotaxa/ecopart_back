@@ -75,7 +75,7 @@ export default function ProjectRouter(
             else if (err.message.includes(" cannot be used: ")) res.status(403).send({ errors: [err.message] })
             else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
             else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Cannot find created project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find the created project.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create project"] })
