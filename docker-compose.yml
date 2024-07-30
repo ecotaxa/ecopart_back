@@ -1,0 +1,13 @@
+services:
+  api:
+    image: 'ecotaxa/ecopart_back:latest'
+    env_file: .env
+    volumes:
+      - ./sqlite_db:/src/sqlite_db
+      - type: bind
+        source: ./.env
+        target: /src/.env
+    ports:
+      - 4000:4000
+    restart: unless-stopped
+    command: npm run prod:serve
