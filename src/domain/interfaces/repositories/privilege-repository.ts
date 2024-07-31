@@ -1,7 +1,7 @@
 // import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectResponseModel } from "../../entities/project";
 // import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
-import { PrivilegeRequestModel, PublicPrivilege } from "../../entities/privilege";
+import { PrivilegeRequestModel, PrivilegeResponseModel, PublicPrivilege } from "../../entities/privilege";
 import { ProjectRequestModel } from "../../entities/project";
 
 export interface PrivilegeRepository {
@@ -13,6 +13,7 @@ export interface PrivilegeRepository {
     getProjectsByUsers(user_ids: number[]): Promise<number[]>;
     getProjectsByUser(privilege: PrivilegeRequestModel): Promise<number[]>;
     isGranted(privilege: PrivilegeRequestModel): Promise<boolean>;
+    getContact(project: ProjectRequestModel): Promise<PrivilegeResponseModel>;
     createPrivileges(publicPrivilege: PublicPrivilege): Promise<number>;
     getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege>;
     deletePrivileges(privilege: PrivilegeRequestModel): Promise<number>
