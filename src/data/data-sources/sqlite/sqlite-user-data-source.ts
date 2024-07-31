@@ -82,7 +82,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                     filtering_sql += filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == undefined || filter.value == null || filter.value == "") {
+                else if (filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
                     } else if (filter.operator == "!=") {

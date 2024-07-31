@@ -130,7 +130,7 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
                     filtering_sql += "privilege." + filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == undefined || filter.value == null || filter.value == "") {
+                else if (filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += "privilege." + filter.field + ` IS NULL`;
                     } else if (filter.operator == "!=") {
@@ -216,7 +216,7 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
         // remove last AND
         placeholders = placeholders.slice(0, -4);
         // form final sql
-        const sql = `SELECT privilege.*, user.first_name, user.last_name, user.email, FROM privilege LEFT JOIN user ON privilege.user_id = user.user_id WHERE ` + placeholders + `LIMIT 1;`;
+        const sql = `SELECT privilege.*, user.first_name, user.last_name, user.email FROM privilege LEFT JOIN user ON privilege.user_id = user.user_id WHERE ` + placeholders + `LIMIT 1;`;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {

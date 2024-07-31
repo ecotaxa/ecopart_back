@@ -37,7 +37,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
     async create(instrument_model: InstrumentModelRequestCreationModel): Promise<number> {
         const params = [instrument_model.instrument_model_name, instrument_model.bodc_url];
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO instrument_model (instrument_model, bodc_url) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO instrument_model (instrument_model_name, bodc_url) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -79,7 +79,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                     filtering_sql += filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == undefined || filter.value == null || filter.value == "") {
+                else if (filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
                     } else if (filter.operator == "!=") {
