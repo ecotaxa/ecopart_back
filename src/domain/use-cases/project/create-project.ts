@@ -90,13 +90,16 @@ export class CreateProject implements CreateProjectUseCase {
     // Create and retrieve privileges for the project
     private async createAndRetrievePrivileges(projectId: number, publicProject: PublicProjectRequestCreationModel) {
         // Create the privileges for the project
-        const createdPrivilegesIds: number = await this.privilegeRepository.createPrivileges({ project_id: projectId, members: publicProject.members, managers: publicProject.managers, contact: publicProject.contact })
-        if (!createdPrivilegesIds) { throw new Error("Cannot create privileges for project"); }
-
+        const number_of_created_privileges: number = await this.privilegeRepository.createPrivileges({ project_id: projectId, members: publicProject.members, managers: publicProject.managers, contact: publicProject.contact })
+        // Ensure privileges were created correctly
+        if (number_of_created_privileges !== publicProject.members.length + publicProject.managers.length) {
+            throw new Error("Privileges partially created, please check members, managers and contact");
+        }
         // Retrieve the newly created privileges
         const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: projectId });
-        if (!privileges) { throw new Error("Cannot find created privileges"); }
-
+        if (privileges.members.length + privileges.managers.length !== publicProject.members.length + publicProject.managers.length) {
+            throw new Error("Cant find created privileges, please check members, managers and contact");
+        }
         return privileges;
     }
 }

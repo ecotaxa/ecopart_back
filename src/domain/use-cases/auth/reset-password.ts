@@ -28,17 +28,11 @@ export class ResetPassword implements ResetPasswordUseCase {
                 reset_password_code: decoded_token.reset_password_code
             }
         )
-        // If the user does not exist or the reset_password_code is not valid
+        // If the user reset_password_code is not valid
         if (!preexistant_user) throw new Error("User does not exist or reset_password_code is not valid");
-
-        // is the user validated ?
-        if (!preexistant_user.valid_email) throw new Error("User email is not validated");
 
         // Change the password
         nb_of_updated_user = await this.userRepository.changePassword({ ...preexistant_user, ...credentials })
         if (nb_of_updated_user == 0) throw new Error("Cannot change password");
-        // TODO clean 
-        //if (updatedUser.reset_password_code !== null) throw new Error("User reset password code not reset");
-
     }
 }

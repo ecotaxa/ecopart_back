@@ -21,11 +21,8 @@ export class ResetPasswordRequest implements ResetPasswordRequestUseCase {
         const preexistant_user = await this.userRepository.getUser(user)
         if (!preexistant_user) throw new Error("User does not exist");
 
-        // User should not be deleted
+        // User should not be deleted nor unvalidated
         await this.userRepository.ensureUserCanBeUsed(preexistant_user.user_id);
-
-        // Is the user validated ?
-        if (!preexistant_user.valid_email) throw new Error("User email is not validated");
 
         // Generate a reset password token and add it to the user
         const updateCount = await this.userRepository.setResetPasswordCode({ user_id: preexistant_user.user_id })

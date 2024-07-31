@@ -79,7 +79,7 @@ export class SearchProject implements SearchProjectsUseCase {
                 page: 1
             });
 
-            if (!instrumentModels) {
+            if (instrumentModels.total === 0) {
                 throw new Error("Instrument model not found");
             }
 
@@ -105,7 +105,7 @@ export class SearchProject implements SearchProjectsUseCase {
             options.filter = options.filter.filter(f => f.field !== "for_managing");
 
             // If filter is for managing = true, get all projects where current_user have at least one privilege
-            if (managingFilter.value === "true") {
+            if (managingFilter.value === "true" || managingFilter.value === true) {
                 const projectIds = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
                 // Add the new filter to the list of filters
                 options.filter.push({ field: "project_id", operator: "IN", value: projectIds });

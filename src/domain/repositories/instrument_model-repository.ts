@@ -15,8 +15,8 @@ export class InstrumentModelRepositoryImpl implements InstrumentModelRepository 
         this.instrument_modelDataSource = instrument_modelDataSource
     }
 
-    async getOneInstrumentModel(instrument_model_id: InstrumentModelRequestModel): Promise<InstrumentModelResponseModel | null> {
-        const result = await this.instrument_modelDataSource.getOne(instrument_model_id);
+    async getOneInstrumentModel(instrument_model_request: InstrumentModelRequestModel): Promise<InstrumentModelResponseModel | null> {
+        const result = await this.instrument_modelDataSource.getOne(instrument_model_request);
         return result;
     }
 

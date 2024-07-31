@@ -16,8 +16,12 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         const privileges = await this.publicToPrivate(publicPrivilege)
         let result = 0;
         for (const privilege of privileges) {
-            await this.privilegeDataSource.create(privilege)
-            result += 1
+            try {
+                await this.privilegeDataSource.create(privilege)
+                result += 1
+            } catch (error) {
+                console.error(error)
+            }
         }
         return result;
     }
@@ -102,6 +106,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         }];
         const privileges = await this.getPrivilegesByFilter(filter)
         return privileges.items.map(privilege => privilege.project_id);
+        // [ ...new Set(privileges.items.map(privilege => privilege.project_id);)]  
     }
 
     // Get all projects where a list of user ids have at least one privilege
@@ -112,7 +117,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
             value: user_ids
         }];
         const privileges = await this.getPrivilegesByFilter(filter)
-        return privileges.items.map(privilege => privilege.project_id);
+        return [...new Set(privileges.items.map(privilege => privilege.project_id))]
     }
 
     // Get all projects where a list of user ids are contact
@@ -128,7 +133,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
             value: true
         }];
         const privileges = await this.getPrivilegesByFilter(filter)
-        return privileges.items.map(privilege => privilege.project_id);
+        return [...new Set(privileges.items.map(privilege => privilege.project_id))]
     }
 
     // Get all projects where a list of user ids are managers
@@ -144,7 +149,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
             value: "manager"
         }];
         const privileges = await this.getPrivilegesByFilter(filter)
-        return privileges.items.map(privilege => privilege.project_id);
+        return [...new Set(privileges.items.map(privilege => privilege.project_id))]
     }
 
     // Get all projects where a list of user ids are members
@@ -160,7 +165,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
             value: "member"
         }];
         const privileges = await this.getPrivilegesByFilter(filter)
-        return privileges.items.map(privilege => privilege.project_id);
+        return [...new Set(privileges.items.map(privilege => privilege.project_id))]
     }
 
     async isGranted(privilege: PrivilegeRequestModel): Promise<boolean> {
@@ -181,7 +186,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
                 }
             ],
             sort_by: [{ sort_by: "privilege_creation_date", order_by: "desc" }],
-            limit: 1000,
+            limit: 1,
             page: 1
 
         }
@@ -234,7 +239,9 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
 
         }
         const privileges = await this.privilegeDataSource.getAll(prepare_options)
-
+        if (privileges.items.length === 0) {
+            throw new Error("No contact found for this project")
+        }
         return privileges.items[0];
     }
 

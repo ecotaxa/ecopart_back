@@ -247,13 +247,11 @@ export class UserRepositoryImpl implements UserRepository {
         return publicUser
     }
 
-    async isDeleted(user: UserResponseModel | null): Promise<boolean> {
-        if (!user) return false;
+    async isDeleted(user: UserResponseModel): Promise<boolean> {
         return user.deleted ? true : false
     }
 
-    async isValidated(user: UserResponseModel | null): Promise<boolean> {
-        if (!user) return false;
+    async isValidated(user: UserResponseModel): Promise<boolean> {
         return user.valid_email ? true : false
     }
 
