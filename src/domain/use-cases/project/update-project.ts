@@ -127,9 +127,9 @@ export class UpdateProject implements UpdateProjectUseCase {
         // Create new privileges
         const number_of_created_privileges = await this.privilegeRepository.createPrivileges(privilege);
 
-        // Ensure privileges were created correctly
+        // Ensure privileges were updated correctly
         if (number_of_created_privileges !== privilege.members.length + privilege.managers.length) {
-            throw new Error("Privileges partially created, please check members, managers and contact");
+            throw new Error("Privileges partially updated, please check members, managers and contact. Other project properties were not updated due to this error, please try again.");
         }
     }
 
