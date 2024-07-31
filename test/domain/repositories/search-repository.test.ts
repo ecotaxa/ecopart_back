@@ -1,5 +1,6 @@
 import { SearchRepository } from "../../../src/domain/interfaces/repositories/search-repository";
 import { SearchRepositoryImpl } from "../../../src/domain/repositories/search-repository";
+import { SearchOptions } from "../../../src/domain/entities/search";
 
 describe("Search Repository", () => {
 
@@ -9,6 +10,48 @@ describe("Search Repository", () => {
         jest.clearAllMocks();
         searchRepository = new SearchRepositoryImpl()
     })
+    describe("formatSearchInfo", () => {
+        test("Should return formatted search info", () => {
+            const result = {
+                total: 100,
+                items: ["item1", "item2"]
+            }
+            const options: SearchOptions = {
+                limit: 2,
+                page: 1,
+                sort_by: [],
+            }
+            const expected_search_info = {
+                total: 100,
+                limit: 2,
+                total_on_page: 2,
+                page: 1,
+                pages: 50
+            }
+            const search_info = searchRepository.formatSearchInfo(result, options)
+            expect(search_info).toStrictEqual(expected_search_info)
+        });
+        test("Should return formatted search info with default page and limit when no result", () => {
+            const result = {
+                total: 0,
+                items: []
+            }
+            const options: SearchOptions = {
+                limit: 2,
+                page: 1,
+                sort_by: [],
+            }
+            const expected_search_info = {
+                total: 0,
+                limit: 2,
+                total_on_page: 0,
+                page: 1,
+                pages: 1
+            }
+            const search_info = searchRepository.formatSearchInfo(result, options)
+            expect(search_info).toStrictEqual(expected_search_info)
+        });
+    });
 
     describe("formatSortBy", () => {
         test("Should return prepared sort by", () => {

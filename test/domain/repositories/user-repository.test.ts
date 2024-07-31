@@ -10,6 +10,7 @@ import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken"
 import 'dotenv/config'
 import { JwtPayload } from "jsonwebtoken";
 import { decodedToken } from "../../entities/auth";
+import { deletedUser, unvalidUser, validUser } from "../../entities/user";
 
 class MockUserDataSource implements UserDataSource {
     deleteOne(): void {
@@ -865,6 +866,82 @@ describe("User Repository", () => {
         });
     });
 
+    describe("ensureUserCanBeUsed", () => {
+        test("Should run without error", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(validUser))
+            try {
+                await userRepository.ensureUserCanBeUsed(1);
+            } catch (e) {
+                expect(true).toBe(false)
+            }
+        });
+        test("Should throw error if user is deleted", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(deletedUser))
+            try {
+                await userRepository.ensureUserCanBeUsed(1);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("User cannot be used")
+            }
+        });
+        test("Should throw error if user is unvalid", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(unvalidUser))
+            try {
+                await userRepository.ensureUserCanBeUsed(1);
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("User cannot be used")
+            }
+        });
+    });
+    describe("ensureTypedUserCanBeUsed", () => {
+        test("Should run without error", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(validUser))
+            try {
+                await userRepository.ensureTypedUserCanBeUsed(1, "admin");
+            } catch (e) {
+                expect(true).toBe(false)
+            }
+        });
+        test("Should throw error if user is deleted", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(deletedUser))
+            try {
+                await userRepository.ensureTypedUserCanBeUsed(1, "member");
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("member with ID 1 cannot be used: User cannot be used")
+            }
+        });
+        test("Should throw error if user is unvalid", async () => {
+            jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(unvalidUser))
+            try {
+                await userRepository.ensureTypedUserCanBeUsed(1, "manager");
+            } catch (e) {
+                expect(e).toBeInstanceOf(Error)
+                expect(e.message).toBe("manager with ID 1 cannot be used: User cannot be used")
+            }
+        });
+    });
+    describe("isDeleted", () => {
+        test("Should return true for a deleted user", async () => {
+            const result = await userRepository.isDeleted(deletedUser);
+            expect(result).toBe(true)
+        });
+        test("Should return false for a non deleted user", async () => {
+            const result = await userRepository.isDeleted(validUser);
+            expect(result).toBe(false)
+        });
+    });
+    describe("isValidated", () => {
+        test("Should return true for a validated user", async () => {
+            const result = await userRepository.isValidated(validUser);
+            expect(result).toBe(true)
+        });
+        test("Should return false for a non validated user", async () => {
+            const result = await userRepository.isValidated(unvalidUser);
+            expect(result).toBe(false)
+        });
+    });
     describe("DeleteUser", () => {
 
         test("user deletion is a sucess", async () => {

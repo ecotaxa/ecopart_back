@@ -1,7 +1,12 @@
-import { PublicPrivilege } from "../../src/domain/entities/privilege";
+import { PrivilegeResponseModel, PublicPrivilege } from "../../src/domain/entities/privilege";
+import { SearchResult } from "../../src/domain/entities/search";
 import { PrivilegeRepository } from "../../src/domain/interfaces/repositories/privilege-repository";
+import { PrivilegeDataSource } from "../../src/data/interfaces/data-sources/privilege-data-source";
 
 export class MockPrivilegeRepository implements PrivilegeRepository {
+    getContact(): Promise<PrivilegeResponseModel> {
+        throw new Error("Method not implemented for privilege mock getContact");
+    }
     isManager(): unknown {
         throw new Error("Method not implemented for privilege mock isManager");
     }
@@ -36,4 +41,24 @@ export class MockPrivilegeRepository implements PrivilegeRepository {
         throw new Error("Method not implemented for privilege mock deletePrivileges");
     }
 
+}
+export class MockPrivilegeDataSource implements PrivilegeDataSource {
+    deleteAll(): Promise<number> {
+        throw new Error("Method not implemented.");
+    }
+    create(): Promise<number> {
+        throw new Error("Method not implemented : create");
+    }
+    getAll(): Promise<SearchResult<PrivilegeResponseModel>> {
+        throw new Error("Method not implemented : getAll");
+    }
+    updateOne(): Promise<number> {
+        throw new Error("Method not implemented : updateOne");
+    }
+    getOne(): Promise<PrivilegeResponseModel | null> {
+        throw new Error("Method not implemented : getOne");
+    }
+    deleteOne(): Promise<number> {
+        throw new Error("Method not implemented : deleteOne");
+    }
 }

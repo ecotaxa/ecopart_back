@@ -8,7 +8,7 @@ import { ProjectResponseModel, PublicProjectRequestCreationModel } from "../../.
 import { MockInstrumentModelRepository } from "../../../mocks/instrumentModel-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { instrument_model_response } from "../../../entities/instrumentModel";
-import { publicPrivileges } from "../../../entities/privilege";
+import { publicPrivileges, publicPrivileges_WithMemberAndManager } from "../../../entities/privilege";
 
 let mockUserRepository: UserRepository;
 let mockProjectRepository: MockProjectRepository;
@@ -38,8 +38,8 @@ test("Try to add a project return created project", async () => {
     jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
     jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
-    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
-    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
@@ -69,8 +69,8 @@ test("Create a project without override_depth_offset", async () => {
     jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
     jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
-    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
-    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
 
@@ -130,4 +130,62 @@ test("Cannot create project because user is deleted", async () => {
     expect(mockProjectRepository.createProject).not.toBeCalled();
     expect(mockProjectRepository.getProject).not.toBeCalled();
 
+});
+
+test("Create project but something went wrong during privilege creation", async () => {
+    const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const outputError = new Error("Privileges partially created, please check members, managers and contact")
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "computeDefaultDepthOffset")
+    jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockImplementation(() => Promise.resolve(instrument_model_response))
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(0))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError(outputError);
+
+
+    expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
+    expect(mockProjectRepository.computeDefaultDepthOffset).not.toBeCalled();
+    expect(mockProjectRepository.createProject).toHaveBeenCalledWith(projectRequestCreationModelForRepository);
+    expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
+});
+test("Create project but something went wrong when fetching created privileges", async () => {
+    const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const outputError = new Error("Cant find created privileges, please check members, managers and contact")
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "computeDefaultDepthOffset")
+    jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockImplementation(() => Promise.resolve(instrument_model_response))
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError(outputError);
+
+    expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
+    expect(mockProjectRepository.computeDefaultDepthOffset).not.toBeCalled();
+    expect(mockProjectRepository.createProject).toHaveBeenCalledWith(projectRequestCreationModelForRepository);
+    expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
 });

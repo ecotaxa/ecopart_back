@@ -1,11 +1,10 @@
 import { SQLiteUserDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-user-data-source'
 import sqlite3 from 'sqlite3'
-import 'dotenv/config'
 import { UserRequestCreationModel, UserUpdateModel } from '../../../../src/domain/entities/user';
 import fs from 'fs';
 
 const config = {
-    TEST_DBSOURCE: process.env.TEST_DBSOURCE || '',
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_USER'
 }
 
 function initializeUserDB() {
@@ -16,6 +15,9 @@ function initializeUserDB() {
             throw err
         }
     });
+    // Enable foreign keys in sqlite
+    db.get("PRAGMA foreign_keys = ON")
+
     return new SQLiteUserDataSource(db)
 }
 
@@ -86,14 +88,21 @@ describe('SQLiteUserDataSource', () => {
                 user_planned_usage: 'Usage'
             };
 
+            // Insert the user the first time
+            await dataSource.create(user);
+
             try {
+                // Attempt to insert the user a second time
                 await dataSource.create(user);
-            }
-            catch (error) {
+                // If it doesn't throw, the test should fail
+                expect(true).toBeFalsy();
+            } catch (error) {
+                // If it throws, check the error message
                 expect(error).toBeDefined();
                 expect(error.message).toEqual('SQLITE_CONSTRAINT: UNIQUE constraint failed: user.email');
             }
         });
+
     });
     describe('getAll', () => {
         test('init the db', async () => {
@@ -244,7 +253,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '=', value: null }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '=', value: 'null' }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(6);
@@ -252,7 +261,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '!=', value: null }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '!=', value: 'null' }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(0);

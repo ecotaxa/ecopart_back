@@ -139,7 +139,6 @@ export const data_source_projectRequestCreationModel_3: ProjectRequestCreationMo
     operator_email: 'operator_email@email.fr',
     chief_scientist_name: 'chief_scientist_name',
     chief_scientist_email: 'chief_scientist_email@email.fr',
-    override_depth_offset: 1,
     enable_descent_filter: true,
     privacy_duration: 1,
     visible_duration: 1,
@@ -415,6 +414,7 @@ export const projectResponseModel: PublicProjectResponseModel = {
     project_id: 1,
     project_creation_date: '2024-04-29 15:43:10'
 }
+
 export const projectResponseModel2: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 2,
@@ -445,6 +445,7 @@ export const projectUpdateModel: PublicProjectUpdateModel = {
 export const privateProjectUpdateModel: ProjectUpdateModel = {
     operator_email: "edited_user@email.com",
     operator_name: "Edited name",
+    enable_descent_filter: true,
     project_id: 1
 }
 
@@ -453,5 +454,21 @@ export const projectUpdateModel_withBadData: ProjectUpdateModel = {
     unauthorized_param: "unauthorized_param"
 }
 
-// define unvalid example of project entities to use in the tests
+export const projectUpdateModel_withPrivilegeUpdate: PublicProjectUpdateModel = {
+    ...projectUpdateModel,
+    managers: [{ user_id: 2 } as MinimalUserModel],
+    members: [{ user_id: 3 } as MinimalUserModel],
+    contact: { user_id: 4 } as MinimalUserModel,
+}
 
+export const projectUpdateModel_withInstrumentModel: PublicProjectUpdateModel = {
+    ...projectUpdateModel,
+    instrument_model: "UVP5HD"
+}
+
+
+export const projectUpdateModel_withPartialPrivilegeUpdate: PublicProjectUpdateModel = {
+    ...projectUpdateModel,
+    managers: [{ user_id: 2 } as MinimalUserModel],
+    members: [{ user_id: 3 } as MinimalUserModel]
+}

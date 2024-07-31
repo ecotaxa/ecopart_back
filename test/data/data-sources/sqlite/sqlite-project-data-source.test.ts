@@ -1,13 +1,12 @@
 import { SQLiteProjectDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLiteInstrumentModelDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import sqlite3 from 'sqlite3'
-import 'dotenv/config'
 import { ProjectRequestCreationModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
 import fs from 'fs';
 import { data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4, data_source_projectRequestCreationModel_5, data_source_projectRequestCreationModel_6, privateProjectUpdateModel, projectRequestCreationModel_3 } from '../../../entities/project';
 
 const config = {
-    TEST_DBSOURCE: process.env.TEST_DBSOURCE || '',
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_PROJECT'
 }
 
 function initializeProjectDB() {
@@ -18,6 +17,9 @@ function initializeProjectDB() {
             throw err
         }
     });
+    // Enable foreign keys in sqlite
+    db.get("PRAGMA foreign_keys = ON")
+
     new SQLiteInstrumentModelDataSource(db)
     return new SQLiteProjectDataSource(db)
 }
@@ -112,6 +114,24 @@ describe('SQLiteProjectDataSource', () => {
             expect(getAllOutput.total).toEqual(1);
             expect(getAllOutput.items.length).toEqual(1);
             expect(getAllOutput.items[0].project_title).toEqual('joan project_title');
+        });
+        test('should return all projects with filtering on not null', async () => {
+            // Call the getAll method
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'override_depth_offset', operator: '!=', value: 'null' }], sort_by: [] });
+            expect(getAllOutput.items).toBeDefined();
+            expect(getAllOutput.total).toBeDefined();
+            expect(getAllOutput.total).toEqual(1);
+            expect(getAllOutput.items.length).toEqual(1);
+            expect(getAllOutput.items[0].project_title).toEqual('joan project_title');
+        });
+        test('should return all projects with filtering on null', async () => {
+            // Call the getAll method
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'override_depth_offset', operator: '=', value: 'null' }], sort_by: [] });
+            expect(getAllOutput.items).toBeDefined();
+            expect(getAllOutput.total).toBeDefined();
+            expect(getAllOutput.total).toEqual(1);
+            expect(getAllOutput.items.length).toEqual(1);
+            expect(getAllOutput.items[0].project_title).toEqual('john project_title');
         });
         test('should return all projects with filtering', async () => {
             // Call the getAll method
@@ -221,6 +241,7 @@ describe('SQLiteProjectDataSource', () => {
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(1);
             expect(getAllOutput.items.length).toEqual(1);
+            expect(getAllOutput.items[0].enable_descent_filter).toEqual(true);
             expect(getAllOutput.items[0].operator_email).toEqual("edited_user@email.com");
             expect(getAllOutput.items[0].operator_name).toEqual("Edited name");
         });

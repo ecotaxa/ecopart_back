@@ -4,7 +4,9 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel,
 import { SearchResult } from "../../../src/domain/entities/search";
 import { ProjectRepository } from "../../../src/domain/interfaces/repositories/project-repository";
 import { ProjectRepositoryImpl } from "../../../src/domain/repositories/project-repository";
-import { privateProjectUpdateModel, projectRequestCreationModelForRepository, projectResponseModel, projectResponseModelArray, projectUpdateModel_withBadData } from "../../entities/project";
+import { instrument_model_response } from "../../entities/instrumentModel";
+import { publicPrivileges_WithMemberAndManager } from "../../entities/privilege";
+import { privateProjectUpdateModel, projectRequestCreationModel, projectRequestCreationModelForRepository, projectResponseModel, projectResponseModelArray, projectUpdateModel_withBadData } from "../../entities/project";
 import { MockProjectDataSource } from "../../mocks/project-mock";
 
 import 'dotenv/config'
@@ -232,5 +234,17 @@ describe("Project Repository", () => {
 
     })
 
+    describe("formatProjectRequestCreationModel", () => {
+        test("Should format project request creation model", () => {
+            const result = projectRepository.formatProjectRequestCreationModel(projectRequestCreationModel, instrument_model_response)
+            expect(result).toStrictEqual(projectRequestCreationModelForRepository)
+        });
+    });
+    describe("toPublicProject", () => {
+        test("Should return public project", () => {
+            const result = projectRepository.toPublicProject(projectResponseModel, publicPrivileges_WithMemberAndManager)
+            expect(result).toStrictEqual(projectResponseModel)
+        });
+    });
 
 })

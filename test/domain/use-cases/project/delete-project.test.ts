@@ -158,6 +158,31 @@ describe("Delete Project Use Case", () => {
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.deleteProject).toBeCalledWith(project_to_delete);
     });
+    test("User is not admin and not manager", async () => {
+        const current_user: UserUpdateModel = {
+            user_id: 1
+        }
+        const project_to_delete: ProjectUpdateModel = {
+            project_id: 1
+        }
+        const preexistent_project: ProjectResponseModel = projectResponseModel
 
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(preexistent_project))
+        jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
 
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        try {
+            await deleteProjectUseCase.execute(current_user, project_to_delete);
+        } catch (err) {
+            expect(err.message).toBe("Logged user cannot delete this project");
+        }
+
+        expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
+        expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
+        expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
+        expect(mockProjectRepository.deleteProject).not.toBeCalled();
+    });
 })
