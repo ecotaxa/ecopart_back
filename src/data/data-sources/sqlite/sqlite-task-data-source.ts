@@ -1,7 +1,8 @@
 import { TaskDataSource } from "../../interfaces/data-sources/task-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel } from "../../../domain/entities/task";
+import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel } from "../../../domain/entities/task";
+import { UserRequestModel } from "../../../domain/entities/user";
 
 export class SQLiteTaskDataSource implements TaskDataSource {
 
@@ -291,6 +292,21 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             });
         })
     }
+    async getTasksByUser(user: UserRequestModel): Promise<number[]> {
+        const sql = `SELECT task_id FROM task WHERE task_owner_id = (?)`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [user.user_id], (err, rows) => {
+                if (err) {
+                    console.log("DB error--", err)
+                    reject(err);
+                } else {
+                    if (rows === undefined) resolve([]);
+                    const result = rows.map(row => row.task_id);
+                    resolve(result);
+                }
+            });
+        })
+    }
 
     async getOne(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null> {
         const params: any[] = []
@@ -335,6 +351,194 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                         };
                         resolve(result);
                     }
+                }
+            });
+        })
+    }
+    async getAllType(options: PreparedSearchOptions): Promise<SearchResult<TaskTypeResponseModel>> {
+        // Get the limited rows and the total count of rows //  WHERE your_condition
+        let sql = `SELECT *, (SELECT COUNT(*) FROM task_type`
+        const params: any[] = []
+        let filtering_sql = ""
+        const params_filtering: any[] = []
+        // Add filtering
+        if (options.filter.length > 0) {
+            filtering_sql += ` WHERE `;
+            // For each filter, add to filtering_sql and params_filtering
+            for (const filter of options.filter) {
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                    // if array do not contains null or undefined
+                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
+                        // for eatch value in filter.value, add to filtering_sql and params_filtering
+                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        params_filtering.push(...filter.value)
+                    }
+                }
+                // If value is true or false, set to 1 or 0
+                else if (filter.value == true || filter.value == "true") {
+                    filtering_sql += filter.field + ` = 1`;
+                }
+                else if (filter.value == false || filter.value == "false") {
+                    filtering_sql += filter.field + ` = 0`;
+                }
+                // If value is undefined, null or empty, and operator =, set to is null
+                else if (filter.value == "null") {
+                    if (filter.operator == "=") {
+                        filtering_sql += filter.field + ` IS NULL`;
+                    } else if (filter.operator == "!=") {
+                        filtering_sql += filter.field + ` IS NOT NULL`;
+                    }
+                }
+
+                else {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
+                    params_filtering.push(filter.value)
+                }
+                filtering_sql += ` AND `;
+            }
+            // remove last AND
+            filtering_sql = filtering_sql.slice(0, -4);
+        }
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        sql += `) AS total_count FROM task_type`
+
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        // Add sorting
+        if (options.sort_by.length > 0) {
+            sql += ` ORDER BY`;
+            for (const sort of options.sort_by) {
+                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+            }
+            // remove last ,
+            sql = sql.slice(0, -1);
+        }
+
+        // Add pagination
+        const page = options.page;
+        const limit = options.limit;
+        const offset = (page - 1) * limit;
+        sql += ` LIMIT (?) OFFSET (?)`;
+        params.push(limit, offset);
+
+        // Add final ;
+        sql += `;`
+
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (rows === undefined) resolve({ items: [], total: 0 });
+                    const result: SearchResult<TaskTypeResponseModel> = {
+                        items: rows.map(row => ({
+                            task_type_id: row.task_type_id,
+                            task_type_label: row.task_type_label,
+                        })),
+                        total: rows[0]?.total_count || 0
+                    };
+                    resolve(result);
+                }
+            });
+        })
+    }
+    async getAllStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>> {
+        // Get the limited rows and the total count of rows //  WHERE your_condition
+        let sql = `SELECT *, (SELECT COUNT(*) FROM task_status`
+        const params: any[] = []
+        let filtering_sql = ""
+        const params_filtering: any[] = []
+        // Add filtering
+        if (options.filter.length > 0) {
+            filtering_sql += ` WHERE `;
+            // For each filter, add to filtering_sql and params_filtering
+            for (const filter of options.filter) {
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                    // if array do not contains null or undefined
+                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
+                        // for eatch value in filter.value, add to filtering_sql and params_filtering
+                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        params_filtering.push(...filter.value)
+                    }
+                }
+                // If value is true or false, set to 1 or 0
+                else if (filter.value == true || filter.value == "true") {
+                    filtering_sql += filter.field + ` = 1`;
+                }
+                else if (filter.value == false || filter.value == "false") {
+                    filtering_sql += filter.field + ` = 0`;
+                }
+                // If value is undefined, null or empty, and operator =, set to is null
+                else if (filter.value == "null") {
+                    if (filter.operator == "=") {
+                        filtering_sql += filter.field + ` IS NULL`;
+                    } else if (filter.operator == "!=") {
+                        filtering_sql += filter.field + ` IS NOT NULL`;
+                    }
+                }
+
+                else {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
+                    params_filtering.push(filter.value)
+                }
+                filtering_sql += ` AND `;
+            }
+            // remove last AND
+            filtering_sql = filtering_sql.slice(0, -4);
+        }
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        sql += `) AS total_count FROM task_status`
+
+        // Add filtering_sql to sql
+        sql += filtering_sql
+        // Add params_filtering to params
+        params.push(...params_filtering)
+
+        // Add sorting
+        if (options.sort_by.length > 0) {
+            sql += ` ORDER BY`;
+            for (const sort of options.sort_by) {
+                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+            }
+            // remove last ,
+            sql = sql.slice(0, -1);
+        }
+
+        // Add pagination
+        const page = options.page;
+        const limit = options.limit;
+        const offset = (page - 1) * limit;
+        sql += ` LIMIT (?) OFFSET (?)`;
+        params.push(limit, offset);
+
+        // Add final ;
+        sql += `;`
+
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (rows === undefined) resolve({ items: [], total: 0 });
+                    const result: SearchResult<TaskStatusResponseModel> = {
+                        items: rows.map(row => ({
+                            task_status_id: row.task_status_id,
+                            task_status_label: row.task_status_label,
+                        })),
+                        total: rows[0]?.total_count || 0
+                    };
+                    resolve(result);
                 }
             });
         })

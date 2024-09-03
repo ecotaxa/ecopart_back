@@ -1,4 +1,3 @@
-import internal from "stream";
 
 export enum TasksStatus {
     Pending = "PENDING",
@@ -43,6 +42,14 @@ export interface PrivateTaskRequestCreationModel {
 }
 
 /* RESPONSE */
+export interface TaskTypeResponseModel {
+    task_type_id: number;
+    task_type_label: string;
+}
+export interface TaskStatusResponseModel {
+    task_status_id: number;
+    task_status_label: string;
+}
 export interface PrivateTaskResponseModel extends PrivateTaskRequestCreationModel {
     task_id: number;
     task_creation_date: string;
@@ -71,6 +78,7 @@ export interface TaskResponseModel {
     task_creation_date: string;
     task_start_date?: string;
     task_end_date?: string;
+    task_log_file_path?: string;
 
     task_progress_pct: number;
     task_progress_msg?: string;
