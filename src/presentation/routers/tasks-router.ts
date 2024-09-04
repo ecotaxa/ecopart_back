@@ -28,9 +28,10 @@ export default function TaskRouter(
             res.status(200).send(tasks)
         } catch (err) {
             console.log(err)
-            // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            // else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
-            // else res.status(500).send({ errors: ["Cannot get tasks"] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
     })
 
@@ -41,9 +42,10 @@ export default function TaskRouter(
             res.status(200).send(tasks)
         } catch (err) {
             console.log(err)
-            // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            // else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
-            // else res.status(500).send({ errors: ["Cannot search tasks"] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
     })
 
@@ -54,8 +56,10 @@ export default function TaskRouter(
             res.status(200).send(task)
         } catch (err) {
             console.log(err)
-            if (err.message === "Logged user cannot get this task") res.status(403).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Cannot find task"] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task"] })
+            else res.status(500).send({ errors: ["Cannot get task"] })
         }
     })
 
@@ -66,8 +70,9 @@ export default function TaskRouter(
             res.status(200).send({ message: "Task " + req.params.task_id + " successfully deleted" })
         } catch (err) {
             console.log(err)
-            if (err.message === "Logged user cannot delete this task") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task to delete") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this task") res.status(403).send({ errors: ["Cannot delete task"] })
             else res.status(500).send({ errors: ["Cannot delete task"] })
         }
     })
@@ -80,7 +85,9 @@ export default function TaskRouter(
             res.status(200).send(logs);
         } catch (err) {
             console.log(err);
-            if (err.message === "Cannot find task log") res.status(404).send({ errors: [err.message] });
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
+            else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
             else res.status(500).send({ errors: ["Cannot get task log"] });
         }
     });
