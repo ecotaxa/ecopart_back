@@ -10,6 +10,7 @@ import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/
 
 import { CustomRequest } from '../../domain/entities/auth'
 import { SearchProjectsUseCase } from '../../domain/interfaces/use-cases/project/search-project'
+import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
 
 export default function ProjectRouter(
     middlewareAuth: MiddlewareAuth,
@@ -17,7 +18,8 @@ export default function ProjectRouter(
     createProjectUseCase: CreateProjectUseCase,
     deleteProjectUseCase: DeleteProjectUseCase,
     updateProjectUseCase: UpdateProjectUseCase,
-    searchProjectUseCase: SearchProjectsUseCase
+    searchProjectUseCase: SearchProjectsUseCase,
+    listImportableSamples: ListImportableSamplesUseCase,
 ) {
     const router = express.Router()
 
@@ -120,6 +122,37 @@ export default function ProjectRouter(
             else res.status(500).send({ errors: ["Cannot delete project"] })
         }
     })
+
+    /***********************************************SAMPLES***********************************************/
+
+    router.get('/:project_id/samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const tasks = await listImportableSamples.execute((req as CustomRequest).token, req.params.project_id as any);
+            res.status(200).send(tasks)
+        } catch (err) {
+            console.log(err)
+            // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            // else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+            // else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            // else res.status(500).send({ errors: ["Cannot search tasks"] })
+            res.status(500).send({ errors: ["Cannot search tasks"] })
+        }
+    })
+
+    // // Pagined and sorted list of filtered task
+    // router.post('/:project_id/samples/import', middlewareAuth.auth,/*middlewareSampleValidation.rulesImport,*/  async (req: Request, res: Response) => {
+    //     try {
+    //         const tasks = await importSamples.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id });
+    //         res.status(200).send(tasks)
+    //     } catch (err) {
+    //         // console.log(err)
+    //         // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+    //         // else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+    //         // else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+    //         // else res.status(500).send({ errors: ["Cannot search tasks"] })
+    //         res.status(500).send({ errors: ["Cannot search tasks"] })
+    //     }
+    // })
 
     return router
 }
