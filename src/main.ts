@@ -9,6 +9,7 @@ import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
+//import SampleRouter from './presentation/routers/sample-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -26,6 +27,7 @@ import { UpdateProject } from './domain/use-cases/project/update-project'
 import { SearchProject } from './domain/use-cases/project/search-projects'
 import { GetOneInstrumentModel } from './domain/use-cases/instrument_model/get-one-instrument_model'
 import { SearchInstrumentModels } from './domain/use-cases/instrument_model/search-instrument_model'
+import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -33,6 +35,7 @@ import { SearchRepositoryImpl } from './domain/repositories/search-repository'
 import { InstrumentModelRepositoryImpl } from './domain/repositories/instrument_model-repository'
 import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
 import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
+import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -119,6 +122,7 @@ async function getSQLiteDS() {
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
+    const sample_repo = new SampleRepositoryImpl()
 
     const userMiddleWare =
         UserRouter(
@@ -150,11 +154,18 @@ async function getSQLiteDS() {
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
+        new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo)
     )
+    // const sampleMiddleWare = SampleRouter(
+    //     new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+    //   
+    // )
+
 
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
     server.use("/instrument_models", instrumentModelMiddleWare)
+    //server.use("/projects/:project_id/samples", sampleMiddleWare)
     server.use("/projects", projectMiddleWare)
 
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))
