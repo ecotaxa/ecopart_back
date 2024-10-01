@@ -6,7 +6,6 @@
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { head } from "shelljs";
 import { HeaderSampleModel, PublicHeaderSampleResponseModel } from "../entities/sample";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
@@ -37,38 +36,49 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    async listImportableSamples(root_folder_path: string): Promise<PublicHeaderSampleResponseModel[]> {
+    async listImportableSamples(root_folder_path: string, instrument_model: string): Promise<PublicHeaderSampleResponseModel[]> {
+        let samples: PublicHeaderSampleResponseModel[] = [];
         const folderPath = path.join(root_folder_path);
         // read from folderPath/meta/*header*.txt and return the list of samples
         const meta_header_samples = await this.getSamplesFromHeaders(folderPath);
 
-        // read from folderPath/ecodata and return the list of samples
-        const ecodata_samples = await this.getSamplesFromEcodata(folderPath);
+        if (instrument_model.startsWith('UVP6')) {
+            // read from folderPath/ecodata and return the list of samples
+            const samples_ecodata = await this.getSamplesFromEcodata(folderPath);
+            samples = await this.setupSamples(meta_header_samples, samples_ecodata, "ecodata");
 
+        } else if (instrument_model.startsWith('UVP5')) {
+            // read from folderPath/work and return the list of samples
+            const samples_work = await this.getSamplesFromWork(folderPath);
+            samples = await this.setupSamples(meta_header_samples, samples_work, "work");
+        }
+
+        return samples;
+    }
+    // Function to setup samples
+    async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string): Promise<PublicHeaderSampleResponseModel[]> {
         // flag qc samples to flase if not in both lists, and add qc message
-        const samples: PublicHeaderSampleResponseModel[] = [];
+        const samples_response: PublicHeaderSampleResponseModel[] = [];
         for (const sample of meta_header_samples) {
-            samples.push({
-                sample_name: sample.filename,
+            samples_response.push({
+                sample_name: sample.profileId,
                 raw_file_name: sample.filename,
                 station_id: sample.stationId,
                 first_image: sample.firstImage,
                 last_image: sample.endImg,
                 comment: sample.comment,
-                qc_lvl1: ecodata_samples.includes(sample.filename) ? true : false,
-                qc_lvl1_comment: ecodata_samples.includes(sample.filename) ? '' : 'Sample not found in ecodata folder'
+                qc_lvl1: samples.includes(sample.profileId) ? true : false,
+                qc_lvl1_comment: samples.includes(sample.profileId) ? '' : 'Sample not found in ' + folder + ' folder'
             });
         }
-        return samples;
+        return samples_response;
     }
-
     // Function to read and return samples from header.txt files
     async getSamplesFromHeaders(folderPath: string): Promise<HeaderSampleModel[]> {
         const samples: HeaderSampleModel[] = [];
         try {
             const header_path = path.join(folderPath, 'meta');
             const files = await fs.readdir(header_path);
-            console.log('header files', files);
             for (const file of files) {
                 if (file.includes('header') && file.endsWith('.txt')) {
                     const filePath = path.join(header_path, file);
@@ -127,6 +137,22 @@ export class SampleRepositoryImpl implements SampleRepository {
         const samples: string[] = [];
         try {
             const files = await fs.readdir(path.join(folderPath, 'ecodata'));
+
+            for (const file of files) {
+                samples.push(file);
+            }
+        } catch (err) {
+            throw new Error(`Error reading files: ${err.message}`);
+        }
+
+        return samples;
+    }
+
+    // Function to read and return samples from work folder names
+    async getSamplesFromWork(folderPath: string): Promise<string[]> {
+        const samples: string[] = [];
+        try {
+            const files = await fs.readdir(path.join(folderPath, 'work'));
 
             for (const file of files) {
                 samples.push(file);

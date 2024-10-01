@@ -40,7 +40,7 @@ export class ListImportableSamples implements ListImportableSamplesUseCase {
 
     private async listImportableSamples(project: ProjectResponseModel): Promise<PublicSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
-        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path);
+        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model);
         return samples;
     }
 

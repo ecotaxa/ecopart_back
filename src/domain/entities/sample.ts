@@ -43,9 +43,9 @@ export interface HeaderSampleModel {
     endImg: string;
     yoyo: string;
     stationId: string;
-    sampleType: string;
-    integrationTime: string;
-    argoId: string;
-    pixelSize: string;
-    sampleDateTime: string;
+    sampleType: string | undefined;
+    integrationTime: string | undefined;
+    argoId: string | undefined;
+    pixelSize: string | undefined;
+    sampleDateTime: string | undefined;
 }
