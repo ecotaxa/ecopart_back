@@ -1,4 +1,4 @@
-import { TaskResponseModel, PrivateTaskRequestCreationModel, PrivateTaskRequestModel, TaskTypeResponseModel, TaskStatusResponseModel } from "../../../domain/entities/task";
+import { TaskResponseModel, PrivateTaskRequestCreationModel, PrivateTaskRequestModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel } from "../../../domain/entities/task";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { UserRequestModel } from "../../../domain/entities/user";
 
@@ -11,4 +11,5 @@ export interface TaskDataSource {
     getOne(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null>;
     getAllType(options: PreparedSearchOptions): Promise<SearchResult<TaskTypeResponseModel>>
     getAllStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>>
+    updateOne(task: PrivateTaskUpdateModel): Promise<number>
 }

@@ -33,7 +33,7 @@ export class ListImportableSamples implements ListImportableSamplesUseCase {
         const samples = await this.listImportableSamples(project);
 
         // Ensure the task to get exists
-        if (!samples) { throw new Error("Cannot find samples"); }
+        if (!samples) { throw new Error("No samples to import"); }
 
         return samples;
     }
@@ -53,16 +53,11 @@ export class ListImportableSamples implements ListImportableSamplesUseCase {
     }
 
     private async ensureUserCanGet(current_user: UserUpdateModel, project_id: number): Promise<void> {
-        console.log("project_id : ", project_id);
-        console.log("current_user.user_id : ", current_user.user_id);
         const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        console.log("userIsAdmin : ", userIsAdmin);
         const userHasPrivilege = await this.privilegeRepository.isGranted({
             user_id: current_user.user_id,
             project_id: project_id
         });
-        console.log("userHasPrivilege : ", userHasPrivilege);
-
         if (!userIsAdmin && !userHasPrivilege) {
             throw new Error("Logged user cannot list importable samples in this project");
         }

@@ -30,7 +30,6 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         try {
             await fs.access(folderPath);
-            console.log('Folder exists');
         } catch (error) {
             throw new Error(`Folder does not exist at path: ${folderPath}`);
         }
@@ -55,6 +54,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         return samples;
     }
+
     // Function to setup samples
     async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string): Promise<PublicHeaderSampleResponseModel[]> {
         // flag qc samples to flase if not in both lists, and add qc message
@@ -98,7 +98,6 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     getSampleFromHeaderLine(line: string): HeaderSampleModel {
-        console.log('line', line);
         const fields = line.split(';');
 
         const sample: HeaderSampleModel = {
@@ -162,6 +161,43 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
 
         return samples;
+    }
+    // This needs to be inside an async function to use await
+    async ensureSampleFolderDoNotExists(samples_names_to_import: string[], dest_folder: string): Promise<void> {
+        // Ensure that none of the sample folders already exist
+        for (const sample of samples_names_to_import) {
+            const destPath = path.join(dest_folder, sample);
+            try {
+                await fs.access(destPath);
+                throw new Error(`Sample folder already exists: ${destPath}`);
+            } catch (error) {
+                if (error.code === 'ENOENT') {
+                    // Do nothing, the folder does not exist
+                } else {
+                    // Throw other types of errors, e.g., permission issues
+                    throw error;
+                }
+            }
+        }
+    }
+
+    async copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+
+        const base_folder = path.join(__dirname, '..', '..', '..');
+        // Ensure that non of the samples folder already exists
+        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(base_folder, dest_folder));
+
+        // Ensure destination folder exists
+        await fs.mkdir(path.join(base_folder, dest_folder), { recursive: true });
+
+        // Iterate over each sample name and copy it
+        for (const sample of samples_names_to_import) {
+            const sourcePath = path.join(base_folder, source_folder, sample);
+            const destPath = path.join(base_folder, dest_folder, sample);
+
+            // Copy the sample folder recurcively from source to destination
+            await fs.cp(sourcePath, destPath, { recursive: true, errorOnExist: true });
+        }
     }
 
 

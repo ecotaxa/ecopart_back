@@ -52,7 +52,7 @@ export default function TaskRouter(
     // Get one task
     router.get('/:task_id/', middlewareAuth.auth,/*middlewareTaskValidation.rulesGetTasks,*/  async (req: Request, res: Response) => {
         try {
-            const task = await getOneTaskUseCase.execute((req as CustomRequest).token, { ...req.body, task_id: req.params.task_id })
+            const task = await getOneTaskUseCase.execute((req as CustomRequest).token, req.params.task_id as any);
             res.status(200).send(task)
         } catch (err) {
             console.log(err)

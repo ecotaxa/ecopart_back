@@ -25,15 +25,15 @@ export enum TaskAction {
 
 /* CREATION */
 export interface PublicTaskRequestCreationModel {
-    task_type_id: TaskType;
-    task_status_id: TasksStatus;
-    task_owner_id: number; // task owner : string in a public version
+    task_type: TaskType;
+    task_status: TasksStatus;
+    task_owner_id: number;
     task_project_id?: number;
     task_params: object;
 }
 export interface PrivateTaskRequestCreationModel {
-    task_type_id: TaskType;
-    task_status_id: TasksStatus;
+    task_type_id: number; //TaskType;
+    task_status_id: number; //TasksStatus;
     task_owner_id: number; // task owner : string in a public version
     task_project_id?: number;
 
@@ -116,4 +116,31 @@ export interface PublicTaskRequestModel extends PrivateTaskRequestModel {
     task_status?: string;
     task_owner?: string;
 }
+export interface PrivateTaskUpdateModel {
+    task_id: number;
 
+    task_type_id?: number;
+    task_type?: string;
+    task_status_id?: number;
+    task_status?: string;
+    task_owner_id?: number;
+    task_owner?: string;
+    task_project_id?: number;
+    task_params?: object;
+    task_creation_date?: string;
+    task_start_date?: string;
+    task_end_date?: string;
+    task_log_file_path?: string;
+
+    task_progress_pct?: number;
+    task_progress_msg?: string;
+    task_result?: string;
+    task_error?: string;
+    task_question?: string;
+    task_reply?: string;
+    task_step?: string;
+}
+// export interface PublicTaskUpdateModel {
+//     task_id: number;
+//     task_reply: string;
+// }

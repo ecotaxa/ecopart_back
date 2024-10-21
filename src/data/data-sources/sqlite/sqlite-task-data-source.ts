@@ -1,7 +1,7 @@
 import { TaskDataSource } from "../../interfaces/data-sources/task-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel } from "../../../domain/entities/task";
+import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel } from "../../../domain/entities/task";
 import { UserRequestModel } from "../../../domain/entities/user";
 
 export class SQLiteTaskDataSource implements TaskDataSource {
@@ -37,7 +37,15 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             else {
 
                 // Insert default task_status
-                const sql_admin = "INSERT OR IGNORE INTO task_status (task_status_label) VALUES ('PENDING', 'VALIDATING', 'RUNNING', 'WAITING_FO_RESPONSE', 'DONE', 'ERROR');";
+                const sql_admin = `
+                INSERT OR IGNORE INTO task_status (task_status_label) 
+                VALUES 
+                ('PENDING'),
+                ('VALIDATING'),
+                ('RUNNING'),
+                ('WAITING_FOR_RESPONSE'),
+                ('DONE'),
+                ('ERROR');`;
 
                 db_tables.run(sql_admin, [], function (err: Error | null) {
                     if (err) {
@@ -66,8 +74,16 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             else {
 
                 // Insert default task_type
-                const sql_admin = "INSERT OR IGNORE INTO task_type (task_type_label) VALUES ('EXPORT', 'DELETE', 'UPDATE', 'IMPORT', 'IMPORT_CTD', 'IMPORT_ECO_TAXA');";
-
+                const sql_admin = `
+                INSERT OR IGNORE INTO task_type (task_type_label) 
+                VALUES 
+                ('EXPORT'),
+                ('DELETE'),
+                ('UPDATE'),
+                ('IMPORT'),
+                ('IMPORT_CTD'),
+                ('IMPORT_ECO_TAXA');
+                `;
                 db_tables.run(sql_admin, [], function (err: Error | null) {
                     if (err) {
                         console.log("DB error--", err);
@@ -99,8 +115,8 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             task_end_date TIMESTAMP,
             FOREIGN KEY (task_type_id) REFERENCES task_type(task_type_id),
             FOREIGN KEY (task_status_id) REFERENCES task_status(task_status_id),
-            FOREIGN KEY (task_owner_id) REFERENCES user(task_owner_id) ON DELETE CASCADE,
-            FOREIGN KEY (task_project_id) REFERENCES project(task_project_id) ON DELETE CASCADE
+            FOREIGN KEY (task_owner_id) REFERENCES user(user_id) ON DELETE CASCADE, 
+            FOREIGN KEY (task_project_id) REFERENCES project(project_id) ON DELETE CASCADE
         );`
 
         // Run the SQL query to create the table
@@ -271,7 +287,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner_id: row.task_owner_id,
                             task_owner: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
-                            task_file_path: row.task_log_file_path,
+                            task_log_file_path: row.task_log_file_path,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
@@ -335,7 +351,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner_id: row.task_owner_id,
                             task_owner: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
-                            task_file_path: row.task_log_file_path,
+                            task_log_file_path: row.task_log_file_path,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
@@ -543,5 +559,34 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             });
         })
     }
-}
 
+    // Update One task
+    // Returns the number of lines updates
+    async updateOne(task: PrivateTaskUpdateModel): Promise<number> {
+        const { task_id, ...taskData } = task; // Destructure the project object
+        const params: any[] = []
+        let placeholders: string = ""
+        // generate sql and params
+        for (const [key, value] of Object.entries(taskData)) {
+            params.push(value)
+            placeholders = placeholders + key + "=(?),"
+        }
+        // remove last ,
+        placeholders = placeholders.slice(0, -1);
+        // add task_id to params
+        params.push(task_id)
+
+        // form final sql
+        const sql = `UPDATE task SET ` + placeholders + ` WHERE task_id=(?);`;
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    const result = this.changes;
+                    resolve(result);
+                }
+            });
+        })
+    }
+}

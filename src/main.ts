@@ -9,7 +9,6 @@ import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
-//import SampleRouter from './presentation/routers/sample-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -28,6 +27,11 @@ import { SearchProject } from './domain/use-cases/project/search-projects'
 import { GetOneInstrumentModel } from './domain/use-cases/instrument_model/get-one-instrument_model'
 import { SearchInstrumentModels } from './domain/use-cases/instrument_model/search-instrument_model'
 import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
+import { ImportSamples } from './domain/use-cases/sample/import-samples'
+import { DeleteTask } from './domain/use-cases/task/delete-task'
+import { SearchTask } from './domain/use-cases/task/search-tasks'
+import { GetOneTask } from './domain/use-cases/task/get-one-task'
+import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -36,21 +40,25 @@ import { InstrumentModelRepositoryImpl } from './domain/repositories/instrument_
 import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
 import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
 import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
+import { TaskRepositoryImpl } from './domain/repositories/task-repository'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
 import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
+import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
 import sqlite3 from 'sqlite3'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
+import { FsAdapter } from './infra/files/fs'
 
 import 'dotenv/config'
 import path from 'path'
+import TaskRouter from './presentation/routers/tasks-router'
 
 sqlite3.verbose()
 
@@ -62,6 +70,9 @@ const config = {
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
     PORT_PUBLIC: parseInt(process.env.PORT_PUBLIC as string, 10),
     BASE_URL_PUBLIC: process.env.BASE_URL_PUBLIC || '',
+
+    DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
+    DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -100,11 +111,13 @@ async function getSQLiteDS() {
     const jwtAdapter = new JwtAdapter()
     const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV)
     const countriesAdapter = new CountriesAdapter()
+    const fsAdapter = new FsAdapter()
 
     const user_dataSource = new SQLiteUserDataSource(db)
     const instrument_model_dataSource = new SQLiteInstrumentModelDataSource(db)
     const project_dataSource = new SQLiteProjectDataSource(db)
     const privilege_dataSource = new SQLitePrivilegeDataSource(db)
+    const task_datasource = new SQLiteTaskDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -123,6 +136,7 @@ async function getSQLiteDS() {
     const project_repo = new ProjectRepositoryImpl(project_dataSource)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl()
+    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
 
     const userMiddleWare =
         UserRouter(
@@ -154,19 +168,24 @@ async function getSQLiteDS() {
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
-        new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo)
+        new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo),
+        new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE)
     )
-    // const sampleMiddleWare = SampleRouter(
-    //     new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-    //   
-    // )
 
+    const taskMiddleWare = TaskRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new DeleteTask(user_repo, task_repo, privilege_repo),
+        new GetOneTask(task_repo, user_repo, privilege_repo),
+        new GetLogFileTask(task_repo, user_repo, privilege_repo),
+        new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo)
+    )
 
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
     server.use("/instrument_models", instrumentModelMiddleWare)
-    //server.use("/projects/:project_id/samples", sampleMiddleWare)
     server.use("/projects", projectMiddleWare)
+    server.use("/tasks", taskMiddleWare)
+
 
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))
 

@@ -3,7 +3,7 @@ services:
     image: 'ecotaxa/ecopart_back:latest'
     env_file: .env
     volumes:
-      - ./sqlite_db:/src/sqlite_db
+      - ./data_storage:/src/data_storage
       - type: bind
         source: ./.env
         target: /src/.env
