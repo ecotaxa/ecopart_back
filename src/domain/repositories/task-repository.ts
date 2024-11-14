@@ -320,7 +320,6 @@ export class TaskRepositoryImpl implements TaskRepository {
     }
     // Get One Task
     async getOneTask(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null> {
-        console.log("getOneTask", task)
         return await this.taskDataSource.getOne(task);
     }
     async getTasksByUser(user: UserRequestModel): Promise<number[]> {
@@ -358,7 +357,7 @@ export class TaskRepositoryImpl implements TaskRepository {
             await this.taskDataSource.updateOne({ task_id: task_id, task_error: error.message })
 
             // Update the task status to error
-            this.statusManager({
+            await this.statusManager({
                 task_id: task_id
             }, TasksStatus.Error)
 

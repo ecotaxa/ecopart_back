@@ -26,7 +26,6 @@ export default function InstrumentModelsRouter(
     })
     router.get('/:instrument_model_id/', async (req: Request, res: Response) => {
         try {
-            console.log(req.params.instrument_model_id)
             const instrument_model = await getOneInstrumentModelsUseCase.execute(req.params.instrument_model_id as any);
             res.status(200).send(instrument_model)
         } catch (err) {

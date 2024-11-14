@@ -116,7 +116,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         const params: any[] = []
         let placeholders: string = ""
         for (const [key, value] of Object.entries(projectData)) {
-            if (key == "enable_descent_filter") { // TODO somewhere else? serializer?
+            if (key == "enable_descent_filter") {
                 params.push(value == true || value == "true" ? 1 : 0) // TODO clean
             } else {
                 params.push(value)

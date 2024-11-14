@@ -1,5 +1,5 @@
 
-import { PublicSampleResponseModel } from "../../entities/sample";
+import { PublicHeaderSampleResponseModel, SampleRequestCreationModel } from "../../entities/sample";
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
@@ -38,11 +38,6 @@ export class ImportSamples implements ImportSamplesUseCase {
 
         const project: ProjectResponseModel = await this.getProjectIfExist(project_id);
 
-        const samples = await this.listImportableSamples(project);
-
-        // Check that asked samples are in the importable list of samples
-        this.ensureSamplesAreImportables(samples, samples_names_to_import);
-
         // create a task to import samples
         const task_id = await this.createImportSamplesTask(current_user, project, samples_names_to_import);
 
@@ -53,31 +48,12 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
 
         // start the task
-        this.startImportTask(task, samples_names_to_import, project.instrument_model, project);
+        this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user);
 
         return task;
     }
-    ensureSamplesAreImportables(samples: PublicSampleResponseModel[], samples_names_to_import: string[]) {
-        this.ensureSamplesAreBothInHeadersAndInRawData(samples, samples_names_to_import);
-        this.ensureSamplesAreNotAlreadyImported(samples_names_to_import);
-    }
 
-    ensureSamplesAreBothInHeadersAndInRawData(samples: PublicSampleResponseModel[], samples_names_to_import: string[]) {
-        const samples_names_set = new Set(samples.map(sample => sample.sample_name));
-
-        const missing_samples = samples_names_to_import.filter(sample_id => !samples_names_set.has(sample_id));
-
-        if (missing_samples.length > 0) {
-            throw new Error("Samples not importable: " + missing_samples.join(", "));
-        }
-    }
-
-    ensureSamplesAreNotAlreadyImported(samples_names_to_import: string[]) {
-        //TODO
-        console.log("TODO: ensureSamplesAreNotAlreadyImported please do an import update", samples_names_to_import);
-    }
-
-    createImportSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]) {
+    async createImportSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]): Promise<number> {
         const task: PublicTaskRequestCreationModel = {
             task_type: TaskType.Import,
             task_status: TasksStatus.Pending,
@@ -85,13 +61,13 @@ export class ImportSamples implements ImportSamplesUseCase {
             task_project_id: project.project_id,
             task_params: { samples: samples }
         }
-        return this.taskRepository.createTask(task);
-
+        return await this.taskRepository.createTask(task);
     }
 
-    private async listImportableSamples(project: ProjectResponseModel): Promise<PublicSampleResponseModel[]> {
+    private async listImportableSamples(project: ProjectResponseModel): Promise<PublicHeaderSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
-        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model);
+        const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
+        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
         // Ensure the task to get exists
         if (!samples) { throw new Error("No samples to import"); }
 
@@ -117,32 +93,58 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
     }
 
-    private async startImportTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel) {
+    private async startImportTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel) {
         const task_id = task.task_id;
         try {
             await this.taskRepository.startTask({ task_id: task_id });
 
             // 1/4 Do validation before importing
-            //TODO LATER 
+            const importable_samples = await this.listImportableSamples(project);
+            // Check that asked samples are in the importable list of samples
+            await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id);
 
             // 2/4 Copy source files to hiden project folder 
             await this.copySourcesToProjectFolder(task_id, samples_names_to_import, instrument_model, project);
-
-            // 3/4 Import samples
-            //await this.sampleRepository.importSamples(task_id, project.project_id, samples_names_to_import);
-
-            // 4/4 generate qc report by samples
+        } catch (error) {
+            await this.taskRepository.failedTask(task_id, error);
+            return;
+        }
+        try {
+            // 3/4 generate qc report by samples
             //TODO LATER but we can already et the qc flag to un validated
+
+            // 4/4 Create samples
+            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import);
 
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
         } catch (error) {
+            await this.deleteSourcesFromProjectFolder(task_id, samples_names_to_import, project);
             this.taskRepository.failedTask(task_id, error);
         }
+    }
+    async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number) {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/4 sample validation : start");
+        this.ensureSamplesAreBothInHeadersAndInRawData(samples, samples_names_to_import);
+        //TODO LATER add more validation
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 20, "Step 1/4 sample validation : done");
 
     }
 
+    ensureSamplesAreBothInHeadersAndInRawData(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[]) {
+        const samples_names_set = new Set(samples.map(sample => sample.sample_name));
+
+        const missing_samples = samples_names_to_import.filter(sample_id => !samples_names_set.has(sample_id));
+
+        if (missing_samples.length > 0) {
+            throw new Error("Samples not importable: " + missing_samples.join(", "));
+        }
+    }
+
+
     async copySourcesToProjectFolder(task_id: number, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel) {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/4 sample folders copy : start");
+
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
         const root_folder_path = project.root_folder_path;
         let source_folder;
@@ -155,11 +157,46 @@ export class ImportSamples implements ImportSamplesUseCase {
             throw new Error("Unknown instrument model");
         }
         await this.sampleRepository.copySamplesToImportFolder(source_folder, dest_folder, samples_names_to_import);
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/4 sample folders copied");
+
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/4 sample folders copy : done");
 
     }
+    async deleteSourcesFromProjectFolder(task_id: number, samples_names_to_import: string[], project: ProjectResponseModel) {
+        // Delete sources files from project folder
+        const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
+        await this.sampleRepository.deleteSamplesFromImportFolder(dest_folder, samples_names_to_import);
+        // Log the action
+        const task_file_path = await this.taskRepository.getTask({ task_id });
+        if (!task_file_path) {
+            throw new Error("Cannot find task");
+        }
+        await this.taskRepository.logMessage(task_file_path.task_log_file_path, "Samples import failed, sources files deleted for samples: " + samples_names_to_import.join(", "));
+    }
 
-    // async importSamples(task_id: number, project_id: number, samples_names_to_import: string[]) {
+    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[]): Promise<number[]> {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples creation : start");
 
-    // }
+        // Common sample data
+        const base_sample: Partial<SampleRequestCreationModel> = {
+            project_id: project.project_id,
+            visual_qc_validator_user_id: current_user_id
+        }
+        // Format samples to import
+        const formated_samples: SampleRequestCreationModel[] = await Promise.all(
+            samples_names_to_import.map(async (sample_name) => {
+                const sample = await this.sampleRepository.formatSampleToImport(
+                    { ...base_sample, sample_name },
+                    project.instrument_model
+                );
+                return sample;
+            })
+        );
+
+
+        // Create samples
+        const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
+
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/4 samples creation done");
+        return created_samples_ids;
+    }
 }

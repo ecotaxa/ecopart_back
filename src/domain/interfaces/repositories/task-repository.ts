@@ -23,4 +23,5 @@ export interface TaskRepository {
     getTasksByUser(user: UserRequestModel): Promise<number[]>;
     getLogFileTask(task_id: number): Promise<string>;
     failedTask(task_id: number, error: Error): Promise<void>;
+    logMessage(task_log_file_path: string | undefined, message: string): Promise<void>;
 }

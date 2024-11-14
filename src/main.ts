@@ -4,6 +4,7 @@ import { MiddlewareAuthCookie } from './presentation/middleware/auth-cookie'
 import { MiddlewareAuthValidation } from './presentation/middleware/auth-validation'
 import { MiddlewareUserValidation } from './presentation/middleware/user-validation'
 import { MiddlewareProjectValidation } from './presentation/middleware/project-validation'
+import { MiddlewareSampleValidation } from './presentation/middleware/sample-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -32,6 +33,8 @@ import { DeleteTask } from './domain/use-cases/task/delete-task'
 import { SearchTask } from './domain/use-cases/task/search-tasks'
 import { GetOneTask } from './domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
+import { DeleteSample } from './domain/use-cases/sample/delete-sample'
+import { SearchSamples } from './domain/use-cases/sample/search-samples'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -48,6 +51,7 @@ import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqli
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
 import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
+import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
 import sqlite3 from 'sqlite3'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
@@ -118,6 +122,7 @@ async function getSQLiteDS() {
     const project_dataSource = new SQLiteProjectDataSource(db)
     const privilege_dataSource = new SQLitePrivilegeDataSource(db)
     const task_datasource = new SQLiteTaskDataSource(db)
+    const sample_dataSource = new SQLiteSampleDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -135,7 +140,7 @@ async function getSQLiteDS() {
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
-    const sample_repo = new SampleRepositoryImpl()
+    const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
 
     const userMiddleWare =
@@ -164,12 +169,15 @@ async function getSQLiteDS() {
     const projectMiddleWare = ProjectRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
+        new MiddlewareSampleValidation(),
         new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
-        new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo),
-        new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE)
+        new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
+        new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
+        new DeleteSample(user_repo, sample_repo, privilege_repo),
+        new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
     )
 
     const taskMiddleWare = TaskRouter(
