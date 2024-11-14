@@ -1,3 +1,4 @@
+import path from "path";
 import { ProjectRequestCreationModel, PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../entities/project";
 import { UserUpdateModel } from "../../entities/user";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
@@ -11,12 +12,14 @@ export class CreateProject implements CreateProjectUseCase {
     projectRepository: ProjectRepository
     instrument_modelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
+    DATA_STORAGE_FS_STORAGE: string
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, DATA_STORAGE_FS_STORAGE: string) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.instrument_modelRepository = instrument_modelRepository
         this.privilegeRepository = privilegeRepository
+        this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
     async execute(current_user: UserUpdateModel, public_project: PublicProjectRequestCreationModel): Promise<PublicProjectResponseModel> {
@@ -34,8 +37,11 @@ export class CreateProject implements CreateProjectUseCase {
 
         // Format the provided information
         const project: ProjectRequestCreationModel = this.projectRepository.formatProjectRequestCreationModel(public_project, instrument)
-        // Create the project and retrieve its ID
+        // Create the project in the database and retrieve its ID
         const createdProjectId = await this.projectRepository.createProject(project);
+
+        // Create the project root folder
+        await this.createProjectRootFolder(createdProjectId);
 
         // Retrieve the newly created project information
         const createdProject = await this.getCreatedProject(createdProjectId);
@@ -101,5 +107,13 @@ export class CreateProject implements CreateProjectUseCase {
             throw new Error("Cant find created privileges, please check members, managers and contact");
         }
         return privileges;
+    }
+
+    // Create the project root folder
+    private async createProjectRootFolder(projectId: number) {
+        const root_folder_path = path.join(this.DATA_STORAGE_FS_STORAGE, `${projectId}`);
+        // create with fs
+        await this.projectRepository.createProjectRootFolder(root_folder_path);
+
     }
 }

@@ -6,6 +6,8 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, P
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
 
+import { promises as fs } from 'fs';
+
 export class ProjectRepositoryImpl implements ProjectRepository {
     projectDataSource: ProjectDataSource
 
@@ -181,6 +183,16 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         return publicProject;
     }
-
-
+    async createProjectRootFolder(root_folder_path: string): Promise<void> {
+        try {
+            // Check if the folder exists
+            await fs.access(root_folder_path);
+            // If it exists, remove it recursively
+            await fs.rm(root_folder_path, { recursive: true, force: true });
+        } catch (error) {
+            // Folder does not exist; no need to delete anything
+        }
+        // Create the root folder
+        await fs.mkdir(root_folder_path, { recursive: true });
+    }
 }

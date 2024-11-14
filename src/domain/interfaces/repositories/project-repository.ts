@@ -4,6 +4,7 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, P
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface ProjectRepository {
+    createProjectRootFolder(root_folder_path: string): Promise<void>;
     formatProjectRequestCreationModel(public_project: PublicProjectRequestCreationModel, instrument: InstrumentModelResponseModel): ProjectRequestCreationModel;
     toPublicProject(project: ProjectResponseModel, privileges: PublicPrivilege): PublicProjectResponseModel;
     standardUpdateProject(project_to_update: ProjectUpdateModel): Promise<number>;

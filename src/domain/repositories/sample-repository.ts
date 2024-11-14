@@ -465,7 +465,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             filename: ini_content.sample_metadata['filename'] as string,
             filter_first_image: ini_content.sample_metadata['firstimage'] as string,
             filter_last_image: ini_content.sample_metadata['endimg'] as string,
-            instrument_settings_acq_gain: ini_content.ACQ_CONF['Gain'] as number,
+            instrument_settings_acq_gain: ini_content.HW_CONF['Gain'] as number,
             instrument_settings_acq_description: undefined,
             instrument_settings_acq_task_type: undefined,
             instrument_settings_acq_choice: undefined,

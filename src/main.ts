@@ -170,7 +170,7 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
         new MiddlewareSampleValidation(),
-        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
+        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),

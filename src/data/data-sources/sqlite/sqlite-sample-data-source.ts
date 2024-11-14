@@ -138,8 +138,8 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         instrument_settings_particle_minimum_size_esd INTEGER,
         instrument_settings_vignettes_minimum_size_esd INTEGER,
         instrument_settings_acq_shutter_speed INTEGER,
-        instrument_settings_acq_shutter_speed INTEGER,
         instrument_settings_acq_exposure INTEGER,
+        instrument_settings_acq_shutter INTEGER,
 
         visual_qc_validator_user_id INTEGER NOT NULL,
         visual_qc_status_id INTEGER NOT NULL DEFAULT 1,
@@ -530,7 +530,6 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     // Update One Sample
     // Returns the number of lines updates
     async updateOne(sample: PrivateSampleUpdateModel): Promise<number> {
-        console.log("######TODO: updateOne sample#######")
         const { sample_id, ...sampleData } = sample; // Destructure the sample object
         const params: any[] = []
         let placeholders: string = ""
