@@ -723,13 +723,27 @@ export class SampleRepositoryImpl implements SampleRepository {
         // Ensure destination folder exists
         await fs.mkdir(path.join(base_folder, dest_folder), { recursive: true });
 
-        // Iterate over each sample name and copy it
+        // Iterate over each sample name and copy .zip files only
         for (const sample of samples_names_to_import) {
             const sourcePath = path.join(base_folder, source_folder, sample);
             const destPath = path.join(base_folder, dest_folder, sample);
 
-            // Copy the sample folder recurcively from source to destination
-            await fs.cp(sourcePath, destPath, { recursive: true, errorOnExist: true });
+            // Check if the sample directory exists and list files
+            const files = await fs.readdir(sourcePath);
+
+            // Filter and copy only .zip files
+            for (const file of files) {
+                if (path.extname(file) === '.zip') {
+                    const sourceFilePath = path.join(sourcePath, file);
+                    const destFilePath = path.join(destPath, file);
+
+                    // Ensure destination subfolder exists
+                    await fs.mkdir(destPath, { recursive: true });
+
+                    console.log("Copying:", sourceFilePath, "to", destFilePath);
+                    await fs.copyFile(sourceFilePath, destFilePath);
+                }
+            }
         }
     }
 
