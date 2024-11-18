@@ -6,7 +6,6 @@ export interface SampleRequestCreationModel {
     instrument_serial_number: string;          // Instrument serial number
     optional_structure_id?: string;                      // Optional id (Argo / Glider)
     max_pressure: number;                      // Maximum pressure (in relevant unit)
-    integration_time?: number;                 // Integration time (in seconds or relevant unit)
     station_id: string;                        // Station identifier
     sampling_date: string;                     // Sampling date in ISO format
     latitude: number;                          // Latitude (in decimal degrees) [DD.DDDD] (- for South)
@@ -70,7 +69,6 @@ export interface SampleRequestModel {
     instrument_serial_number?: string;          // Instrument serial number
     optional_structure_id?: string;                      // Optional id (Argo / Glider)
     max_pressure?: number;                      // Maximum pressure (in relevant unit)
-    integration_time?: number;                 // Integration time (in seconds or relevant unit)
     station_id?: string;                        // Station identifier
     sampling_date?: string;                     // Sampling date in ISO format
     latitude?: number;                          // Latitude (in decimal degrees) [DD.DDDD] (- for South)
@@ -220,7 +218,6 @@ export interface MetadataIniSampleModel {
     comment: string;                           // Optional comment
     instrument_serial_number: string;          // Instrument serial number
     optional_structure_id?: string;                      // Optional id (Argo / Glider)
-    integration_time?: number;                 // Integration time (in seconds or relevant unit)
     station_id: string;                        // Station identifier
     sampling_date: string;                     // Sampling date in ISO format
     wind_direction: number;                    // Wind direction (in degrees)

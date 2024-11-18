@@ -60,92 +60,30 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string): Promise<SampleRequestCreationModel> {
+    //     // Complete/reprocess the sample object
+    //     // Get sample info from meta/uvp5_header_sn
+    //     const sample_metadata_ini = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
+    //     // get sample from work/profileid/profileid_datfile.txt
+    //     // get sample from config\cruise_info.txt 
+    //     // get sample from work/profileid/HDRfilename.txt 
+    //     // get sample from config/uvp5_settings/uvp5_configurationdata.txt
+    //     // get sample from config/process_install_config.txt
 
-    // const sample: Partial<SampleRequestCreationModel> = {
-    //     sample_name: ini_content.sample_metadata['profileid'] as string,
-    //     comment: ini_content.sample_metadata['comment'] as string,
-    //     instrument_serial_number: ini_content.HW_CONF['Camera_ref'] as string,
-    //     optional_structure_id: ini_content.sample_metadata['argoid'] as string,
-    //     max_pressure: this.computeMaxPressure(),//TODO à calculer
-    //     integration_time: ini_content.sample_metadata['integrationtime'] as number,
-    //     station_id: ini_content.sample_metadata['stationid'] as string,
-    //     sampling_date: ini_content.sample_metadata['sampledatetime'] as string,
-    //     latitude: this.computeLatitude(ini_content.sample_metadata['latitude'] as number),
-    //     longitude: this.computeLongitude(ini_content.sample_metadata['longitude'] as number),
-    //     wind_direction: ini_content.sample_metadata['winddir'] as number,
-    //     wind_speed: ini_content.sample_metadata['windspeed'] as number,
-    //     sea_state: ini_content.sample_metadata['seastate'] as string,
-    //     nebulousness: ini_content.sample_metadata['nebuloussness'] as number,
-    //     bottom_depth: ini_content.sample_metadata['bottom_depth'] as number,
-    //     instrument_operator_email: ini_content.HW_CONF['Operator_email'] as string,
-    //     filename: ini_content.sample_metadata['filename'] as string,
-    //     filter_first_image: ini_content.sample_metadata['firstimage'] as string,
-    //     filter_last_image: ini_content.sample_metadata['endimg'] as string,
-    //     instrument_settings_acq_gain: ini_content.ACQ_CONF['Gain'] as number,
-    //     instrument_settings_acq_description: ini_content['???'] as string || "#TODO",//TODO seulement pour l'uvp5
-    //     instrument_settings_acq_task_type: ini_content['???'] as string || "#TODO",// TODO seulement pour l'uvp5
-    //     sample_type_id: this.getSampleTypeFromLetter(ini_content.sample_metadata['sampletype']), //TODO à calculer checket si T ou D si non erreur
-    //     instrument_settings_acq_choice: ini_content['???'] as string || "#TODO",//TODO seulement pour l'uvp5
-    //     instrument_settings_acq_disk_type: ini_content['???'] as string || "#TODO", // TODO seulement pour l'uvp5
-    //     instrument_settings_acq_appendices_ratio: ini_content.ACQ_CONF['Appendices_ratio'] as number,
-    //     instrument_settings_acq_xsize: ini_content['???'] as number || -1,//TODO seulement pour l'uvp5 (fichier uvp5_configurationdata.txt)
-    //     instrument_settings_acq_ysize: ini_content['???'] as number || -1,//TODO seulement pour l'uvp5 (fichier uvp5_configurationdata.txt)
-    //     instrument_settings_acq_erase_border: ini_content['???'] as number || -1,//TODO seulement pour l'uvp5 
-    //     instrument_settings_acq_threshold: ini_content.HW_CONF['Threshold'] as number,
-    //     instrument_settings_process_datetime: "ini_content['???'] as string || ",//TODO seulement pour l'uvp5 
-    //     instrument_settings_process_gamma: this.getGammaForUVP6(),//TODO à aller chercher image.zip compute_vignette.txt
-    //     instrument_settings_images_post_process: "uvpapp",
-    //     instrument_settings_aa: ini_content.HW_CONF['Aa'] as number,
-    //     instrument_settings_exp: ini_content.HW_CONF['Exp'] as number,
-    //     instrument_settings_image_volume_l: ini_content.HW_CONF['Image_volume'] as number,
-    //     instrument_settings_pixel_size_mm: ini_content.HW_CONF['Pixel_Size'] as number,
-    //     instrument_settings_depth_offset_m: ini_content.HW_CONF['Pressure_offset'] as number,
-    //     instrument_settings_particle_minimum_size_pixels: ini_content['??'] as number || -1,//TODO seulement pour l'uvp5 
-    //     instrument_settings_vignettes_minimum_size_pixels: ini_content.ACQ_CONF['??'] as number, //TODO seulement pour l'uvp5 
-    //     instrument_settings_particle_minimum_size_esd: ini_content.ACQ_CONF['Limit_lpm_detection_size'] as number || -1,//TODO seulement pour l'uvp6 
-    //     instrument_settings_vignettes_minimum_size_esd: ini_content.ACQ_CONF['Vignetting_lower_limit_size'] as number, //TODO seulement pour l'uvp6 
-    //     instrument_settings_acq_shutter_speed: ini_content.HW_CONF['???'] as number, // UVP5SD 
-    //     instrument_settings_acq_exposure: ini_content['???'] as number || -1,// TODO UVP5HD 
-    //     instrument_settings_acq_shutter: ini_content['Shutter'] as number || -1,// TODO UVP6,
-    // }
-    ////////////////////////////////
-    //     //read from tsv
-    //     const tsvPath = path.join(file_system_storage_project_folder, "work", sample_name, `ecotaxa_${sample_name}.tsv`);
-    //     type RowType = {
-    //         name: string;
-    //         age: number;
-    //         city: string;
+    //     //hardcode "zooprocess"
+
+
+    //     // Process sample_type_id
+    //     const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini);
+    //     // Process latitude and longitude
+    //     const coords = this.computeLatitudeAndLongitude(sample_metadata_ini);
+    //     // Construct the sample object
+    //     const sample_to_return: Partial<SampleRequestCreationModel> = {
+    //         ...sample_metadata_ini,
+    //         sample_type_id,
+    //         latitude: coords.latitude,
+    //         longitude: coords.longitude
     //     };
-
-    //     const options: Options = {
-    //         delimiter: '\t',
-    //         columns: true,
-    //     };
-    //     let rowCount = 0;
-    //     const rows: RowType[] = []; // Array to store the rows
-
-    //     return new Promise((resolve, reject) => {
-    //         const stream = fs.createReadStream(tsvPath)
-    //             .pipe(parse(options))
-    //             .on('data', (row: RowType) => {
-    //                 if (rowCount < 2) {
-    //                     console.log('Row:', row);
-    //                     rows.push(row); // Add the row to the array
-    //                     rowCount++;
-    //                 } else {
-    //                     // Stop reading further data once two rows are processed
-    //                     stream.destroy();
-    //                 }
-    //             })
-    //             .on('end', () => {
-    //                 console.log('File processing completed.');
-    //                 resolve(rows); // Return the array of rows
-    //             })
-    //             .on('error', (err) => {
-    //                 console.error('Error reading the file:', err);
-    //                 reject(err);
-    //             });
-    //     });
+    //     return sample_to_return;
     // }
 
     async getSampleFromFsStorageUVP6(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
@@ -301,10 +239,97 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    computeMaxPressure(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): number {
-        console.log(sample, file_system_storage_project_folder, sample_name)
-        return 0;
+    async computeMaxPressure(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
+        // Read the pressure file
+        const pressures = await this.getPressuresFromParticulesCsv(file_system_storage_project_folder, sample_name);
+        // Compute the max pressure
+        const max_pressure = this.getMaxPressure(pressures);
+
+        return max_pressure;
     }
+
+    getMaxPressure(pressures: (number | "NaN")[]): number | undefined {
+        // Filter out "NaN" values and ensure only numbers are considered
+        const numericPressures = pressures.filter((value): value is number => value !== "NaN");
+
+        // If the array is empty, return undefined to indicate no valid pressures
+        if (numericPressures.length === 0) {
+            return undefined;
+        }
+
+        // Use Math.max to find the maximum pressure
+        return Math.max(...numericPressures);
+    }
+
+    getPressuresFromParticulesCsv(file_system_storage_project_folder: string, sample_name: string): Promise<(number | "NaN")[]> {
+        return new Promise((resolve, reject) => {
+            // Define the path to the .zip file based on the project folder and sample name
+            const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
+
+            // Open the zip file without extracting it to disk
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) {
+                    return reject(err || new Error('Failed to open zip file'));
+                }
+
+                // Start reading entries in the zip file
+                zipfile.readEntry();
+
+                // Handle each entry found in the zip file
+                zipfile.on('entry', (entry) => {
+                    // Check if the current entry is the particules.csv file
+                    if (entry.fileName === 'particules.csv') {
+                        zipfile.openReadStream(entry, (err, readStream) => {
+                            if (err || !readStream) {
+                                return reject(err || new Error('Failed to open read stream'));
+                            }
+
+                            let data = '';
+                            // Collect data chunks from the read stream
+                            readStream.on('data', (chunk) => {
+                                data += chunk;
+                            });
+
+                            // When the read stream ends, parse the collected data manually
+                            readStream.on('end', () => {
+                                try {
+                                    const parsedData = this.extractPressures(data);
+                                    resolve(parsedData);
+                                } catch (parseError) {
+                                    reject(parseError);
+                                }
+                            });
+                        });
+                    } else {
+                        zipfile.readEntry();
+                    }
+                });
+
+                zipfile.on('end', () => {
+                    reject(new Error('particules.csv not found in zip file'));
+                });
+            });
+        });
+    }
+
+    extractPressures(input: string): (number | "NaN")[] {
+        // Split the input by lines
+        const lines = input.split("\n");
+        const pressures: (number | "NaN")[] = [];
+
+        lines.forEach((line) => {
+            // Match lines that start with a timestamp and have a pressure value
+            const match = line.match(/^\d{8}-\d{6},([0-9.]+|NaN),/);
+            if (match) {
+                const pressure = match[1];
+                // Convert to number or retain "NaN" as string
+                pressures.push(pressure === "NaN" ? "NaN" : parseFloat(pressure));
+            }
+        });
+
+        return pressures;
+    }
+
 
     computeLatitudeAndLongitude(sample: MetadataIniSampleModel): { latitude: number, longitude: number } {
         // Compute latitude and longitude
@@ -453,7 +478,6 @@ export class SampleRepositoryImpl implements SampleRepository {
             comment: ini_content.sample_metadata['comment'] as string,
             instrument_serial_number: ini_content.HW_CONF['Camera_ref'] as string,
             optional_structure_id: ini_content.sample_metadata['argoid'] as string,
-            integration_time: ini_content.sample_metadata['integrationtime'] as number,
             station_id: ini_content.sample_metadata['stationid'] as string,
             sampling_date: ini_content.sample_metadata['sampledatetime'] as string,
             wind_direction: ini_content.sample_metadata['winddir'] as number,
@@ -739,8 +763,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
                     // Ensure destination subfolder exists
                     await fs.mkdir(destPath, { recursive: true });
-
-                    console.log("Copying:", sourceFilePath, "to", destFilePath);
+                    //TODO à noter dans la tache console.log("Copying:", sourceFilePath, "to", destFilePath);
                     await fs.copyFile(sourceFilePath, destFilePath);
                 }
             }
@@ -830,10 +853,10 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "integration_time", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
+        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
 
         // Can be sort_by 
-        const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "integration_time", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
+        const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
 
         return await this.getSamples(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }

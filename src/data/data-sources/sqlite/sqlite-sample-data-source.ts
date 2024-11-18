@@ -98,7 +98,6 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         instrument_serial_number TEXT NOT NULL,
         optional_structure_id TEXT,
         max_pressure INTEGER NOT NULL,
-        integration_time INTEGER,
         station_id TEXT NOT NULL,
         sampling_date TEXT NOT NULL,
         latitude REAL NOT NULL,
@@ -164,9 +163,9 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     }
 
     async createOne(sample: SampleRequestCreationModel): Promise<number> {
-        const params = [sample.sample_name, sample.comment, sample.instrument_serial_number, sample.optional_structure_id, sample.max_pressure, sample.integration_time, sample.station_id, sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth, sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio, sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize, sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold, sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp, sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels, sample.instrument_settings_vignettes_minimum_size_pixels, sample.instrument_settings_particle_minimum_size_esd, sample.instrument_settings_vignettes_minimum_size_esd, sample.instrument_settings_acq_shutter, sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure, sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id]
+        const params = [sample.sample_name, sample.comment, sample.instrument_serial_number, sample.optional_structure_id, sample.max_pressure, sample.station_id, sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth, sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio, sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize, sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold, sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp, sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels, sample.instrument_settings_vignettes_minimum_size_pixels, sample.instrument_settings_particle_minimum_size_esd, sample.instrument_settings_vignettes_minimum_size_esd, sample.instrument_settings_acq_shutter, sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure, sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO sample (sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, integration_time, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, instrument_settings_acq_threshold, instrument_settings_process_datetime, instrument_settings_process_gamma, instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, instrument_settings_vignettes_minimum_size_pixels, instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd, instrument_settings_acq_shutter, instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id
+        const sql = `INSERT INTO sample (sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, instrument_settings_acq_threshold, instrument_settings_process_datetime, instrument_settings_process_gamma, instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, instrument_settings_vignettes_minimum_size_pixels, instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd, instrument_settings_acq_shutter, instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id
         ) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
@@ -197,7 +196,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                     return new Promise<number>((resolveInsert, rejectInsert) => {
                         const params = [
                             sample.sample_name, sample.comment, sample.instrument_serial_number,
-                            sample.optional_structure_id, sample.max_pressure, sample.integration_time, sample.station_id,
+                            sample.optional_structure_id, sample.max_pressure, sample.station_id,
                             sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction,
                             sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth,
                             sample.instrument_operator_email, sample.filename, sample.filter_first_image,
@@ -223,7 +222,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         const placeholders = params.map(() => '?').join(', ');
                         const sql = `INSERT INTO sample (
                             sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, 
-                            integration_time, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, 
+                            station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, 
                             nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, 
                             instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, 
                             instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, 
@@ -308,7 +307,6 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             instrument_serial_number: row.instrument_serial_number,
                             optional_structure_id: row.optional_structure_id,
                             max_pressure: row.max_pressure,
-                            integration_time: row.integration_time,
                             station_id: row.station_id,
                             sampling_date: row.sampling_date,
                             latitude: row.latitude,
@@ -471,7 +469,6 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             instrument_serial_number: row.instrument_serial_number,
                             optional_structure_id: row.optional_structure_id,
                             max_pressure: row.max_pressure,
-                            integration_time: row.integration_time,
                             station_id: row.station_id,
                             sampling_date: row.sampling_date,
                             latitude: row.latitude,
