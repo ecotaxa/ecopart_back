@@ -151,12 +151,12 @@ export class ImportSamples implements ImportSamplesUseCase {
 
         if (instrument_model.startsWith('UVP6')) {
             source_folder = path.join(root_folder_path, 'ecodata');
+            await this.sampleRepository.UVP6copySamplesToImportFolder(source_folder, dest_folder, samples_names_to_import);
         } else if (instrument_model.startsWith('UVP5')) {
-            source_folder = path.join(root_folder_path, 'work');
+            await this.sampleRepository.UVP5copySamplesToImportFolder(root_folder_path, dest_folder, samples_names_to_import);
         } else {
             throw new Error("Unknown instrument model");
         }
-        await this.sampleRepository.copySamplesToImportFolder(source_folder, dest_folder, samples_names_to_import);
 
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/4 sample folders copy : done");
 
@@ -174,7 +174,7 @@ export class ImportSamples implements ImportSamplesUseCase {
     }
 
     async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[]): Promise<number[]> {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples creation : start");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
 
         // Common sample data
         const base_sample: Partial<SampleRequestCreationModel> = {
@@ -196,7 +196,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         // Create samples
         const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
 
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/4 samples creation done");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/4 samples db creation done");
         return created_samples_ids;
     }
 }

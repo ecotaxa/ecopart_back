@@ -6,17 +6,19 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
 
-import { promises as fs } from 'fs';
-//import fs from 'fs'; // Correct import for `createReadStream`
+import * as fs from 'fs'; // For createWriteStream
+import * as fsPromises from 'fs/promises'; // For promise-based file operations//import fs from 'fs'; // Correct import for `createReadStream`
 //import { parse, Options } from 'csv-parse'; // Use named import for `parse`
 
 import path from 'path';
 import yauzl from 'yauzl';
+import archiver from 'archiver';
+
 
 
 
@@ -42,6 +44,49 @@ export class SampleRepositoryImpl implements SampleRepository {
         const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
         return sample_to_return;
     }
+    // Generic method to read a file from a ZIP archive
+    private async readFileFromZip(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
+        return new Promise((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) {
+                    return reject(err || new Error('Failed to open zip file'));
+                }
+
+                zipfile.readEntry();
+
+                zipfile.on('entry', (entry) => {
+                    if ((targetFileName && entry.fileName === targetFileName) || (filePathPattern && filePathPattern.test(entry.fileName))) {
+                        zipfile.openReadStream(entry, (err, readStream) => {
+                            if (err || !readStream) {
+                                return reject(err || new Error('Failed to open read stream'));
+                            }
+
+                            let data = '';
+                            readStream.on('data', (chunk) => (data += chunk));
+                            readStream.on('end', () => resolve(data));
+                        });
+                    } else {
+                        zipfile.readEntry();
+                    }
+                });
+
+                zipfile.on('end', () => reject(new Error(`${targetFileName} or ${filePathPattern} not found in zip file`)));
+            });
+        });
+    }
+    // Method to parse and return ComputeVignettes data
+    async readComputeVignettes(file_system_storage_project_folder: string, sample_name: string): Promise<ComputeVignettesModel> {
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Images.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, 'compute_vignette.txt', undefined);
+        return this.parseComputeVignettes(fileContent);
+    }
+
+    // Method to parse and return pressures from particules.csv
+    async getPressuresFromParticulesCsv(file_system_storage_project_folder: string, sample_name: string): Promise<(number | "NaN")[]> {
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, 'particules.csv', undefined);
+        return this.extractPressures(fileContent);
+    }
 
     async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
         let sample_fss = {};
@@ -50,41 +95,98 @@ export class SampleRepositoryImpl implements SampleRepository {
             // read from file_system_storage_project_folder/ecodata and return the list of samples
             sample_fss = await this.getSampleFromFsStorageUVP6(file_system_storage_project_folder, base_sample.sample_name as string);
         }
-        // else if (instrument_model.startsWith('UVP5')) {
-        //     // read from file_system_storage_project_folder/work and return the list of samples
-        //     sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string);
-        // }
+        else if (instrument_model.startsWith('UVP5')) {
+            // read from file_system_storage_project_folder/work and return the list of samples
+            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string);
+        }
         const sample = this.constructSampleFromBaseAndFsStorage(sample_fss, base_sample);
 
         return sample;
     }
 
-    // async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string): Promise<SampleRequestCreationModel> {
-    //     // Complete/reprocess the sample object
-    //     // Get sample info from meta/uvp5_header_sn
-    //     const sample_metadata_ini = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
-    //     // get sample from work/profileid/profileid_datfile.txt
-    //     // get sample from config\cruise_info.txt 
-    //     // get sample from work/profileid/HDRfilename.txt 
-    //     // get sample from config/uvp5_settings/uvp5_configurationdata.txt
-    //     // get sample from config/process_install_config.txt
+    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
+        // Complete the sample object
+        // Get sample info from meta/uvp5_header_sn
+        const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
+        // get sample from work/profileid/profileid_datfile.txt
+        const sample_work_datfile = await this.getSampleFromWorkDatfile(file_system_storage_project_folder, sample_name);
+        // get sample from work/profileid/HDRfilename.txt 
+        const sample_work_hdr = await this.getSampleFromWorkHDR(file_system_storage_project_folder, sample_name);
+        // get sample from config/cruise_info.txt 
+        const sample_cruise_info = await this.getSampleFromCruiseInfo(file_system_storage_project_folder, sample_name);
+        // get sample from config/uvp5_settings/uvp5_configurationdata.txt
+        const sample_configurationdata = await this.getSampleFromConfigurationData(file_system_storage_project_folder, sample_name);
+        // get sample from config/process_install_config.txt
+        const sample_install_config = await this.getSampleFromInstallConfig(file_system_storage_project_folder, sample_name);
 
-    //     //hardcode "zooprocess"
+        //TODO hardcode "zooprocess"
+        const instrument_settings_images_post_process = "zooprocess";
 
+        // Process some fields
 
-    //     // Process sample_type_id
-    //     const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini);
-    //     // Process latitude and longitude
-    //     const coords = this.computeLatitudeAndLongitude(sample_metadata_ini);
-    //     // Construct the sample object
-    //     const sample_to_return: Partial<SampleRequestCreationModel> = {
-    //         ...sample_metadata_ini,
-    //         sample_type_id,
-    //         latitude: coords.latitude,
-    //         longitude: coords.longitude
-    //     };
-    //     return sample_to_return;
-    // }
+        // Process sample_type_id
+        const sample_type_id = await this.computeSampleTypeId(sample_header.sampleType);
+        // Process latitude and longitude
+        const coords = this.computeLatitudeAndLongitude(sample_header.latitude_raw, sample_header.longitude_raw);
+
+        // Construct the sample object
+        delete (sample_header as any).sampleType;
+        delete (sample_header as any).latitude_raw;
+        delete (sample_header as any).longitude_raw;
+
+        // Construct the sample object
+        const sample_to_return: Partial<SampleRequestCreationModel> = {
+            ...sample_header,
+            ...sample_work_datfile,
+            ...sample_work_hdr,
+            ...sample_cruise_info,
+            ...sample_configurationdata,
+            ...sample_install_config,
+            sample_type_id,
+            instrument_settings_images_post_process,
+            latitude: coords.latitude,
+            longitude: coords.longitude
+        };
+        return sample_to_return;
+    }
+
+    async getSampleFromInstallConfig(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromInstallConfigModel> {
+        const filePath = 'config/process_install_config.txt';
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        return this.parseInstallConfig(fileContent);
+    }
+    async getSampleFromConfigurationData(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromConfigurationDataModel> {
+        const filePath = 'config/uvp5_settings/uvp5_configurationdata.txt';
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        return this.parseConfigurationData(fileContent);
+    }
+    async getSampleFromCruiseInfo(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromCruiseInfoModel> {
+        const filePath = 'config/cruise_info.txt';
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        return this.parseCruiseInfo(fileContent);
+    }
+    async getSampleFromWorkHDR(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkHDRModel> {
+        // Construct the file path to match files starting with "HDR" and ending with ".txt"
+        const filePathPattern = new RegExp(`^work/${sample_name}/'HDR.*\\.txt$`);
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
+        return this.parseWorkHDR(fileContent);
+    }
+    async getSampleFromWorkDatfile(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkDatfileModel> {
+        const filePath = 'work/' + sample_name + '/' + sample_name + '_datfile.txt'; // perle3_003_datfile.txt
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        return this.parseWorkDatfile(fileContent);
+    }
+    async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
+        const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
+        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
+        return this.parseMetaHeader(fileContent);
+    }
 
     async getSampleFromFsStorageUVP6(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
 
@@ -95,22 +197,22 @@ export class SampleRepositoryImpl implements SampleRepository {
             process already fetch data:
                 latitude: this.computeLatitude(ini_content.sample_metadata['latitude'] as number),
                 longitude: this.computeLongitude(ini_content.sample_metadata['longitude'] as number),
-
-                sample_type_id: this.getSampleTypeFromLetter(ini_content.sample_metadata['sampletype']), //TODO à calculer checket si T ou D si non erreur
-
+ 
+                sample_type_id: this.getSampleTypeFromLetter(ini_content.sample_metadata['sampletype']), 
+ 
             go to another file to get the data:  
-                max_pressure: this.computeMaxPressure(),//TODO à calculer
-                instrument_settings_process_gamma: this.getGammaForUVP6(),//TODO à aller chercher image.zip compute_vignette.txt    
-
+                max_pressure: this.computeMaxPressure(),
+                instrument_settings_process_gamma: this.getGammaForUVP6(), 
+ 
          * 
          ***/
         // Complete/reprocess the sample object
         // Get sample info from metadata.ini
         const sample_metadata_ini = await this.getSampleFromMetadataIni(file_system_storage_project_folder, sample_name);
         // Process sample_type_id
-        const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini);
+        const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini.sampleType);
         // Process latitude and longitude
-        const coords = this.computeLatitudeAndLongitude(sample_metadata_ini);
+        const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw);
 
         // Compute max_pressure
         const max_pressure = await this.computeMaxPressure(sample_metadata_ini, file_system_storage_project_folder, sample_name);
@@ -142,57 +244,6 @@ export class SampleRepositoryImpl implements SampleRepository {
         // else return the gamma
         const gamma = (await this.readComputeVignettes(file_system_storage_project_folder, sample_name)).gamma;
         return gamma;
-    }
-
-    async readComputeVignettes(file_system_storage_project_folder: string, sample_name: string): Promise<ComputeVignettesModel> {
-        return new Promise((resolve, reject) => {
-            // Define the path to the .zip file based on the project folder and sample name
-            const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Images.zip`);
-
-            // Open the zip file without extracting it to disk
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-                if (err || !zipfile) {
-                    return reject(err || new Error('Failed to open zip file'));
-                }
-
-                // Start reading entries in the zip file
-                zipfile.readEntry();
-
-                // Handle each entry found in the zip file
-                zipfile.on('entry', (entry) => {
-                    // Check if the current entry is the metadata.ini file
-                    if (entry.fileName === 'compute_vignette.txt') {
-                        zipfile.openReadStream(entry, (err, readStream) => {
-                            if (err || !readStream) {
-                                return reject(err || new Error('Failed to open read stream'));
-                            }
-
-                            let data = '';
-                            // Collect data chunks from the read stream
-                            readStream.on('data', (chunk) => {
-                                data += chunk;
-                            });
-
-                            // When the read stream ends, parse the collected data manually
-                            readStream.on('end', () => {
-                                try {
-                                    const parsedData = this.parseComputeVignettes(data);
-                                    resolve(parsedData);
-                                } catch (parseError) {
-                                    reject(parseError);
-                                }
-                            });
-                        });
-                    } else {
-                        zipfile.readEntry();
-                    }
-                });
-
-                zipfile.on('end', () => {
-                    reject(new Error('metadata.ini not found in zip file'));
-                });
-            });
-        });
     }
 
     parseComputeVignettes(data: string): ComputeVignettesModel {
@@ -261,57 +312,6 @@ export class SampleRepositoryImpl implements SampleRepository {
         return Math.max(...numericPressures);
     }
 
-    getPressuresFromParticulesCsv(file_system_storage_project_folder: string, sample_name: string): Promise<(number | "NaN")[]> {
-        return new Promise((resolve, reject) => {
-            // Define the path to the .zip file based on the project folder and sample name
-            const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
-
-            // Open the zip file without extracting it to disk
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-                if (err || !zipfile) {
-                    return reject(err || new Error('Failed to open zip file'));
-                }
-
-                // Start reading entries in the zip file
-                zipfile.readEntry();
-
-                // Handle each entry found in the zip file
-                zipfile.on('entry', (entry) => {
-                    // Check if the current entry is the particules.csv file
-                    if (entry.fileName === 'particules.csv') {
-                        zipfile.openReadStream(entry, (err, readStream) => {
-                            if (err || !readStream) {
-                                return reject(err || new Error('Failed to open read stream'));
-                            }
-
-                            let data = '';
-                            // Collect data chunks from the read stream
-                            readStream.on('data', (chunk) => {
-                                data += chunk;
-                            });
-
-                            // When the read stream ends, parse the collected data manually
-                            readStream.on('end', () => {
-                                try {
-                                    const parsedData = this.extractPressures(data);
-                                    resolve(parsedData);
-                                } catch (parseError) {
-                                    reject(parseError);
-                                }
-                            });
-                        });
-                    } else {
-                        zipfile.readEntry();
-                    }
-                });
-
-                zipfile.on('end', () => {
-                    reject(new Error('particules.csv not found in zip file'));
-                });
-            });
-        });
-    }
-
     extractPressures(input: string): (number | "NaN")[] {
         // Split the input by lines
         const lines = input.split("\n");
@@ -331,10 +331,14 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    computeLatitudeAndLongitude(sample: MetadataIniSampleModel): { latitude: number, longitude: number } {
+    computeLatitudeAndLongitude(latitude_raw: string | undefined, longitude_raw: string | undefined): { latitude: number, longitude: number } {
+        if (latitude_raw === undefined || longitude_raw === undefined) {
+            throw new Error("Latitude or longitude not found");
+        }  // #TODO what to do if not found????
+
         // Compute latitude and longitude
-        const latitude = this.convTextDegreeDotMinuteToDecimalDegree(sample.latitude_raw, 'uvp6');
-        const longitude = this.convTextDegreeDotMinuteToDecimalDegree(sample.longitude_raw, 'uvp6');
+        const latitude = this.convTextDegreeDotMinuteToDecimalDegree(latitude_raw, 'uvp6');
+        const longitude = this.convTextDegreeDotMinuteToDecimalDegree(longitude_raw, 'uvp6');
 
         return { latitude, longitude };
     }
@@ -375,17 +379,16 @@ export class SampleRepositoryImpl implements SampleRepository {
         return parseFloat(v);
     }
 
-
-    async computeSampleTypeId(sample: MetadataIniSampleModel): Promise<number> {
+    async computeSampleTypeId(sampleType: string | undefined): Promise<number> {
         let sample_type_id: number | undefined;
 
         //throw error if unknown sample type
-        if (sample.sampleType === undefined) throw new Error("Undefined sample type");
+        if (sampleType === undefined) throw new Error("Undefined sample type");
 
         // Compute sample_type_id
-        if (sample.sampleType == "T") {
+        if (sampleType == "T") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Time" }))?.sample_type_id;
-        } else if (sample.sampleType == "D") {
+        } else if (sampleType == "D") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Depth" }))?.sample_type_id;
         } else throw new Error("Unknown sample type");
 
@@ -393,55 +396,274 @@ export class SampleRepositoryImpl implements SampleRepository {
         return sample_type_id
     }
 
-    getSampleFromMetadataIni(file_system_storage_project_folder: string, sample_name: string): Promise<MetadataIniSampleModel> {
-        return new Promise((resolve, reject) => {
-            // Define the path to the .zip file based on the project folder and sample name
-            const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
+    // Method to read and parse the metadata.ini file
+    async getSampleFromMetadataIni(file_system_storage_project_folder: string, sample_name: string): Promise<MetadataIniSampleModel> {
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, 'metadata.ini', undefined);
+        return this.parseIniContent(fileContent);
+    }
 
-            // Open the zip file without extracting it to disk
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-                if (err || !zipfile) {
-                    return reject(err || new Error('Failed to open zip file'));
-                }
+    parseInstallConfig(data: string): SampleFromInstallConfigModel {
+        const install_config_content: any = {};
+        console.log("******************************parseInstallConfig******************************");
+        console.log(data);
+        // TODO
+        // let currentSection: string | null = null;
 
-                // Start reading entries in the zip file
-                zipfile.readEntry();
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
 
-                // Handle each entry found in the zip file
-                zipfile.on('entry', (entry) => {
-                    // Check if the current entry is the metadata.ini file
-                    if (entry.fileName === 'metadata.ini') {
-                        zipfile.openReadStream(entry, (err, readStream) => {
-                            if (err || !readStream) {
-                                return reject(err || new Error('Failed to open read stream'));
-                            }
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
 
-                            let data = '';
-                            // Collect data chunks from the read stream
-                            readStream.on('data', (chunk) => {
-                                data += chunk;
-                            });
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
 
-                            // When the read stream ends, parse the collected data manually
-                            readStream.on('end', () => {
-                                try {
-                                    const parsedData = this.parseIniContent(data);
-                                    resolve(parsedData);
-                                } catch (parseError) {
-                                    reject(parseError);
-                                }
-                            });
-                        });
-                    } else {
-                        zipfile.readEntry();
-                    }
-                });
+        const sample: SampleFromInstallConfigModel = {
+            instrument_settings_process_gamma: install_config_content.sample_metadata['gamma'],
+            instrument_settings_vignettes_minimum_size_esd: install_config_content.sample_metadata['esdmin']
+        }
 
-                zipfile.on('end', () => {
-                    reject(new Error('metadata.ini not found in zip file'));
-                });
-            });
-        });
+        return sample;
+    }
+    parseConfigurationData(data: string): SampleFromConfigurationDataModel {
+        const configuration_data_content: any = {};
+        console.log("******************************parseConfigurationData******************************");
+        console.log(data);
+        // TODO
+        // let currentSection: string | null = null;
+
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
+
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
+
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
+
+        const sample: SampleFromConfigurationDataModel = {
+            instrument_settings_acq_xsize: configuration_data_content.sample_metadata['xsize'],           // xsize
+            instrument_settings_acq_ysize: configuration_data_content.sample_metadata['ysize'],           // ysize
+            instrument_settings_pixel_size_mm: configuration_data_content.sample_metadata['Pixel_Size']   // Pixel_Size
+        }
+
+        return sample;
+    }
+    parseCruiseInfo(data: string): SampleFromCruiseInfoModel {
+        const cruise_info_content: any = {};
+        console.log("******************************parseCruiseInfo******************************");
+        console.log(data);
+        // TODO
+        // let currentSection: string | null = null;
+
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
+
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
+
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
+
+        const sample: SampleFromCruiseInfoModel = {
+            instrument_operator_email: cruise_info_content.sample_metadata['op_email'],// op_email
+        }
+
+        return sample;
+    }
+    parseWorkHDR(data: string): SampleFromWorkHDRModel {
+        console.log("******************************parseWorkHDR******************************");
+        console.log(data);
+        const work_hdr_content: any = {};
+        // TODO
+        // let currentSection: string | null = null;
+
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
+
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
+
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
+
+
+        const sample: SampleFromWorkHDRModel = {
+            instrument_settings_acq_gain: work_hdr_content.sample_metadata['Gain'],                       // Gain
+            instrument_settings_acq_description: work_hdr_content.sample_metadata['description'],         // 2e ligne du fichier (retirer le ;)
+            instrument_settings_acq_task_type: work_hdr_content.sample_metadata['TaskType'],              // TaskType
+            instrument_settings_acq_choice: work_hdr_content.sample_metadata['Choice'],                   // Choice
+            instrument_settings_acq_disk_type: work_hdr_content.sample_metadata['DiskType'],              // DiskType
+            instrument_settings_acq_appendices_ratio: work_hdr_content.sample_metadata['Ratio'],          // Ratio
+            instrument_settings_acq_erase_border: work_hdr_content.sample_metadata['EraseBorderBlobs'],   // EraseBorderBlobs
+            instrument_settings_acq_threshold: work_hdr_content.sample_metadata['Thresh'],                // Thresh
+            instrument_settings_particle_minimum_size_pixels: work_hdr_content.sample_metadata['SMbase'], // SMbase
+            instrument_settings_vignettes_minimum_size_pixels: work_hdr_content.sample_metadata['SMzoo'], // SMzoo
+            instrument_settings_acq_shutter_speed: work_hdr_content.sample_metadata['Exposure'],          // Exposure UVP5HD       ????????? #TODO
+            instrument_settings_acq_exposure: work_hdr_content.sample_metadata['ShutterSpeed']            // ShutterSpeed UVP5SD   ????????? #TODO
+        }
+
+        return sample;
+    }
+    parseWorkDatfile(data: string): SampleFromWorkDatfileModel {
+        console.log("******************************parseWorkDatfile******************************");
+        console.log(data);
+        const work_datfile_content: any = {};
+        // TODO
+        // let currentSection: string | null = null;
+
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
+
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
+
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
+
+        const sample: SampleFromWorkDatfileModel = {
+            max_pressure: work_datfile_content.sample_metadata['max_pressure'] //maxpressure work/profileid/profileid_datfile.txt : 9;    //TODO à calculer ?
+        }
+
+        return sample;
+    }
+
+    parseMetaHeader(data: string): SampleFromMetaHeaderModel {
+        const meta_header_content: any = {};
+        console.log("******************************parseMetaHeader******************************");
+        console.log(data);
+        // TODO
+        // let currentSection: string | null = null;
+
+        // // Split the data into lines and process each line
+        // const lines = data.split(/\r?\n/);
+        // lines.forEach((line) => {
+        //     line = line.trim();
+
+        //     // Ignore empty lines or comments
+        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
+        //         return;
+        //     }
+
+        //     // Check if the line is a section header
+        //     if (line.startsWith('[') && line.endsWith(']')) {
+        //         currentSection = line.slice(1, -1).trim();
+        //         ini_content[currentSection] = {};
+        //     }
+        //     // Otherwise, it's a key-value pair
+        //     else if (currentSection) {
+        //         const [key, value] = line.split('=').map((part) => part.trim());
+        //         if (key) {
+        //             // Convert the value to a number if possible, otherwise keep as string
+        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+        //         }
+        //     }
+        // });
+
+        const sample: SampleFromMetaHeaderModel = {
+            sample_name: meta_header_content.sample_metadata['profileid'],
+            comment: meta_header_content.sample_metadata['comment'],
+            instrument_serial_number: meta_header_content.sample_metadata['Camera_ref'],
+            station_id: meta_header_content.sample_metadata['stationid'],
+            sampling_date: meta_header_content.sample_metadata['filename'],
+            latitude_raw: meta_header_content.sample_metadata['latitude'],
+            longitude_raw: meta_header_content.sample_metadata['longitude'],
+            wind_direction: meta_header_content.sample_metadata['winddir'],
+            wind_speed: meta_header_content.sample_metadata['windspeed'],
+            sea_state: meta_header_content.sample_metadata['seastate'],
+            nebulousness: meta_header_content.sample_metadata['nebuloussness'],
+            bottom_depth: meta_header_content.sample_metadata['bottomdepth'],
+            filename: meta_header_content.sample_metadata['filename'],
+            filter_first_image: meta_header_content.sample_metadata['firstimage'],
+            filter_last_image: meta_header_content.sample_metadata['endimg'],
+            sampleType: meta_header_content.sample_metadata['yoyo'],
+            instrument_settings_aa: meta_header_content.sample_metadata['aa'],
+            instrument_settings_exp: meta_header_content.sample_metadata['exp'],
+            instrument_settings_image_volume_l: meta_header_content.sample_metadata['volimage']
+        }
+
+        return sample;
     }
 
     parseIniContent(data: string): MetadataIniSampleModel {
@@ -543,7 +765,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const folderPath = path.join(root_folder_path);
 
         try {
-            await fs.access(folderPath);
+            await fsPromises.access(folderPath);
         } catch (error) {
             throw new Error(`Folder does not exist at path: ${folderPath}`);
         }
@@ -602,7 +824,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         // list folders names in folderPath
         const samples: string[] = [];
         try {
-            const files = await fs.readdir(folderPath);
+            const files = await fsPromises.readdir(folderPath);
 
             for (const file of files) {
                 samples.push(file);
@@ -636,11 +858,11 @@ export class SampleRepositoryImpl implements SampleRepository {
         const samples: HeaderSampleModel[] = [];
         try {
             const header_path = path.join(folderPath, 'meta');
-            const files = await fs.readdir(header_path);
+            const files = await fsPromises.readdir(header_path);
             for (const file of files) {
                 if (file.includes('header') && file.endsWith('.txt')) {
                     const filePath = path.join(header_path, file);
-                    const content = await fs.readFile(filePath, 'utf8');
+                    const content = await fsPromises.readFile(filePath, 'utf8');
 
                     const lines = content.trim().split('\n');
                     for (let i = 1; i < lines.length; i++) {
@@ -693,7 +915,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     async getSamplesFromEcodata(folderPath: string): Promise<string[]> {
         const samples: string[] = [];
         try {
-            const files = await fs.readdir(path.join(folderPath, 'ecodata'));
+            const files = await fsPromises.readdir(path.join(folderPath, 'ecodata'));
 
             for (const file of files) {
                 samples.push(file);
@@ -709,7 +931,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     async getSamplesFromWork(folderPath: string): Promise<string[]> {
         const samples: string[] = [];
         try {
-            const files = await fs.readdir(path.join(folderPath, 'work'));
+            const files = await fsPromises.readdir(path.join(folderPath, 'work'));
 
             for (const file of files) {
                 samples.push(file);
@@ -725,7 +947,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         for (const sample of samples_names_to_import) {
             const destPath = path.join(dest_folder, sample);
             try {
-                await fs.access(destPath);
+                await fsPromises.access(destPath);
                 throw new Error(`Sample folder already exists: ${destPath}`);
             } catch (error) {
                 if (error.code === 'ENOENT') {
@@ -737,15 +959,85 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         }
     }
+    async UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+        const base_folder = path.join(__dirname, '..', '..', '..');
 
-    async copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+        // Ensure that none of the samples folder already exists
+        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(base_folder, dest_folder));
+
+        // Create destination folder
+        await fsPromises.mkdir(path.join(base_folder, dest_folder), { recursive: true });
+
+        // Iterate over each sample name, create the sample folder, copy files, and zip the folder
+        for (const sample of samples_names_to_import) {
+            const sourcePath = path.join(base_folder, source_folder);
+            const destPath = path.join(base_folder, dest_folder, sample);
+
+            // Ensure the destination sample folder exists
+            await fsPromises.mkdir(destPath, { recursive: true });
+
+            // Copy specific files and directories
+            const filesToCopy = [
+                { source: 'work/' + sample, dest: 'work/' + sample },
+                { source: 'meta', dest: 'meta' },
+                { source: 'config/cruise_info.txt', dest: 'config/cruise_info.txt' },
+                { source: 'config/uvp5_settings/uvp5_configuration_data.txt', dest: 'config/uvp5_settings/uvp5_configuration_data.txt' },
+                { source: 'config/process_install_config.txt', dest: 'config/process_install_config.txt' },
+            ];
+
+            for (const file of filesToCopy) {
+                const sourceFilePath = path.join(sourcePath, file.source);
+                const destFilePath = path.join(destPath, file.dest);
+
+                try {
+                    // Ensure the parent folder exists for nested files
+                    await fsPromises.mkdir(path.dirname(destFilePath), { recursive: true });
+
+                    // Copy the file or directory
+                    await fsPromises.cp(sourceFilePath, destFilePath, { recursive: true });
+                    console.log(`Copied ${file.source} for sample ${sample}`);
+                } catch (error) {
+                    throw new Error(`Error copying ${file.source} for sample ${sample}: ${error.message}`);
+                }
+            }
+
+            // Zip the sample folder
+            const zipFilePath = path.join(base_folder, dest_folder, `${sample}.zip`);
+            try {
+                await this.zipFolder(destPath, zipFilePath);
+                console.log(`Zipped folder for sample ${sample} to ${zipFilePath}`);
+
+                // Remove the unzipped folder after zipping
+                await fsPromises.rm(destPath, { recursive: true, force: true });
+                console.log(`Removed unzipped folder for sample ${sample}`);
+            } catch (error) {
+                throw new Error(`Error zipping folder for sample ${sample}: ${error.message}`);
+            }
+        }
+    }
+
+    async zipFolder(folderPath: string, zipFilePath: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(zipFilePath);
+            const archive = archiver('zip', { zlib: { level: 9 } }); // High compression level
+
+            output.on('close', resolve);
+            archive.on('error', reject);
+
+            archive.pipe(output);
+            archive.directory(folderPath, false); // Add folder contents
+            archive.finalize();
+        });
+    }
+
+    async UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
 
         const base_folder = path.join(__dirname, '..', '..', '..');
         // Ensure that non of the samples folder already exists
         await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(base_folder, dest_folder));
 
         // Ensure destination folder exists
-        await fs.mkdir(path.join(base_folder, dest_folder), { recursive: true });
+        await fsPromises.mkdir(path.join(base_folder, dest_folder), { recursive: true });
 
         // Iterate over each sample name and copy .zip files only
         for (const sample of samples_names_to_import) {
@@ -753,7 +1045,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             const destPath = path.join(base_folder, dest_folder, sample);
 
             // Check if the sample directory exists and list files
-            const files = await fs.readdir(sourcePath);
+            const files = await fsPromises.readdir(sourcePath);
 
             // Filter and copy only .zip files
             for (const file of files) {
@@ -762,9 +1054,9 @@ export class SampleRepositoryImpl implements SampleRepository {
                     const destFilePath = path.join(destPath, file);
 
                     // Ensure destination subfolder exists
-                    await fs.mkdir(destPath, { recursive: true });
+                    await fsPromises.mkdir(destPath, { recursive: true });
                     //TODO à noter dans la tache console.log("Copying:", sourceFilePath, "to", destFilePath);
-                    await fs.copyFile(sourceFilePath, destFilePath);
+                    await fsPromises.copyFile(sourceFilePath, destFilePath);
                 }
             }
         }
@@ -772,21 +1064,19 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void> {
         const base_folder = path.join(__dirname, '..', '..', '..');
-        // Iterate over each sample name and delete it
-        for (const sample of samples_names_to_import) {
-            const destPath = path.join(base_folder, dest_folder, sample);
 
-            // Delete the sample folder recurcively from destination
-            await fs.rm(destPath, { recursive: true, force: true });
+        for (const sample of samples_names_to_import) {
+            // Construct paths for the .zip file and the folder
+            const zipPath = path.join(base_folder, dest_folder, `${sample}.zip`);
+            const folderPath = path.join(base_folder, dest_folder, sample);
+
+            // Delete the .zip file
+            await fsPromises.rm(zipPath, { force: true });
+
+            // Delete the folder and its contents recursively
+            await fsPromises.rm(folderPath, { recursive: true, force: true });
         }
     }
-
-
-
-    // async createSample(sample: SampleRequestCreationModel): Promise<number> {
-    //     const result = await this.sampleDataSource.create(sample)
-    //     return result;
-    // }
 
     async getSample(sample: SampleRequestModel): Promise<PublicSampleModel | null> {
         // Clean the sample to keep only sample_id, sample_name, project_id if they are defined
@@ -811,7 +1101,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const folderPath = path.join(this.DATA_STORAGE_FS_STORAGE, `${project_id}`, `${sample_name}`);
         try {
             console.log(`Deleting sample from storage: ${folderPath}`);
-            await fs.rm(folderPath, { recursive: true, force: true });
+            await fsPromises.rm(folderPath, { recursive: true, force: true });
             return 1;
         } catch (error) {
             throw new Error(`Error deleting sample from storage: ${error.message}`);
@@ -928,5 +1218,4 @@ export class SampleRepositoryImpl implements SampleRepository {
         const result = await this.sampleDataSource.getVisualQCStatus(cleaned_visual_qc_status);
         return result;
     }
-
 }

@@ -264,3 +264,58 @@ export interface ExportSampleModel extends PublicSampleModel {
     filter_filtered_rows: number,//TODO à déplacer : metadata à calculer au moment de export
     instrument_settings_acq_descent_filter: string,//TODO à déplacer 
 }
+
+/* FOR import UVP5 */
+export interface SampleFromMetaHeaderModel {
+    sample_name: string,                        // profilid
+    comment: string,                            // comment
+    instrument_serial_number: string,           // in file title : uvp5_header_snXXX
+    station_id: string,                         // stationid
+    sampling_date: string,                      // filename?????
+    latitude_raw: string,                       // latitude
+    longitude_raw: string,                      // longitude
+    wind_direction: number,                     // winddir
+    wind_speed: number,                         // windspeed
+    sea_state: string,                          // seastate
+    nebulousness: number,                       // nebuloussness
+    bottom_depth: number,                       // bottomdepth
+    filename: string,                           // filename
+    filter_first_image: string,                 // firstimage
+    filter_last_image: string,                  // endimg
+    sampleType: string,                         // yoyo
+    instrument_settings_aa: number,             // aa
+    instrument_settings_exp: number,            // exp
+    instrument_settings_image_volume_l: number, // volimage
+
+}
+export interface SampleFromWorkDatfileModel {
+    max_pressure: number,                       // maxpressure work/profileid/profileid_datfile.txt : 9;        20120520080214_203;        ***00150***;00356;003
+}
+export interface SampleFromWorkHDRModel {
+    instrument_settings_acq_gain: number,                       // Gain
+    instrument_settings_acq_description: string,                // 2e ligne du fichier (retirer le ;)
+    instrument_settings_acq_task_type: string                   // TaskType
+    instrument_settings_acq_choice: string,                     // Choice
+    instrument_settings_acq_disk_type: string,                  // DiskType
+    instrument_settings_acq_appendices_ratio: number,           // Ratio
+    instrument_settings_acq_erase_border: number,               // EraseBorderBlobs
+    instrument_settings_acq_threshold: number,                  // Thresh
+    instrument_settings_particle_minimum_size_pixels: number,   // SMbase
+    instrument_settings_vignettes_minimum_size_pixels: number,  // SMzoo
+
+    instrument_settings_acq_shutter_speed: number,              // Exposure UVP5HD       ????????? #TODO
+    instrument_settings_acq_exposure: number                    // ShutterSpeed UVP5SD   ????????? #TODO
+
+}
+export interface SampleFromCruiseInfoModel {
+    instrument_operator_email: string,            // op_email
+}
+export interface SampleFromConfigurationDataModel {
+    instrument_settings_acq_xsize: number,         // xsize
+    instrument_settings_acq_ysize: number,         // ysize
+    instrument_settings_pixel_size_mm: number,     // Pixel_Size
+}
+export interface SampleFromInstallConfigModel {
+    instrument_settings_process_gamma: number,    // gamma
+    instrument_settings_vignettes_minimum_size_esd: number, // esdmin
+}

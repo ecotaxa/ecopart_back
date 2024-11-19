@@ -7,7 +7,8 @@ export interface SampleRepository {
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
     listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]>;
-    copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>
+    UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>
+    UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>
     deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>
     getSample(sample: SampleRequestModel): Promise<PublicSampleModel | null>;
     deleteSample(sample: SampleIdModel): Promise<number>;
