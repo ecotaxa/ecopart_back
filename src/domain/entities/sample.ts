@@ -23,9 +23,9 @@ export interface SampleRequestCreationModel {
 
     instrument_settings_acq_gain: number;                        // Acquisition gain
     instrument_settings_acq_description: string | undefined;                 // Acquisition description
-    instrument_settings_acq_task_type: string | undefined;                   // Acquisition task type
-    instrument_settings_acq_choice: string | undefined;                     // Acquisition choice
-    instrument_settings_acq_disk_type: string | undefined;                   // Acquisition disk type
+    instrument_settings_acq_task_type: number | undefined;                   // Acquisition task type
+    instrument_settings_acq_choice: number | undefined;                     // Acquisition choice
+    instrument_settings_acq_disk_type: number | undefined;                   // Acquisition disk type
     instrument_settings_acq_appendices_ratio: number;            // Acquisition ratio
     instrument_settings_acq_xsize: number | undefined;                       // Acquisition X size (in pixels or relevant unit)
     instrument_settings_acq_ysize: number | undefined;                       // Acquisition Y size (in pixels or relevant unit)
@@ -86,9 +86,9 @@ export interface SampleRequestModel {
 
     instrument_settings_acq_gain?: number;                        // Acquisition gain
     instrument_settings_acq_description?: string | undefined;                 // Acquisition description
-    instrument_settings_acq_task_type?: string | undefined;                 // Acquisition task type
-    instrument_settings_acq_choice?: string | undefined;                    // Acquisition choice
-    instrument_settings_acq_disk_type?: string | undefined;                   // Acquisition disk type
+    instrument_settings_acq_task_type?: number | undefined;                 // Acquisition task type
+    instrument_settings_acq_choice?: number | undefined;                    // Acquisition choice
+    instrument_settings_acq_disk_type?: number | undefined;                   // Acquisition disk type
     instrument_settings_acq_appendices_ratio?: number;                       // Acquisition ratio
     instrument_settings_acq_xsize?: number | undefined;                       // Acquisition X size (in pixels or relevant unit)
     instrument_settings_acq_ysize?: number | undefined;                       // Acquisition Y size (in pixels or relevant unit)
@@ -233,9 +233,9 @@ export interface MetadataIniSampleModel {
 
     instrument_settings_acq_gain: number;                        // Acquisition gain
     instrument_settings_acq_description: string | undefined;                 // Acquisition description
-    instrument_settings_acq_task_type: string | undefined;                   // Acquisition task type
-    instrument_settings_acq_choice: string | undefined;                     // Acquisition choice
-    instrument_settings_acq_disk_type: string | undefined;                   // Acquisition disk type
+    instrument_settings_acq_task_type: number | undefined;                   // Acquisition task type
+    instrument_settings_acq_choice: number | undefined;                     // Acquisition choice
+    instrument_settings_acq_disk_type: number | undefined;                   // Acquisition disk type
     instrument_settings_acq_appendices_ratio: number;            // Acquisition ratio
     instrument_settings_acq_xsize: number | undefined;                       // Acquisition X size (in pixels or relevant unit)
     instrument_settings_acq_ysize: number | undefined;                       // Acquisition Y size (in pixels or relevant unit)
@@ -294,17 +294,17 @@ export interface SampleFromWorkDatfileModel {
 export interface SampleFromWorkHDRModel {
     instrument_settings_acq_gain: number,                       // Gain
     instrument_settings_acq_description: string,                // 2e ligne du fichier (retirer le ;)
-    instrument_settings_acq_task_type: string                   // TaskType
-    instrument_settings_acq_choice: string,                     // Choice
-    instrument_settings_acq_disk_type: string,                  // DiskType
+    instrument_settings_acq_task_type: number                   // TaskType
+    instrument_settings_acq_choice: number,                     // Choice
+    instrument_settings_acq_disk_type: number,                  // DiskType
     instrument_settings_acq_appendices_ratio: number,           // Ratio
     instrument_settings_acq_erase_border: number,               // EraseBorderBlobs
     instrument_settings_acq_threshold: number,                  // Thresh
     instrument_settings_particle_minimum_size_pixels: number,   // SMbase
     instrument_settings_vignettes_minimum_size_pixels: number,  // SMzoo
 
-    instrument_settings_acq_shutter_speed: number,              // Exposure UVP5HD       ????????? #TODO
-    instrument_settings_acq_exposure: number                    // ShutterSpeed UVP5SD   ????????? #TODO
+    instrument_settings_acq_shutter_speed: number | undefined,              // Exposure UVP5HD       ????????? #TODO
+    instrument_settings_acq_exposure: number | undefined                    // ShutterSpeed UVP5SD   ????????? #TODO
 
 }
 export interface SampleFromCruiseInfoModel {

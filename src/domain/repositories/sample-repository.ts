@@ -114,7 +114,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const sample_work_hdr = await this.getSampleFromWorkHDR(file_system_storage_project_folder, sample_name);
         // get sample from config/cruise_info.txt 
         const sample_cruise_info = await this.getSampleFromCruiseInfo(file_system_storage_project_folder, sample_name);
-        // get sample from config/uvp5_settings/uvp5_configurationdata.txt
+        // get sample from config/uvp5_settings/uvp5_configuration_data.txt
         const sample_configurationdata = await this.getSampleFromConfigurationData(file_system_storage_project_folder, sample_name);
         // get sample from config/process_install_config.txt
         const sample_install_config = await this.getSampleFromInstallConfig(file_system_storage_project_folder, sample_name);
@@ -123,7 +123,6 @@ export class SampleRepositoryImpl implements SampleRepository {
         const instrument_settings_images_post_process = "zooprocess";
 
         // Process some fields
-
         // Process sample_type_id
         const sample_type_id = await this.computeSampleTypeId(sample_header.sampleType);
         // Process latitude and longitude
@@ -157,7 +156,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return this.parseInstallConfig(fileContent);
     }
     async getSampleFromConfigurationData(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromConfigurationDataModel> {
-        const filePath = 'config/uvp5_settings/uvp5_configurationdata.txt';
+        const filePath = 'config/uvp5_settings/uvp5_configuration_data.txt';
         const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
         const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
         return this.parseConfigurationData(fileContent);
@@ -170,7 +169,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
     async getSampleFromWorkHDR(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkHDRModel> {
         // Construct the file path to match files starting with "HDR" and ending with ".txt"
-        const filePathPattern = new RegExp(`^work/${sample_name}/'HDR.*\\.txt$`);
+        const filePathPattern = new RegExp(`^work/${sample_name}/HDR.*\\.txt$`);
         const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
         const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
         return this.parseWorkHDR(fileContent);
@@ -185,7 +184,31 @@ export class SampleRepositoryImpl implements SampleRepository {
         const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
         const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
         const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
-        return this.parseMetaHeader(fileContent);
+        const fileName = await this.getFileNameFromZip(zipPath, filePathPattern);
+
+        return this.parseMetaHeader(fileContent, fileName);
+    }
+
+    async getFileNameFromZip(zipPath: string, filePathPattern: RegExp): Promise<string> {
+        return new Promise((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) {
+                    return reject(err || new Error('Failed to open zip file'));
+                }
+
+                zipfile.readEntry();
+
+                zipfile.on('entry', (entry) => {
+                    if (filePathPattern.test(entry.fileName)) {
+                        resolve(entry.fileName);
+                    } else {
+                        zipfile.readEntry();
+                    }
+                });
+
+                zipfile.on('end', () => reject(new Error('File not found in zip')));
+            });
+        });
     }
 
     async getSampleFromFsStorageUVP6(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
@@ -364,33 +387,29 @@ export class SampleRepositoryImpl implements SampleRepository {
             return parseFloat(decimalDegrees.toFixed(5));
         } else {
             if (instrumtype === 'uvp5') {
-                const floatValue = this._ToFloat(v);
+                const floatValue = parseFloat(v);
                 const integerPart = Math.floor(floatValue);
                 const fractionPart = floatValue - integerPart;
                 return parseFloat((integerPart + fractionPart / 0.6).toFixed(5));
             } else {
-                return parseFloat(this._ToFloat(v).toFixed(5));
+                return parseFloat(parseFloat(v).toFixed(5));
             }
         }
     }
 
-    // Helper function to convert a string to float
-    _ToFloat(v: string): number {
-        return parseFloat(v);
-    }
-
     async computeSampleTypeId(sampleType: string | undefined): Promise<number> {
+        // Défini par la personne qui crée le sample dans UVPapp (UVP6 : T for Time D for depth, UVP5 : N for depth, Y for depth:yoyo, H for autre ou time)
         let sample_type_id: number | undefined;
 
-        //throw error if unknown sample type
+        // Throw error if unknown sample type
         if (sampleType === undefined) throw new Error("Undefined sample type");
 
         // Compute sample_type_id
-        if (sampleType == "T") {
+        if (sampleType == "T" || sampleType == "H") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Time" }))?.sample_type_id;
-        } else if (sampleType == "D") {
+        } else if (sampleType == "D" || sampleType == "N" || sampleType == "Y") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Depth" }))?.sample_type_id;
-        } else throw new Error("Unknown sample type");
+        } else throw new Error("Unknown sample type : " + sampleType);
 
         if (sample_type_id === undefined) throw new Error("Sample type not found");
         return sample_type_id
@@ -405,266 +424,181 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     parseInstallConfig(data: string): SampleFromInstallConfigModel {
         const install_config_content: any = {};
-        console.log("******************************parseInstallConfig******************************");
-        console.log(data);
-        // TODO
-        // let currentSection: string | null = null;
+        // Split the data by new lines and process each line
+        const lines = data.split('\n');
+        lines.forEach(line => {
+            // Split each line by the equal sign and trim whitespace
+            const [key, value] = line.split('=').map(str => str.trim());
+            if (key && value) {
+                install_config_content[key] = value;
+            }
+        });
 
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
-
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
-
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
-
+        // Prepare the output object
         const sample: SampleFromInstallConfigModel = {
-            instrument_settings_process_gamma: install_config_content.sample_metadata['gamma'],
-            instrument_settings_vignettes_minimum_size_esd: install_config_content.sample_metadata['esdmin']
-        }
-
+            instrument_settings_process_gamma: install_config_content['gamma'],
+            instrument_settings_vignettes_minimum_size_esd: install_config_content['esdmin']
+        };
         return sample;
     }
+
+
     parseConfigurationData(data: string): SampleFromConfigurationDataModel {
         const configuration_data_content: any = {};
-        console.log("******************************parseConfigurationData******************************");
-        console.log(data);
-        // TODO
-        // let currentSection: string | null = null;
 
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
+        // Split the data into lines and process each line
+        const lines = data.split('\n');
 
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
+        lines.forEach(line => {
+            // Skip lines that don't contain key-value pairs (like headers or empty lines)
+            if (line.includes('=')) {
+                const [key, value] = line.split('=').map(item => item.trim());
+                configuration_data_content[key] = value;
+            }
+        });
 
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
-
+        // Create the model with the parsed data
         const sample: SampleFromConfigurationDataModel = {
-            instrument_settings_acq_xsize: configuration_data_content.sample_metadata['xsize'],           // xsize
-            instrument_settings_acq_ysize: configuration_data_content.sample_metadata['ysize'],           // ysize
-            instrument_settings_pixel_size_mm: configuration_data_content.sample_metadata['Pixel_Size']   // Pixel_Size
-        }
+            instrument_settings_acq_xsize: configuration_data_content['xsize'],           // xsize
+            instrument_settings_acq_ysize: configuration_data_content['ysize'],           // ysize
+            instrument_settings_pixel_size_mm: configuration_data_content['pixel']        // Pixel_Size
+        };
 
         return sample;
     }
+
     parseCruiseInfo(data: string): SampleFromCruiseInfoModel {
         const cruise_info_content: any = {};
-        console.log("******************************parseCruiseInfo******************************");
-        console.log(data);
-        // TODO
-        // let currentSection: string | null = null;
+        // Parse the input data string into a key-value object
+        const lines = data.split("\n");
+        lines.forEach(line => {
+            const [key, value] = line.split("=");
+            if (key && value) {
+                cruise_info_content[key.trim()] = value.trim();
+            }
+        });
 
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
-
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
-
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
-
+        // Construct the SampleFromCruiseInfoModel object
         const sample: SampleFromCruiseInfoModel = {
-            instrument_operator_email: cruise_info_content.sample_metadata['op_email'],// op_email
-        }
-
+            instrument_operator_email: cruise_info_content["op_email"],     // 'op_email'
+            // Add other properties as needed based on the SampleFromCruiseInfoModel structure
+        };
         return sample;
     }
+
     parseWorkHDR(data: string): SampleFromWorkHDRModel {
-        console.log("******************************parseWorkHDR******************************");
-        console.log(data);
         const work_hdr_content: any = {};
-        // TODO
-        // let currentSection: string | null = null;
-
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
-
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
-
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
-
-
+        // Parse the input data string into a key-value object
+        const lines = data.split("\n");
+        lines.forEach(line => {
+            const [key, value] = line.split("=");
+            if (key && value) {
+                work_hdr_content[key.trim()] = value.trim();
+            }
+        });
+        // Create the sample object
         const sample: SampleFromWorkHDRModel = {
-            instrument_settings_acq_gain: work_hdr_content.sample_metadata['Gain'],                       // Gain
-            instrument_settings_acq_description: work_hdr_content.sample_metadata['description'],         // 2e ligne du fichier (retirer le ;)
-            instrument_settings_acq_task_type: work_hdr_content.sample_metadata['TaskType'],              // TaskType
-            instrument_settings_acq_choice: work_hdr_content.sample_metadata['Choice'],                   // Choice
-            instrument_settings_acq_disk_type: work_hdr_content.sample_metadata['DiskType'],              // DiskType
-            instrument_settings_acq_appendices_ratio: work_hdr_content.sample_metadata['Ratio'],          // Ratio
-            instrument_settings_acq_erase_border: work_hdr_content.sample_metadata['EraseBorderBlobs'],   // EraseBorderBlobs
-            instrument_settings_acq_threshold: work_hdr_content.sample_metadata['Thresh'],                // Thresh
-            instrument_settings_particle_minimum_size_pixels: work_hdr_content.sample_metadata['SMbase'], // SMbase
-            instrument_settings_vignettes_minimum_size_pixels: work_hdr_content.sample_metadata['SMzoo'], // SMzoo
-            instrument_settings_acq_shutter_speed: work_hdr_content.sample_metadata['Exposure'],          // Exposure UVP5HD       ????????? #TODO
-            instrument_settings_acq_exposure: work_hdr_content.sample_metadata['ShutterSpeed']            // ShutterSpeed UVP5SD   ????????? #TODO
-        }
-
+            instrument_settings_acq_gain: parseInt(work_hdr_content['Gain']),                                 // Gain
+            instrument_settings_acq_description: lines[1].replace(';', '').trim(),                            // 2nd line description
+            instrument_settings_acq_task_type: parseInt(work_hdr_content['TaskType']),                        // TaskType
+            instrument_settings_acq_choice: parseInt(work_hdr_content['Choice']),                             // Choice
+            instrument_settings_acq_disk_type: parseInt(work_hdr_content['DiskType']),                        // DiskType
+            instrument_settings_acq_appendices_ratio: parseInt(work_hdr_content['Ratio']),                    // Ratio
+            instrument_settings_acq_erase_border: parseInt(work_hdr_content['EraseBorderBlobs']),             // EraseBorderBlobs
+            instrument_settings_acq_threshold: parseInt(work_hdr_content['Thresh']),                          // Thresh
+            instrument_settings_particle_minimum_size_pixels: parseInt(work_hdr_content['SMbase']),           // SMbase
+            instrument_settings_vignettes_minimum_size_pixels: parseInt(work_hdr_content['SMzoo']),           // SMzoo
+            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['Exposure']) || undefined,       // Exposure UVP5HD
+            instrument_settings_acq_exposure: parseInt(work_hdr_content['ShutterSpeed']) || undefined         // ShutterSpeed UVP5SD (default to 0 if missing)
+        };
         return sample;
     }
+
+
     parseWorkDatfile(data: string): SampleFromWorkDatfileModel {
-        console.log("******************************parseWorkDatfile******************************");
-        console.log(data);
         const work_datfile_content: any = {};
-        // TODO
-        // let currentSection: string | null = null;
 
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
+        // Split the data into lines and process each line
+        const lines = data.trim().split("\n");
+        const pressures: number[] = [];
 
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
+        lines.forEach((line) => {
+            const columns = line.split(";").map((col) => col.trim());
+            // Assuming the pressure value is the 3 column (index 2 in zero-based indexing)//TODO check with marc
+            const pressure = parseInt(columns[2], 10);
+            if (!isNaN(pressure)) {
+                pressures.push(pressure);
+            }
+        });
 
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
+        // Find the maximum pressure value
+        const maxPressure = Math.max(...pressures);
+
+        // Assign to work_datfile_content
+        work_datfile_content.sample_metadata = {
+            max_pressure: maxPressure,
+        };
 
         const sample: SampleFromWorkDatfileModel = {
-            max_pressure: work_datfile_content.sample_metadata['max_pressure'] //maxpressure work/profileid/profileid_datfile.txt : 9;    //TODO à calculer ?
-        }
-
+            max_pressure: work_datfile_content.sample_metadata.max_pressure,
+        };
         return sample;
     }
 
-    parseMetaHeader(data: string): SampleFromMetaHeaderModel {
+
+
+    parseMetaHeader(data: string, fileName: string): SampleFromMetaHeaderModel {
+        // Compute instrument serial number from the file name
+        const instrumentSerialMatch = fileName.match(/sn(\d+)/i); // Example: matches "sn205" in "uvp5_header_sn205_perle_03_2020.txt"
+        if (!instrumentSerialMatch) throw new Error('Instrument serial number not found');
+        const instrumentSerialNumber = instrumentSerialMatch[1]
+
+        // Prepare the object to store the parsed data
         const meta_header_content: any = {};
-        console.log("******************************parseMetaHeader******************************");
-        console.log(data);
-        // TODO
-        // let currentSection: string | null = null;
 
-        // // Split the data into lines and process each line
-        // const lines = data.split(/\r?\n/);
-        // lines.forEach((line) => {
-        //     line = line.trim();
+        // Split the input data by lines
+        const lines = data.split('\n').filter(line => line.trim() !== '');
 
-        //     // Ignore empty lines or comments
-        //     if (!line || line.startsWith(';') || line.startsWith('#')) {
-        //         return;
-        //     }
+        // Extract the headers (first line)
+        const headers = lines[0].split(';');
 
-        //     // Check if the line is a section header
-        //     if (line.startsWith('[') && line.endsWith(']')) {
-        //         currentSection = line.slice(1, -1).trim();
-        //         ini_content[currentSection] = {};
-        //     }
-        //     // Otherwise, it's a key-value pair
-        //     else if (currentSection) {
-        //         const [key, value] = line.split('=').map((part) => part.trim());
-        //         if (key) {
-        //             // Convert the value to a number if possible, otherwise keep as string
-        //             (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
-        //         }
-        //     }
-        // });
+        // Parse the remaining lines into objects
+        const rows = lines.slice(1).map(line => {
+            const values = line.split(';');
+            const rowObject: any = {};
+            headers.forEach((header, index) => {
+                rowObject[header.trim()] = values[index] ? values[index].trim() : null;
+            });
+            return rowObject;
+        });
+
+        // Assign the first row (or any specific row) to `meta_header_content`
+        meta_header_content.sample_metadata = rows[0]; // Assuming we want the first row's data
 
         const sample: SampleFromMetaHeaderModel = {
             sample_name: meta_header_content.sample_metadata['profileid'],
             comment: meta_header_content.sample_metadata['comment'],
-            instrument_serial_number: meta_header_content.sample_metadata['Camera_ref'],
+            instrument_serial_number: instrumentSerialNumber,//TODO : is the sn205 in uvp5_header_sn205_perle_03_2020.txt
             station_id: meta_header_content.sample_metadata['stationid'],
             sampling_date: meta_header_content.sample_metadata['filename'],
             latitude_raw: meta_header_content.sample_metadata['latitude'],
             longitude_raw: meta_header_content.sample_metadata['longitude'],
             wind_direction: meta_header_content.sample_metadata['winddir'],
-            wind_speed: meta_header_content.sample_metadata['windspeed'],
+            wind_speed: parseFloat(meta_header_content.sample_metadata['windspeed']),
             sea_state: meta_header_content.sample_metadata['seastate'],
-            nebulousness: meta_header_content.sample_metadata['nebuloussness'],
-            bottom_depth: meta_header_content.sample_metadata['bottomdepth'],
+            nebulousness: parseFloat(meta_header_content.sample_metadata['nebuloussness']),
+            bottom_depth: parseFloat(meta_header_content.sample_metadata['bottomdepth']),
             filename: meta_header_content.sample_metadata['filename'],
             filter_first_image: meta_header_content.sample_metadata['firstimage'],
             filter_last_image: meta_header_content.sample_metadata['endimg'],
             sampleType: meta_header_content.sample_metadata['yoyo'],
-            instrument_settings_aa: meta_header_content.sample_metadata['aa'],
-            instrument_settings_exp: meta_header_content.sample_metadata['exp'],
-            instrument_settings_image_volume_l: meta_header_content.sample_metadata['volimage']
-        }
-
+            instrument_settings_aa: parseFloat(meta_header_content.sample_metadata['aa']),
+            instrument_settings_exp: parseFloat(meta_header_content.sample_metadata['exp']),
+            instrument_settings_image_volume_l: parseFloat(meta_header_content.sample_metadata['volimage']),
+        };
         return sample;
     }
+
 
     parseIniContent(data: string): MetadataIniSampleModel {
         const ini_content: any = {};
@@ -995,7 +929,6 @@ export class SampleRepositoryImpl implements SampleRepository {
 
                     // Copy the file or directory
                     await fsPromises.cp(sourceFilePath, destFilePath, { recursive: true });
-                    console.log(`Copied ${file.source} for sample ${sample}`);
                 } catch (error) {
                     throw new Error(`Error copying ${file.source} for sample ${sample}: ${error.message}`);
                 }
@@ -1005,11 +938,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             const zipFilePath = path.join(base_folder, dest_folder, `${sample}.zip`);
             try {
                 await this.zipFolder(destPath, zipFilePath);
-                console.log(`Zipped folder for sample ${sample} to ${zipFilePath}`);
 
                 // Remove the unzipped folder after zipping
                 await fsPromises.rm(destPath, { recursive: true, force: true });
-                console.log(`Removed unzipped folder for sample ${sample}`);
             } catch (error) {
                 throw new Error(`Error zipping folder for sample ${sample}: ${error.message}`);
             }
@@ -1055,7 +986,6 @@ export class SampleRepositoryImpl implements SampleRepository {
 
                     // Ensure destination subfolder exists
                     await fsPromises.mkdir(destPath, { recursive: true });
-                    //TODO à noter dans la tache console.log("Copying:", sourceFilePath, "to", destFilePath);
                     await fsPromises.copyFile(sourceFilePath, destFilePath);
                 }
             }
@@ -1100,7 +1030,6 @@ export class SampleRepositoryImpl implements SampleRepository {
     async deleteSampleFromStorage(sample_name: string, project_id: number): Promise<number> {
         const folderPath = path.join(this.DATA_STORAGE_FS_STORAGE, `${project_id}`, `${sample_name}`);
         try {
-            console.log(`Deleting sample from storage: ${folderPath}`);
             await fsPromises.rm(folderPath, { recursive: true, force: true });
             return 1;
         } catch (error) {
