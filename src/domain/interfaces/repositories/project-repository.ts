@@ -13,4 +13,6 @@ export interface ProjectRepository {
     computeDefaultDepthOffset(instrument_model: string): number | undefined;
     deleteProject(project: ProjectRequestModel): Promise<number>;
     standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>>;
+    ensureFolderStructureForBackup(root_folder_path: string): Promise<void>;
+    copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean): Promise<void>;
 }

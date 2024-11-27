@@ -10,6 +10,7 @@ import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
+import TaskRouter from './presentation/routers/tasks-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -44,6 +45,7 @@ import { ProjectRepositoryImpl } from './domain/repositories/project-repository'
 import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-repository'
 import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
 import { TaskRepositoryImpl } from './domain/repositories/task-repository'
+import { BackupProject } from './domain/use-cases/project/backup-project'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -52,7 +54,6 @@ import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-proje
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
 import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
 import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
-import sqlite3 from 'sqlite3'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -60,9 +61,10 @@ import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
 import { FsAdapter } from './infra/files/fs'
 
-import 'dotenv/config'
+import sqlite3 from 'sqlite3'
 import path from 'path'
-import TaskRouter from './presentation/routers/tasks-router'
+
+import 'dotenv/config'
 
 sqlite3.verbose()
 
@@ -174,6 +176,7 @@ async function getSQLiteDS() {
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
+        new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo),

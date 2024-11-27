@@ -6,7 +6,12 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, P
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
 
-import { promises as fs } from 'fs';
+import * as fsPromises from 'fs/promises'; // For promise-based file operations//import fs from 'fs'; // Correct import for `createReadStream`
+import * as fs from 'fs'; // For createWriteStream
+
+import archiver from 'archiver';
+
+import path from "path";
 
 export class ProjectRepositoryImpl implements ProjectRepository {
     projectDataSource: ProjectDataSource
@@ -14,6 +19,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
+    base_folder = path.join(__dirname, '..', '..', '..');
 
     constructor(projectDataSource: ProjectDataSource) {
         this.projectDataSource = projectDataSource
@@ -186,13 +192,160 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     async createProjectRootFolder(root_folder_path: string): Promise<void> {
         try {
             // Check if the folder exists
-            await fs.access(root_folder_path);
+            await fsPromises.access(root_folder_path);
             // If it exists, remove it recursively
-            await fs.rm(root_folder_path, { recursive: true, force: true });
+            await fsPromises.rm(root_folder_path, { recursive: true, force: true });
         } catch (error) {
             // Folder does not exist; no need to delete anything
         }
         // Create the root folder
-        await fs.mkdir(root_folder_path, { recursive: true });
+        await fsPromises.mkdir(root_folder_path, { recursive: true });
     }
+
+    async ensureFolderStructureForBackup(root_folder_path: string): Promise<void> {
+        // Ensure /raw, /meta, /config EXISTS
+        const foldersTocheck = ['raw', 'meta', 'config'];
+
+        for (const folder of foldersTocheck) {
+            const folderPath = path.join(this.base_folder, root_folder_path, folder);
+            try {
+                await fsPromises.access(folderPath);
+            } catch (error) {
+                throw new Error(`Folder does not exist at path: ${folderPath}`);
+            }
+        }
+    }
+
+    async copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean): Promise<void> {
+        // Create destination folder if does not exist
+        await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
+
+        // Copy meta/*, and config/*.
+        await this.copy_metadata(this.base_folder, source_folder, dest_folder);
+
+        // Copy L0b files
+        if (skip_already_imported === true) {
+            await this.copyNewL0bFolders(this.base_folder, source_folder, dest_folder);
+        } else {
+            await this.copyAllL0bFolders(this.base_folder, source_folder, dest_folder);
+        }
+    }
+
+    async copy_metadata(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
+        const foldersToCopy = [
+            { source: 'meta', dest: 'meta' },
+            { source: 'config', dest: 'config' }
+        ];
+
+        for (const folder of foldersToCopy) {
+            const sourcePath = path.join(base_folder, source_folder, folder.source);
+            const destPath = path.join(base_folder, dest_folder, folder.dest);
+            const oldDestPath = path.join(base_folder, dest_folder, `old_${folder.dest}`);
+
+            // Ensure the destination folder exists
+            await fsPromises.mkdir(destPath, { recursive: true });
+
+            // Rename dest folder to old_{folder.dest}
+            await fsPromises.rename(destPath, oldDestPath);
+            try {
+                // Copy source folder to dest folder using cp
+                await fsPromises.cp(sourcePath, destPath, { recursive: true });
+            } catch (error) {
+                // If an error occurs, restore the old_{folder.dest}
+                await fsPromises.rename(oldDestPath, destPath);
+                throw error;
+            }
+
+            // If everything is ok, remove old_{folder.dest}
+            await fsPromises.rm(oldDestPath, { recursive: true, force: true });
+        }
+    }
+
+
+    async copyAllL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
+        const sourcePath = path.join(base_folder, source_folder, 'raw');
+        const destPath = path.join(base_folder, dest_folder, 'raw');
+
+        // Ensure the destination folder exists
+        await fsPromises.mkdir(destPath, { recursive: true });
+
+        // Read all subfolders in the source folder
+        const subfolders = await fsPromises.readdir(sourcePath, { withFileTypes: true });
+
+        for (const entry of subfolders) {
+            if (entry.isDirectory()) {
+                const sourceSubfolder = path.join(sourcePath, entry.name);
+                const destZipFile = path.join(destPath, `${entry.name}.zip`);
+
+                // Zip the folder and write to the destination
+                await this.zipFolder(sourceSubfolder, destZipFile);
+            }
+        }
+    }
+
+    async zipFolder(sourceFolder: string, destZipFile: string): Promise<void> {
+        // Create a file output stream for the destination zip file
+        const output = fs.createWriteStream(destZipFile);
+
+        // Create a new archiver instance to create a zip file
+        const archive = archiver('zip', {
+            zlib: { level: 9 }  // Maximum compression
+        });
+
+        // Pipe the archiver output to the file stream
+        output.on('close', () => {
+            //console.log(`Archive ${destZipFile} has been created, ${archive.pointer()} total bytes.`);
+        });
+
+        archive.on('error', (err) => {
+            throw err;
+        });
+
+        archive.pipe(output);
+
+        // Append all files from the source folder to the archive
+        archive.directory(sourceFolder, false);  // Second argument 'false' keeps directory structure intact
+
+        // Finalize the archive (this will compress the data)
+        await archive.finalize();
+    }
+
+    async copyNewL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
+        const sourcePath = path.join(base_folder, source_folder, 'raw');
+        const destPath = path.join(base_folder, dest_folder, 'raw');
+
+        // Ensure the destination folder exists
+        await fsPromises.mkdir(destPath, { recursive: true });
+
+        // Read all subfolders in the source folder
+        const subfolders = await fsPromises.readdir(sourcePath, { withFileTypes: true });
+
+        for (const entry of subfolders) {
+            if (entry.isDirectory()) {
+                const sourceSubfolder = path.join(sourcePath, entry.name);
+                const destSubfolder = path.join(destPath, `${entry.name}.zip`);
+
+                // Check if the subfolder is already copied (check if the zip file exists)
+                const zipExists = await this.checkFileExists(destSubfolder);
+                if (!zipExists) {
+                    // If not, copy and zip the folder
+                    //console.log(`Copying new folder: ${entry.name}`);
+                    await this.zipFolder(sourceSubfolder, destSubfolder);
+                }
+                // else {
+                //     console.log(`Skipping already existing folder: ${entry.name}`);
+                // }
+            }
+        }
+    }
+
+    async checkFileExists(filePath: string): Promise<boolean> {
+        try {
+            await fsPromises.access(filePath);
+            return true; // File exists
+        } catch {
+            return false; // File does not exist
+        }
+    }
+
 }

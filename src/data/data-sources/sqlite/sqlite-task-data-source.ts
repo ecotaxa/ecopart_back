@@ -78,9 +78,11 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 INSERT OR IGNORE INTO task_type (task_type_label) 
                 VALUES 
                 ('EXPORT'),
+                ('EXPORT_BACKUP'),
                 ('DELETE'),
                 ('UPDATE'),
                 ('IMPORT'),
+                ('IMPORT_BACKUP'),
                 ('IMPORT_CTD'),
                 ('IMPORT_ECO_TAXA');
                 `;
@@ -330,7 +332,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(task)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + "task." + key + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);

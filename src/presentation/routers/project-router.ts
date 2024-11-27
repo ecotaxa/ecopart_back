@@ -7,6 +7,8 @@ import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-v
 import { CreateProjectUseCase } from '../../domain/interfaces/use-cases/project/create-project'
 import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/delete-project'
 import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
+import { BackupProjectUseCase } from '../../domain/interfaces/use-cases/project/backup-project'
+// import { ExportBackupProjectUseCase } from '../../domain/interfaces/use-cases/project/export-backup-project'
 import { ImportSamplesUseCase } from '../../domain/interfaces/use-cases/sample/import-samples'
 import { DeleteSampleUseCase } from '../../domain/interfaces/use-cases/sample/delete-sample'
 import { SearchSamplesUseCase } from '../../domain/interfaces/use-cases/sample/search-samples'
@@ -24,10 +26,12 @@ export default function ProjectRouter(
     deleteProjectUseCase: DeleteProjectUseCase,
     updateProjectUseCase: UpdateProjectUseCase,
     searchProjectUseCase: SearchProjectsUseCase,
+    backupProjectUseCase: BackupProjectUseCase,
+    // exportBackupProjectUseCase: ExportBackupProjectUseCase,
     listImportableSamplesUseCase: ListImportableSamplesUseCase,
     importSamplesUseCase: ImportSamplesUseCase,
     deleteSampleUseCase: DeleteSampleUseCase,
-    searchSamplesUseCase: SearchSamplesUseCase
+    searchSamplesUseCase: SearchSamplesUseCase,
 ) {
     const router = express.Router()
 
@@ -130,6 +134,34 @@ export default function ProjectRouter(
             else res.status(500).send({ errors: ["Cannot delete project"] })
         }
     })
+
+    // L0-b project backup
+    router.post('/:project_id/backup', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackup, async (req: Request, res: Response) => {
+        try {
+            const task = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.skip_already_imported);
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot backup project"] })
+        }
+    })
+
+    // // L0-b project backup export
+    // router.get('/:project_id/backup/export', middlewareAuth.auth, async (req: Request, res: Response) => {
+    //     try {
+    //         const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
+    //         res.status(200).send(task)
+    //     } catch (err) {
+    //         console.log(err)
+    //         if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+    //         else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
+    //         else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+    //         else res.status(500).send({ errors: ["Cannot export project"] })
+    //     }
+    // })
 
     /***********************************************SAMPLES***********************************************/
 

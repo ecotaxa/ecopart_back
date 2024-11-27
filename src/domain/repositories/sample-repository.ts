@@ -30,6 +30,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
+    base_folder = path.join(__dirname, '..', '..', '..');
 
     constructor(sampleDataSource: SampleDataSource, DATA_STORAGE_FS_STORAGE: string) {
         this.sampleDataSource = sampleDataSource
@@ -894,18 +895,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
     async UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
-        const base_folder = path.join(__dirname, '..', '..', '..');
 
         // Ensure that none of the samples folder already exists
-        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(base_folder, dest_folder));
+        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(this.base_folder, dest_folder));
 
         // Create destination folder
-        await fsPromises.mkdir(path.join(base_folder, dest_folder), { recursive: true });
+        await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
 
         // Iterate over each sample name, create the sample folder, copy files, and zip the folder
         for (const sample of samples_names_to_import) {
-            const sourcePath = path.join(base_folder, source_folder);
-            const destPath = path.join(base_folder, dest_folder, sample);
+            const sourcePath = path.join(this.base_folder, source_folder);
+            const destPath = path.join(this.base_folder, dest_folder, sample);
 
             // Ensure the destination sample folder exists
             await fsPromises.mkdir(destPath, { recursive: true });
@@ -935,7 +935,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
 
             // Zip the sample folder
-            const zipFilePath = path.join(base_folder, dest_folder, `${sample}.zip`);
+            const zipFilePath = path.join(this.base_folder, dest_folder, `${sample}.zip`);
             try {
                 await this.zipFolder(destPath, zipFilePath);
 
@@ -962,18 +962,16 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
-
-        const base_folder = path.join(__dirname, '..', '..', '..');
         // Ensure that non of the samples folder already exists
-        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(base_folder, dest_folder));
+        await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(this.base_folder, dest_folder));
 
         // Ensure destination folder exists
-        await fsPromises.mkdir(path.join(base_folder, dest_folder), { recursive: true });
+        await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
 
         // Iterate over each sample name and copy .zip files only
         for (const sample of samples_names_to_import) {
-            const sourcePath = path.join(base_folder, source_folder, sample);
-            const destPath = path.join(base_folder, dest_folder, sample);
+            const sourcePath = path.join(this.base_folder, source_folder, sample);
+            const destPath = path.join(this.base_folder, dest_folder, sample);
 
             // Check if the sample directory exists and list files
             const files = await fsPromises.readdir(sourcePath);
@@ -993,12 +991,10 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void> {
-        const base_folder = path.join(__dirname, '..', '..', '..');
-
         for (const sample of samples_names_to_import) {
             // Construct paths for the .zip file and the folder
-            const zipPath = path.join(base_folder, dest_folder, `${sample}.zip`);
-            const folderPath = path.join(base_folder, dest_folder, sample);
+            const zipPath = path.join(this.base_folder, dest_folder, `${sample}.zip`);
+            const folderPath = path.join(this.base_folder, dest_folder, sample);
 
             // Delete the .zip file
             await fsPromises.rm(zipPath, { force: true });

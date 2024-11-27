@@ -12,6 +12,8 @@ export enum TaskType {
     Delete = "DELETE",
     Update = "UPDATE",
     Import = "IMPORT",
+    Import_Backup = "IMPORT_BACKUP",
+    Export_Backup = "EXPORT_BACKUP",
     Import_CTD = "IMPORT_CTD",
     Import_EcoTaxa = "IMPORT_ECO_TAXA",
 }
@@ -99,8 +101,8 @@ export interface TaskResponseModel {
 
 export interface PrivateTaskRequestModel {
     task_id?: number;
-    task_type_id?: TaskType;
-    task_status_id?: TasksStatus;
+    task_type_id?: number;
+    task_status_id?: number;
     task_owner_id?: number;
     task_project_id?: number;
     task_params?: object;

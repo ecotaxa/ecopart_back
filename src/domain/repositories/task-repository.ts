@@ -20,6 +20,8 @@ export class TaskRepositoryImpl implements TaskRepository {
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
+    base_folder = path.join(__dirname, '..', '..', '..');
+
 
     constructor(taskDataSource: TaskDataSource, fs: FsWrapper, DATA_STORAGE_FOLDER: string) {
         this.taskDataSource = taskDataSource
@@ -62,7 +64,7 @@ export class TaskRepositoryImpl implements TaskRepository {
         const result = await this.taskDataSource.create(private_task)
 
         //create log file based on created task_id
-        const log_file_path = path.join(__dirname, '..', '..', '..', this.DATA_STORAGE_FOLDER, "tasks_log", `task_${result}.log`)
+        const log_file_path = path.join(this.base_folder, this.DATA_STORAGE_FOLDER, "tasks_log", `task_${result}.log`)
 
         //  create log file
         try {
