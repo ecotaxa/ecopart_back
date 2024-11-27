@@ -45,6 +45,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
         return sample_to_return;
     }
+
     // Generic method to read a file from a ZIP archive
     private async readFileFromZip(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
         return new Promise((resolve, reject) => {
@@ -91,7 +92,6 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
         let sample_fss = {};
-
         if (instrument_model.startsWith('UVP6')) {
             // read from file_system_storage_project_folder/ecodata and return the list of samples
             sample_fss = await this.getSampleFromFsStorageUVP6(file_system_storage_project_folder, base_sample.sample_name as string);
@@ -239,7 +239,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw);
 
         // Compute max_pressure
-        const max_pressure = await this.computeMaxPressure(sample_metadata_ini, file_system_storage_project_folder, sample_name);
+        const max_pressure = await this.computeMaxPressure(file_system_storage_project_folder, sample_name);
         // Get instrument_settings_process_gamma
         const instrument_settings_process_gamma = await this.getInstrumentSettingsProcessGamma(sample_metadata_ini, file_system_storage_project_folder, sample_name);
 
@@ -314,7 +314,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    async computeMaxPressure(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
+    async computeMaxPressure(file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
         // Read the pressure file
         const pressures = await this.getPressuresFromParticulesCsv(file_system_storage_project_folder, sample_name);
         // Compute the max pressure
@@ -332,8 +332,14 @@ export class SampleRepositoryImpl implements SampleRepository {
             return undefined;
         }
 
-        // Use Math.max to find the maximum pressure
-        return Math.max(...numericPressures);
+        const arrayMinMax = (arr: number[]): [number, number] =>
+            arr.reduce(
+                ([min, max], val): [number, number] => [Math.min(min, val), Math.max(max, val)],
+                [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]
+            );
+
+        const [, max_pressure] = arrayMinMax(numericPressures);
+        return max_pressure
     }
 
     extractPressures(input: string): (number | "NaN")[] {
