@@ -68,7 +68,7 @@ export class TaskRepositoryImpl implements TaskRepository {
 
         //  create log file
         try {
-            await this.logMessage(log_file_path, "Task created")
+            await this.logMessage(log_file_path, "Task created for " + task.task_type)
             await this.logMessage(log_file_path, "Task params: " + JSON.stringify(task.task_params))
         } catch (err) {
             console.log(err);
