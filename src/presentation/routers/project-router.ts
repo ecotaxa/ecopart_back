@@ -179,10 +179,15 @@ export default function ProjectRouter(
         }
     })
 
-    router.post('/:project_id/samples/import', middlewareAuth.auth,/*middlewareSampleValidation.rulesImport,*/  async (req: Request, res: Response) => {
+    router.post('/:project_id/samples/import', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
         try {
-            const tasks = await importSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any, { ...req.body }.samples);
-            res.status(200).send(tasks)
+            const task_import_samples = await importSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any, { ...req.body }.samples);
+            if (req.body.backup_project === true) {
+                const task_backup_project = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.backup_project_skip_already_imported);
+                res.status(200).send([task_import_samples, task_backup_project])
+            } else {
+                res.status(200).send(task_import_samples)
+            }
         } catch (err) {
             console.log(err)
             // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })

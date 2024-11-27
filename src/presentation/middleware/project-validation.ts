@@ -303,4 +303,23 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             next();
         },
     ]
+
+    rulesProjectBackupFromImport = [
+        check("backup_project").default(false)
+            .isIn([true, false]).withMessage('Backup project must be a boolean true or false value.'),
+        check("backup_project_skip_already_imported").default(true)
+            .isIn([true, false]).withMessage('Backup project, skip already imported must be a boolean true or false value.'),
+        check("samples")
+            .exists().withMessage('Samples are required.')
+            .isArray().withMessage('Samples must be an array.'),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ]
 }
