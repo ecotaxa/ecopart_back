@@ -31,13 +31,13 @@ export class BackupProject implements BackupProjectUseCase {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        // Ensure the current user has permission to get the project importable samples
+        // Ensure the current user has permission to backup project
         await this.ensureUserCanGet(current_user, project_id);
 
         // Get the project
         const project: ProjectResponseModel = await this.getProjectIfExist(project_id);
 
-        // Create a task to import samples
+        // Create a task to backup project
         const task_id = await this.createBackupProjectTask(current_user, project, skip_already_imported);
 
         // get the task

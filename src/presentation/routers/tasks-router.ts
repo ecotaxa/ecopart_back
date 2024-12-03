@@ -8,6 +8,7 @@ import { DeleteTaskUseCase } from '../../domain/interfaces/use-cases/task/delete
 import { SearchTasksUseCase } from '../../domain/interfaces/use-cases/task/search-task'
 import { GetOneTaskUseCase } from '../../domain/interfaces/use-cases/task/get-one-task'
 import { GetLogFileTask } from '../../domain/use-cases/task/get-log-file-task'
+import { StreamZipFileUseCase } from '../../domain/interfaces/use-cases/task/stream-zip-file'
 
 import { CustomRequest } from '../../domain/entities/auth'
 
@@ -17,6 +18,7 @@ export default function TaskRouter(
     deleteTaskUseCase: DeleteTaskUseCase,
     getOneTaskUseCase: GetOneTaskUseCase,
     getLogFileTask: GetLogFileTask,
+    streamZipFileUseCase: StreamZipFileUseCase,
     searchTaskUseCase: SearchTasksUseCase
 ) {
     const router = express.Router()
@@ -77,7 +79,7 @@ export default function TaskRouter(
         }
     })
 
-    // Fetch log for admin nof task owner of project member/managers
+    // Fetch log for admin or task owner or project member/managers
     router.get('/:task_id/log', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const taskId = parseInt(req.params.task_id);
@@ -89,6 +91,21 @@ export default function TaskRouter(
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
             else res.status(500).send({ errors: ["Cannot get task log"] });
+        }
+    });
+
+    // Fetch task file for admin or task owner or project member/managers
+    router.get('/:task_id/file', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const taskId = parseInt(req.params.task_id);
+            await streamZipFileUseCase.execute((req as CustomRequest).token, taskId, res);
+        } catch (err) {
+            console.log(err);
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
+            else if (err.message === "Cannot find task file") res.status(404).send({ errors: [err.message] });
+            else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task file"] });
+            else res.status(500).send({ errors: ["Cannot get task file"] });
         }
     });
 

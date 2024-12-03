@@ -322,4 +322,17 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             next();
         },
     ]
+    rulesProjectExportBackup = [
+        check("out_to_ftp").default(false)
+            .isIn([true, false]).withMessage('Out to ftp must be a boolean true or false value.'),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ]
 }

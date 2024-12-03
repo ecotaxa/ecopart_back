@@ -34,6 +34,7 @@ import { DeleteTask } from './domain/use-cases/task/delete-task'
 import { SearchTask } from './domain/use-cases/task/search-tasks'
 import { GetOneTask } from './domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
+import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
 import { DeleteSample } from './domain/use-cases/sample/delete-sample'
 import { SearchSamples } from './domain/use-cases/sample/search-samples'
 
@@ -46,6 +47,7 @@ import { PrivilegeRepositoryImpl } from './domain/repositories/privilege-reposit
 import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
 import { TaskRepositoryImpl } from './domain/repositories/task-repository'
 import { BackupProject } from './domain/use-cases/project/backup-project'
+import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -79,6 +81,7 @@ const config = {
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
+    DATA_STORAGE_FTP_EXPORT: process.env.DATA_STORAGE_FTP_EXPORT || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -140,7 +143,7 @@ async function getSQLiteDS() {
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
-    const project_repo = new ProjectRepositoryImpl(project_dataSource)
+    const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_FTP_EXPORT, config.DATA_STORAGE_FOLDER)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
@@ -177,6 +180,7 @@ async function getSQLiteDS() {
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
+        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_FTP_EXPORT, config.BASE_URL_PUBLIC),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo),
@@ -188,6 +192,7 @@ async function getSQLiteDS() {
         new DeleteTask(user_repo, task_repo, privilege_repo),
         new GetOneTask(task_repo, user_repo, privilege_repo),
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
+        new StreamZipFile(task_repo, user_repo, privilege_repo),
         new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo)
     )
 

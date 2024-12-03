@@ -10,7 +10,7 @@ import { UserRequestModel } from "../../entities/user";
 export interface TaskRepository {
     getOneTask(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null>;
     startTask(task: PublicTaskRequestModel): Promise<void>;
-    finishTask(task: PublicTaskRequestModel): Promise<void>;
+    finishTask(task: PublicTaskRequestModel, task_result?: string): Promise<void>;
     updateTaskProgress(task: PublicTaskRequestModel, progress_pct: number, progress_msg: string): Promise<void>;
     // formatTaskRequestCreationModel(public_task: PublicTaskRequestCreationModel, instrument: InstrumentModelResponseModel): TaskRequestCreationModel;
     // standardUpdateTask(task_to_update: TaskUpdateModel): Promise<number>;
@@ -22,6 +22,8 @@ export interface TaskRepository {
     standardGetTaskStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>>;
     getTasksByUser(user: UserRequestModel): Promise<number[]>;
     getLogFileTask(task_id: number): Promise<string>;
+    getZipFilePath(task_id: number): Promise<string>;
     failedTask(task_id: number, error: Error): Promise<void>;
     logMessage(task_log_file_path: string | undefined, message: string): Promise<void>;
+    updateTaskResult(task: PublicTaskRequestModel, task_result: string): Promise<void>;
 }

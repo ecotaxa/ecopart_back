@@ -8,6 +8,7 @@ export interface IMiddlewareProjectValidation {
     rulesProjectRequestCreationModel: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesProjectUpdateModel: ((Middleware & ContextRunner) | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesProjectBackup: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
+    rulesProjectExportBackup: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesProjectBackupFromImport: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
 }
 

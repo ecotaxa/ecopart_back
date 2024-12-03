@@ -15,14 +15,21 @@ import path from "path";
 
 export class ProjectRepositoryImpl implements ProjectRepository {
     projectDataSource: ProjectDataSource
+    DATA_STORAGE_FS_STORAGE: string
+    DATA_STORAGE_FTP_EXPORT: string
+    DATA_STORAGE_FOLDER: string
 
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
+
     base_folder = path.join(__dirname, '..', '..', '..');
 
-    constructor(projectDataSource: ProjectDataSource) {
+    constructor(projectDataSource: ProjectDataSource, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_FTP_EXPORT: string, DATA_STORAGE_FOLDER: string) {
         this.projectDataSource = projectDataSource
+        this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
+        this.DATA_STORAGE_FTP_EXPORT = DATA_STORAGE_FTP_EXPORT
+        this.DATA_STORAGE_FOLDER = DATA_STORAGE_FOLDER
     }
 
     async createProject(project: ProjectRequestCreationModel): Promise<number> {
@@ -282,34 +289,40 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             }
         }
     }
-
     async zipFolder(sourceFolder: string, destZipFile: string): Promise<void> {
-        // Create a file output stream for the destination zip file
+        // Ensure the parent directory of destZipFile exists
+        const destDir = path.dirname(destZipFile);
+        if (!fs.existsSync(destDir)) {
+            throw new Error(`Destination directory does not exist: ${destDir}`);
+        }
+        // Ensure the destination is not an existing directory
+        if (fs.existsSync(destZipFile) && fs.lstatSync(destZipFile).isDirectory()) {
+            throw new Error(`Destination path is a directory: ${destZipFile}`);
+        }
+
+        // Create a writable stream for the zip file
         const output = fs.createWriteStream(destZipFile);
 
-        // Create a new archiver instance to create a zip file
-        const archive = archiver('zip', {
-            zlib: { level: 9 }  // Maximum compression
-        });
+        // Create a new Archiver instance
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
-        // Pipe the archiver output to the file stream
+        // Handle events
         output.on('close', () => {
-            //console.log(`Archive ${destZipFile} has been created, ${archive.pointer()} total bytes.`);
         });
 
         archive.on('error', (err) => {
             throw err;
         });
 
+        // Pipe the archive data to the file
         archive.pipe(output);
 
-        // Append all files from the source folder to the archive
-        archive.directory(sourceFolder, false);  // Second argument 'false' keeps directory structure intact
+        // Append the folder to the archive
+        archive.directory(sourceFolder, false);
 
-        // Finalize the archive (this will compress the data)
+        // Finalize the archive
         await archive.finalize();
     }
-
     async copyNewL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
         const sourcePath = path.join(base_folder, source_folder, 'raw');
         const destPath = path.join(base_folder, dest_folder, 'raw');
@@ -346,6 +359,71 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         } catch {
             return false; // File does not exist
         }
+    }
+
+    getFormattedDate(date: Date) {
+        return date.toISOString()
+            .replace('T', '_') // Remplace le 'T' par un underscore
+            .replace(/\..+/, '') // Supprime la partie millisecondes et 'Z'
+            .replace(/-/g, '_') // Remplace les tirets par des underscores
+            .replace(/:/g, '_'); // Remplace les deux-points par des underscores
+    }
+
+    async ensureBackupExist(project_id: number): Promise<void> {
+        const backuped_project_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, project_id.toString(), 'l0b_backup');
+        try {
+            await fsPromises.access(backuped_project_path);
+        } catch (error) {
+            throw new Error(`Backup folder does not exist at path: ${backuped_project_path}`);
+        }
+    }
+
+    async exportBackupedProjectToFtp(project: ProjectResponseModel, task_id: number): Promise<string> {
+        // Create the export ftp folder
+        const formattedDate = this.getFormattedDate(new Date());
+
+        const exportFolder = path.join(
+            this.base_folder,
+            this.DATA_STORAGE_FTP_EXPORT,
+            task_id.toString()
+        );
+
+        // Create the export zip file path
+        await fsPromises.mkdir(exportFolder, { recursive: true });
+        const exportZip = path.join(
+            exportFolder,
+            `ecopart_export_backup_${project.project_id.toString()}_${formattedDate}.zip`
+        );
+        await this.copyZippedL0bFoldersToExportFolder(project, exportZip);
+        return exportZip;
+    }
+
+    async exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string> {
+        // Create the export fs folder 
+        const formattedDate = this.getFormattedDate(new Date());
+        const exportFolder = path.join(
+            this.base_folder,
+            this.DATA_STORAGE_FOLDER,
+            'tasks',
+            task_id.toString(),
+        );
+        await fsPromises.mkdir(exportFolder, { recursive: true });
+
+        // Create the export zip file path
+        const exportZip = path.join(
+            exportFolder,
+            `ecopart_export_backup_${project.project_id.toString()}_${formattedDate}.zip`
+        );
+        await this.copyZippedL0bFoldersToExportFolder(project, exportZip);
+
+        return exportZip;
+    }
+
+    async copyZippedL0bFoldersToExportFolder(project: ProjectResponseModel, exportFolder: string): Promise<void> {
+        //  with date
+        const backupedProjectPath = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, project.project_id.toString(), 'l0b_backup');
+        // zip and copy backupedProjectPath to exportFolder
+        await this.zipFolder(backupedProjectPath, exportFolder);
     }
 
 }

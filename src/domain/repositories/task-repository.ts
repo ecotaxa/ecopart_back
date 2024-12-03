@@ -1,5 +1,4 @@
 
-import path from "path";
 import { TaskDataSource } from "../../data/interfaces/data-sources/task-data-source";
 import { FsWrapper } from "../../infra/files/fs-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -11,6 +10,8 @@ import { PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, Ta
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { TaskRepository } from "../interfaces/repositories/task-repository";
+import path from "path";
+import fs from "fs/promises";
 
 export class TaskRepositoryImpl implements TaskRepository {
     taskDataSource: TaskDataSource
@@ -94,7 +95,7 @@ export class TaskRepositoryImpl implements TaskRepository {
         await this.logMessage(task_to_start.task_log_file_path, "Task is running")
     }
 
-    async finishTask(task: PublicTaskRequestModel): Promise<void> {
+    async finishTask(task: PublicTaskRequestModel, task_result?: string): Promise<void> {
         const task_to_finish = await this.taskDataSource.getOne({ task_id: task.task_id })
         if (!task_to_finish) {
             throw new Error("Task not found")
@@ -105,6 +106,11 @@ export class TaskRepositoryImpl implements TaskRepository {
 
         // Update the task progress to 100% and add a message
         await this.updateTaskProgress(task, 100, "Task is done sucessfilly")
+
+        // Update the task result if provided
+        if (task_result) {
+            await this.taskDataSource.updateOne({ task_id: task_to_finish.task_id, task_result: task_result })
+        }
 
         // appendFile to log file that task is done
         await this.logMessage(task_to_finish.task_log_file_path, "Task is done sucessfilly")
@@ -348,6 +354,19 @@ export class TaskRepositoryImpl implements TaskRepository {
         }
     }
 
+    async getZipFilePath(task_id: number): Promise<string> {
+        // ensure folder exists for this task
+        const zipPath = path.join(this.base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${task_id}`)
+
+        // return the first file that have extention .zip in the folder
+        const files = await fs.readdir(zipPath)
+        const zipFile = files.find(file => file.endsWith(".zip"))
+        if (!zipFile) {
+            throw new Error(`No file found for task ${task_id}`)
+        }
+        return path.join(zipPath, zipFile)
+    }
+
     async failedTask(task_id: number, error: Error): Promise<void> {
         this.getTask({ task_id: task_id }).then(async task => {
             if (!task) throw new Error("Task not found")
@@ -419,5 +438,15 @@ export class TaskRepositoryImpl implements TaskRepository {
 
         // Logging task status update in the log file
         await this.logMessage(task_to_update.task_log_file_path, `Task status updated from ${task_to_update.task_status} to ${status}`);
+    }
+
+    async updateTaskResult(task: PublicTaskRequestModel, task_result: string): Promise<void> {
+        const task_to_update = await this.taskDataSource.getOne({ task_id: task.task_id });
+        if (!task_to_update) {
+            throw new Error("Task not found");
+        }
+        await this.taskDataSource.updateOne({
+            task_id: task_to_update.task_id, task_result: task_result
+        })
     }
 }
