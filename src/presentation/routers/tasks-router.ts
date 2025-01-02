@@ -86,7 +86,7 @@ export default function TaskRouter(
             const logs = await getLogFileTask.execute((req as CustomRequest).token, taskId);
             res.status(200).send(logs);
         } catch (err) {
-            console.log(err);
+            console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
@@ -100,7 +100,7 @@ export default function TaskRouter(
             const taskId = parseInt(req.params.task_id);
             await streamZipFileUseCase.execute((req as CustomRequest).token, taskId, res);
         } catch (err) {
-            console.log(err);
+            console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "Cannot find task file") res.status(404).send({ errors: [err.message] });

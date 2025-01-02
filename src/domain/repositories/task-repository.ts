@@ -72,7 +72,6 @@ export class TaskRepositoryImpl implements TaskRepository {
             await this.logMessage(log_file_path, "Task created for " + task.task_type)
             await this.logMessage(log_file_path, "Task params: " + JSON.stringify(task.task_params))
         } catch (err) {
-            console.log(err);
             throw new Error("Cannot create log file");
         }
         // update task with log file path
@@ -349,7 +348,6 @@ export class TaskRepositoryImpl implements TaskRepository {
             return data;
         } catch (err) {
             // if error, throw an error
-            console.log(err);
             throw new Error("Cannot read log file");
         }
     }

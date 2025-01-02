@@ -342,11 +342,11 @@ export class ProjectRepositoryImpl implements ProjectRepository {
                 const zipExists = await this.checkFileExists(destSubfolder);
                 if (!zipExists) {
                     // If not, copy and zip the folder
-                    //console.log(`Copying new folder: ${entry.name}`);
+                    // TODO LOG IN TASK LOG FILE `Copying new folder: ${entry.name}`
                     await this.zipFolder(sourceSubfolder, destSubfolder);
                 }
                 // else {
-                //     console.log(`Skipping already existing folder: ${entry.name}`);
+                //     TODO LOG IN TASK LOG FILE `Skipping already existing folder: ${entry.name}`);
                 // }
             }
         }

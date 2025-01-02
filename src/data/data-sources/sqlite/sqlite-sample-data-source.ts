@@ -188,8 +188,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             // Begin transaction
             this.db.run('BEGIN TRANSACTION', (beginErr: Error) => {
                 if (beginErr) {
-                    console.log("Failed to begin transaction:", beginErr);
-                    return reject(beginErr);
+                    return reject("Failed to begin transaction:" + beginErr);
                 }
 
                 const insertPromises = samples.map((sample) => {
@@ -238,8 +237,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
                         this.db.run(sql, params, function (err) {
                             if (err) {
-                                console.log("Failed to insert sample:", err);
-                                rejectInsert(err);
+                                rejectInsert("Failed to insert sample:" + err);
                             } else {
                                 insertedIds.push(this.lastID);
                                 resolveInsert(this.lastID);
@@ -253,8 +251,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         // Commit transaction if all inserts are successful
                         this.db.run('COMMIT', (commitErr: Error) => {
                             if (commitErr) {
-                                console.log("Failed to commit transaction:", commitErr);
-                                return reject(commitErr);
+                                return reject("Failed to commit transaction:" + commitErr);
                             }
                             resolve(insertedIds);
                         });
@@ -263,11 +260,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         // Rollback transaction if any insert fails
                         this.db.run('ROLLBACK', (rollbackErr: Error) => {
                             if (rollbackErr) {
-                                console.log("Failed to rollback transaction:", rollbackErr);
+                                reject("Failed to rollback transaction:" + rollbackErr);
                             } else {
-                                console.log("Transaction rolled back due to error:", error);
+                                reject("Transaction rolled back due to error:" + error);
                             }
-                            reject(error);
+
                         });
                     });
             });

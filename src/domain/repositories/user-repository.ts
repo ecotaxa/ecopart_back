@@ -193,7 +193,6 @@ export class UserRepositoryImpl implements UserRepository {
             return false;
         } catch (error) {
             // An error occurred while fetching or comparing, log the error and return false
-            console.log(error);
             return false;
         }
     }
@@ -218,8 +217,6 @@ export class UserRepositoryImpl implements UserRepository {
             return decoded_token
         } catch (error) {
             // An error occurred while fetching or comparing, log the error and return null
-            console.log(error);
-            console.log("Token invalid or expired.");
             return null;
         }
     }

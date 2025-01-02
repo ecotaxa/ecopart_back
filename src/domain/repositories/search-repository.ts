@@ -33,7 +33,6 @@ export class SearchRepositoryImpl implements SearchRepository {
             if (!sort_by || sort_by.slice(-1) !== ")") {
                 // Add an error message to the errors array
                 errors.push(statement);
-                console.log("error" + statement)
                 return null;
             }
 
@@ -44,8 +43,6 @@ export class SearchRepositoryImpl implements SearchRepository {
             if (!clean_sort_by || !order_by) {
                 // Add an error message to the errors array
                 errors.push(statement);
-                console.log("error" + statement)
-
                 return null;
             }
 
@@ -53,7 +50,6 @@ export class SearchRepositoryImpl implements SearchRepository {
             if (!this.order_by_allow_params.includes(order_by.toLowerCase())) {
                 // Add an error message to the errors array
                 errors.push(order_by);
-                console.log("error" + order_by)
                 return null;
             }
 
