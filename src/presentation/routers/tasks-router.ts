@@ -1,5 +1,5 @@
 import express from 'express'
-import { Request, Response } from 'express'
+import e, { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 // import { IMiddlewareTaskValidation } from '../interfaces/middleware/task-validation'
@@ -103,6 +103,7 @@ export default function TaskRouter(
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
+            else if (err.message === "ZIP file not found") res.status(404).send({ errors: [err.message] });
             else if (err.message === "Cannot find task file") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task file"] });
             else res.status(500).send({ errors: ["Cannot get task file"] });

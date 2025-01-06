@@ -143,8 +143,15 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "An export backup is already running for this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot backup project"] })
         }
     })
@@ -157,8 +164,14 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Backup folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot export backuped project"] })
         }
     })
@@ -172,8 +185,9 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
-            //TODO handle other errors
             else res.status(500).send({ errors: ["Cannot list importable samples"] })
         }
     })
@@ -181,20 +195,45 @@ export default function ProjectRouter(
     router.post('/:project_id/samples/import', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
         try {
             const task_import_samples = await importSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any, { ...req.body }.samples);
-            if (req.body.backup_project === true) {
-                const task_backup_project = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.backup_project_skip_already_imported);
-                res.status(200).send([task_import_samples, task_backup_project])
-            } else {
-                res.status(200).send(task_import_samples)
+            try {
+                if (req.body.backup_project === true) {
+                    const task_backup_project = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.backup_project_skip_already_imported);
+                    res.status(200).send([task_import_samples, task_backup_project])
+                } else {
+                    res.status(200).send(task_import_samples)
+                }
+            } catch (err) {
+                console.log(err)
+                if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+                else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+                else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+                else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+                else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+                else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
+                else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
+                else if (err.message === "Task is already in this status") res.status(500).send({ errors: [err.message] })
+                else if (err.message.includes("Cannot change status from")) res.status(500).send({ errors: [err.message] })
+                else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+                else if (err.meassage === "An export backup is already running for this project") res.status(401).send({ errors: [err.message] })
+                else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+                res.status(500).send({ errors: ["Cannot backup project"] })
             }
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
-            // if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            // else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
-            // else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
-            // else res.status(500).send({ errors: ["Cannot search tasks"] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task is already in this status") res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot change status from")) res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("No samples to import")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Samples not importable:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Unknown instrument model") res.status(404).send({ errors: [err.message] })
             res.status(500).send({ errors: ["Cannot import samples"] })
         }
     })
@@ -207,11 +246,17 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get samples"] })
         }
     })
+
     // Pagined and sorted list of filtered samples for the given project
     router.post('/:project_id/samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
@@ -220,10 +265,13 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search samples"] })
         }
     })
@@ -236,7 +284,6 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Cannot find parent project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete sample") res.status(401).send({ errors: [err.message] })

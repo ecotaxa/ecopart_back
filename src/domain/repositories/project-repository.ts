@@ -268,7 +268,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         }
     }
 
-
     async copyAllL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
         const sourcePath = path.join(base_folder, source_folder, 'raw');
         const destPath = path.join(base_folder, dest_folder, 'raw');
@@ -289,6 +288,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             }
         }
     }
+
     async zipFolder(sourceFolder: string, destZipFile: string): Promise<void> {
         // Ensure the parent directory of destZipFile exists
         const destDir = path.dirname(destZipFile);
