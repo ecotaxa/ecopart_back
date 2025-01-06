@@ -1,8 +1,8 @@
 import express from 'express'
-import e, { Request, Response } from 'express'
+import { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
-// import { IMiddlewareTaskValidation } from '../interfaces/middleware/task-validation'
+import { IMiddlewareTaskValidation } from '../interfaces/middleware/task-validation'
 
 import { DeleteTaskUseCase } from '../../domain/interfaces/use-cases/task/delete-task'
 import { SearchTasksUseCase } from '../../domain/interfaces/use-cases/task/search-task'
@@ -14,7 +14,7 @@ import { CustomRequest } from '../../domain/entities/auth'
 
 export default function TaskRouter(
     middlewareAuth: MiddlewareAuth,
-    //middlewareTaskValidation: IMiddlewareTaskValidation,
+    middlewareTaskValidation: IMiddlewareTaskValidation,
     deleteTaskUseCase: DeleteTaskUseCase,
     getOneTaskUseCase: GetOneTaskUseCase,
     getLogFileTask: GetLogFileTask,
@@ -24,7 +24,7 @@ export default function TaskRouter(
     const router = express.Router()
     // TODO Manage errors
     // Pagined and sorted list of all task
-    router.get('/', middlewareAuth.auth, /*middlewareTaskValidation.rulesGetTasks,*/ async (req: Request, res: Response) => {
+    router.get('/', middlewareAuth.auth, middlewareTaskValidation.rulesGetTasks, async (req: Request, res: Response) => {
         try {
             const tasks = await searchTaskUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(tasks)
@@ -38,7 +38,7 @@ export default function TaskRouter(
     })
 
     // Pagined and sorted list of filtered task
-    router.post('/searches', middlewareAuth.auth,/*middlewareTaskValidation.rulesGetTasks,*/  async (req: Request, res: Response) => {
+    router.post('/searches', middlewareAuth.auth, middlewareTaskValidation.rulesGetTasks, async (req: Request, res: Response) => {
         try {
             const tasks = await searchTaskUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
             res.status(200).send(tasks)
@@ -52,7 +52,7 @@ export default function TaskRouter(
     })
 
     // Get one task
-    router.get('/:task_id/', middlewareAuth.auth,/*middlewareTaskValidation.rulesGetTasks,*/  async (req: Request, res: Response) => {
+    router.get('/:task_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const task = await getOneTaskUseCase.execute((req as CustomRequest).token, req.params.task_id as any);
             res.status(200).send(task)

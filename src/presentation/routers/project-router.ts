@@ -239,7 +239,7 @@ export default function ProjectRouter(
     })
 
     // Pagined and sorted list of all project
-    router.get('/:project_id/samples/', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.get('/:project_id/samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
             const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
             res.status(200).send(project)
@@ -290,33 +290,6 @@ export default function ProjectRouter(
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
-
-    // Update a sample
-    // router.patch('/:project_id//samples/:sample_id', middlewareProjectValidation.rulesProjectUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
-    //     try {
-    //         const updated_project = await updateProjectSampleUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
-    //         res.status(200).send(updated_project)
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-    //         else if (err.message === "Logged user cannot update this property or project") res.status(401).send({ errors: [err.message] })
-    //         else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Member user cannot be use") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Manager user cannot be use") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Contact user cannot be use") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Contact user must be either in members or managers") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "To update privilege part you must provide members, managers and contact, if you want to manage privileges more granuraly please use privilege endpoints") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Please provide at least one property to update") res.status(401).send({ errors: [err.message] })
-    //         else if (err.message === "Privileges partially created, please check members, managers and contact") res.status(500).send({ errors: [err.message] })
-    //         else if (err.message === "Cannot find updated project") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
-    //         else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-    //         else if (err.message === "Please provide at least one valid parameter to update") res.status(401).send({ errors: [err.message] })
-    //         else res.status(500).send({ errors: ["Cannot update project"] })
-    //     }
-    // })
 
     return router
 }

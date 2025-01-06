@@ -3,16 +3,18 @@ import { Request, Response } from 'express'
 
 import { GetOneInstrumentModelUseCase } from '../../domain/interfaces/use-cases/instrument_model/get-one-instrument_model'
 import { SearchInstrumentModelsUseCase } from '../../domain/interfaces/use-cases/instrument_model/search-instrument_model'
+import { IMiddlewareInstrumentModelValidation } from '../interfaces/middleware/instrument_model-validation'
 
 export default function InstrumentModelsRouter(
     // middlewareAuth: MiddlewareAuth,
     getOneInstrumentModelsUseCase: GetOneInstrumentModelUseCase,
-    searchInstrumentModelsUseCase: SearchInstrumentModelsUseCase
+    searchInstrumentModelsUseCase: SearchInstrumentModelsUseCase,
+    middlewareInstrumentModelValidation: IMiddlewareInstrumentModelValidation
 ) {
     const router = express.Router()
 
     // Pagined and sorted list of all instrument_models
-    router.get('/', async (req: Request, res: Response) => {
+    router.get('/', middlewareInstrumentModelValidation.rulesGetInstrumentModels, async (req: Request, res: Response) => {
         try {
             const instrument_models = await searchInstrumentModelsUseCase.execute({ ...req.query } as any);
             res.status(200).send(instrument_models)

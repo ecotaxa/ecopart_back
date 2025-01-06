@@ -47,9 +47,7 @@ export default function AuthRouter(
     })
 
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
-
         res.status(200).send((req as CustomRequest).token)
-
     })
 
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
@@ -74,14 +72,12 @@ export default function AuthRouter(
             .clearCookie("refresh_token")
             .status(200)
             .json({ message: "You are Logged Out" });
-
     })
 
     /* PASSWORD MANAGEMENT */
     // Change password
     router.post('/password/change', middlewareAuthValidation.rulesPassword, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-
             await changePasswordUseCase.execute((req as CustomRequest).token, req.body)
             //TODO Unvalidate EXISTING TOKENS for the user?
             //TODO logout user?
