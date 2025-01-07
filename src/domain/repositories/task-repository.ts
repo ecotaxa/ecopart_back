@@ -65,13 +65,23 @@ export class TaskRepositoryImpl implements TaskRepository {
         const result = await this.taskDataSource.create(private_task)
 
         //create log file based on created task_id
-        const log_file_path = path.join(this.base_folder, this.DATA_STORAGE_FOLDER, "tasks_log", `task_${result}.log`)
+        const log_file_path = path.join(this.base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${result}`, `task_log_${result}.log`)
 
-        //  create log file
+        //  create log file and log task creation
         try {
+            // Ensure the directory exists
+            const dir = path.dirname(log_file_path);
+            await fs.mkdir(dir, { recursive: true });
+
+            // Create or empty the log file
+            await fs.writeFile(log_file_path, "");
+
+            // Write the task creation message
             await this.logMessage(log_file_path, "Task created for " + task.task_type)
             await this.logMessage(log_file_path, "Task params: " + JSON.stringify(task.task_params))
         } catch (err) {
+            // if error, failed task and throw an error
+            await this.internalFailedTask(result, err)
             throw new Error("Cannot create log file");
         }
         // update task with log file path
@@ -372,15 +382,19 @@ export class TaskRepositoryImpl implements TaskRepository {
             // log error in log file
             await this.logMessage(task.task_log_file_path, `Task failed with error: ${error.message}`);
 
-            // Update the task error message
-            await this.taskDataSource.updateOne({ task_id: task_id, task_error: error.message })
-
-            // Update the task status to error
-            await this.statusManager({
-                task_id: task_id
-            }, TasksStatus.Error)
-
+            // internally failed task
+            await this.internalFailedTask(task_id, error)
         })
+    }
+
+    async internalFailedTask(task_id: number, error: Error): Promise<void> {
+        // Update the task error message
+        await this.taskDataSource.updateOne({ task_id: task_id, task_error: error.message })
+
+        // Update the task status to error
+        await this.statusManager({
+            task_id: task_id
+        }, TasksStatus.Error)
     }
 
     async logMessage(task_log_file_path: string | undefined, message: string): Promise<void> {
