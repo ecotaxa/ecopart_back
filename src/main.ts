@@ -5,6 +5,8 @@ import { MiddlewareAuthValidation } from './presentation/middleware/auth-validat
 import { MiddlewareUserValidation } from './presentation/middleware/user-validation'
 import { MiddlewareProjectValidation } from './presentation/middleware/project-validation'
 import { MiddlewareSampleValidation } from './presentation/middleware/sample-validation'
+import { MiddlewareInstrumentModelValidation } from './presentation/middleware/instrument_model-validation'
+import { MiddlewareTaskValidation } from './presentation/middleware/task-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -65,8 +67,9 @@ import { FsAdapter } from './infra/files/fs'
 
 import sqlite3 from 'sqlite3'
 import path from 'path'
-
 import 'dotenv/config'
+
+
 
 sqlite3.verbose()
 
@@ -169,7 +172,8 @@ async function getSQLiteDS() {
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),
-        new SearchInstrumentModels(instrument_model_repo, search_repo)
+        new SearchInstrumentModels(instrument_model_repo, search_repo),
+        new MiddlewareInstrumentModelValidation()
     )
     const projectMiddleWare = ProjectRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
@@ -189,6 +193,7 @@ async function getSQLiteDS() {
 
     const taskMiddleWare = TaskRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareTaskValidation(),
         new DeleteTask(user_repo, task_repo, privilege_repo),
         new GetOneTask(task_repo, user_repo, privilege_repo),
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
