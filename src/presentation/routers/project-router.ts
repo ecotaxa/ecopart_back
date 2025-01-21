@@ -192,53 +192,112 @@ export default function ProjectRouter(
         }
     })
 
-    router.post('/:project_id/samples/import', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
+    const sendErrorResponseSampleImport = (res: Response, err: Error, defaultMessage: string) => {
+        const errorMap: { [key: string]: { status: number; message: string } } = {
+            "User cannot be used": { status: 403, message: err.message },
+            "Logged user cannot list importable samples in this project": { status: 401, message: err.message },
+            "Cannot find project": { status: 404, message: err.message },
+            "Task type not found": { status: 404, message: err.message },
+            "Task status not found": { status: 404, message: err.message },
+            "Cannot create log file": { status: 500, message: err.message },
+            "Task not found": { status: 404, message: err.message },
+            "Task is already in this status": { status: 500, message: err.message },
+            "Cannot change status from": { status: 500, message: err.message },
+            "Cannot find task": { status: 404, message: err.message },
+            "An export backup is already running for this project": { status: 401, message: err.message },
+            "Folder does not exist at path": { status: 404, message: err.message },
+            "No samples to import": { status: 404, message: err.message },
+            "Samples not importable:": { status: 401, message: err.message },
+            "Unknown instrument model": { status: 404, message: err.message },
+            "Backup aborted": { status: 500, message: err.message },
+        };
+
+        for (const key in errorMap) {
+            if (err.message.includes(key)) {
+                const { status, message } = errorMap[key];
+                return { status, errors: [message] };
+            }
+        }
+
+        // Default error response if no match is found
+        return { status: 500, errors: [defaultMessage] };
+    };
+
+    router.post("/:project_id/samples/import", middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
+        let importError, backupError;
+        let task_import_samples, task_backup_project;
+
         try {
-            const task_import_samples = await importSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any, { ...req.body }.samples);
-            try {
-                if (req.body.backup_project === true) {
-                    const task_backup_project = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.backup_project_skip_already_imported);
-                    res.status(200).send([task_import_samples, task_backup_project])
-                } else {
-                    res.status(200).send(task_import_samples)
+            task_import_samples = await importSamplesUseCase.execute(
+                (req as CustomRequest).token,
+                req.params.project_id as any,
+                { ...req.body }.samples
+            );
+
+            // Proceed with backup only if import is successful
+            if (req.body.backup_project === true) {
+                try {
+                    task_backup_project = await backupProjectUseCase.execute(
+                        (req as CustomRequest).token,
+                        req.params.project_id as any,
+                        req.body.backup_project_skip_already_imported
+                    );
+                } catch (err) {
+                    console.log(err);
+                    backupError = sendErrorResponseSampleImport(res, err, "Cannot backup project");
                 }
-            } catch (err) {
-                console.log(err)
-                if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-                else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
-                else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-                else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
-                else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
-                else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
-                else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
-                else if (err.message === "Task is already in this status") res.status(500).send({ errors: [err.message] })
-                else if (err.message.includes("Cannot change status from")) res.status(500).send({ errors: [err.message] })
-                else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
-                else if (err.meassage === "An export backup is already running for this project") res.status(401).send({ errors: [err.message] })
-                else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
-                res.status(500).send({ errors: ["Cannot backup project"] })
             }
         } catch (err) {
-            console.log(err)
-            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task is already in this status") res.status(500).send({ errors: [err.message] })
-            else if (err.message.includes("Cannot change status from")) res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("No samples to import")) res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Samples not importable:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Unknown instrument model") res.status(404).send({ errors: [err.message] })
-            res.status(500).send({ errors: ["Cannot import samples"] })
+            if (req.body.backup_project === true) {
+                backupError = sendErrorResponseSampleImport(res, err, "Backup aborted");
+            }
+            importError = sendErrorResponseSampleImport(res, err, "Cannot import samples");
         }
-    })
 
-    // Pagined and sorted list of all project
+        // Handle different outcomes
+
+        // Case 1: Both failed
+        if (importError && backupError) {
+            return res.status(500).send({
+                success: false,
+                errors: {
+                    import: importError.errors,
+                    backup: backupError.errors,
+                },
+            });
+        }
+
+        // Case 2: Import failed, but backup didn't execute (or was skipped)
+        if (importError) {
+            return res.status(importError.status).send({
+                success: false,
+                errors: {
+                    import: importError.errors,
+                },
+            });
+        }
+
+        // Case 3: Import succeeded, but backup failed
+        if (backupError) {
+            return res.status(backupError.status).send({
+                success: false,
+                task_import_samples,
+                errors: {
+                    backup: backupError.errors,
+                },
+            });
+        }
+
+        // Case 4: Both succeeded
+        return res.status(200).send({
+            success: true,
+            task_import_samples,
+            task_backup_project,
+        });
+    }
+    );
+
+    // Pagined and sorted list of all samples for the given project
     router.get('/:project_id/samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
             const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
@@ -260,8 +319,8 @@ export default function ProjectRouter(
     // Pagined and sorted list of filtered samples for the given project
     router.post('/:project_id/samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
-            const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
-            res.status(200).send(project)
+            const samples = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
+            res.status(200).send(samples)
         } catch (err) {
             console.log(err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })

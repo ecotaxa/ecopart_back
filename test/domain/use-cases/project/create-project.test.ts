@@ -14,6 +14,7 @@ let mockUserRepository: UserRepository;
 let mockProjectRepository: MockProjectRepository;
 let mockInstrumentModelRepository: MockInstrumentModelRepository;
 let mockPrivilegeRepository: MockPrivilegeRepository;
+let DATA_STORAGE_FS_STORAGE: "test/data_storage/";
 
 beforeEach(async () => {
     jest.clearAllMocks();
@@ -42,7 +43,7 @@ test("Try to add a project return created project", async () => {
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     const result = await createProjectUseCase.execute(current_user, InputData);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
@@ -74,7 +75,7 @@ test("Create a project without override_depth_offset", async () => {
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     const result = await createProjectUseCase.execute(current_user, InputData);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
@@ -100,7 +101,7 @@ test("Cannot find the created project.", async () => {
     jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Cannot find the created project.");
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
@@ -122,7 +123,7 @@ test("Cannot create project because user is deleted", async () => {
     jest.spyOn(mockProjectRepository, "createProject")
     jest.spyOn(mockProjectRepository, "getProject")
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError(outputError);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(current_user.user_id);
@@ -151,7 +152,7 @@ test("Create project but something went wrong during privilege creation", async 
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
 
     await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError(outputError);
 
@@ -180,7 +181,7 @@ test("Create project but something went wrong when fetching created privileges",
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
 
-    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
 
     await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError(outputError);
 

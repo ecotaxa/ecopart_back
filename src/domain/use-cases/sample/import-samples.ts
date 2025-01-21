@@ -141,7 +141,6 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
     }
 
-
     async copySourcesToProjectFolder(task_id: number, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel) {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/4 sample folders copy : start");
 
@@ -157,10 +156,9 @@ export class ImportSamples implements ImportSamplesUseCase {
         } else {
             throw new Error("Unknown instrument model");
         }
-
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/4 sample folders copy : done");
-
     }
+
     async deleteSourcesFromProjectFolder(task_id: number, samples_names_to_import: string[], project: ProjectResponseModel) {
         // Delete sources files from project folder
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
@@ -191,8 +189,6 @@ export class ImportSamples implements ImportSamplesUseCase {
                 return sample;
             })
         );
-
-
         // Create samples
         const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
 

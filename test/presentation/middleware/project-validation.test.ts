@@ -13,24 +13,23 @@ import { SearchProjectsUseCase } from "../../../src/domain/interfaces/use-cases/
 
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { IMiddlewareProjectValidation } from "../../../src/presentation/interfaces/middleware/project-validation";
+import { IMiddlewareSampleValidation } from "../../../src/presentation/interfaces/middleware/sample-validation";
 import { MiddlewareProjectValidation } from "../../../src/presentation/middleware/project-validation";
+import { MiddlewareSampleValidation } from "../../../src/presentation/middleware/sample-validation";
 
 import { Request, Response, NextFunction } from "express";
 import { SearchInfo } from "../../../src/domain/entities/search";
-import { partial_projectUpdateModel_toSanatize, projectRequestCreationModel, projectRequestCreationModel_withDataSanitized, projectRequestCreationModel_withDataToSanitize, projectRequestCreationModel_withmissingData, projectResponseModel, partial_projectUpdateModel } from "../../entities/project";
-
-class MockCreateProjectUseCase implements CreateProjectUseCase {
-    execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented for create project")
-    }
-}
-class MockUpdateProjectUseCase implements UpdateProjectUseCase {
-    execute(): Promise<PublicProjectResponseModel> {
-        throw new Error("Method not implemented for update project")
-    }
-}
-
-class MockMiddlewareAuth implements MiddlewareAuth {
+import { partial_projectUpdateModel_toSanatize, projectRequestCreationModel, projectRequestCreationModel_withDataSanitized, projectRequestCreationModel_withDataToSanitize, projectRequestCreationModel_withmissingData, projectResponseModel, partial_projectUpdateModel, projectRequestCreationModel_withmissingData_2, partial_projectUpdateModel_withInvalidData } from "../../entities/project";
+import { BackupProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/backup-project";
+import { ExportBackupedProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/export-backuped-project";
+import { DeleteSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/delete-sample";
+import { ImportSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/import-samples";
+import { ListImportableSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/list-importable-samples";
+import { SearchSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/search-samples";
+import { MockBackupProjectUseCase, MockCreateProjectUseCase, MockDeleteProjectUseCase, MockDeleteSampleUseCase, MockExportBackupedProjectUseCase, MockImportSamplesUseCase, MockListImportableSamplesUseCase, MockSearchProjectsUseCase, MockSearchSamplesUseCase, MockUpdateProjectUseCase } from "../../mocks/project-mock";
+import { TaskResponseModel } from "../../../src/domain/entities/task";
+import { TaskResponseModel_1, TaskResponseModel_2 } from "../../entities/task";
+export class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
         next()
     }
@@ -39,35 +38,38 @@ class MockMiddlewareAuth implements MiddlewareAuth {
     }
 }
 
-class MockDeleteProjectUseCase implements DeleteProjectUseCase {
-    execute(): Promise<void> {
-        throw new Error("Method not implemented for delete project")
-    }
-}
-
-class MockSearchProjectsUseCase implements SearchProjectsUseCase {
-    execute(): Promise<{ projects: PublicProjectResponseModel[]; search_info: any; }> {
-        throw new Error("Method not implemented for search projects")
-    }
-}
 describe("Project Router", () => {
     let mockMiddlewareAuth: MockMiddlewareAuth;
     let middlewareProjectValidation: IMiddlewareProjectValidation;
+    let middlewareSampleValidation: IMiddlewareSampleValidation;
     let mockCreateProjectUseCase: CreateProjectUseCase;
     let mockUpdateProjectUseCase: UpdateProjectUseCase;
     let mockDeleteProjectUseCase: DeleteProjectUseCase;
     let mockSearchProjectsUseCase: SearchProjectsUseCase;
+    let mockBackupProjectUseCase: BackupProjectUseCase;
+    let mockExportBackupProjectUseCase: ExportBackupedProjectUseCase;
+    let mockListImportableSamplesUseCase: ListImportableSamplesUseCase;
+    let mockImportSamplesUseCase: ImportSamplesUseCase;
+    let mockDeleteSampleUseCase: DeleteSampleUseCase;
+    let mockSearchSamplesUseCase: SearchSamplesUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
         middlewareProjectValidation = new MiddlewareProjectValidation()
+        middlewareSampleValidation = new MiddlewareSampleValidation()
         mockCreateProjectUseCase = new MockCreateProjectUseCase()
         mockUpdateProjectUseCase = new MockUpdateProjectUseCase()
         mockDeleteProjectUseCase = new MockDeleteProjectUseCase()
         mockSearchProjectsUseCase = new MockSearchProjectsUseCase()
+        mockBackupProjectUseCase = new MockBackupProjectUseCase()
+        mockExportBackupProjectUseCase = new MockExportBackupedProjectUseCase()
+        mockListImportableSamplesUseCase = new MockListImportableSamplesUseCase()
+        mockImportSamplesUseCase = new MockImportSamplesUseCase()
+        mockDeleteSampleUseCase = new MockDeleteSampleUseCase()
+        mockSearchSamplesUseCase = new MockSearchSamplesUseCase()
 
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase))
     })
 
     beforeEach(() => {
@@ -108,7 +110,6 @@ describe("Project Router", () => {
 
         test("Missing project_title and data_owner_name", async () => {
             const InputData = projectRequestCreationModel_withmissingData
-            //TODO update test
             const OutputData = {
                 "errors": [
                     {
@@ -127,6 +128,13 @@ describe("Project Router", () => {
                     },
                     {
                         "location": "body",
+                        "msg": "Contact user_id is required.",
+                        "path": "contact",
+                        "type": "field",
+                        "value": {},
+                    },
+                    {
+                        "location": "body",
                         "msg": "Members are required.",
                         "path": "members",
                         "type": "field",
@@ -137,6 +145,14 @@ describe("Project Router", () => {
                         "path": "members",
                         "type": "field",
                     },
+                    {
+                        "location": "body",
+                        "msg": "At least one user must be a manager",
+                        "path": "managers",
+                        "type": "field",
+                        "value": [],
+                    }
+
                 ]
             }
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
@@ -148,6 +164,34 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(OutputData)
         });
 
+        test("Missing Member user_id.", async () => {
+            const InputData = projectRequestCreationModel_withmissingData_2
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "body",
+                        "msg": "Member user_id is required.",
+                        "path": "members",
+                        "type": "field",
+                        "value": [{}],
+                    },
+                    {
+                        "location": "body",
+                        "msg": "Manager user_id is required.",
+                        "path": "managers",
+                        "type": "field",
+                        "value": [{}],
+                    }
+                ]
+            }
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
+
+            const response = await request(server).post("/projects").send(InputData)
+
+            expect(response.status).toBe(422)
+            expect(mockCreateProjectUseCase.execute).not.toBeCalled()
+            expect(response.body).toStrictEqual(OutputData)
+        });
     })
 
     describe("Test project router update project validation", () => {
@@ -177,6 +221,27 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(OutputData)
         });
 
+        test("update project with invalid instrument", async () => {
+            const project_to_update = partial_projectUpdateModel_withInvalidData
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "body",
+                        "msg": "Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']",
+                        "path": "instrument_model",
+                        "type": "field",
+                        "value": "invalid_param"
+                    }
+                ]
+            }
+            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
+
+            const response = await request(server).patch("/projects/1").send(project_to_update)
+
+            expect(response.status).toBe(422)
+            expect(mockUpdateProjectUseCase.execute).not.toBeCalled()
+            expect(response.body).toStrictEqual(OutputData)
+        });
     })
 
     describe("Test project router rules GetProjects", () => {
@@ -266,5 +331,130 @@ describe("Project Router", () => {
         });
 
     });
+    describe("Test project rulesProjectBackup", () => {
+        test("Backup project all params are valid", async () => {
+            const InputData = {
+                skip_already_imported: true
+            }
 
+            const OutputData: TaskResponseModel = TaskResponseModel_2
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).post("/projects/1/backup").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockBackupProjectUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Backup project with invalid skip_already_imported", async () => {
+            const InputData = {
+                skip_already_imported: "a"
+            }
+
+            const OutputData = {
+                "errors": [
+                    {
+                        "location": "body",
+                        "msg": "Skip already imported must be a boolean true or false value.",
+                        "path": "skip_already_imported",
+                        "type": "field",
+                        "value": "a"
+                    }
+                ]
+            }
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).post("/projects/1/backup").send(InputData)
+
+            expect(mockBackupProjectUseCase.execute).not.toBeCalled()
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+    });
+    describe("Test project rulesProjectBackup", () => {
+        test("Backup project all params are valid", async () => {
+            const InputData = {
+                backup_project: true,
+                backup_project_skip_already_imported: true,
+                samples: ["Mooring_0N_23W_201910_850m"]
+            }
+            const OutputData = {
+                success: true,
+                task_import_samples: TaskResponseModel_1,
+                task_backup_project: TaskResponseModel_2
+            }
+
+            jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_2))
+            const response = await request(server).post("/projects/1/samples/import").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(OutputData)
+            expect(mockBackupProjectUseCase.execute).toBeCalledTimes(1)
+        });
+
+        test("Backup project with invalid params", async () => {
+            const InputData = {
+                backup_project: "fegrg",
+                backup_project_skip_already_imported: 100,
+                samples: "Mooring_0N_23W_201910_850m"
+            }
+            const OutputData = {
+                "errors": [
+                    {
+                        type: "field",
+                        value: "fegrg",
+                        msg: "Backup project must be a boolean true or false value.",
+                        path: "backup_project",
+                        location: "body",
+                    },
+                    {
+                        type: "field",
+                        value: 100,
+                        msg: "Backup project, skip already imported must be a boolean true or false value.",
+                        path: "backup_project_skip_already_imported",
+                        location: "body",
+                    },
+                    {
+                        type: "field",
+                        value: "Mooring_0N_23W_201910_850m",
+                        msg: "Samples must be an array.",
+                        path: "samples",
+                        location: "body",
+                    },
+                ]
+            }
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).post("/projects/1/samples/import").send(InputData)
+
+            expect(mockBackupProjectUseCase.execute).not.toBeCalled()
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("Backup project with missing params", async () => {
+            const InputData = {
+            }
+            const OutputData = {
+                "errors": [
+                    {
+                        type: "field",
+                        msg: "Samples are required.",
+                        path: "samples",
+                        location: "body",
+                    },
+                    {
+                        type: "field",
+                        msg: "Samples must be an array.",
+                        path: "samples",
+                        location: "body",
+                    },
+                ]
+            }
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => { throw new Error() })
+            const response = await request(server).post("/projects/1/samples/import").send(InputData)
+
+            expect(mockBackupProjectUseCase.execute).not.toBeCalled()
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+    });
 })

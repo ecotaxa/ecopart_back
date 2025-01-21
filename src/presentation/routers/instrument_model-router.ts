@@ -6,7 +6,6 @@ import { SearchInstrumentModelsUseCase } from '../../domain/interfaces/use-cases
 import { IMiddlewareInstrumentModelValidation } from '../interfaces/middleware/instrument_model-validation'
 
 export default function InstrumentModelsRouter(
-    // middlewareAuth: MiddlewareAuth,
     getOneInstrumentModelsUseCase: GetOneInstrumentModelUseCase,
     searchInstrumentModelsUseCase: SearchInstrumentModelsUseCase,
     middlewareInstrumentModelValidation: IMiddlewareInstrumentModelValidation

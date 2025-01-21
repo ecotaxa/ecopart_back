@@ -2,6 +2,7 @@
 // define an example of project entities to use in the tests
 
 import { InstrumentModelRequestCreationModel, InstrumentModelRequestModel, InstrumentModelResponseModel } from "../../src/domain/entities/instrument_model"
+import { SearchInfo } from "../../src/domain/entities/search"
 
 export const instrument_model_response: InstrumentModelResponseModel = {
     instrument_model_id: 1,
@@ -28,4 +29,18 @@ export const instrument_model_request_id: InstrumentModelRequestModel = {
 }
 export const instrument_model_request_name: InstrumentModelRequestModel = {
     instrument_model_name: "UVP5HD",
+}
+
+export const SearchInstrument_modelResult: { instrument_models: InstrumentModelResponseModel[], search_info: SearchInfo } = {
+    search_info: {
+        total: 2,
+        limit: 10,
+        total_on_page: 2,
+        page: 1,
+        pages: 1
+    },
+    instrument_models: [
+        instrument_model_response,
+        instrument_model_response_UVP6
+    ]
 }

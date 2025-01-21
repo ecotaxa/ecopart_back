@@ -359,8 +359,34 @@ export const projectRequestCreationModel_withmissingData = {
     public_duration: 1,
     instrument_model: "UVP5HD",
     serial_number: 'serial_number',
+    contact: {} as MinimalUserModel,
+    managers: []
+}
+
+export const projectRequestCreationModel_withmissingData_2 = {
+    root_folder_path: 'root_folder_path',
+    project_title: 'julie project_title',
+    project_acronym: 'project_acronym',
+    project_description: 'project_description',
+    project_information: 'project_information',
+    cruise: 'cruise',
+    ship: "['ship1', 'ship2']",
+    data_owner_name: 'data_owner_name',
+    data_owner_email: 'data_owner_email@email.fr',
+    operator_name: 'operator_name',
+    operator_email: 'operator_email@email.fr',
+    chief_scientist_name: 'chief_scientist_name',
+    chief_scientist_email: 'chief_scientist_email@email.fr',
+    override_depth_offset: 1,
+    enable_descent_filter: true,
+    privacy_duration: 1,
+    visible_duration: 1,
+    public_duration: 1,
+    instrument_model: "UVP5SD",
+    serial_number: 'serial_number',
     contact: { user_id: 1 } as MinimalUserModel,
-    managers: [{ user_id: 1 } as MinimalUserModel]
+    managers: [{} as MinimalUserModel],
+    members: [{} as MinimalUserModel],
 }
 
 export const projectRequestCreationModel_withmissingOverrideDepthOffset = {
@@ -435,6 +461,10 @@ export const partial_projectUpdateModel_toSanatize: Partial<ProjectUpdateModel> 
 export const partial_projectUpdateModel: Partial<ProjectUpdateModel> = {
     operator_email: "edited_user@email.com",
     operator_name: "Edited name"
+}
+
+export const partial_projectUpdateModel_withInvalidData: Partial<PublicProjectUpdateModel> = {
+    instrument_model: "invalid_param"
 }
 
 export const projectUpdateModel: PublicProjectUpdateModel = {

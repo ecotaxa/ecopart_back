@@ -7,7 +7,7 @@ import { IMiddlewareTaskValidation } from '../interfaces/middleware/task-validat
 import { DeleteTaskUseCase } from '../../domain/interfaces/use-cases/task/delete-task'
 import { SearchTasksUseCase } from '../../domain/interfaces/use-cases/task/search-task'
 import { GetOneTaskUseCase } from '../../domain/interfaces/use-cases/task/get-one-task'
-import { GetLogFileTask } from '../../domain/use-cases/task/get-log-file-task'
+import { GetLogFileTaskUseCase } from '../../domain/interfaces/use-cases/task/get-log-file-task'
 import { StreamZipFileUseCase } from '../../domain/interfaces/use-cases/task/stream-zip-file'
 
 import { CustomRequest } from '../../domain/entities/auth'
@@ -17,7 +17,7 @@ export default function TaskRouter(
     middlewareTaskValidation: IMiddlewareTaskValidation,
     deleteTaskUseCase: DeleteTaskUseCase,
     getOneTaskUseCase: GetOneTaskUseCase,
-    getLogFileTask: GetLogFileTask,
+    getLogFileTaskUseCase: GetLogFileTaskUseCase,
     streamZipFileUseCase: StreamZipFileUseCase,
     searchTaskUseCase: SearchTasksUseCase
 ) {
@@ -83,7 +83,7 @@ export default function TaskRouter(
     router.get('/:task_id/log', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const taskId = parseInt(req.params.task_id);
-            const logs = await getLogFileTask.execute((req as CustomRequest).token, taskId);
+            const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId);
             res.status(200).send(logs);
         } catch (err) {
             console.log(err)

@@ -15,7 +15,7 @@ export interface SampleRequestCreationModel {
     sea_state: string;                         // Description or classification of sea state
     nebulousness: number;                      // Cloud coverage percentage (0-100)
     bottom_depth: number;                      // Bottom depth (in meters or relevant unit)
-    instrument_operator_email: string;                    // Operator's email
+    instrument_operator_email: string;         // Operator's email
     filename: string;                          // source file name
 
     filter_first_image: string;                // First image

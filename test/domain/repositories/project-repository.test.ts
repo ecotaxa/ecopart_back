@@ -13,13 +13,15 @@ import 'dotenv/config'
 
 describe("Project Repository", () => {
     let mockProjectDataSource: ProjectDataSource;
-
-    let projectRepository: ProjectRepository
+    let projectRepository: ProjectRepository;
+    let DATA_STORAGE_FS_STORAGE: "test/data_storage/";
+    let DATA_STORAGE_FTP_EXPORT: "test/data_storage/files_system_storage/";
+    let DATA_STORAGE_FOLDER: "test/data_storage/FTP/ecopart_exported_data/";
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockProjectDataSource = new MockProjectDataSource()
-        projectRepository = new ProjectRepositoryImpl(mockProjectDataSource)
+        projectRepository = new ProjectRepositoryImpl(mockProjectDataSource, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_FTP_EXPORT, DATA_STORAGE_FOLDER)
     })
 
 
