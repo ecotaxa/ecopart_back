@@ -35,6 +35,12 @@ npm run test
 
 To publish a new version, create and push a new tag for the application's code. Pushing a tag in the GitHub repository triggers a GitHub Action that builds the Docker image and publishes it on Docker Hub. The Docker image can be found [here](https://hub.docker.com/repository/docker/ecotaxa/ecopart_back/general).
 
+```bash
+git tag -a vXX.XX.XX -m "version message"
+git push --follow-tags
+```
+
+
 ### Production Procedure
 
 To deploy a new version of the application to production, follow these steps:

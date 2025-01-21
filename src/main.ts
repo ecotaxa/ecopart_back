@@ -67,9 +67,8 @@ import { FsAdapter } from './infra/files/fs'
 
 import sqlite3 from 'sqlite3'
 import path from 'path'
+import fs from 'fs';
 import 'dotenv/config'
-
-
 
 sqlite3.verbose()
 
@@ -117,6 +116,20 @@ async function getSQLiteDS() {
 }
 
 (async () => {
+    // Ensure required directories exist
+    const requiredFolders = [
+        config.DATA_STORAGE_FOLDER,
+        config.DBSOURCE_FOLDER,
+        config.DATA_STORAGE_FS_STORAGE,
+        config.DATA_STORAGE_FTP_EXPORT,
+    ];
+
+    requiredFolders.forEach(folder => {
+        if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder, { recursive: true });
+            console.log(`Created folder: ${folder}`);
+        }
+    });
     const db = await getSQLiteDS();
 
     const bcryptAdapter = new BcryptAdapter()
