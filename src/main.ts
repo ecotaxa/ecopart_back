@@ -83,7 +83,7 @@ const config = {
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
-    DATA_STORAGE_FTP_EXPORT: process.env.DATA_STORAGE_FTP_EXPORT || '',
+    DATA_STORAGE_EXPORT: process.env.DATA_STORAGE_EXPORT || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -121,9 +121,11 @@ async function getSQLiteDS() {
         config.DATA_STORAGE_FOLDER,
         config.DBSOURCE_FOLDER,
         config.DATA_STORAGE_FS_STORAGE,
-        config.DATA_STORAGE_FTP_EXPORT,
+        config.DATA_STORAGE_EXPORT,
+        path.join(config.DATA_STORAGE_FOLDER, "ecopart_data_to_import/"),
+        path.join(config.DATA_STORAGE_FOLDER, "ecopart_exported_data/")
     ];
-
+    console.log(requiredFolders)
     requiredFolders.forEach(folder => {
         if (!fs.existsSync(folder)) {
             fs.mkdirSync(folder, { recursive: true });
@@ -159,7 +161,7 @@ async function getSQLiteDS() {
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
-    const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_FTP_EXPORT, config.DATA_STORAGE_FOLDER)
+    const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
@@ -197,7 +199,7 @@ async function getSQLiteDS() {
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
-        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_FTP_EXPORT, config.BASE_URL_PUBLIC),
+        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.BASE_URL_PUBLIC),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo),

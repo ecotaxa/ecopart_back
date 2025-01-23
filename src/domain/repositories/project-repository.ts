@@ -16,7 +16,7 @@ import path from "path";
 export class ProjectRepositoryImpl implements ProjectRepository {
     projectDataSource: ProjectDataSource
     DATA_STORAGE_FS_STORAGE: string
-    DATA_STORAGE_FTP_EXPORT: string
+    DATA_STORAGE_EXPORT: string
     DATA_STORAGE_FOLDER: string
 
     // TODO move to a search repository
@@ -25,10 +25,10 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
     base_folder = path.join(__dirname, '..', '..', '..');
 
-    constructor(projectDataSource: ProjectDataSource, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_FTP_EXPORT: string, DATA_STORAGE_FOLDER: string) {
+    constructor(projectDataSource: ProjectDataSource, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_EXPORT: string, DATA_STORAGE_FOLDER: string) {
         this.projectDataSource = projectDataSource
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
-        this.DATA_STORAGE_FTP_EXPORT = DATA_STORAGE_FTP_EXPORT
+        this.DATA_STORAGE_EXPORT = DATA_STORAGE_EXPORT
         this.DATA_STORAGE_FOLDER = DATA_STORAGE_FOLDER
     }
 
@@ -384,7 +384,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         const exportFolder = path.join(
             this.base_folder,
-            this.DATA_STORAGE_FTP_EXPORT,
+            this.DATA_STORAGE_EXPORT,
             task_id.toString()
         );
 

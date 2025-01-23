@@ -15,16 +15,16 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
     projectRepository: ProjectRepository
     taskRepository: TaskRepository
     DATA_STORAGE_FS_STORAGE: string
-    DATA_STORAGE_FTP_EXPORT: string
+    DATA_STORAGE_EXPORT: string
     base_url_path: string
 
-    constructor(userRepository: UserRepository, privilegeRepository: PrivilegeRepository, projectRepository: ProjectRepository, taskRepository: TaskRepository, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_FTP_EXPORT: string, base_url_path: string) {
+    constructor(userRepository: UserRepository, privilegeRepository: PrivilegeRepository, projectRepository: ProjectRepository, taskRepository: TaskRepository, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_EXPORT: string, base_url_path: string) {
         this.userRepository = userRepository
         this.privilegeRepository = privilegeRepository
         this.projectRepository = projectRepository
         this.taskRepository = taskRepository
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
-        this.DATA_STORAGE_FTP_EXPORT = DATA_STORAGE_FTP_EXPORT
+        this.DATA_STORAGE_EXPORT = DATA_STORAGE_EXPORT
         this.base_url_path = base_url_path
     }
 
