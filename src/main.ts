@@ -84,6 +84,7 @@ const config = {
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
     DATA_STORAGE_EXPORT: process.env.DATA_STORAGE_EXPORT || '',
+    DATA_STORAGE_IMPORT: process.env.DATA_STORAGE_IMPORT || '',
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -122,10 +123,8 @@ async function getSQLiteDS() {
         config.DBSOURCE_FOLDER,
         config.DATA_STORAGE_FS_STORAGE,
         config.DATA_STORAGE_EXPORT,
-        path.join(config.DATA_STORAGE_FOLDER, "ecopart_data_to_import/"),
-        path.join(config.DATA_STORAGE_FOLDER, "ecopart_exported_data/")
+        config.DATA_STORAGE_IMPORT
     ];
-    console.log(requiredFolders)
     requiredFolders.forEach(folder => {
         if (!fs.existsSync(folder)) {
             fs.mkdirSync(folder, { recursive: true });
