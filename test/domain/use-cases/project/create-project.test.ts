@@ -14,7 +14,7 @@ let mockUserRepository: UserRepository;
 let mockProjectRepository: MockProjectRepository;
 let mockInstrumentModelRepository: MockInstrumentModelRepository;
 let mockPrivilegeRepository: MockPrivilegeRepository;
-let DATA_STORAGE_FS_STORAGE: "test/data_storage/";
+let DATA_STORAGE_FS_STORAGE: string;
 
 beforeEach(async () => {
     jest.clearAllMocks();
@@ -22,6 +22,7 @@ beforeEach(async () => {
     mockProjectRepository = new MockProjectRepository()
     mockInstrumentModelRepository = new MockInstrumentModelRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
+    DATA_STORAGE_FS_STORAGE = "data_storage/files_system_storage/"
 
 })
 
@@ -42,6 +43,7 @@ test("Try to add a project return created project", async () => {
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     const result = await createProjectUseCase.execute(current_user, InputData);
@@ -73,7 +75,7 @@ test("Create a project without override_depth_offset", async () => {
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
-
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     const result = await createProjectUseCase.execute(current_user, InputData);
@@ -100,6 +102,7 @@ test("Cannot find the created project.", async () => {
 
     jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
     await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrowError("Cannot find the created project.");
@@ -151,6 +154,7 @@ test("Create project but something went wrong during privilege creation", async 
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(0))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
 
@@ -180,6 +184,7 @@ test("Create project but something went wrong when fetching created privileges",
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, DATA_STORAGE_FS_STORAGE)
 
