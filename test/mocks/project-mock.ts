@@ -16,22 +16,22 @@ import { SearchSamplesUseCase } from "../../src/domain/interfaces/use-cases/samp
 
 export class MockProjectRepository implements ProjectRepository {
     createProjectRootFolder(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for createProjectRootFolder");
     }
     ensureFolderStructureForBackup(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for ensureFolderStructureForBackup");
     }
     copyL0bToProjectFolder(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for copyL0bToProjectFolder");
     }
     ensureBackupExist(): Promise<void> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for ensureBackupExist");
     }
     exportBackupedProjectToFtp(): Promise<string> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for exportBackupedProjectToFtp");
     }
     exportBackupedProjectToFs(): Promise<string> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for exportBackupedProjectToFs");
     }
     formatProjectRequestCreationModel(): ProjectRequestCreationModel {
         throw new Error("Method not implemented for formatProjectRequestCreationModel");

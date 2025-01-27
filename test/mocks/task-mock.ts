@@ -39,7 +39,7 @@ export class MockTaskRepository implements TaskRepository {
         throw new Error("Method not implemented for standardGetTaskType");
     }
     standardGetTaskStatus(): Promise<SearchResult<TaskStatusResponseModel>> {
-        throw new Error("Method not implemented.");
+        throw new Error("Method not implemented for standardGetTaskStatus");
     }
     getTasksByUser(): Promise<number[]> {
         throw new Error("Method not implemented for getTasksByUser");
