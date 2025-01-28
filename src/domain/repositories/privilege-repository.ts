@@ -55,10 +55,12 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         return privileges.items
     }
 
-    async getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege> {
+    async getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege | null> {
 
         const privileges: PrivilegeResponseModel[] = await this.getPrivileges(project)
-
+        if (privileges.length === 0) {
+            return null;
+        }
         const publicPrivilege: PublicPrivilege = {
             project_id: project.project_id,
             members: privileges.filter(

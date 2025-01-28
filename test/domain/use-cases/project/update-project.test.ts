@@ -446,3 +446,39 @@ test("Please provide at least one property to update", async () => {
         expect(mockPrivilegeRepository.createPrivileges).toHaveBeenCalledTimes(0)
     }
 });
+// getUpdatedPrivileges : getPublicPrivileges returns null : error Cannot find updated privileges
+test("Cannot find updated privileges", async () => {
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const project_to_update: PublicProjectUpdateModel = projectUpdateModel
+    const updated_public_project: PublicProjectResponseModel = projectResponseModel
+    const expected_error = new Error("Cannot find updated privileges")
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(null))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    try {
+        await updateProjectUseCase.execute(current_user, project_to_update);
+        expect(true).toBe(false)
+    } catch (err) {
+        expect(err).toStrictEqual(expected_error)
+        expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
+        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+        expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
+        expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
+        expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(0)
+        expect(mockPrivilegeRepository.createPrivileges).toHaveBeenCalledTimes(0)
+    }
+});

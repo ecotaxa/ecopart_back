@@ -176,6 +176,9 @@ export class UpdateProject implements UpdateProjectUseCase {
 
     private async getUpdatedPrivileges(project_id: number): Promise<PublicPrivilege> {
         const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: project_id });
+        if (!privileges) {
+            throw new Error("Cannot find updated privileges");
+        }
         return privileges;
     }
 

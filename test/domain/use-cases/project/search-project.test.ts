@@ -577,3 +577,40 @@ test("Should return error if filter is not valid : operator different of = or IN
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
     expect(mockProjectRepository.standardGetProjects).not.toBeCalled()
 });
+// Cannot find privileges : mapToPublicProjects
+test("Should return error if cannot find privileges", async () => {
+    const ExpectedResult = {
+        items: projectResponseModelArray,
+        total: 2
+    }
+
+    const current_user: UserUpdateModel = {
+        user_id: 1,
+    }
+
+    const options = {
+        page: 1,
+        limit: 10,
+        sort_by: []
+    }
+    const filters: FilterSearchOptions[] = []
+    const search_info = { total: 2, limit: 10, total_on_page: 2, page: 1, pages: 1 }
+    const projectIds = [1, 2]
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(null))
+    jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => { return filters })
+    jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => { return [] })
+    jest.spyOn(mockProjectRepository, "standardGetProjects").mockImplementation(() => Promise.resolve(ExpectedResult))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => projectResponseModel).mockImplementationOnce(() => projectResponseModel2)
+    jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return search_info })
+    jest.spyOn(mockPrivilegeRepository, "getProjectsByContacts").mockImplementation(() => Promise.resolve(projectIds))
+
+    await expect(searchProjectUseCase.execute(current_user, options, filters)).rejects.toThrow(new Error("Cannot find privileges"))
+
+    // expect functions ahve been called with
+    expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
+    expect(mockSearchRepository.formatFilters).not.toBeCalled()
+    expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
+    expect(mockProjectRepository.standardGetProjects).toBeCalledTimes(1)
+});

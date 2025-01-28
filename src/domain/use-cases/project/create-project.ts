@@ -103,7 +103,7 @@ export class CreateProject implements CreateProjectUseCase {
         }
         // Retrieve the newly created privileges
         const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: projectId });
-        if (privileges.members.length + privileges.managers.length !== publicProject.members.length + publicProject.managers.length) {
+        if (!privileges || privileges.members.length + privileges.managers.length !== publicProject.members.length + publicProject.managers.length) {
             throw new Error("Cant find created privileges, please check members, managers and contact");
         }
         return privileges;

@@ -116,6 +116,7 @@ export default function ProjectRouter(
             else if (err.message === "Privileges partially created, please check members, managers and contact") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find updated project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot find updated privileges")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message === "Please provide at least one valid parameter to update") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot update project"] })

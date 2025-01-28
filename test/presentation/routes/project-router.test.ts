@@ -403,6 +403,17 @@ describe("Project Router", () => {
             expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("PATCH /projects fail for Cannot find updated privileges reason", async () => {
+            const project_to_update = partial_projectUpdateModel
+
+            const expectedResponse = { errors: ["Cannot find updated privileges"] }
+            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find updated privileges") })
+            const response = await request(server).patch("/projects/2").send(project_to_update)
+
+            expect(response.status).toBe(500)
+            expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
     })
 
 

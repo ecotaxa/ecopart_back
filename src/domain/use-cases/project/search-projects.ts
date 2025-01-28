@@ -146,8 +146,6 @@ export class SearchProject implements SearchProjectsUseCase {
                 projectIds = await this.privilegeRepository.getProjectsByMembers(userIds);
             } else if (filterField === "granted_users") {
                 projectIds = await this.privilegeRepository.getProjectsByUsers(userIds);
-            } else {
-                throw new Error("Invalid filter field");
             }
             options.filter.push({ field: "project_id", operator: "IN", value: projectIds });
         }

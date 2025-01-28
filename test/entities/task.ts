@@ -1,5 +1,5 @@
-import { SearchInfo } from "../../src/domain/entities/search";
-import { PrivateTaskRequestCreationModel, TaskResponseModel } from "../../src/domain/entities/task";
+import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
+import { PrivateTaskRequestCreationModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../../src/domain/entities/task";
 
 export const TaskResponseModel_1: TaskResponseModel = {
     task_type_id: 4,
@@ -103,4 +103,37 @@ export const data_source_taskRequestCreationModel_2: PrivateTaskRequestCreationM
 
     task_log_file_path: "Path/to/log/file",
     task_params: '{ "samples": ["Mooring_0N_23W_201910_850m"] }',
+}
+export const tasktype_1: TaskTypeResponseModel =
+{
+    task_type_id: 1,
+    task_type_label: "IMPORT"
+}
+export const tasktype_2: TaskTypeResponseModel =
+{
+    task_type_id: 2,
+    task_type_label: "EXPORT"
+}
+export const tasktype_3: TaskTypeResponseModel =
+{
+    task_type_id: 3,
+    task_type_label: "BACKUP"
+}
+export const task_type_1_search_result: SearchResult<TaskTypeResponseModel> = {
+    items: [
+        tasktype_1
+    ],
+    total: 1
+}
+
+export const tasks_status_1: TaskStatusResponseModel =
+{
+    task_status_id: 1,
+    task_status_label: "PENDING"
+}
+export const task_status_1_search_result = {
+    items: [
+        tasks_status_1
+    ],
+    total: 1
 }

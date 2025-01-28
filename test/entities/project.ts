@@ -1,7 +1,7 @@
 
 // define an example of project entities to use in the tests
 
-import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../src/domain/entities/project"
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectResponseModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../src/domain/entities/project"
 import { MinimalUserModel } from "../../src/domain/entities/user"
 
 export const projectRequestCreationModel: PublicProjectRequestCreationModel = {
@@ -501,4 +501,10 @@ export const projectUpdateModel_withPartialPrivilegeUpdate: PublicProjectUpdateM
     ...projectUpdateModel,
     managers: [{ user_id: 2 } as MinimalUserModel],
     members: [{ user_id: 3 } as MinimalUserModel]
+}
+
+export const private_projectResponseModel: ProjectResponseModel = {
+    ...projectRequestCreationModel,
+    project_id: 1,
+    project_creation_date: '2024-04-29 15:43:10'
 }

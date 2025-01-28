@@ -47,7 +47,7 @@ export class BackupProject implements BackupProjectUseCase {
         }
 
         // start the task
-        this.startBackupProjectTask(task, project.instrument_model, project, current_user, skip_already_imported);
+        this.startBackupProjectTask(task, project, skip_already_imported);
 
         return task;
     }
@@ -87,7 +87,7 @@ export class BackupProject implements BackupProjectUseCase {
         }
     }
 
-    private async startBackupProjectTask(task: TaskResponseModel, instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel, skip_already_imported: boolean) {
+    private async startBackupProjectTask(task: TaskResponseModel, project: ProjectResponseModel, skip_already_imported: boolean) {
         const task_id = task.task_id;
         try {
             await this.taskRepository.startTask({ task_id: task_id });

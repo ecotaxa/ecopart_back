@@ -15,6 +15,6 @@ export interface PrivilegeRepository {
     isGranted(privilege: PrivilegeRequestModel): Promise<boolean>;
     getContact(project: ProjectRequestModel): Promise<PrivilegeResponseModel>;
     createPrivileges(publicPrivilege: PublicPrivilege): Promise<number>;
-    getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege>;
+    getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege | null>;
     deletePrivileges(privilege: PrivilegeRequestModel): Promise<number>
 }
