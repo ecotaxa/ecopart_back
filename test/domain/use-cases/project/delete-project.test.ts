@@ -2,6 +2,7 @@ import { UserUpdateModel } from "../../../../src/domain/entities/user";
 import { ProjectResponseModel, ProjectUpdateModel } from "../../../../src/domain/entities/project";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
+import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
 import { DeleteProject } from '../../../../src/domain/use-cases/project/delete-project'
 import { projectResponseModel } from "../../../entities/project";
 import { MockProjectRepository } from "../../../mocks/project-mock";
@@ -12,7 +13,7 @@ describe("Delete Project Use Case", () => {
 
     let mockProjectRepository: ProjectRepository;
     let mockUserRepository: UserRepository;
-    let mockPrivilegeRepository: MockPrivilegeRepository;
+    let mockPrivilegeRepository: PrivilegeRepository;
 
     beforeEach(() => {
         jest.clearAllMocks();

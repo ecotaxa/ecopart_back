@@ -47,6 +47,7 @@ export default function TaskRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task managing filter value is not valid") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
     })

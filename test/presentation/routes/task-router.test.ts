@@ -160,6 +160,14 @@ describe('TaskRouter', () => {
             expect(searchTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("failed if task managing filter value is not valid", async () => {
+            const expectedResponse = { errors: ["Task managing filter value is not valid"] }
+            jest.spyOn(searchTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task managing filter value is not valid") })
+            const response = await request(server).post("/tasks/searches")
+            expect(response.status).toBe(401)
+            expect(searchTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
         test("failed if cannot search tasks", async () => {
             const expectedResponse = { errors: ["Cannot search tasks"] }
             jest.spyOn(searchTaskUseCase, "execute").mockImplementation(() => { throw new Error("xyz") })
@@ -168,6 +176,7 @@ describe('TaskRouter', () => {
             expect(searchTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+
     })
     describe("Tests for GET /:task_id", () => {
         test("Should return 200 with data", async () => {

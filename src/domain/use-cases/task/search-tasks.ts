@@ -137,6 +137,8 @@ export class SearchTask implements SearchTasksUseCase {
                 const taskIds = await this.taskRepository.getTasksByUser({ user_id: current_user.user_id });
                 // Add the new filter to the list of filters
                 options.filter.push({ field: "task_id", operator: "IN", value: taskIds });
+            } else if (!(managingFilter.value === "false" || managingFilter.value === false)) {
+                throw new Error("Task managing filter value is not valid");
             }
         }
         return options;
