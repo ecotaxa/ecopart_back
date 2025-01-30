@@ -1,4 +1,4 @@
-import { PublicSampleModel } from "../../src/domain/entities/sample";
+import { PublicHeaderSampleResponseModel, PublicSampleModel, SampleRequestCreationModel } from "../../src/domain/entities/sample";
 import { SearchInfo } from "../../src/domain/entities/search";
 
 export const sampleModel_1: PublicSampleModel = {
@@ -122,4 +122,81 @@ export const SearchSampleResult: { samples: PublicSampleModel[], search_info: Se
         sampleModel_1,
         sampleModel_2
     ]
+}
+
+
+export const PublicHeaderSampleResponseModel_1: PublicHeaderSampleResponseModel = {
+    sample_name: "perle3_001",
+    raw_file_name: "20200313004656",
+    station_id: "A01",
+    first_image: 2790,
+    last_image: 15872,
+    comment: "no",
+    qc_lvl1: true,
+    qc_lvl1_comment: "no"
+}
+
+export const PublicHeaderSampleResponseModel_2: PublicHeaderSampleResponseModel = {
+    sample_name: "Mooring_0N_23W_201910_850m",
+    raw_file_name: "20191012-000000_Merged-020",
+    station_id: "0N_23W_830m",
+    first_image: 3432,
+    last_image: 107843,
+    comment: "0",
+    qc_lvl1: true,
+    qc_lvl1_comment: "no"
+}
+
+export const listImportableSamplesResult: PublicHeaderSampleResponseModel[] = [
+    PublicHeaderSampleResponseModel_1,
+    PublicHeaderSampleResponseModel_2
+]
+
+export const sampleRequestCreationModel_1: SampleRequestCreationModel = {
+    sample_name: "Mooring_0N_23W_201910_850m",
+    comment: "0",
+    instrument_serial_number: "000002LP",
+    optional_structure_id: "0",
+    max_pressure: 863.99,
+    station_id: "0N_23W_830m",
+    sampling_date: "20191012-151516",
+    latitude: 0,
+    longitude: -23,
+    wind_direction: 90,
+    wind_speed: 100,
+    sea_state: "nan",
+    nebulousness: 0,
+    bottom_depth: 100,
+    instrument_operator_email: "picheral@obs-vlfr.fr",
+    filename: "20191012-000000_Merged-020",
+    filter_first_image: "3432",
+    filter_last_image: "107843",
+    instrument_settings_acq_gain: 6,
+    instrument_settings_acq_description: "uvp5hd sn000002LP : mixtfd",
+    instrument_settings_acq_task_type: 2,
+    instrument_settings_acq_choice: 0,
+    instrument_settings_acq_disk_type: 0,
+    instrument_settings_acq_appendices_ratio: 2,
+    instrument_settings_acq_xsize: 2048,
+    instrument_settings_acq_ysize: 2048,
+    instrument_settings_acq_erase_border: 0,
+    instrument_settings_acq_threshold: 23,
+    instrument_settings_process_datetime: "20191012-151516",
+    instrument_settings_process_gamma: 1,
+    instrument_settings_images_post_process: "uvpapp",
+    instrument_settings_aa: 1130,
+    instrument_settings_exp: 1.313,
+    instrument_settings_image_volume_l: 0.63,
+    instrument_settings_pixel_size_mm: 73,
+    instrument_settings_depth_offset_m: 999,
+    instrument_settings_particle_minimum_size_pixels: 2,
+    instrument_settings_vignettes_minimum_size_pixels: 80,
+    instrument_settings_particle_minimum_size_esd: 700,
+    instrument_settings_vignettes_minimum_size_esd: 700,
+    instrument_settings_acq_shutter: 10,
+    instrument_settings_acq_shutter_speed: 10,
+    instrument_settings_acq_exposure: 0,
+    visual_qc_validator_user_id: 1,
+    sample_type_id: 1,
+    project_id: 6
 }

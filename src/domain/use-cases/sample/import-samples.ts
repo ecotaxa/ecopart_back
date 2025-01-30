@@ -68,8 +68,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
         const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
-        // Ensure the task to get exists
-        if (!samples) { throw new Error("No samples to import"); }
+        if (samples.length === 0) { throw new Error("No samples to import"); }
 
         return samples;
     }

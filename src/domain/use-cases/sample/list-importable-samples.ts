@@ -35,9 +35,6 @@ export class ListImportableSamples implements ListImportableSamplesUseCase {
 
         const samples = await this.listImportableSamples(project);
 
-        // Ensure the task to get exists
-        if (!samples) { throw new Error("No samples to import"); }
-
         return samples;
     }
 
