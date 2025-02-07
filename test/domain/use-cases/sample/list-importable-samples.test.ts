@@ -29,7 +29,7 @@ beforeEach(async () => {
 })
 
 
-describe("Delete Sample Use Case", () => {
+describe("List importable samples Sample Use Case", () => {
     describe("errors senarios", () => {
         test("should throw an error if the user is not valid", async () => {
             const current_user: UserUpdateModel = {
