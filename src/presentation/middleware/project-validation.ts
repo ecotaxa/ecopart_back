@@ -27,17 +27,14 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
 
         // Project information Validation
         check('project_information')
-            .trim()
-            .not().isEmpty().withMessage('Project information is required.'),
-
+            .trim(),
         // Project cruise Validation
         check('cruise')
             .trim()
             .not().isEmpty().withMessage('Cruise name is required.'),
 
         // Project ship Validation 
-        check('ship').trim()
-            .not().isEmpty().withMessage('Ship name is required.'),
+        check('ship').trim(),
 
         // Data owner name Validation
         check('data_owner_name')
