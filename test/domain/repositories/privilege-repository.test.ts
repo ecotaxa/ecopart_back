@@ -61,6 +61,15 @@ describe("Privilege Repository", () => {
 
             expect(result).toStrictEqual(publicPrivilegesResponse_WithMemberAndManager)
         });
+        test("Should return empty array if no project is found", async () => {
+            const all_projects: SearchResult<PrivilegeResponseModel> = { total: 0, items: [] }
+
+            jest.spyOn(mockPrivilegeDataSource, 'getAll').mockResolvedValue(all_projects)
+
+            const result = await privilegeRepository.getPublicPrivileges({ project_id: 1 })
+
+            expect(result).toStrictEqual(null)
+        });
     });
     describe("GetProjectsByUser", () => {
         test("Should return projects by user", async () => {

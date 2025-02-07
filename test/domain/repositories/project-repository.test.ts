@@ -14,13 +14,16 @@ import 'dotenv/config'
 describe("Project Repository", () => {
     let mockProjectDataSource: ProjectDataSource;
     let projectRepository: ProjectRepository;
-    let DATA_STORAGE_FS_STORAGE: "test/data_storage/";
-    let DATA_STORAGE_EXPORT: "test/data_storage/files_system_storage/";
-    let DATA_STORAGE_FOLDER: "test/data_storage/FTP/ecopart_exported_data/";
+    let DATA_STORAGE_FS_STORAGE: string;
+    let DATA_STORAGE_EXPORT: string;
+    let DATA_STORAGE_FOLDER: string;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockProjectDataSource = new MockProjectDataSource()
+        DATA_STORAGE_FS_STORAGE = "test/data_storage/";
+        DATA_STORAGE_EXPORT = "test/data_storage/files_system_storage/";
+        DATA_STORAGE_FOLDER = "test/data_storage/FTP/ecopart_exported_data/";
         projectRepository = new ProjectRepositoryImpl(mockProjectDataSource, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, DATA_STORAGE_FOLDER)
     })
 
