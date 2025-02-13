@@ -97,6 +97,34 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         })
     }
 
+    async getOne(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel | null> {
+        const sql = "SELECT * FROM ecotaxa_account WHERE ecotaxa_account_id = (?)";
+        const params = [ecotaxa_account_id];
+        return await new Promise((resolve, reject) => {
+            this.db.get(sql, params, (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
+                    const result: EcotaxaAccountResponseModel = {
+                        ecotaxa_account_id: row.ecotaxa_account_id,
+                        ecotaxa_account_creation_date: row.ecotaxa_account_creation_date,
+                        ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
+                        ecotaxa_account_token: row.ecotaxa_account_token,
+                        ecotaxa_account_user_name: row.ecotaxa_account_user_name,
+                        ecotaxa_account_user_email: row.ecotaxa_account_user_email,
+                        ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
+                        ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date
+                    };
+                    resolve(result);
+                }
+            });
+        })
+    }
+
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
         let sql = `SELECT *, (SELECT COUNT(*) FROM ecotaxa_account`
@@ -198,15 +226,17 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         })
     }
 
-    async deleteOne(ecotaxa_account: EcotaxaAccountRequestModel): Promise<boolean> {
-        const sql = "DELETE FROM ecotaxa_account WHERE ecotaxa_account_id = (?)";
-        const params = [ecotaxa_account.ecotaxa_account_id];
+    async deleteOne(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number> {
+        // returns the number of deleted rows
+        const sql = "DELETE FROM ecotaxa_account WHERE ecotaxa_account_id = (?) and ecotaxa_account_ecopart_user_id = (?)";
+        const params = [ecotaxa_account.ecotaxa_account_id, ecotaxa_account.ecotaxa_account_ecopart_user_id];
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve(true);
+                    const nb_of_deleted_rows = this.changes;
+                    resolve(nb_of_deleted_rows);
                 }
             });
         })

@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { check, validationResult, query } from 'express-validator';
+import { check, validationResult, query, param } from 'express-validator';
 import { CountriesAdapter } from '../../infra/countries/country';
 import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation';
 
@@ -156,4 +156,22 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
             next();
         },
     ];
+
+    rulesLogoutEcoTaxaAccount = [
+        param('user_id')
+            .not().isEmpty().withMessage('User id is required.')
+            .isInt().withMessage('Ecopart user id must be a number.'),
+        param('ecotaxa_account_id')
+            .not().isEmpty().withMessage('Ecotaxa account id is required.')
+            .isInt().withMessage('Ecotaxa account id must be a number.'),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ]
 }

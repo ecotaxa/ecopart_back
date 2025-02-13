@@ -9,7 +9,7 @@ import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-u
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
 import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
-//import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
+import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { CustomRequest } from '../../domain/entities/auth'
 import { MiddlewareAuthValidation } from '../middleware/auth-validation'
 
@@ -22,7 +22,7 @@ export default function UsersRouter(
     validUserUseCase: ValidUserUseCase,
     deleteUserUseCase: DeleteUserUseCase,
     loginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase,
-    // logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
+    logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
     searchUsersUseCase: SearchUsersUseCase
 ) {
     const router = express.Router()
@@ -147,18 +147,19 @@ export default function UsersRouter(
         }
     })
     //    logout from an ecotaxa Account
-    // router.delete('/:user_id/ecotaxa_account/:ecotaxa_account_id', middlewareAuth.auth, async (req: Request, res: Response) => {
-    //     try {
-    //         await logoutEcotaxaAccountUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id, ecotaxa_account_id: req.params.ecotaxa_account_id })
-    //         res.status(200).send({ message: "You have been logged out from ecotaxa account" });
-    //     } catch (err) {
-    //         console.log(err)
-    //         if (err.message === "Logged user cannot delete this ecotaxa account") res.status(401).send({ errors: [err.message] })
-    //         else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-    //         //TODO ADD OTHER ERRORS
-    //         else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
-    //     }
-    // })
+    router.delete('/:user_id/ecotaxa_account/:ecotaxa_account_id', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
+        try {
+            await logoutEcotaxaAccountUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id))
+            res.status(200).send({ message: "You have been logged out from ecotaxa account" });
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Logged user cannot delete this ecotaxa account") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot logout from the requested ecotaxa account") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
+        }
+    })
     // search ecotaxa accounts
     return router
 }

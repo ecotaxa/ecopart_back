@@ -40,6 +40,7 @@ import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
 import { DeleteSample } from './domain/use-cases/sample/delete-sample'
 import { SearchSamples } from './domain/use-cases/sample/search-samples'
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
+import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -180,6 +181,7 @@ async function getSQLiteDS() {
             new ValidUser(user_repo),
             new DeleteUser(user_repo, privilege_repo),
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
+            new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo),
         )
     const authMiddleWare = AuthRouter(

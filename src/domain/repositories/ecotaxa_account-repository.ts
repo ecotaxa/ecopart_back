@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, ecotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, ecotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel } from "../entities/ecotaxa_account";
 import { PreparedSearchOptions } from "../entities/search";
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -36,14 +36,16 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<void> {
         await this.ecotaxa_accountDataSource.create(private_ecotaxa_account_to_create);
     }
+    async getOneEcotaxaAccount(ecotaxa_account_id: number): Promise<EcotaxaAccountRequestCreationModel | null> {
+        const ecotaxa_account = await this.ecotaxa_accountDataSource.getOne(ecotaxa_account_id);
+        return ecotaxa_account;
+    }
     async getInstanceURL(ecotaxa_instance_id: number): Promise<string> {
         const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
         if (!ecotaxa_instance) throw new Error("Ecotaxa instance not found : " + ecotaxa_instance_id);
         return ecotaxa_instance.ecotaxa_instance_url;
     }
     async getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null> {
-        // should be a number
-        if (isNaN(ecotaxa_instance_id)) throw new Error("Ecotaxa instance id should be a number");
         const ecotaxa_instance = await this.ecotaxa_accountDataSource.getOneEcoTaxaInstance(ecotaxa_instance_id);
         return ecotaxa_instance;
     }
@@ -100,5 +102,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return this.ecotaxa_accountDataSource
             .getAll(options)
             .then(result => result.total > 0);
+    }
+    async deleteEcotaxaAccount(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number> {
+        // Return the number of deleted rows
+        const nb_of_deleted_rows = await this.ecotaxa_accountDataSource.deleteOne(ecotaxa_account);
+        if (nb_of_deleted_rows === 0) {
+            throw new Error("Ecotaxa account not found");
+        }
+        return nb_of_deleted_rows;
     }
 }
