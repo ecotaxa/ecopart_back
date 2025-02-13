@@ -295,7 +295,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             sample_id: row.sample_id,
@@ -574,7 +577,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             sample_type_id: row.sample_type_id,
@@ -610,7 +616,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             visual_qc_status_id: row.visual_qc_status_id,

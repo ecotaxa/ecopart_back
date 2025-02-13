@@ -39,6 +39,7 @@ import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
 import { DeleteSample } from './domain/use-cases/sample/delete-sample'
 import { SearchSamples } from './domain/use-cases/sample/search-samples'
+import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -50,6 +51,7 @@ import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
 import { TaskRepositoryImpl } from './domain/repositories/task-repository'
 import { BackupProject } from './domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
+import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -58,6 +60,7 @@ import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-proje
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
 import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
 import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
+import { SQLiteEcotaxaAccountDataSource } from './data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -145,6 +148,7 @@ async function getSQLiteDS() {
     const privilege_dataSource = new SQLitePrivilegeDataSource(db)
     const task_datasource = new SQLiteTaskDataSource(db)
     const sample_dataSource = new SQLiteSampleDataSource(db)
+    const ecotaxa_account_dataSource = new SQLiteEcotaxaAccountDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -164,15 +168,18 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource)
 
     const userMiddleWare =
         UserRouter(
             new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
             new MiddlewareUserValidation(countriesAdapter),
+            new MiddlewareAuthValidation(),
             new CreateUser(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
             new DeleteUser(user_repo, privilege_repo),
+            new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo),
         )
     const authMiddleWare = AuthRouter(

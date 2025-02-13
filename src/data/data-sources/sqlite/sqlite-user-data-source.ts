@@ -23,7 +23,6 @@ export class SQLiteUserDataSource implements UserDataSource {
                 return; // Return early if there's an error creating the table
             }
             else {
-
                 // Create admin user if not exist
                 const sql_admin = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('admin', 'admin', 'julie.coustenoble@imev-mer.fr', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 1, 'admin', 'admin', 'admin');"
 
@@ -207,7 +206,10 @@ export class SQLiteUserDataSource implements UserDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             user_id: row.user_id,

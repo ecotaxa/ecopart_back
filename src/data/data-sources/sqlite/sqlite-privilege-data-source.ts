@@ -222,7 +222,10 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             privilege_id: row.privilege_id,

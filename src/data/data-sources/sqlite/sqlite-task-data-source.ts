@@ -343,7 +343,10 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             task_type_id: row.task_type_id,

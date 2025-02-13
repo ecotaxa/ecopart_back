@@ -71,6 +71,33 @@ export class MiddlewareAuthValidation implements IMiddlewareAuthValidation {
         },
     ];
 
+    rulesAuthEcoTaxaAccountCredentialsModel = [
+        // Email Validation
+        check('ecotaxa_user_login')
+            .not().isEmpty()
+            .trim()
+            .isEmail()
+            .withMessage('Invalid ecotaxa_user_login'),
+        // Password Validation
+        check('ecotaxa_user_password')
+            .not().isEmpty()
+            .withMessage('Invalid ecotaxa_user_password'),
+        // ecotaxa instance id
+        check('ecotaxa_instance_id')
+            .not().isEmpty()
+            .isNumeric()
+            .withMessage('Invalid ecotaxa instance id'),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
     rulesRequestResetPassword = [
         // Email Validation
         check('email')

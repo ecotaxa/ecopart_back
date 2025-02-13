@@ -195,7 +195,10 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             instrument_model_id: row.instrument_model_id,

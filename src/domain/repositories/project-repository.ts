@@ -196,6 +196,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         return publicProject;
     }
+
     async createProjectRootFolder(root_folder_path: string): Promise<void> {
         try {
             // Check if the folder exists

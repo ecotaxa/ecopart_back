@@ -8,15 +8,21 @@ import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
 import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
+import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
+//import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { CustomRequest } from '../../domain/entities/auth'
+import { MiddlewareAuthValidation } from '../middleware/auth-validation'
 
 export default function UsersRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareUserValidation: IMiddlewareUserValidation,
+    middlewareAuthValidation: MiddlewareAuthValidation,
     createUserUseCase: CreateUserUseCase,
     updateUserUseCase: UpdateUserUseCase,
     validUserUseCase: ValidUserUseCase,
     deleteUserUseCase: DeleteUserUseCase,
+    loginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase,
+    // logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
     searchUsersUseCase: SearchUsersUseCase
 ) {
     const router = express.Router()
@@ -121,6 +127,38 @@ export default function UsersRouter(
             else res.status(500).send({ errors: ["Cannot delete user"] })
         }
     })
-
+    /********** ECOTAXA ACCOUNTS ENDPOINTS ***********/
+    // login to an ecotaxa Account
+    router.post('/:user_id/ecotaxa_account', middlewareAuth.auth, middlewareAuthValidation.rulesAuthEcoTaxaAccountCredentialsModel, async (req: Request, res: Response) => {
+        try {
+            const ecotaxa_account = await loginEcotaxaAccountUseCase.execute((req as CustomRequest).token, { ...req.body, ecopart_user_id: req.params.user_id })
+            res.status(200).send(ecotaxa_account)
+        } catch (err) {
+            console.log(err)
+            if (err.message === "Logged user cannot login to this ecotaxa account") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot add account to the desired ecopart user") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa instance not found ")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance id should be a number") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot create ecotaxa account") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Account already exists") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "HTTP Error: 403") res.status(403).send({ errors: ["Cannot login ecotaxa account"] })
+            else res.status(500).send({ errors: ["Cannot login ecotaxa account"] })
+        }
+    })
+    //    logout from an ecotaxa Account
+    // router.delete('/:user_id/ecotaxa_account/:ecotaxa_account_id', middlewareAuth.auth, async (req: Request, res: Response) => {
+    //     try {
+    //         await logoutEcotaxaAccountUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id, ecotaxa_account_id: req.params.ecotaxa_account_id })
+    //         res.status(200).send({ message: "You have been logged out from ecotaxa account" });
+    //     } catch (err) {
+    //         console.log(err)
+    //         if (err.message === "Logged user cannot delete this ecotaxa account") res.status(401).send({ errors: [err.message] })
+    //         else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+    //         //TODO ADD OTHER ERRORS
+    //         else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
+    //     }
+    // })
+    // search ecotaxa accounts
     return router
 }

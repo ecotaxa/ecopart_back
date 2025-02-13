@@ -60,7 +60,10 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row === undefined) resolve(null);
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
                     else {
                         const result = {
                             project_id: row.project_id,
