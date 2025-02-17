@@ -73,6 +73,7 @@ import sqlite3 from 'sqlite3'
 import path from 'path'
 import fs from 'fs';
 import 'dotenv/config'
+import { SearchEcotaxaAccounts } from './domain/use-cases/ecotaxa_account/search-ecotaxa_account'
 
 sqlite3.verbose()
 
@@ -183,6 +184,7 @@ async function getSQLiteDS() {
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo),
+            new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo)
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),

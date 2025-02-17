@@ -1,4 +1,4 @@
-import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel } from "../../entities/ecotaxa_account";
+import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
 import { UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
@@ -13,7 +13,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
         this.ecotaxaAccountRepository = ecotaxaAccountRepository
     }
 
-    async execute(current_user: UserUpdateModel, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel> {
+    async execute(current_user: UserUpdateModel, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<PublicEcotaxaAccountResponseModel> {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.userRepository.ensureUserCanBeUsed(ecotaxa_account_to_create.ecopart_user_id);

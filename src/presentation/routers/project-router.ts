@@ -41,7 +41,7 @@ export default function ProjectRouter(
             const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(project)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
@@ -57,7 +57,7 @@ export default function ProjectRouter(
             const project = await searchProjectUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
             res.status(200).send(project)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
@@ -83,7 +83,7 @@ export default function ProjectRouter(
             const created_project = await createProjectUseCase.execute((req as CustomRequest).token, req.body)
             res.status(201).send(created_project)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes(" cannot be used: ")) res.status(403).send({ errors: [err.message] })
@@ -101,7 +101,7 @@ export default function ProjectRouter(
             const updated_project = await updateProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
             res.status(200).send(updated_project)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot update this property or project") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
@@ -128,7 +128,7 @@ export default function ProjectRouter(
             await deleteProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
             res.status(200).send({ message: "Project successfully deleted" })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this project") res.status(401).send({ errors: [err.message] })
@@ -142,7 +142,7 @@ export default function ProjectRouter(
             const task = await backupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.skip_already_imported);
             res.status(200).send(task)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
@@ -163,7 +163,7 @@ export default function ProjectRouter(
             const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.out_to_ftp);
             res.status(200).send(task)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
@@ -184,7 +184,7 @@ export default function ProjectRouter(
             const tasks = await listImportableSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
             res.status(200).send(tasks)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
@@ -304,7 +304,7 @@ export default function ProjectRouter(
             const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
             res.status(200).send(project)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
@@ -323,7 +323,7 @@ export default function ProjectRouter(
             const samples = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
             res.status(200).send(samples)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
@@ -342,7 +342,7 @@ export default function ProjectRouter(
             await deleteSampleUseCase.execute((req as CustomRequest).token, req.params.sample_id as any, req.params.project_id as any);
             res.status(200).send({ message: "Sample successfully deleted" })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })

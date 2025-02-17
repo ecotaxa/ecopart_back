@@ -29,7 +29,7 @@ export default function TaskRouter(
             const tasks = await searchTaskUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(tasks)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
@@ -43,7 +43,7 @@ export default function TaskRouter(
             const tasks = await searchTaskUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
             res.status(200).send(tasks)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
@@ -58,7 +58,7 @@ export default function TaskRouter(
             const task = await getOneTaskUseCase.execute((req as CustomRequest).token, req.params.task_id as any);
             res.status(200).send(task)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task"] })
@@ -72,7 +72,7 @@ export default function TaskRouter(
             await deleteTaskUseCase.execute((req as CustomRequest).token, { ...req.body, task_id: req.params.task_id })
             res.status(200).send({ message: "Task " + req.params.task_id + " successfully deleted" })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this task") res.status(403).send({ errors: ["Cannot delete task"] })
@@ -87,7 +87,7 @@ export default function TaskRouter(
             const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId);
             res.status(200).send(logs);
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
@@ -101,7 +101,7 @@ export default function TaskRouter(
             const taskId = parseInt(req.params.task_id);
             await streamZipFileUseCase.execute((req as CustomRequest).token, taskId, res);
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "ZIP file not found") res.status(404).send({ errors: [err.message] });

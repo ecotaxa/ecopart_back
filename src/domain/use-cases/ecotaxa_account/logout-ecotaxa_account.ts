@@ -27,7 +27,7 @@ export class LogoutEcotaxaAccount implements LogoutEcotaxaAccountUseCase {
         await this.userRepository.ensureUserCanBeUsed(ecopart_user_id);
 
         // Ensure current user can delete account to the desired ecopart user
-        await this.ensureUserCanAddAccount(current_user.user_id, ecopart_user_id);
+        await this.ensureUserCanDeleteAccount(current_user.user_id, ecopart_user_id);
 
         // Delete the ecotaxa account
         await this.ecotaxaAccountRepository.deleteEcotaxaAccount({
@@ -36,7 +36,7 @@ export class LogoutEcotaxaAccount implements LogoutEcotaxaAccountUseCase {
         });
     }
 
-    async ensureUserCanAddAccount(user_id: number, ecopart_user_id: number): Promise<void> {
+    async ensureUserCanDeleteAccount(user_id: number, ecopart_user_id: number): Promise<void> {
         const isAdmin = await this.userRepository.isAdmin(user_id);
         const userCanAddAccount = isAdmin || user_id === ecopart_user_id;
         if (!userCanAddAccount) {

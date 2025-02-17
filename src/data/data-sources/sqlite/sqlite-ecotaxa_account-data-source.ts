@@ -98,7 +98,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
     }
 
     async getOne(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel | null> {
-        const sql = "SELECT * FROM ecotaxa_account WHERE ecotaxa_account_id = (?)";
+        const sql = "SELECT ecotaxa_instance.ecotaxa_instance_name, ecotaxa_account.* FROM ecotaxa_account INNER JOIN ecotaxa_instance ON ecotaxa_account.ecotaxa_account_instance_id = ecotaxa_instance.ecotaxa_instance_id WHERE ecotaxa_account_id = (?)";
         const params = [ecotaxa_account_id];
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
@@ -117,7 +117,8 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                         ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                         ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
-                        ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date
+                        ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date,
+                        ecotaxa_account_instance_name: row.ecotaxa_instance_name
                     };
                     resolve(result);
                 }
@@ -127,7 +128,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
 
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT *, (SELECT COUNT(*) FROM ecotaxa_account`
+        let sql = `SELECT ecotaxa_instance.ecotaxa_instance_name, ecotaxa_account.* , (SELECT COUNT(*) FROM ecotaxa_account`
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -174,7 +175,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         // Add params_filtering to params
         params.push(...params_filtering)
 
-        sql += `) AS total_count FROM ecotaxa_account`
+        sql += `) AS total_count FROM ecotaxa_account INNER JOIN ecotaxa_instance ON ecotaxa_account.ecotaxa_account_instance_id = ecotaxa_instance.ecotaxa_instance_id`
 
         // Add filtering_sql to sql
         sql += filtering_sql
@@ -216,7 +217,8 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                             ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                             ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                             ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
-                            ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date
+                            ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date,
+                            ecotaxa_account_instance_name: row.ecotaxa_instance_name
                         })),
                         total: rows[0]?.total_count || 0
                     };

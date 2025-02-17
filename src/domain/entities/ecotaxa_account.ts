@@ -17,6 +17,7 @@ export interface EcotaxaAccountRequestCreationModel {
 export interface EcotaxaAccountResponseModel extends EcotaxaAccountRequestCreationModel {
     ecotaxa_account_id: number;
     ecotaxa_account_creation_date: string;
+    ecotaxa_account_instance_name: string;
 }
 
 export interface EcotaxaAccountRequestModel {
@@ -31,22 +32,19 @@ export interface PublicEcotaxaAccountRequestCreationModel {
     ecotaxa_instance_id: number;
 }
 
-export interface PublicEcotaxaAccountModel {
-    ecotaxa_account_instance_id: number;
-    ecotaxa_instance_name: string;
-    ecotaxa_account_id: number;
-    ecotaxa_account_ecopart_user_id: number;
-    ecotaxa_account_user_name: string;
-    ecotaxa_account_user_email: string;
-    ecotaxa_account_time_left: string;
-}
-
 export interface EcotaxaAccountModel {
     ecotaxa_token: string;
     ecotaxa_user_name: string;
     ecotaxa_expiration_date: string;
 }
 
+export interface PublicEcotaxaAccountResponseModel {
+    ecotaxa_account_instance_id: number;
+    ecotaxa_account_id: number;
+    ecotaxa_user_name: string;
+    ecotaxa_expiration_date: string;
+    ecotaxa_account_instance_name: string;
+}
 
 export interface EcotaxaAccountUser {
     id: number,

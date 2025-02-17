@@ -38,7 +38,7 @@ export default function AuthRouter(
                 .status(200)
                 .send(tokens)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Invalid credentials") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User email not verified") res.status(403).send({ errors: [err.message] })
@@ -59,7 +59,7 @@ export default function AuthRouter(
                 .cookie("access_token", token.jwt, http0nlyCookie)
                 .send(token)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot refresh token"] })
@@ -85,7 +85,7 @@ export default function AuthRouter(
                 .status(200)
                 .json({ message: "Password sucessfully changed" });
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "New password must be different from old password") res.status(401).send({ errors: ["New password must be different from old password"] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot change password"] })
@@ -100,7 +100,7 @@ export default function AuthRouter(
                 .status(200)
                 .json({ message: "Reset password request email sent." });
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User does not exist") res.status(200).send({ message: "Reset password request email sent." })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: ["Cannot reset password"] })
             else if (err.message === "User email is not validated") res.status(200).send({ message: "Reset password request email sent." })
@@ -118,7 +118,7 @@ export default function AuthRouter(
                 .status(200)
                 .json({ message: "Password sucessfully reset, please login" });
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Token is not valid") res.status(401).send({ errors: ["Cannot reset password"] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: ["Cannot reset password"] })
             else if (err.message === "No token provided") res.status(401).send({ errors: ["Cannot reset password"] })

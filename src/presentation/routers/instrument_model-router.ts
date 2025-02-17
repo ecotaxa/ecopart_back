@@ -18,7 +18,7 @@ export default function InstrumentModelsRouter(
             const instrument_models = await searchInstrumentModelsUseCase.execute({ ...req.query } as any);
             res.status(200).send(instrument_models)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Cannot search instrument models")) res.status(500).send({ errors: [err.message] })
@@ -30,7 +30,7 @@ export default function InstrumentModelsRouter(
             const instrument_model = await getOneInstrumentModelsUseCase.execute(req.params.instrument_model_id as any);
             res.status(200).send(instrument_model)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Cannot find instrument_model") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get instrument model"] })
         }

@@ -8,6 +8,7 @@ import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
 import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
+import { SearchEcotaxaAccountsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { CustomRequest } from '../../domain/entities/auth'
@@ -23,7 +24,8 @@ export default function UsersRouter(
     deleteUserUseCase: DeleteUserUseCase,
     loginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase,
     logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
-    searchUsersUseCase: SearchUsersUseCase
+    searchUsersUseCase: SearchUsersUseCase,
+    searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase
 ) {
     const router = express.Router()
 
@@ -33,7 +35,7 @@ export default function UsersRouter(
             const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query } as any, []);
             res.status(200).send(users)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
@@ -47,7 +49,7 @@ export default function UsersRouter(
             const users = await searchUsersUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[]);
             res.status(200).send(users)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
@@ -61,7 +63,7 @@ export default function UsersRouter(
             await createUserUseCase.execute(req.body)
             res.status(201).send({ message: "User sucessfully created." })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Cannot create user"] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot update preexistent user") res.status(403).send({ errors: [err.message] })
@@ -76,7 +78,7 @@ export default function UsersRouter(
             const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
             res.status(200).send(updated_user)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
@@ -94,7 +96,7 @@ export default function UsersRouter(
             // Redirect to login page // TODO?
             res.status(200).send({ message: "Account activated, please login" })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Invalid confirmation token") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User vallidation forbidden") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
@@ -118,7 +120,7 @@ export default function UsersRouter(
             } else
                 res.status(200).send({ message: "User successfully deleted" })
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Logged user cannot delete this user") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find user to delete") res.status(404).send({ errors: [err.message] })
@@ -134,7 +136,7 @@ export default function UsersRouter(
             const ecotaxa_account = await loginEcotaxaAccountUseCase.execute((req as CustomRequest).token, { ...req.body, ecopart_user_id: req.params.user_id })
             res.status(200).send(ecotaxa_account)
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Logged user cannot login to this ecotaxa account") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot add account to the desired ecopart user") res.status(401).send({ errors: [err.message] })
@@ -152,7 +154,7 @@ export default function UsersRouter(
             await logoutEcotaxaAccountUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id))
             res.status(200).send({ message: "You have been logged out from ecotaxa account" });
         } catch (err) {
-            console.log(err)
+            console.log(new Date().toISOString(), err)
             if (err.message === "Logged user cannot delete this ecotaxa account") res.status(401).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot logout from the requested ecotaxa account") res.status(403).send({ errors: [err.message] })
@@ -160,6 +162,21 @@ export default function UsersRouter(
             else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
         }
     })
-    // search ecotaxa accounts
+    // Pagined and sorted list of all ecotaxa accounts for a user
+    router.get('/:user_id/ecotaxa_account/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
+        try {
+            const ecotaxa_accounts = await searchEcotaxaAccountsUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), { ...req.query } as any);
+            res.status(200).send(ecotaxa_accounts)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("User cannot get requested ecotaxa accounts")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get ecotaxa accounts for user : " + req.params.user_id] })
+        }
+    })
     return router
 }

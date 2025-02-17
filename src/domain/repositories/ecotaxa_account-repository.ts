@@ -1,6 +1,6 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel } from "../entities/ecotaxa_account";
-import { PreparedSearchOptions } from "../entities/search";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel } from "../entities/ecotaxa_account";
+import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
@@ -15,6 +15,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource) {
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
     }
+
     async connectToEcotaxaInstance(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel> {
         const instance_url = await this.getInstanceURL(ecotaxa_account_to_create.ecotaxa_instance_id)
 
@@ -40,11 +41,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const ecotaxa_account = await this.ecotaxa_accountDataSource.getOne(ecotaxa_account_id);
         return ecotaxa_account;
     }
-    formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): EcotaxaAccountModel {
+    formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel {
         return {
-            ecotaxa_token: ecotaxa_account.ecotaxa_account_token,
+            ecotaxa_account_id: ecotaxa_account.ecotaxa_account_id,
             ecotaxa_user_name: ecotaxa_account.ecotaxa_account_user_name,
-            ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_date
+            ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_date,
+            ecotaxa_account_instance_id: ecotaxa_account.ecotaxa_account_instance_id,
+            ecotaxa_account_instance_name: ecotaxa_account.ecotaxa_account_instance_name
         }
     }
     async getInstanceURL(ecotaxa_instance_id: number): Promise<string> {
@@ -117,5 +120,56 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             throw new Error("Ecotaxa account not found");
         }
         return nb_of_deleted_rows;
+    }
+
+    async standardGetEcotaxaAccountsModels(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>> {
+        // Can be filtered by 
+        const filter_params_restricted: string[] = ["ecotaxa_account_ecopart_user_id"]
+
+        // Can be sort_by 
+        const sort_param_restricted: string[] = ["ecotaxa_account_expiration_date"]
+
+        return await this.getEcotaxaAccountModels(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
+    }
+
+    // //TODO MOVE TO SEARCH REPOSITORY
+    private async getEcotaxaAccountModels(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult<EcotaxaAccountResponseModel>> {
+        const unauthorizedParams: string[] = [];
+        //TODO move to a search repository
+        // Filter options.sort_by by sorting params 
+        options.sort_by = options.sort_by.filter(sort_by => {
+            let is_valid = true;
+            if (!sort_by_params.includes(sort_by.sort_by)) {
+                unauthorizedParams.push(`Unauthorized sort_by: ${sort_by.sort_by}`);
+                is_valid = false;
+            }
+            if (!order_by_params.includes(sort_by.order_by)) {
+                unauthorizedParams.push(`Unauthorized order_by: ${sort_by.order_by}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+
+        //TODO move to a search repository
+        // Filter options.filters by filtering params
+        options.filter = options.filter.filter(filter => {
+            let is_valid = true;
+            if (!filtering_params.includes(filter.field)) {
+                unauthorizedParams.push(`Filter field: ${filter.field}`);
+                is_valid = false;
+            }
+            if (!filter_operator_params.includes(filter.operator)) {
+                unauthorizedParams.push(`Filter operator: ${filter.operator}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+
+        //TODO move to a search repository
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+
+        return await this.ecotaxa_accountDataSource.getAll(options);
     }
 }
