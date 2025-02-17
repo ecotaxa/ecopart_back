@@ -1,4 +1,4 @@
-import { ecotaxaAccountModel, EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel } from "../../entities/ecotaxa_account";
+import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel } from "../../entities/ecotaxa_account";
 import { UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
@@ -13,7 +13,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
         this.ecotaxaAccountRepository = ecotaxaAccountRepository
     }
 
-    async execute(current_user: UserUpdateModel, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<void> {
+    async execute(current_user: UserUpdateModel, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel> {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.userRepository.ensureUserCanBeUsed(ecotaxa_account_to_create.ecopart_user_id);
@@ -39,7 +39,15 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
         const private_ecotaxa_account_to_create = this.formatEcotaxaAccountToCreate(ecotaxa_account_to_create, ecotaxa_data);
 
         // Create the ecotaxa account
-        await this.ecotaxaAccountRepository.createEcotaxaAccount(private_ecotaxa_account_to_create);
+        const ecotaxa_account_id = await this.ecotaxaAccountRepository.createEcotaxaAccount(private_ecotaxa_account_to_create);
+
+        // get and return the created ecotaxa account 
+        const ecotaxa_account = await this.ecotaxaAccountRepository.getOneEcotaxaAccount(ecotaxa_account_id);
+        if (!ecotaxa_account) {
+            throw new Error("Ecotaxa account not found");
+        }
+        const formatted_ecotaxa_account = this.ecotaxaAccountRepository.formatEcotaxaAccountResponse(ecotaxa_account);
+        return formatted_ecotaxa_account;
     }
 
     async ensureUserCanAddAccount(user_id: number, ecopart_user_id: number): Promise<void> {
@@ -50,7 +58,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
         }
     }
 
-    formatEcotaxaAccountToCreate(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel, ecotaxa_data: ecotaxaAccountModel): EcotaxaAccountRequestCreationModel {
+    formatEcotaxaAccountToCreate(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel, ecotaxa_data: EcotaxaAccountModel): EcotaxaAccountRequestCreationModel {
         return {
             ecotaxa_account_ecopart_user_id: ecotaxa_account_to_create.ecopart_user_id,
             ecotaxa_account_token: ecotaxa_data.ecotaxa_token,

@@ -266,6 +266,5 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
             });
         })
     }
-
 }
 

@@ -41,7 +41,7 @@ export interface PublicEcotaxaAccountModel {
     ecotaxa_account_time_left: string;
 }
 
-export interface ecotaxaAccountModel {
+export interface EcotaxaAccountModel {
     ecotaxa_token: string;
     ecotaxa_user_name: string;
     ecotaxa_expiration_date: string;
