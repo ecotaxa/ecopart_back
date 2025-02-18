@@ -16,7 +16,12 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { MockCreateUserUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
+import { MockCreateUserUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
+import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
+import { LoginEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
+import { LogoutEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
+import { SearchEcotaxaAccountsUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
+
 
 
 
@@ -50,6 +55,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
     }
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
+    rulesLogoutEcoTaxaAccount = []
     rulesUserRequestCreationModel = []
     rulesUserRequestModel = []
     rulesUserUpdateModel = []
@@ -65,17 +71,25 @@ describe("User Router", () => {
     let mockValidUserUseCase: ValidUserUseCase;
     let mockDeleteUserUseCase: DeleteUserUseCase;
     let mockSearchUsersUseCase: SearchUsersUseCase;
+    let mockMiddlewareAuthValidation: MiddlewareAuthValidation;
+    let mockLoginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase;
+    let mockLogoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase;
+    let mockSearchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
         mockCreateUserUseCase = new MockCreateUserUseCase()
+        mockMiddlewareAuthValidation = new MiddlewareAuthValidation()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
         mockDeleteUserUseCase = new MockDeleteUserUseCase()
         mockMiddlewareUserValidation = new MockMiddlewareUserValidation()
+        mockLoginEcotaxaAccountUseCase = new MockLoginEcotaxaAccountUseCase()
+        mockLogoutEcotaxaAccountUseCase = new MockLogoutEcotaxaAccountUseCase()
         mockSearchUsersUseCase = new MockSearchUsersUseCase()
+        mockSearchEcotaxaAccountsUseCase = new MockSearchEcotaxaAccountsUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockSearchUsersUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockMiddlewareAuthValidation, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase))
     })
 
     beforeEach(() => {

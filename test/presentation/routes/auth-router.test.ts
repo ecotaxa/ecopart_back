@@ -34,6 +34,8 @@ class MockMiddlewareAuthValidation implements IMiddlewareAuthValidation {
     rulesRequestResetPassword = [];
     rulesPassword = []
     rulesAuthUserCredentialsModel = [];
+    rulesAuthEcoTaxaAccountCredentialsModel = [];
+
 }
 class MockChangePasswordUseCase implements ChangePasswordUseCase {
     execute(): Promise<void> {
