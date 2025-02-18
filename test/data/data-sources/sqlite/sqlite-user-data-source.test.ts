@@ -40,8 +40,10 @@ describe('SQLiteUserDataSource', () => {
 
 
 
-    beforeAll(() => {
+    beforeAll(async () => {
         dataSource = initializeUserDB();
+        // wait for the database to be ready
+        await new Promise(resolve => setTimeout(resolve, 3000));
     });
 
     afterAll(() => {
