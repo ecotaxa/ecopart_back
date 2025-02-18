@@ -496,7 +496,7 @@ describe("Update User Use Case", () => {
 
     });
 
-    // others scenarios (for coverage)
+    // others scenarios 
     test("Cannot find updated user", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1

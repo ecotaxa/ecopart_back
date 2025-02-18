@@ -4,8 +4,8 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "test": "jest --watchAll --collectCoverage",
-    "test-CI": "jest --collectCoverage",
+    "test": "jest --watchAll --collectCoverage --coveragePathIgnorePatterns '/test/' '/src/infra/'",
+    "test-CI": "jest --collectCoverage --coveragePathIgnorePatterns '/test/' '/src/infra/'",
     "clean": "rimraf ./dist",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
