@@ -1,5 +1,5 @@
 import { DecodedToken } from "../../src/domain/entities/auth";
-import { SearchResult } from "../../src/domain/entities/search";
+import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { UserResponseModel } from "../../src/domain/entities/user";
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
 import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
@@ -10,6 +10,10 @@ import { DeleteUserUseCase } from "../../src/domain/interfaces/use-cases/user/de
 import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/search-user";
 
 import { Request, Response, NextFunction } from "express";
+import { LoginEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
+import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
+import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
+import { PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 
 export class MockUserRepository implements UserRepository {
     isValidated(): Promise<boolean> {
@@ -117,7 +121,23 @@ export class MockDeleteUserUseCase implements DeleteUserUseCase {
 }
 
 export class MockSearchUsersUseCase implements SearchUsersUseCase {
-    execute(): Promise<{ users: UserResponseModel[]; search_info: any; }> {
+    execute(): Promise<{ users: UserResponseModel[]; search_info: SearchInfo; }> {
         throw new Error("Method not implemented for SearchUsersUseCase");
     }
 }
+export class MockLoginEcotaxaAccountUseCase implements LoginEcotaxaAccountUseCase {
+    execute(): Promise<PublicEcotaxaAccountResponseModel> {
+        throw new Error("Method not implemented for LoginEcotaxaAccountUseCase");
+    }
+}
+export class MockLogoutEcotaxaAccountUseCase implements LogoutEcotaxaAccountUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for LogoutEcotaxaAccountUseCase");
+    }
+}
+export class MockSearchEcotaxaAccountsUseCase implements SearchEcotaxaAccountsUseCase {
+    execute(): Promise<{ ecotaxa_accounts: PublicEcotaxaAccountResponseModel[], search_info: SearchInfo }> {
+        throw new Error("Method not implemented for SearchEcotaxaAccountsUseCase");
+    }
+}
+
