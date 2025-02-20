@@ -21,7 +21,7 @@ import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/a
 import { LoginEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
 import { SearchEcotaxaAccountsUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
-import { PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../../src/domain/entities/ecotaxa_account";
+import { PublicEcotaxaAccountResponseModel } from "../../../src/domain/entities/ecotaxa_account";
 import { public_ecotaxa_account_response_model, public_ecotaxa_request_creation_model_without_ecopart_id } from "../../entities/user";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
@@ -536,6 +536,23 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
+        test("PATCH /users fail for Cannot find updated user reason", async () => {
+            const user_to_update = {
+                last_name: "Smith",
+                first_name: "John"
+            }
+            const expectedResponse = { errors: ["User cannot be used"] }
+
+
+            jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("User cannot be used")))
+            const response = await request(server).patch("/users/2").send(user_to_update)
+
+            expect(response.status).toBe(403)
+            expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+
     })
 
 
@@ -581,6 +598,16 @@ describe("User Router", () => {
             const response = await request(server).get("/users/1/welcome/123456789")
 
             expect(response.status).toBe(403)
+            expect(mockValidUserUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("Get users welcome fail for Cannot find user with confirmation code", async () => {
+            const expectedResponse = { errors: ["Cannot find user with confirmation code"] }
+            jest.spyOn(mockValidUserUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find user with confirmation code") })
+
+            const response = await request(server).get("/users/1/welcome/123456789")
+
+            expect(response.status).toBe(404)
             expect(mockValidUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -661,13 +688,19 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-
-
         test("DELETE /users fail for Logged user cannot delete this users hould return 401", async () => {
             const expectedResponse = { errors: ["Logged user cannot delete this user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot delete this user")))
             const response = await request(server).delete("/users/1")
             expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("DELETE /users fail for User cannot be used1", async () => {
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("User cannot be used")))
+            const response = await request(server).delete("/users/1")
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
