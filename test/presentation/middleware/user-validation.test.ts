@@ -23,6 +23,7 @@ import { SearchInfo } from "../../../src/domain/entities/search";
 import { MockCreateUserUseCase, MockDeleteUserUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockMiddlewareAuth, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
 import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth-validation";
+import { public_ecotaxa_account_response_model } from "../../entities/user";
 
 describe("User Router", () => {
     let countriesAdapter: CountriesAdapter
@@ -377,6 +378,96 @@ describe("User Router", () => {
 
         });
 
+    });
+    describe("Test user router logout ecotaxa account", () => {
+        test("Logout ecotaxa account all params are valid", async () => {
+            const OutputData = { message: "You have been logged out from ecotaxa account" }
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).delete("/users/1/ecotaxa_account/1")
+
+            expect(response.status).toBe(200)
+            expect(mockLogoutEcotaxaAccountUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("Logout ecotaxa account with invalid user_id and invalid ecotaxa_account_id", async () => {
+            const OutputData = {
+                "errors":
+                    [
+                        {
+                            location: "params",
+                            msg: "Ecopart user id must be a number.",
+                            path: "user_id",
+                            type: "field",
+                            value: "tutu",
+                        },
+                        {
+                            location: "params",
+                            msg: "Ecotaxa account id must be a number.",
+                            path: "ecotaxa_account_id",
+                            type: "field",
+                            value: "toto",
+                        },
+                    ]
+            }
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).delete("/users/tutu/ecotaxa_account/toto")
+
+            expect(response.status).toBe(422)
+            expect(mockLogoutEcotaxaAccountUseCase.execute).toBeCalledTimes(0)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+    });
+    describe("Test auth rulesAuthEcoTaxaAccountCredentialsModel", () => {
+        test("login and all params are valid", async () => {
+            const InputData = {
+                ecotaxa_user_login: "lena@gmail.com",
+                ecotaxa_user_password: "lena123.",
+                ecotaxa_instance_id: 1,
+            }
+            const OutputData = public_ecotaxa_account_response_model
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(200)
+            expect(mockLoginEcotaxaAccountUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("login with invalid params", async () => {
+            const InputData = {
+                ecotaxa_user_login: "notanemail",
+                ecotaxa_instance_id: "toto",
+            }
+            const OutputData = {
+                errors: [
+
+                    {
+                        location: "body",
+                        msg: "Invalid ecotaxa_user_login",
+                        path: "ecotaxa_user_login",
+                        type: "field",
+                        value: "notanemail",
+                    }, {
+                        location: "body",
+                        msg: "Invalid ecotaxa_user_password",
+                        path: "ecotaxa_user_password",
+                        type: "field",
+                    },
+                    {
+                        location: "body",
+                        msg: "Invalid ecotaxa instance id",
+                        path: "ecotaxa_instance_id",
+                        type: "field",
+                        value: "toto",
+                    },
+                ]
+            }
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute")
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(422)
+            expect(mockLoginEcotaxaAccountUseCase.execute).toBeCalledTimes(0)
+            expect(response.body).toStrictEqual(OutputData)
+        });
     });
 
 })

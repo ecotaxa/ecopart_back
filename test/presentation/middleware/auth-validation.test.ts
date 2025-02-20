@@ -329,6 +329,5 @@ describe("User Router", () => {
             expect(response.status).toBe(422);
             expect(response.body).toStrictEqual(expectedResponse);
         });
-
     })
 })
