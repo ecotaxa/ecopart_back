@@ -21,6 +21,9 @@ import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/a
 import { LoginEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
 import { SearchEcotaxaAccountsUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../../src/domain/entities/ecotaxa_account";
+import { public_ecotaxa_account_response_model, public_ecotaxa_request_creation_model_without_ecopart_id } from "../../entities/user";
+import { SearchInfo } from "../../../src/domain/entities/search";
 
 
 
@@ -701,5 +704,263 @@ describe("User Router", () => {
         });
 
     })
+    describe("Tests for POST /user/:user_id/ecotaxa_account", () => {
+        test("Should return 200 with data", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputData = public_ecotaxa_account_response_model
 
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+
+            expect(response.status).toBe(200)
+            expect(mockLoginEcotaxaAccountUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Logged user cannot login to this ecotaxa account", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Logged user cannot login to this ecotaxa account")
+            const expectedResponse = { errors: ["Logged user cannot login to this ecotaxa account"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for User cannot be usedt", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("User cannot be used")
+            const expectedResponse = { errors: ["User cannot be used"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for User cannot add account to the desired ecopart user", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("User cannot add account to the desired ecopart user")
+            const expectedResponse = { errors: ["User cannot add account to the desired ecopart user"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Ecotaxa instance not found ", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Ecotaxa instance not found ")
+            const expectedResponse = { errors: ["Ecotaxa instance not found "] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Ecotaxa instance id should be a number", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Ecotaxa instance id should be a number")
+            const expectedResponse = { errors: ["Ecotaxa instance id should be a number"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Cannot create ecotaxa account", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Cannot create ecotaxa account")
+            const expectedResponse = { errors: ["Cannot create ecotaxa account"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Account already exists", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Account already exists")
+            const expectedResponse = { errors: ["Account already exists"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for HTTP Error: 403", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("HTTP Error: 403")
+            const expectedResponse = { errors: ["Cannot login ecotaxa account"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("POST /user/:user_id/ecotaxa_account fail for Cannot login ecotaxa account", async () => {
+            const InputData = public_ecotaxa_request_creation_model_without_ecopart_id
+            const OutputError = new Error("Cannot login ecotaxa account")
+            const expectedResponse = { errors: ["Cannot login ecotaxa account"] }
+
+            jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+    });
+
+    describe("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id", () => {
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id should return 200", async () => {
+            const OutputMessage = { message: "You have been logged out from ecotaxa account" }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve())
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(200)
+            expect(mockLogoutEcotaxaAccountUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputMessage)
+        });
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for Logged user cannot delete this ecotaxa account", async () => {
+            const OutputError = new Error("Logged user cannot delete this ecotaxa account")
+            const expectedResponse = { errors: ["Logged user cannot delete this ecotaxa account"] }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for User cannot be used", async () => {
+            const OutputError = new Error("User cannot be used")
+            const expectedResponse = { errors: ["User cannot be used"] }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for User cannot logout from the requested ecotaxa account", async () => {
+            const OutputError = new Error("User cannot logout from the requested ecotaxa account")
+            const expectedResponse = { errors: ["User cannot logout from the requested ecotaxa account"] }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for Ecotaxa account not found", async () => {
+            const OutputError = new Error("Ecotaxa account not found")
+            const expectedResponse = { errors: ["Ecotaxa account not found"] }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for any other reason", async () => {
+            const OutputError = new Error("tutu")
+            const expectedResponse = { errors: ["Cannot delete logout ecotaxa account"] }
+
+            jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
+
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+    });
+
+    describe("Tests for GET /users/:user_id/ecotaxa_account/:ecotaxa_account_id", () => {
+        test("Should return 200 with data", async () => {
+            const OutputData: { ecotaxa_accounts: PublicEcotaxaAccountResponseModel[], search_info: SearchInfo } = {
+                ecotaxa_accounts: [],
+                search_info: {
+                    total: 0,
+                    limit: 10,
+                    total_on_page: 0,
+                    page: 1,
+                    pages: 1
+                }
+            }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(200)
+            expect(mockSearchEcotaxaAccountsUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(OutputData)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for User cannot be used", async () => {
+            const OutputError = new Error("User cannot be used")
+            const expectedResponse = { errors: ["User cannot be used"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for Unauthorized or unexisting parameters", async () => {
+            const OutputError = new Error("Unauthorized or unexisting parameters")
+            const expectedResponse = { errors: ["Unauthorized or unexisting parameters"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for Invalid sorting statement", async () => {
+            const OutputError = new Error("Invalid sorting statement")
+            const expectedResponse = { errors: ["Invalid sorting statement"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for User cannot get requested ecotaxa account", async () => {
+            const OutputError = new Error("User cannot get requested ecotaxa accounts")
+            const expectedResponse = { errors: ["User cannot get requested ecotaxa accounts"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.status).toBe(401)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for Unauthorized sort_by", async () => {
+            const OutputError = new Error("Unauthorized sort_by")
+            const expectedResponse = { errors: ["Unauthorized sort_by"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for Unauthorized order_by", async () => {
+            const OutputError = new Error("Unauthorized order_by")
+            const expectedResponse = { errors: ["Unauthorized order_by"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("GET /users/:user_id/ecotaxa_account fail for any other error", async () => {
+            const OutputError = new Error("any other error")
+            const expectedResponse = { errors: ["Cannot get ecotaxa accounts for user : 1"] }
+
+            jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
+            const response = await request(server).get("/users/1/ecotaxa_account")
+
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+    });
 })
