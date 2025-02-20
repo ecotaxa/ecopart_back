@@ -6,4 +6,7 @@ module.exports = {
     "/test/",
     "/src/infra/"
   ],
+  collectCoverageFrom: [
+    "src/**"
+  ]
 };
