@@ -1,3 +1,4 @@
+import { PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 import { UserRequestCreationModel, UserResponseModel } from "../../src/domain/entities/user";
 
 export const userRequestCreationModel_1: UserRequestCreationModel = {
@@ -57,4 +58,26 @@ export const unvalidUser: UserResponseModel = {
     country: "France",
     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
     user_creation_date: '2023-08-01 10:30:00'
+}
+
+export const public_ecotaxa_request_creation_model_without_ecopart_id: Partial<PublicEcotaxaAccountRequestCreationModel> = {
+    ecotaxa_user_login: "lena@gmail.com",
+    ecotaxa_user_password: "lena123.",
+    ecotaxa_instance_id: 1,
+}
+export const public_ecotaxa_request_creation_model: PublicEcotaxaAccountRequestCreationModel = {
+    ecotaxa_user_login: "lena@gmail.com",
+    ecotaxa_user_password: "lena123.",
+    ecotaxa_instance_id: 1,
+    ecopart_user_id: 1
+}
+
+
+export const public_ecotaxa_account_response_model: PublicEcotaxaAccountResponseModel =
+{
+    "ecotaxa_account_id": 3,
+    "ecotaxa_user_name": "Test API user",
+    "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR"
 }
