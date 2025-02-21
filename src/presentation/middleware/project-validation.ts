@@ -21,12 +21,12 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .not().isEmpty().withMessage('Project acronym is required.'),
 
         // Project description Validation
-        check('project_description')
-            .trim()
-            .not().isEmpty().withMessage('Project description is required.'),
+        check('project_description').optional()
+            .trim(),
+        //.not().isEmpty().withMessage('Project description is required.'),
 
         // Project information Validation
-        check('project_information')
+        check('project_information').optional()
             .trim(),
         // Project cruise Validation
         check('cruise')

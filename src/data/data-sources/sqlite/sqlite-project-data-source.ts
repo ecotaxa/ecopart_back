@@ -15,7 +15,33 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
 
     init_project_db() {
         // Create table if not exist
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'project' (project_id INTEGER PRIMARY KEY AUTOINCREMENT, root_folder_path TEXT NOT NULL, project_title TEXT NOT NULL, project_acronym TEXT NOT NULL, project_description TEXT, project_information TEXT, cruise TEXT NOT NULL, ship TEXT NOT NULL, data_owner_name TEXT NOT NULL, data_owner_email TEXT NOT NULL, operator_name TEXT NOT NULL, operator_email TEXT NOT NULL, chief_scientist_name TEXT NOT NULL, chief_scientist_email TEXT NOT NULL, override_depth_offset REAL, enable_descent_filter BOOLEAN NOT NULL, privacy_duration INTEGER NOT NULL, visible_duration INTEGER NOT NULL, public_duration INTEGER NOT NULL, instrument_model INTEGER, serial_number TEXT NOT NULL, project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id));"
+        const sql_create = `
+        CREATE TABLE IF NOT EXISTS 'project' (
+            project_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_folder_path TEXT NOT NULL,
+            project_title TEXT NOT NULL,
+            project_acronym TEXT NOT NULL,
+            project_description TEXT,
+            project_information TEXT,
+            cruise TEXT NOT NULL,
+            ship TEXT NOT NULL,
+            data_owner_name TEXT NOT NULL,
+            data_owner_email TEXT NOT NULL,
+            operator_name TEXT NOT NULL,
+            operator_email TEXT NOT NULL,
+            chief_scientist_name TEXT NOT NULL,
+            chief_scientist_email TEXT NOT NULL,
+            override_depth_offset REAL,
+            enable_descent_filter BOOLEAN NOT NULL,
+            privacy_duration INTEGER NOT NULL,
+            visible_duration INTEGER NOT NULL,
+            public_duration INTEGER NOT NULL,
+            instrument_model INTEGER,
+            serial_number TEXT NOT NULL,
+            project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id)
+        );
+    `;
 
         this.db.run(sql_create, [], function (err) {
             if (err) {
