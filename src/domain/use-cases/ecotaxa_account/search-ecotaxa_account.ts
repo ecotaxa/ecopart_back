@@ -32,7 +32,7 @@ export class SearchEcotaxaAccounts implements SearchEcotaxaAccountsUseCase {
         options.filter = [{ field: "ecotaxa_account_ecopart_user_id", operator: "=", value: user_id }];
 
         // Check that options.sort_by are asked and format them if they are
-        if (options.sort_by) {
+        if (options.sort_by && options.sort_by.length > 0) {
             options.sort_by = this.searchRepository.formatSortBy(options.sort_by as string);
         }
         else {

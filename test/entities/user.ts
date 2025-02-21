@@ -1,4 +1,4 @@
-import { PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
+import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 import { UserRequestCreationModel, UserResponseModel } from "../../src/domain/entities/user";
 
 export const userRequestCreationModel_1: UserRequestCreationModel = {
@@ -71,10 +71,82 @@ export const public_ecotaxa_request_creation_model: PublicEcotaxaAccountRequestC
     ecotaxa_instance_id: 1,
     ecopart_user_id: 1
 }
-
+export const ecotaxaAccountRequestCreationModel: EcotaxaAccountRequestCreationModel = {
+    ecotaxa_account_ecopart_user_id: 1,
+    ecotaxa_account_token: "ecotaxa_token",
+    ecotaxa_account_user_name: "ecotaxa_user_name",
+    ecotaxa_account_user_email: "lena@gmail.com",
+    ecotaxa_account_instance_id: 1,
+    ecotaxa_account_expiration_date: "2025-03-19T16:49:24.892Z"
+}
 
 export const public_ecotaxa_account_response_model: PublicEcotaxaAccountResponseModel =
 {
+    "ecotaxa_account_id": 3,
+    "ecotaxa_user_name": "Test API user",
+    "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR"
+}
+export const public_ecotaxa_account_response_model_2: PublicEcotaxaAccountResponseModel =
+{
+    "ecotaxa_account_id": 3,
+    "ecotaxa_user_name": "ecotaxa_account_user_name",
+    "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR"
+}
+
+export const ecotaxaAccountResponseModel: EcotaxaAccountResponseModel = {
+    "ecotaxa_account_id": 3,
+    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR",
+    "ecotaxa_account_ecopart_user_id": 1,
+    "ecotaxa_account_token": "ecotaxa_account_token",
+    "ecotaxa_account_user_name": "ecotaxa_account_user_name",
+    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_user_email": "ecotaxa_account_user_email",
+}
+export const ecotaxaAccountResponseModel_2: EcotaxaAccountResponseModel = {
+    "ecotaxa_account_id": 4,
+    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR",
+    "ecotaxa_account_ecopart_user_id": 2,
+    "ecotaxa_account_token": "ecotaxa_account_token",
+    "ecotaxa_account_user_name": "ecotaxa_account_user_name",
+    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_user_email": "ecotaxa_account_user_email",
+}
+
+export const ecotaxa_instance_1: EcotaxaInstanceModel = {
+    ecotaxa_instance_id: 1,
+    ecotaxa_instance_name: "FR",
+    ecotaxa_instance_description: "FR instance",
+    ecotaxa_instance_creation_date: "2025-03-19T16:49:24.892Z",
+    ecotaxa_instance_url: "http://localhost:8080/"
+}
+
+export const ecotaxa_account_1: EcotaxaAccountModel = {
+    ecotaxa_token: "ecotaxa_token",
+    ecotaxa_user_name: "ecotaxa_user_name",
+    ecotaxa_expiration_date: "2025-03-19T16:49:24.892Z"
+}
+
+export const ecotaxaAccountResponseModel_1: EcotaxaAccountResponseModel = {
+    "ecotaxa_account_id": 3,
+    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_instance_id": 1,
+    "ecotaxa_account_instance_name": "FR",
+    "ecotaxa_account_ecopart_user_id": 1,
+    "ecotaxa_account_token": "ecotaxa_account_token",
+    "ecotaxa_account_user_name": "ecotaxa_account_user_name",
+    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_user_email": "ecotaxa_account_user_email",
+}
+
+export const publicEcotaxaAccountResponseModel_1: PublicEcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
     "ecotaxa_user_name": "Test API user",
     "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",

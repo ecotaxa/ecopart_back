@@ -18,7 +18,7 @@ export class LogoutEcotaxaAccount implements LogoutEcotaxaAccountUseCase {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
         // Ensure ecotaxa account to delete exists
-        const ecotaxa_account = await this.ecotaxaAccountRepository.getOneEcotaxaAccount(ecotaxa_account_to_delete_id);
+        const ecotaxa_account = await this.ecotaxaAccountRepository.getOneEcotaxaAccount(ecotaxa_account_to_delete_id, ecopart_user_id);
         if (!ecotaxa_account) {
             throw new Error("Ecotaxa account not found");
         }
@@ -30,10 +30,14 @@ export class LogoutEcotaxaAccount implements LogoutEcotaxaAccountUseCase {
         await this.ensureUserCanDeleteAccount(current_user.user_id, ecopart_user_id);
 
         // Delete the ecotaxa account
-        await this.ecotaxaAccountRepository.deleteEcotaxaAccount({
+        const number_of_deleted_items = await this.ecotaxaAccountRepository.deleteEcotaxaAccount({
             ecotaxa_account_id: ecotaxa_account_to_delete_id,
             ecotaxa_account_ecopart_user_id: ecopart_user_id
         });
+
+        if (number_of_deleted_items === 0) {
+            throw new Error("Cannot delete ecotaxa account");
+        }
     }
 
     async ensureUserCanDeleteAccount(user_id: number, ecopart_user_id: number): Promise<void> {

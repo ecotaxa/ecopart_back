@@ -1,19 +1,23 @@
-import { DecodedToken } from "../../src/domain/entities/auth";
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { UserResponseModel } from "../../src/domain/entities/user";
+import { EcotaxaAccountModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
+
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
+import { EcotaxaAccountRepository } from "../../src/domain/interfaces/repositories/ecotaxa_account-repository";
+
 import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
 import { UpdateUserUseCase } from "../../src/domain/interfaces/use-cases/user/update-user";
 import { ValidUserUseCase } from "../../src/domain/interfaces/use-cases/user/valid-user";
-import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/auth";
 import { DeleteUserUseCase } from "../../src/domain/interfaces/use-cases/user/delete-user";
 import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/search-user";
-
-import { Request, Response, NextFunction } from "express";
 import { LoginEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
 import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
-import { PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
+
+import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/auth";
+
+import { Request, Response, NextFunction } from "express";
+import { DecodedToken } from "../../src/domain/entities/auth";
 
 export class MockUserRepository implements UserRepository {
     isValidated(): Promise<boolean> {
@@ -87,6 +91,32 @@ export class MockUserRepository implements UserRepository {
     }
 }
 
+export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    connectToEcotaxaInstance(): Promise<EcotaxaAccountModel> {
+        throw new Error("Method not implemented for connectToEcotaxaInstance.");
+    }
+    createEcotaxaAccount(): Promise<number> {
+        throw new Error("Method not implemented for createEcotaxaAccount.");
+    }
+    getOneEcoTaxaInstance(): Promise<EcotaxaInstanceModel | null> {
+        throw new Error("Method not implemented for getOneEcoTaxaInstance.");
+    }
+    accountExists(): Promise<boolean> {
+        throw new Error("Method not implemented for accountExists.");
+    }
+    getOneEcotaxaAccount(): Promise<EcotaxaAccountResponseModel | null> {
+        throw new Error("Method not implemented for getOneEcotaxaAccount.");
+    }
+    formatEcotaxaAccountResponse(): PublicEcotaxaAccountResponseModel {
+        throw new Error("Method not implemented for formatEcotaxaAccountResponse.");
+    }
+    deleteEcotaxaAccount(): Promise<number> {
+        throw new Error("Method not implemented for deleteEcotaxaAccount.");
+    }
+    standardGetEcotaxaAccountsModels(): Promise<SearchResult<EcotaxaAccountResponseModel>> {
+        throw new Error("Method not implemented for standardGetEcotaxaAccountsModels.");
+    }
+}
 
 export class MockCreateUserUseCase implements CreateUserUseCase {
     execute(): Promise<void> {

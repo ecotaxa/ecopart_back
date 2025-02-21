@@ -37,8 +37,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
         return await this.ecotaxa_accountDataSource.create(private_ecotaxa_account_to_create);
     }
-    async getOneEcotaxaAccount(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel | null> {
+    async getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number): Promise<EcotaxaAccountResponseModel | null> {
         const ecotaxa_account = await this.ecotaxa_accountDataSource.getOne(ecotaxa_account_id);
+        if (ecopart_user_id && ecotaxa_account && ecotaxa_account.ecotaxa_account_ecopart_user_id !== ecopart_user_id) {
+            return null;
+        }
         return ecotaxa_account;
     }
     formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel {
