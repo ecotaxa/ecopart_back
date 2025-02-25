@@ -18,6 +18,7 @@ import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/aut
 
 import { Request, Response, NextFunction } from "express";
 import { DecodedToken } from "../../src/domain/entities/auth";
+import { EcotaxaAccountDataSource } from "../../src/data/interfaces/data-sources/ecotaxa_account-data-source";
 
 export class MockUserRepository implements UserRepository {
     isValidated(): Promise<boolean> {
@@ -115,6 +116,23 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     }
     standardGetEcotaxaAccountsModels(): Promise<SearchResult<EcotaxaAccountResponseModel>> {
         throw new Error("Method not implemented for standardGetEcotaxaAccountsModels.");
+    }
+}
+export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
+    create(): Promise<number> {
+        throw new Error("Method not implemented for create.");
+    }
+    getOne(): Promise<EcotaxaAccountResponseModel | null> {
+        throw new Error("Method not implemented for getOne.");
+    }
+    getAll(): Promise<SearchResult<EcotaxaAccountResponseModel>> {
+        throw new Error("Method not implemented for getAll.");
+    }
+    deleteOne(): Promise<number> {
+        throw new Error("Method not implemented for deleteOne.");
+    }
+    getOneEcoTaxaInstance(): Promise<EcotaxaInstanceModel | null> {
+        throw new Error("Method not implemented for getOneEcoTaxaInstance.");
     }
 }
 

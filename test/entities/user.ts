@@ -1,4 +1,5 @@
 import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
+import { SearchResult } from "../../src/domain/entities/search";
 import { UserRequestCreationModel, UserResponseModel } from "../../src/domain/entities/user";
 
 export const userRequestCreationModel_1: UserRequestCreationModel = {
@@ -60,6 +61,11 @@ export const unvalidUser: UserResponseModel = {
     user_creation_date: '2023-08-01 10:30:00'
 }
 
+
+/*
+ * Ecotaxa account
+ */
+
 export const public_ecotaxa_request_creation_model_without_ecopart_id: Partial<PublicEcotaxaAccountRequestCreationModel> = {
     ecotaxa_user_login: "lena@gmail.com",
     ecotaxa_user_password: "lena123.",
@@ -68,6 +74,12 @@ export const public_ecotaxa_request_creation_model_without_ecopart_id: Partial<P
 export const public_ecotaxa_request_creation_model: PublicEcotaxaAccountRequestCreationModel = {
     ecotaxa_user_login: "lena@gmail.com",
     ecotaxa_user_password: "lena123.",
+    ecotaxa_instance_id: 1,
+    ecopart_user_id: 1
+}
+export const public_ecotaxa_request_creation_model_test_user: PublicEcotaxaAccountRequestCreationModel = {
+    ecotaxa_user_login: "ecotaxa.api.user@gmail.com",
+    ecotaxa_user_password: "test!",
     ecotaxa_instance_id: 1,
     ecopart_user_id: 1
 }
@@ -127,6 +139,13 @@ export const ecotaxa_instance_1: EcotaxaInstanceModel = {
     ecotaxa_instance_creation_date: "2025-03-19T16:49:24.892Z",
     ecotaxa_instance_url: "http://localhost:8080/"
 }
+export const ecotaxa_instance_test_ecotaxa: EcotaxaInstanceModel = {
+    ecotaxa_instance_id: 1,
+    ecotaxa_instance_name: "FR",
+    ecotaxa_instance_description: "FR instance",
+    ecotaxa_instance_creation_date: "2025-03-19T16:49:24.892Z",
+    ecotaxa_instance_url: "https://ecotaxa.obs-vlfr.fr/"
+}
 
 export const ecotaxa_account_1: EcotaxaAccountModel = {
     ecotaxa_token: "ecotaxa_token",
@@ -152,4 +171,9 @@ export const publicEcotaxaAccountResponseModel_1: PublicEcotaxaAccountResponseMo
     "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR"
+}
+
+export const searchhResultEcotaxaAccountResponseModel: SearchResult<EcotaxaAccountResponseModel> = {
+    total: 1,
+    items: [ecotaxaAccountResponseModel_1]
 }

@@ -16,6 +16,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
     }
 
+    async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
+        return await this.ecotaxa_accountDataSource.create(private_ecotaxa_account_to_create);
+    }
     async connectToEcotaxaInstance(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel> {
         const instance_url = await this.getInstanceURL(ecotaxa_account_to_create.ecotaxa_instance_id)
 
@@ -33,9 +36,6 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             ecotaxa_user_name: ecotaxa_user_name,
             ecotaxa_expiration_date: expiration_date.toISOString()
         }
-    }
-    async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
-        return await this.ecotaxa_accountDataSource.create(private_ecotaxa_account_to_create);
     }
     async getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number): Promise<EcotaxaAccountResponseModel | null> {
         const ecotaxa_account = await this.ecotaxa_accountDataSource.getOne(ecotaxa_account_id);
