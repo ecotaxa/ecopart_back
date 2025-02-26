@@ -4,7 +4,9 @@ module.exports = {
   testEnvironment: 'node',
   coveragePathIgnorePatterns: [
     "/test/",
-    "/src/infra/"
+    "/src/infra/",
+    "/src/domain/entities/",
+    "/src/domain/mocks/",
   ],
   collectCoverageFrom: [
     "src/**"
