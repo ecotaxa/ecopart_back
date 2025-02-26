@@ -5,6 +5,7 @@ import { EcotaxaAccountRequestCreationModel } from '../../../../src/domain/entit
 import { ecotaxaAccountRequestCreationModel, ecotaxaAccountRequestCreationModel_unexistingUser, ecotaxaAccountResponseModel_lena } from '../../../entities/user';
 import fs from 'fs';
 import sqlite3 from 'sqlite3'
+import { PreparedSearchOptions } from '../../../../src/domain/entities/search';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_ECOTAXA_ACCOUNT'
@@ -121,19 +122,73 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             expect(ecotaxa_account).toEqual(null);
         });
     });
-    // describe('getAll', () => {
-    //     test('should get all the ecotaxa_account', async () => {
-    //         const ecotaxa_accounts = await dataSource_EcotaxaAccount.getAll();
+    describe('getAll', () => {
+        test('should get all the ecotaxa_account without filter and sort by', async () => {
+            const options: PreparedSearchOptions = {
+                filter: [],
+                sort_by: [],
+                page: 1,
+                limit: 10
+            }
+            const ecotaxa_accounts = await dataSource_EcotaxaAccount.getAll(options);
 
-    //         expect(ecotaxa_accounts).toBeDefined();
-    //         expect(ecotaxa_accounts).toHaveLength(1);
-    //         // to be equal exept creation date
-    //         expect(ecotaxa_accounts[0]).toMatchObject({
-    //             ...ecotaxaAccountResponseModel_lena,
-    //             ecotaxa_account_creation_date: expect.any(String)
-    //         });
-    //     });
-    // });
+            expect(ecotaxa_accounts).toBeDefined();
+            expect(ecotaxa_accounts.items).toHaveLength(1);
+            // to be equal exept creation date
+            expect(ecotaxa_accounts.items[0]).toMatchObject({
+                ...ecotaxaAccountResponseModel_lena,
+                ecotaxa_account_creation_date: expect.any(String)
+            });
+            expect(ecotaxa_accounts.total).toEqual(1);
+
+        });
+        test('should get all the ecotaxa_account with filter and sort by', async () => {
+            const options: PreparedSearchOptions = {
+                filter: [{
+                    field: "ecotaxa_account_ecopart_user_id",
+                    operator: "=",
+                    value: 1
+                }],
+                sort_by: [{
+                    sort_by: "ecotaxa_account_expiration_date",
+                    order_by: "asc"
+                }],
+                limit: 10,
+                page: 1,
+            }
+            const ecotaxa_accounts = await dataSource_EcotaxaAccount.getAll(options);
+
+            expect(ecotaxa_accounts).toBeDefined();
+            expect(ecotaxa_accounts.items).toHaveLength(1);
+            // to be equal exept creation date
+            expect(ecotaxa_accounts.items[0]).toMatchObject({
+                ...ecotaxaAccountResponseModel_lena,
+                ecotaxa_account_creation_date: expect.any(String)
+            });
+            expect(ecotaxa_accounts.total).toEqual(1);
+        });
+        test('should return an empty array if no ecotaxa_account match the filter', async () => {
+            const options: PreparedSearchOptions = {
+                filter: [{
+                    field: "ecotaxa_account_ecopart_user_id",
+                    operator: "=",
+                    value: 100
+                }],
+                sort_by: [{
+                    sort_by: "ecotaxa_account_expiration_date",
+                    order_by: "asc"
+                }],
+                limit: 10,
+                page: 1,
+            }
+            const ecotaxa_accounts = await dataSource_EcotaxaAccount.getAll(options);
+
+            expect(ecotaxa_accounts).toBeDefined();
+            expect(ecotaxa_accounts.items).toHaveLength(0);
+            expect(ecotaxa_accounts.total).toEqual(0);
+        });
+
+    });
     describe('deleteOne', () => {
         test('should not delete the ecotaxa_account if ecopart user id doesnt match the account id', async () => {
             const ecotaxaAccount = {
