@@ -39,7 +39,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
 
-        const file_system_storage_project_folder = this.DATA_STORAGE_FS_STORAGE + base_sample.project_id || '';
+        const file_system_storage_project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, (base_sample.project_id || "") as string);
 
         // foreach sample in samples_names_to_import
         const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
@@ -703,7 +703,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async ensureFolderExists(root_folder_path: string): Promise<void> {
-        const folderPath = path.join(root_folder_path);
+        const folderPath = path.join(this.base_folder, root_folder_path);
 
         try {
             await fsPromises.access(folderPath);
@@ -715,7 +715,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]> {
         // List importable samples from root_folder_path
         let samples: PublicHeaderSampleResponseModel[] = [];
-        const folderPath = path.join(root_folder_path);
+        const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
         const meta_header_samples = await this.getSamplesFromHeaders(folderPath);
 
