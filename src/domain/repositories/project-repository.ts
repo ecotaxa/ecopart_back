@@ -159,7 +159,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             visible_duration: public_project.visible_duration,
             public_duration: public_project.public_duration,
             instrument_model: instrument.instrument_model_id,
-            serial_number: public_project.serial_number
+            serial_number: public_project.serial_number,
+            ecotaxa_project_id: public_project.ecotaxa_project_id,
+            ecotaxa_instance_id: public_project.ecotaxa_instance_id
         };
         return project;
     }
@@ -191,7 +193,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             members: privileges.members,
             managers: privileges.managers,
             contact: privileges.contact,
-            project_creation_date: project.project_creation_date
+            project_creation_date: project.project_creation_date,
+            ecotaxa_project_id: project.ecotaxa_project_id,
+            ecotaxa_instance_id: project.ecotaxa_instance_id
         };
 
         return publicProject;

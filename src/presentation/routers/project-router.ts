@@ -92,6 +92,17 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find the created project.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
+            else if (err.message === "User cannot use the provided ecotaxa account") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance ID is required for a new Ecotaxa project.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance ID is required for an existing Ecotaxa project.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account not found.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa project not found") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Mismatch: Ecotaxa instance ID does not match the Ecotaxa account's instance ID.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Instruments do not match")) res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa generic account not found for instance : ")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create project"] })
         }
     })
@@ -350,6 +361,8 @@ export default function ProjectRouter(
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
+
+    /***********************************************ECOTAXA SAMPLES***********************************************/
 
     return router
 }

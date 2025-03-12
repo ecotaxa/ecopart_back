@@ -38,8 +38,12 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             public_duration INTEGER NOT NULL,
             instrument_model INTEGER,
             serial_number TEXT NOT NULL,
+            ecotaxa_project_id INTEGER,
+            ecotaxa_instance_id INTEGER,
+
             project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id)
+            FOREIGN KEY (ecotaxa_instance_id) REFERENCES ecotaxa_instance(ecotaxa_instance_id)
         );
     `;
 
@@ -51,9 +55,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
     async create(project: ProjectRequestCreationModel): Promise<number> {
-        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number]
+        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number, project.ecotaxa_project_id, project.ecotaxa_instance_id]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number) VALUES  (` + placeholders + `);`;
+        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number, ecotaxa_project_id, ecotaxa_instance_id) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -113,7 +117,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             public_duration: row.public_duration,
                             instrument_model: row.instrument_model_name,
                             serial_number: row.serial_number,
-                            project_creation_date: row.project_creation_date
+                            project_creation_date: row.project_creation_date,
+                            ecotaxa_project_id: row.ecotaxa_project_id,
+                            ecotaxa_instance_id: row.ecotaxa_instance_id
                         };
                         resolve(result);
                     }
@@ -274,7 +280,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             public_duration: row.public_duration,
                             instrument_model: row.instrument_model_name,
                             serial_number: row.serial_number,
-                            project_creation_date: row.project_creation_date
+                            project_creation_date: row.project_creation_date,
+                            ecotaxa_project_id: row.ecotaxa_project_id,
+                            ecotaxa_instance_id: row.ecotaxa_instance_id
                         })),
                         total: rows[0]?.total_count || 0
                     };

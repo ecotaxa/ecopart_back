@@ -22,8 +22,13 @@ export interface ProjectRequestCreationModel {
     public_duration: number;
     instrument_model: number;
     serial_number: string;
+    ecotaxa_project_id: number | null;
+    ecotaxa_instance_id: number | null;
 }
 export interface ProjectResponseModel {
+    ecotaxa_project_id: number | null;
+    ecotaxa_instance_id: number | null;
+
     project_id: number;
     project_creation_date: string;
 
@@ -75,6 +80,8 @@ export interface ProjectUpdateModel {
     public_duration?: number;
     instrument_model?: number;
     serial_number?: string;
+    ecotaxa_project_id?: number | null;
+    ecotaxa_instance_id?: number | null;
 }
 
 export interface PublicProjectUpdateModel {
@@ -103,8 +110,10 @@ export interface PublicProjectUpdateModel {
     members?: MinimalUserModel[];//user_id //TODO can be {useer_id}[] only
     managers?: MinimalUserModel[]
     contact?: MinimalUserModel;
+    ecotaxa_project_id?: number | null;
+    ecotaxa_instance_id: number | null;
 }
-export interface PublicProjectRequestCreationModel {
+export interface PublicProjectRequestCreationModel_base {
     //project_id: number;
     root_folder_path: string;
     project_title: string;
@@ -129,9 +138,15 @@ export interface PublicProjectRequestCreationModel {
     members: MinimalUserModel[];//user_id //TODO can be {useer_id}[] only
     managers: MinimalUserModel[]
     contact: MinimalUserModel;
+    ecotaxa_project_id: number | null;
+    ecotaxa_instance_id: number | null;
+}
+export interface PublicProjectRequestCreationModel extends PublicProjectRequestCreationModel_base {
+    new_ecotaxa_project: boolean;
+    ecotaxa_account_id: number | null;
 }
 
-export interface PublicProjectResponseModel extends PublicProjectRequestCreationModel {
+export interface PublicProjectResponseModel extends PublicProjectRequestCreationModel_base {
     project_id: number;
     project_creation_date: string;
 }

@@ -32,14 +32,14 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
                 project_id: publicPrivilege.project_id,
                 user_id: manager.user_id,
                 privilege_name: "manager",
-                contact: publicPrivilege.contact.user_id === manager.user_id
+                contact: publicPrivilege.contact.user_id == manager.user_id
             }
         }).concat(publicPrivilege.members.map(member => {
             return {
                 project_id: publicPrivilege.project_id,
                 user_id: member.user_id,
                 privilege_name: "member",
-                contact: publicPrivilege.contact.user_id === member.user_id
+                contact: publicPrivilege.contact.user_id == member.user_id
             }
         }))
         return privileges
@@ -271,8 +271,8 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
 
     // Ensure the contact is in either members or managers
     private ensureContactInMembersOrManagers(publicProject: PublicPrivilege): void {
-        const isContactInMembers = publicProject.members.some(member => member.user_id === publicProject.contact.user_id);
-        const isContactInManagers = publicProject.managers.some(manager => manager.user_id === publicProject.contact.user_id);
+        const isContactInMembers = publicProject.members.some(member => member.user_id == publicProject.contact.user_id);
+        const isContactInManagers = publicProject.managers.some(manager => manager.user_id == publicProject.contact.user_id);
 
         if (!isContactInMembers && !isContactInManagers) {
             throw new Error("Contact user must be either in members or managers");

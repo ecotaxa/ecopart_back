@@ -52,7 +52,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
 
     async ensureUserCanAddAccount(user_id: number, ecopart_user_id: number): Promise<void> {
         const isAdmin = await this.userRepository.isAdmin(user_id);
-        const userCanAddAccount = isAdmin || user_id === ecopart_user_id;
+        const userCanAddAccount = isAdmin || user_id == ecopart_user_id;
         if (!userCanAddAccount) {
             throw new Error("User cannot add account to the desired ecopart user");
         }
@@ -60,6 +60,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
 
     formatEcotaxaAccountToCreate(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel, ecotaxa_data: EcotaxaAccountModel): EcotaxaAccountRequestCreationModel {
         return {
+            ecotaxa_account_ecotaxa_id: ecotaxa_data.ecotaxa_account_ecotaxa_id,
             ecotaxa_account_ecopart_user_id: ecotaxa_account_to_create.ecopart_user_id,
             ecotaxa_account_token: ecotaxa_data.ecotaxa_token,
             ecotaxa_account_user_name: ecotaxa_data.ecotaxa_user_name,

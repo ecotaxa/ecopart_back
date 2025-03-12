@@ -22,6 +22,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         const sql_ecotaxa_account = `
          CREATE TABLE IF NOT EXISTS 'ecotaxa_account' (
              ecotaxa_account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+             ecotaxa_account_ecotaxa_id INTEGER NOT NULL,
              ecotaxa_account_token TEXT NOT NULL,
              ecotaxa_account_user_name TEXT NOT NULL,
              ecotaxa_account_user_email TEXT NOT NULL,
@@ -81,9 +82,9 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
     }
 
     async create(ecotaxa_account: EcotaxaAccountRequestCreationModel): Promise<number> {
-        const params = [ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_date, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id]
+        const params = [ecotaxa_account.ecotaxa_account_ecotaxa_id, ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_date, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_date, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_date, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -111,6 +112,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     }
                     const result: EcotaxaAccountResponseModel = {
                         ecotaxa_account_id: row.ecotaxa_account_id,
+                        ecotaxa_account_ecotaxa_id: row.ecotaxa_account_ecotaxa_id,
                         ecotaxa_account_creation_date: row.ecotaxa_account_creation_date,
                         ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                         ecotaxa_account_token: row.ecotaxa_account_token,
@@ -211,6 +213,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     const result: SearchResult<EcotaxaAccountResponseModel> = {
                         items: rows.map(row => ({
                             ecotaxa_account_id: row.ecotaxa_account_id,
+                            ecotaxa_account_ecotaxa_id: row.ecotaxa_account_ecotaxa_id,
                             ecotaxa_account_creation_date: row.ecotaxa_account_creation_date,
                             ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                             ecotaxa_account_token: row.ecotaxa_account_token,

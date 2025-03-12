@@ -104,6 +104,8 @@ const config = {
     MAIL_SENDER: process.env.MAIL_SENDER || '',
 
     NODE_ENV: process.env.NODE_ENV || '',
+
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || ''
 }
 async function getSQLiteDS() {
     const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
@@ -144,7 +146,7 @@ async function getSQLiteDS() {
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
-    const user_dataSource = new SQLiteUserDataSource(db)
+    const user_dataSource = new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
     const instrument_model_dataSource = new SQLiteInstrumentModelDataSource(db)
     const project_dataSource = new SQLiteProjectDataSource(db)
     const privilege_dataSource = new SQLitePrivilegeDataSource(db)
@@ -170,7 +172,7 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
 
     const userMiddleWare =
         UserRouter(
@@ -204,7 +206,7 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
         new MiddlewareSampleValidation(),
-        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
+        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteProject(user_repo, project_repo, privilege_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),

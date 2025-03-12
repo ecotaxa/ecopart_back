@@ -6,6 +6,7 @@ export interface EcotaxaInstanceModel {
     ecotaxa_instance_url: string;
 }
 export interface EcotaxaAccountRequestCreationModel {
+    ecotaxa_account_ecotaxa_id: number;
     ecotaxa_account_ecopart_user_id: number;
     ecotaxa_account_token: string;
     ecotaxa_account_user_name: string;
@@ -35,12 +36,14 @@ export interface PublicEcotaxaAccountRequestCreationModel {
 export interface EcotaxaAccountModel {
     ecotaxa_token: string;
     ecotaxa_user_name: string;
+    ecotaxa_account_ecotaxa_id: number;
     ecotaxa_expiration_date: string;
 }
 
 export interface PublicEcotaxaAccountResponseModel {
     ecotaxa_account_instance_id: number;
     ecotaxa_account_id: number;
+    ecotaxa_account_ecotaxa_id: number;
     ecotaxa_user_name: string;
     ecotaxa_expiration_date: string;
     ecotaxa_account_instance_name: string;

@@ -4,10 +4,9 @@ services:
     env_file: .env
     volumes:
       - ./data_storage:/src/data_storage
-      - type: bind
-        source: ./.env
-        target: /src/.env
+      # - ./data_storage/ecopart_data_to_import/remote/piqv/plankton:/src/data_storage/ecopart_data_to_import/remote/piqv/plankton:shared
+      # - ./data_storage/ecopart_data_to_import/remote/ftp_plankton:/src/data_storage/ecopart_data_to_import/remote/ftp_plankton:shared
     ports:
-      - 4000:4000
+      - "4000:4000"
     restart: unless-stopped
     command: npm run prod:serve

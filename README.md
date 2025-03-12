@@ -56,6 +56,9 @@ To deploy a new version of the application to production, follow these steps:
      docker compose up
      ```
 
+### Link with EcoTaxa
+You can configure GENERIC_ECOTAXA_ACCOUNT_EMAIL in the .env file. Applicative accounts are created with this email in every EcoTaxa instances. You should then loggin to ecopart user that uses the same email as GENERIC_ECOTAXA_ACCOUNT_EMAIL and loggin for every instances to the related applicative ecotaxa account. For now you should reconnect to theses accounts every 30 day. We are working on an EcoTaxa feature to ease this process trough a refresh token or longer token.
+
 ### Glossary
 
 **Clean Architecture** is a software design principle that emphasizes separation of concerns and modularity, aiming to create a flexible and maintainable codebase. It divides the application into layers, such as *presentation*, *domain*, and *data*, ensuring that dependencies flow inward, maintaining a clear boundary between the layers. This approach allows developers to change the implementation details of one layer without affecting the others, promoting code reusability and testability.
