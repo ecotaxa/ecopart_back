@@ -158,8 +158,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
         ecotaxa_project.managers.push(generic_ecotaxa_account)
         await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project)
-        return ecotaxa_project.ecotaxa_project_id;
 
+        return ecotaxa_project_id
     }
     ensureInstrumentsMatch(ecotaxa_instrument: string, ecopart_instrument: string): void {
         // Get the list of valid EcoPart instruments for the given EcoTaxa instrument
