@@ -161,6 +161,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             instrument_model: instrument.instrument_model_id,
             serial_number: public_project.serial_number,
             ecotaxa_project_id: public_project.ecotaxa_project_id,
+            ecotaxa_project_name: public_project.ecotaxa_project_name,
             ecotaxa_instance_id: public_project.ecotaxa_instance_id
         };
         return project;
@@ -195,6 +196,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             contact: privileges.contact,
             project_creation_date: project.project_creation_date,
             ecotaxa_project_id: project.ecotaxa_project_id,
+            ecotaxa_project_name: project.ecotaxa_project_name,
             ecotaxa_instance_id: project.ecotaxa_instance_id
         };
 

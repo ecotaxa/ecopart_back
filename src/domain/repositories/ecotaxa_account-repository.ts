@@ -116,7 +116,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return data;
     }
 
-    async linkEcotaxaAndEcopartProject(public_project: PublicProjectRequestCreationModel): Promise<number> {
+    async linkEcotaxaAndEcopartProject(public_project: PublicProjectRequestCreationModel): Promise<{ ecotaxa_project_id: number, ecotaxa_project_name: string }> {
         const {
             ecotaxa_project_id,
             ecotaxa_account_id,
@@ -159,7 +159,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         ecotaxa_project.managers.push(generic_ecotaxa_account)
         await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project)
 
-        return ecotaxa_project_id
+        return { ecotaxa_project_id: ecotaxa_project.projid as number, ecotaxa_project_name: ecotaxa_project.title as string };
     }
     ensureInstrumentsMatch(ecotaxa_instrument: string, ecopart_instrument: string): void {
         // Get the list of valid EcoPart instruments for the given EcoTaxa instrument
@@ -196,7 +196,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return 0;
     }
     async ecotaxa_account_belongs(user_id: number, ecotaxa_account_id: number): Promise<boolean> {
-        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
+        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id, user_id);
         return ecotaxa_account?.ecotaxa_account_ecopart_user_id == user_id || false;
     }
     async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
@@ -222,12 +222,22 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             ecotaxa_expiration_date: expiration_date.toISOString()
         }
     }
-    async getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number): Promise<EcotaxaAccountResponseModel | null> {
-        const ecotaxa_account = await this.ecotaxa_accountDataSource.getOne(ecotaxa_account_id);
-        if (ecopart_user_id && ecotaxa_account && ecotaxa_account.ecotaxa_account_ecopart_user_id !== ecopart_user_id) {
-            return null;
+    async getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number, ecotaxa_instance_id?: number): Promise<EcotaxaAccountResponseModel | null> {
+        const filters = [{ field: "ecotaxa_account_id", operator: "=", value: ecotaxa_account_id }];
+        if (ecopart_user_id !== undefined) {
+            filters.push({ field: "ecotaxa_account_ecopart_user_id", operator: "=", value: ecopart_user_id });
         }
-        return ecotaxa_account;
+        if (ecotaxa_instance_id !== undefined) {
+            filters.push({ field: "ecotaxa_account_instance_id", operator: "=", value: ecotaxa_instance_id });
+        }
+        const options: PreparedSearchOptions = {
+            filter: filters,
+            sort_by: [],
+            page: 1,
+            limit: 1
+        };
+        const ecotaxa_account = await this.ecotaxa_accountDataSource.getAll(options);
+        return ecotaxa_account.total === 0 ? null : ecotaxa_account.items[0];
     }
     formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel {
         return {

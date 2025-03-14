@@ -8,15 +8,13 @@ import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/se
 export class SQLiteUserDataSource implements UserDataSource {
 
     private db: SQLiteDatabaseWrapper
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: string
 
     constructor(db: SQLiteDatabaseWrapper, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string) {
         this.db = db
-        this.GENERIC_ECOTAXA_ACCOUNT_EMAIL = GENERIC_ECOTAXA_ACCOUNT_EMAIL
-        this.init_user_db()
+        this.init_user_db(GENERIC_ECOTAXA_ACCOUNT_EMAIL)
     }
 
-    init_user_db() {
+    init_user_db(GENERIC_ECOTAXA_ACCOUNT_EMAIL: string) {
         // Create table if not exist
         const sql_create = "CREATE TABLE IF NOT EXISTS 'user' (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT NOT NULL, last_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash CHAR(60) NOT NULL, valid_email BOOLEAN CHECK (valid_email IN (0, 1)) DEFAULT 0, confirmation_code TEXT , reset_password_code TEXT ,is_admin BOOLEAN CHECK (is_admin IN (0, 1)) DEFAULT 0, organisation TEXT NOT NULL, country TEXT NOT NULL, user_planned_usage TEXT NOT NULL, user_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, deleted TIMESTAMP DEFAULT NULL);"
         const db_tables = this.db
@@ -28,16 +26,17 @@ export class SQLiteUserDataSource implements UserDataSource {
             else {
                 // Create admin user if not exist
                 const sql_admin = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('admin', 'admin', 'julie.coustenoble@imev-mer.fr', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 1, 'admin', 'admin', 'admin');"
-                const sql_ecopartApp = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('EcoPart', 'app', '" + this.GENERIC_ECOTAXA_ACCOUNT_EMAIL + "', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 0, 'ecopart', 'France', 'Link with ecotaxa');"
+                const sql_ecopartApp = "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES ('EcoPart', 'app', '" + GENERIC_ECOTAXA_ACCOUNT_EMAIL + "', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 0, 'ecopart', 'France', 'Link with ecotaxa');"
 
                 db_tables.run(sql_admin, [], function (err: Error | null) {
                     if (err) {
                         console.log("DB error--", err);
-                    }
-                });
-                db_tables.run(sql_ecopartApp, [], function (err: Error | null) {
-                    if (err) {
-                        console.log("DB error--", err);
+                    } else {
+                        db_tables.run(sql_ecopartApp, [], function (err: Error | null) {
+                            if (err) {
+                                console.log("DB error--", err);
+                            }
+                        });
                     }
                 });
             }

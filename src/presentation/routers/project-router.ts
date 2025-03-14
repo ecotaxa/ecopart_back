@@ -92,7 +92,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find the created project.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
-            else if (err.message === "User cannot use the provided ecotaxa account") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("User cannot use the provided ecotaxa account current user id: ")) res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance ID is required for a new Ecotaxa project.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance ID is required for an existing Ecotaxa project.") res.status(401).send({ errors: [err.message] })

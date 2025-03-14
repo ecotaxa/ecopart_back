@@ -42,7 +42,7 @@ export class CreateProject implements CreateProjectUseCase {
         const public_project_with_ecotaxa_proj_info = await this.handleEcotaxaProjectCreation(public_project, current_user);
 
         // Format the provided information
-        const project: ProjectRequestCreationModel = this.projectRepository.formatProjectRequestCreationModel(public_project_with_ecotaxa_proj_info, instrument)
+        const project: ProjectRequestCreationModel = this.projectRepository.formatProjectRequestCreationModel(public_project_with_ecotaxa_proj_info, instrument);
         // Create the project in the database and retrieve its ID
         const createdProjectId = await this.projectRepository.createProject(project);
 
@@ -65,9 +65,12 @@ export class CreateProject implements CreateProjectUseCase {
         if (public_project.new_ecotaxa_project) {
             // Create ecotaxa project with same title as ecopart project
             public_project.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(public_project);
+
         } else if (public_project.ecotaxa_project_id) {
             // Link ecotaxa project
-            public_project.ecotaxa_project_id = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(public_project);
+            const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(public_project);
+            public_project.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
+            public_project.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
         }
         return public_project
     }
@@ -108,7 +111,7 @@ export class CreateProject implements CreateProjectUseCase {
     }
     async ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void> {
         if (!await this.ecotaxa_accountRepository.ecotaxa_account_belongs(current_user.user_id, ecotaxa_account_id)) {
-            throw new Error("User cannot use the provided ecotaxa account");
+            throw new Error("User cannot use the provided ecotaxa account current user id: " + current_user.user_id + " ecotaxa account id: " + ecotaxa_account_id);
         }
     }
 

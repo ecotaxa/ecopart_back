@@ -23,10 +23,12 @@ export interface ProjectRequestCreationModel {
     instrument_model: number;
     serial_number: string;
     ecotaxa_project_id: number | null;
+    ecotaxa_project_name: string | null;
     ecotaxa_instance_id: number | null;
 }
 export interface ProjectResponseModel {
     ecotaxa_project_id: number | null;
+    ecotaxa_project_name: string | null;
     ecotaxa_instance_id: number | null;
 
     project_id: number;
@@ -111,7 +113,7 @@ export interface PublicProjectUpdateModel {
     managers?: MinimalUserModel[]
     contact?: MinimalUserModel;
     ecotaxa_project_id?: number | null;
-    ecotaxa_instance_id: number | null;
+    ecotaxa_instance_id?: number | null;
 }
 export interface PublicProjectRequestCreationModel_base {
     //project_id: number;
@@ -139,6 +141,7 @@ export interface PublicProjectRequestCreationModel_base {
     managers: MinimalUserModel[]
     contact: MinimalUserModel;
     ecotaxa_project_id: number | null;
+    ecotaxa_project_name: string | null;
     ecotaxa_instance_id: number | null;
 }
 export interface PublicProjectRequestCreationModel extends PublicProjectRequestCreationModel_base {
