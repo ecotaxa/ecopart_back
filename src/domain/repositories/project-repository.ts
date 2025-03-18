@@ -425,12 +425,25 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         return exportZip;
     }
-
     async copyZippedL0bFoldersToExportFolder(project: ProjectResponseModel, exportFolder: string): Promise<void> {
         //  with date
         const backupedProjectPath = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, project.project_id.toString(), 'l0b_backup');
         // zip and copy backupedProjectPath to exportFolder
         await this.zipFolder(backupedProjectPath, exportFolder);
     }
-
+    async ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void> {
+        const options: PreparedSearchOptions = {
+            filter: [
+                { field: "ecotaxa_project_id", operator: "=", value: ecotaxa_project_id },
+                { field: "ecotaxa_instance_id", operator: "=", value: ecotaxa_instance_id }
+            ],
+            sort_by: [],
+            page: 1,
+            limit: 1
+        }
+        const linked_projects = await this.projectDataSource.getAll(options);
+        if (linked_projects.total > 0) {
+            throw new Error("EcoTaxa project is already linked to an EcoPart project");
+        }
+    }
 }

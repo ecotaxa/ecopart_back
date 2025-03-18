@@ -4,7 +4,7 @@ import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface EcotaxaAccountRepository {
     linkEcotaxaAndEcopartProject(public_project: PublicProjectRequestCreationModel): Promise<{ ecotaxa_project_id: number, ecotaxa_project_name: string }>;
-    createEcotaxaProject(ecopart_project: PublicProjectRequestCreationModel): Promise<number> //Promise<{ ecotaxa_project_id: number, ecotaxa_project_name: string }>
+    createEcotaxaProject(ecopart_project: PublicProjectRequestCreationModel): Promise<number>;
     ecotaxa_account_belongs(user_id: number, ecotaxa_account_id: number): Promise<boolean>;
     createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number>;
     connectToEcotaxaInstance(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel>;

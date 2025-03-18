@@ -41,9 +41,10 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             ecotaxa_project_id INTEGER,
             ecotaxa_project_name TEXT,
             ecotaxa_instance_id INTEGER,
-
             project_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id)
+
+            UNIQUE(ecotaxa_project_id, ecotaxa_instance_id),
+            FOREIGN KEY (instrument_model) REFERENCES instrument_model(instrument_model_id),
             FOREIGN KEY (ecotaxa_instance_id) REFERENCES ecotaxa_instance(ecotaxa_instance_id)
         );
     `;
