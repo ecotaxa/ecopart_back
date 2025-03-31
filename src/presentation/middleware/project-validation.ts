@@ -266,27 +266,22 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Serial number Validation,
         check('serial_number').optional()
             .trim()
-            .not().isEmpty().withMessage('Serial number cannot be empty.')
-        ,
+            .not().isEmpty().withMessage('Serial number cannot be empty.'),
         // Project Creation Date Validation
-        check('user_creation_date')
+        check('project_creation_date')
             .isEmpty().withMessage('Project creation date cannot be set manually.'),
         // ecotaxa_project_id Validation
         check('ecotaxa_project_id').optional()
-            .isInt({ min: 1 }).withMessage('Ecotaxa project ID must be a number and must be greater than 0.')
-            .default(null),
+            .isInt({ min: 1 }).withMessage('Ecotaxa project ID must be a number and must be greater than 0.'),
         // ecotaxa_instance_id Validation
         check('ecotaxa_instance_id').optional()
-            .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.')
-            .default(null),
+            .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.'),
         // new_ecotaxa_project Validation
         check('new_ecotaxa_project').optional()
-            .isBoolean().withMessage('New Ecotaxa project must be a boolean value.')
-            .default(false),
+            .isBoolean().withMessage('New Ecotaxa project must be a boolean value.'),
         // ecotaxa_account_id Validation
         check('ecotaxa_account_id').optional()
-            .isInt({ min: 1 }).withMessage('Ecotaxa account ID must be a number and must be greater than 0.')
-            .default(null),
+            .isInt({ min: 1 }).withMessage('Ecotaxa account ID must be a number and must be greater than 0.'),
 
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {

@@ -1,36 +1,39 @@
 import { MinimalUserModel, UserUpdateModel } from "../../entities/user";
-import { ProjectResponseModel, ProjectUpdateModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../entities/project";
+import { ProjectResponseModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../entities/project";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { UpdateProjectUseCase } from "../../interfaces/use-cases/project/update-project";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { PrivilegeRequestModel, PublicPrivilege } from "../../entities/privilege";
+import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 
 export class UpdateProject implements UpdateProjectUseCase {
     userRepository: UserRepository
     projectRepository: ProjectRepository
     instrument_modelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
+    ecotaxa_accountRepository: EcotaxaAccountRepository;
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.instrument_modelRepository = instrument_modelRepository
         this.privilegeRepository = privilegeRepository
+        this.ecotaxa_accountRepository = ecotaxa_accountRepository
     }
 
     async execute(current_user: UserUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<PublicProjectResponseModel> {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         // Ensure the project to delete exists
-        await this.ensureProjectExists(public_project_to_update);
+        const current_project = await this.ensureProjectExists(public_project_to_update);
         // Ensure user has the privilege to update the project
         await this.ensureUserCanUpdate(current_user, public_project_to_update);
         // Prepare the project update model
         const project_to_update: ProjectUpdateModel = await this.prepareProjectUpdateModel(public_project_to_update);
         // Update the project
-        await this.updateProject(project_to_update, public_project_to_update);
+        await this.updateProject(current_user, project_to_update, public_project_to_update, current_project);
         // Retrieve updated project
         const updated_project = await this.getUpdatedProject(project_to_update.project_id);
         // Retrieve updated privileges
@@ -40,11 +43,12 @@ export class UpdateProject implements UpdateProjectUseCase {
     }
 
     // Ensure the project to update exists
-    private async ensureProjectExists(project: PublicProjectUpdateModel): Promise<void> {
+    private async ensureProjectExists(project: PublicProjectUpdateModel): Promise<ProjectResponseModel> {
         const projectExists = await this.projectRepository.getProject({ project_id: project.project_id });
         if (!projectExists) {
             throw new Error("Cannot find project to update");
         }
+        return projectExists;
     }
 
     // Ensure user is admin or has privilege to update the project
@@ -82,8 +86,8 @@ export class UpdateProject implements UpdateProjectUseCase {
         return project_to_update;
     }
 
-    private async updateProject(project: ProjectUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<void> {
-
+    private async updateProject(current_user: UserUpdateModel, project: ProjectUpdateModel, public_project_to_update: PublicProjectUpdateModel, current_project: ProjectResponseModel): Promise<void> {
+        // Privilege updated flag
         let privilegeUpdated: boolean = false
         // Validate and update privileges if provided
         if (this.isPrivilegeUpdate(public_project_to_update)) {
@@ -100,8 +104,42 @@ export class UpdateProject implements UpdateProjectUseCase {
             this.ensurePrivilegesAreNotPartiallyFilled(public_project_to_update);
         }
 
+        // Validate and manage ecotaxa links if provided
+        // ecotaxa_project_id, ecotaxa_instance_id, new_ecotaxa_project, ecotaxa_account_id
+        if (public_project_to_update.ecotaxa_project_id !== undefined || public_project_to_update.ecotaxa_instance_id !== undefined || public_project_to_update.new_ecotaxa_project !== undefined || public_project_to_update.ecotaxa_account_id !== undefined) {
+            await this.handleEcotaxaProjectLinks(public_project_to_update, current_user, current_project);
+        }
+        //else if one is valuated but not the others throw error
+        else if (public_project_to_update.ecotaxa_project_id || public_project_to_update.ecotaxa_instance_id || public_project_to_update.new_ecotaxa_project || public_project_to_update.ecotaxa_account_id) {
+            throw new Error("To update ecotaxa project you must provide ecotaxa_project_id, ecotaxa_instance_id, new_ecotaxa_project and ecotaxa_account_id")
+        }
+
         // Update the project
         await this.updateProjectProperties(project, privilegeUpdated);
+    }
+
+    private async handleEcotaxaProjectLinks(public_project_to_update: PublicProjectUpdateModel, current_user: UserUpdateModel, current_project: ProjectResponseModel): Promise<PublicProjectUpdateModel> {
+        if (!public_project_to_update.ecotaxa_account_id) return public_project_to_update;
+        await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project_to_update.ecotaxa_account_id);
+        await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project_to_update);
+        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
+
+        // delete ecopart user from previous linked ecotaxa project if one was linked
+        await this.ecotaxa_accountRepository.deleteEcopartUserFromEcotaxaProject(current_project, public_project_to_update);
+
+        const project_for_ecotaxa = { ...current_project, ...public_project_to_update };
+        if (public_project_to_update.new_ecotaxa_project) {
+            // Create ecotaxa project with same title as ecopart project
+            public_project_to_update.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
+            public_project_to_update.ecotaxa_project_name = current_project.project_title;
+
+        } else if (public_project_to_update.ecotaxa_project_id) {
+            // Link ecotaxa project
+            const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
+            public_project_to_update.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
+            public_project_to_update.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
+        }
+        return public_project_to_update
     }
 
     private ensurePrivilegesAreNotPartiallyFilled(public_project_to_update: PublicProjectUpdateModel): void {

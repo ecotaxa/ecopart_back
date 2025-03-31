@@ -1,7 +1,8 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
 import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel } from "../entities/ecotaxa_account";
-import { PublicProjectRequestCreationModel } from "../entities/project";
+import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
+import { UserUpdateModel } from "../entities/user";
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
@@ -299,7 +300,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         ecotaxa_project.cnn_network_id = cnn_network_id
         return ecotaxa_project
     }
-    async addEcotaxaGenericAccountToProject(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_project: any,): Promise<void> {
+    async addEcotaxaGenericAccountToProject(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_project: any,): Promise<any> {
         // add generic user to the project
         const result = await this.getEcotaxaGenericAccountForInstance(ecotaxa_instance.ecotaxa_instance_id)
 
@@ -310,6 +311,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         };
 
         ecotaxa_project.managers.push(generic_ecotaxa_account)
+        return ecotaxa_project
+    }
+    async removeEcotaxaGenericAccountFromProject(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_project: any): Promise<any> {
+        // remove generic user from the project
+        const result = await this.getEcotaxaGenericAccountForInstance(ecotaxa_instance.ecotaxa_instance_id)
+
+        ecotaxa_project.managers = ecotaxa_project.managers.filter((manager: any) => manager.id !== result.ecotaxa_account_ecotaxa_id)
         return ecotaxa_project
     }
     ensureInstrumentsMatch(ecotaxa_instrument: string, ecopart_instrument: string): void {
@@ -383,6 +391,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     async getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null> {
         const ecotaxa_instance = await this.ecotaxa_accountDataSource.getOneEcoTaxaInstance(ecotaxa_instance_id);
         return ecotaxa_instance;
+    }
+    async ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void> {
+        if (!await this.ecotaxa_account_belongs(current_user.user_id, ecotaxa_account_id)) {
+            throw new Error("User cannot use the provided ecotaxa account current user id: " + current_user.user_id + " ecotaxa account id: " + ecotaxa_account_id);
+        }
     }
     async accountExists(ecotaxa_account: PublicEcotaxaAccountRequestCreationModel): Promise<boolean> {
         const options: PreparedSearchOptions = {
@@ -467,5 +480,69 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         }
 
         return await this.ecotaxa_accountDataSource.getAll(options);
+    }
+    async ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void> {
+        const { new_ecotaxa_project, ecotaxa_project_id, ecotaxa_instance_id, ecotaxa_account_id } = public_project;
+        // If specified, ecotaxa instance should be valid
+        if (ecotaxa_instance_id) {
+            const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
+            if (!ecotaxa_instance) {
+                throw new Error("Ecotaxa instance not found.");
+            }
+        }
+        // If new ecotaxa project, ecotaxa instance should be provided
+        if (new_ecotaxa_project && !ecotaxa_instance_id) {
+            throw new Error("Ecotaxa instance ID is required for a new Ecotaxa project.");
+        }
+        // If existing ecotaxa project, ecotaxa instance should be provided
+        if (!new_ecotaxa_project && ecotaxa_project_id && !ecotaxa_instance_id) {
+            throw new Error("Ecotaxa instance ID is required for an existing Ecotaxa project.");
+        }
+        // If existing ecotaxa project, ecotaxa instance should match the ecotaxa account's instance
+        if (!new_ecotaxa_project && ecotaxa_project_id) {
+            const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id as number);
+            if (!ecotaxa_account) {
+                throw new Error("Ecotaxa account not found.");
+            }
+            if (ecotaxa_account.ecotaxa_account_instance_id !== ecotaxa_instance_id) {
+                throw new Error("Mismatch: Ecotaxa instance ID does not match the Ecotaxa account's instance ID.");
+            }
+        }
+    }
+
+    async deleteEcopartUserFromEcotaxaProject(current_project: ProjectResponseModel, project_to_update_model: PublicProjectUpdateModel): Promise<void> {
+        const ecotaxa_account_id = project_to_update_model.ecotaxa_account_id as number
+        const ecotaxa_instance_id = current_project.ecotaxa_instance_id as number
+        const ecotaxa_project_id = current_project.ecotaxa_project_id as number
+
+        // if no linked project, return
+        if (!ecotaxa_project_id) return
+
+        // get ecotaxa account
+        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
+        if (!ecotaxa_account) {
+            throw new Error("Ecotaxa account not found");
+        }
+
+        // get ecotaxa instance
+        const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
+        if (!ecotaxa_instance) {
+            throw new Error("Ecotaxa instance not found");
+        }
+
+        // get ecotaxa project
+        // TODO if not found delete the link to not block the project?
+        const ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_id)
+        if (!ecotaxa_project) {
+            throw new Error("EcoTaxa project not found");
+        }
+
+        // check that the ecotaxa account is manager in the ecotaxa project
+        if (ecotaxa_project.highest_right !== "Manage") throw new Error("Given EcoTaxa account is not manager in the old EcoTaxa project and cannot remove created link. You should manage both old and new EcoTaxa projects");
+
+        // remove the user from the project
+        const ecotaxa_project_withour_generic_ecotaxa_user = this.removeEcotaxaGenericAccountFromProject(ecotaxa_instance, ecotaxa_project)
+
+        await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_withour_generic_ecotaxa_user)
     }
 }
