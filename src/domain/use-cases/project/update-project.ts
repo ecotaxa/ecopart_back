@@ -106,40 +106,42 @@ export class UpdateProject implements UpdateProjectUseCase {
 
         // Validate and manage ecotaxa links if provided
         // ecotaxa_project_id, ecotaxa_instance_id, new_ecotaxa_project, ecotaxa_account_id
-        if (public_project_to_update.ecotaxa_project_id !== undefined || public_project_to_update.ecotaxa_instance_id !== undefined || public_project_to_update.new_ecotaxa_project !== undefined || public_project_to_update.ecotaxa_account_id !== undefined) {
-            await this.handleEcotaxaProjectLinks(public_project_to_update, current_user, current_project);
+        if ((public_project_to_update.ecotaxa_project_id !== undefined || public_project_to_update.new_ecotaxa_project == true) && public_project_to_update.ecotaxa_instance_id !== undefined && public_project_to_update.ecotaxa_account_id !== undefined) {
+            project = await this.handleEcotaxaProjectLinks(public_project_to_update, current_user, current_project, project);
         }
         //else if one is valuated but not the others throw error
-        else if (public_project_to_update.ecotaxa_project_id || public_project_to_update.ecotaxa_instance_id || public_project_to_update.new_ecotaxa_project || public_project_to_update.ecotaxa_account_id) {
-            throw new Error("To update ecotaxa project you must provide ecotaxa_project_id, ecotaxa_instance_id, new_ecotaxa_project and ecotaxa_account_id")
+        else if ((public_project_to_update.ecotaxa_project_id == undefined && public_project_to_update.new_ecotaxa_project == undefined) || public_project_to_update.ecotaxa_instance_id == undefined || !public_project_to_update.ecotaxa_account_id == undefined) {
+            throw new Error("To update ecotaxa project you must provide ecotaxa_project_id or ask for new_ecotaxa_project and provide ecotaxa_instance_id and ecotaxa_account_id")
         }
 
         // Update the project
         await this.updateProjectProperties(project, privilegeUpdated);
     }
 
-    private async handleEcotaxaProjectLinks(public_project_to_update: PublicProjectUpdateModel, current_user: UserUpdateModel, current_project: ProjectResponseModel): Promise<PublicProjectUpdateModel> {
-        if (!public_project_to_update.ecotaxa_account_id) return public_project_to_update;
+    private async handleEcotaxaProjectLinks(public_project_to_update: PublicProjectUpdateModel, current_user: UserUpdateModel, current_project: ProjectResponseModel, project: ProjectUpdateModel): Promise<ProjectUpdateModel> {
         await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project_to_update.ecotaxa_account_id);
         await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project_to_update);
         await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
 
-        // delete ecopart user from previous linked ecotaxa project if one was linked
-        await this.ecotaxa_accountRepository.deleteEcopartUserFromEcotaxaProject(current_project, public_project_to_update);
-
         const project_for_ecotaxa = { ...current_project, ...public_project_to_update };
         if (public_project_to_update.new_ecotaxa_project) {
             // Create ecotaxa project with same title as ecopart project
-            public_project_to_update.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
-            public_project_to_update.ecotaxa_project_name = current_project.project_title;
+            project.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
+            project.ecotaxa_project_name = current_project.project_title;
+            delete project.new_ecotaxa_project;
+            delete project.ecotaxa_account_id;
 
         } else if (public_project_to_update.ecotaxa_project_id) {
             // Link ecotaxa project
             const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
-            public_project_to_update.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
-            public_project_to_update.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
+            project.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
+            project.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
+            delete project.new_ecotaxa_project;
+            delete project.ecotaxa_account_id;
         }
-        return public_project_to_update
+        // delete ecopart user from previous linked ecotaxa project if one was linked
+        await this.ecotaxa_accountRepository.deleteEcopartUserFromEcotaxaProject(current_project, public_project_to_update);
+        return project;
     }
 
     private ensurePrivilegesAreNotPartiallyFilled(public_project_to_update: PublicProjectUpdateModel): void {

@@ -82,7 +82,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async standardUpdateProject(project: ProjectUpdateModel): Promise<number> {
-        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number"]
+        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_id", "ecotaxa_project_name", "ecotaxa_instance_id"]
         const updated_project_nb = await this.updateProject(project, params_restricted)
         return updated_project_nb
     }
