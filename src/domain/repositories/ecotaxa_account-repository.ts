@@ -310,7 +310,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             id: result.ecotaxa_account_ecotaxa_id
         };
 
-        ecotaxa_project.managers.push(generic_ecotaxa_account)
+        const exists = ecotaxa_project.managers.some((manager: { id: number; }) => manager.id === generic_ecotaxa_account.id);
+
+        if (!exists) ecotaxa_project.managers.push(generic_ecotaxa_account);
         return ecotaxa_project
     }
     async removeEcotaxaGenericAccountFromProject(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_project: any): Promise<any> {
@@ -541,7 +543,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         if (ecotaxa_project.highest_right !== "Manage") throw new Error("Given EcoTaxa account is not manager in the old EcoTaxa project and cannot remove created link. You should manage both old and new EcoTaxa projects");
 
         // remove the user from the project
-        const ecotaxa_project_withour_generic_ecotaxa_user = this.removeEcotaxaGenericAccountFromProject(ecotaxa_instance, ecotaxa_project)
+        const ecotaxa_project_withour_generic_ecotaxa_user = await this.removeEcotaxaGenericAccountFromProject(ecotaxa_instance, ecotaxa_project)
 
         await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_withour_generic_ecotaxa_user)
     }
