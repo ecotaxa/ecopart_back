@@ -178,7 +178,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
                 }
             }
 
-            throw new Error(`Cannot get EcoTaxa projevt, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${errorDetails}`);
+            throw new Error(`Cannot get EcoTaxa project, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${errorDetails}`);
         }
 
         const data = await response.json();
@@ -516,6 +516,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const ecotaxa_account_id = project_to_update_model.ecotaxa_account_id as number
         const ecotaxa_instance_id = current_project.ecotaxa_instance_id as number
         const ecotaxa_project_id = current_project.ecotaxa_project_id as number
+        let ecotaxa_project: any
 
         // if no linked project, return
         if (!ecotaxa_project_id) return
@@ -534,9 +535,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
         // get ecotaxa project
         // TODO if not found delete the link to not block the project?
-        const ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_id)
-        if (!ecotaxa_project) {
-            throw new Error("EcoTaxa project not found");
+        try {
+            ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_id)
+        } catch (error) {
+            if (error.message.includes("404")) {
+                return
+            } else {
+                throw error
+            }
         }
 
         // check that the ecotaxa account is manager in the ecotaxa project

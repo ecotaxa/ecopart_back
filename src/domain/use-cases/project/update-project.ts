@@ -83,6 +83,9 @@ export class UpdateProject implements UpdateProjectUseCase {
                 }
             }
         }
+        delete project_to_update.new_ecotaxa_project;
+        delete project_to_update.ecotaxa_account_id;
+
         return project_to_update;
     }
 
@@ -128,16 +131,16 @@ export class UpdateProject implements UpdateProjectUseCase {
             // Create ecotaxa project with same title as ecopart project
             project.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
             project.ecotaxa_project_name = current_project.project_title;
-            delete project.new_ecotaxa_project;
-            delete project.ecotaxa_account_id;
-
-        } else if (public_project_to_update.ecotaxa_project_id) {
+        } else if (public_project_to_update.ecotaxa_project_id !== undefined && public_project_to_update.ecotaxa_project_id !== null) {
             // Link ecotaxa project
             const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(project_for_ecotaxa as unknown as PublicProjectRequestCreationModel);
             project.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
             project.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
-            delete project.new_ecotaxa_project;
-            delete project.ecotaxa_account_id;
+        } else if (public_project_to_update.ecotaxa_project_id == null) {
+            // simply unlink ecotaxa project
+            project.ecotaxa_project_id = null;
+            project.ecotaxa_project_name = "";
+            project.ecotaxa_instance_id = null;
         }
         // delete ecopart user from previous linked ecotaxa project if one was linked
         await this.ecotaxa_accountRepository.deleteEcopartUserFromEcotaxaProject(current_project, public_project_to_update);

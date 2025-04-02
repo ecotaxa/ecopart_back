@@ -146,9 +146,16 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
                 return true;
             }),
         // ecotaxa_project_id Validation
-        check('ecotaxa_project_id').optional()
-            .isInt({ min: 1 }).withMessage('Ecotaxa project ID must be a number and must be greater than 0.')
-            .default(null),
+        check('ecotaxa_project_id').optional({ nullable: true })
+            .custom((value, { req }) => {
+                if (req.body.new_ecotaxa_project === true && value !== null) {
+                    throw new Error('Ecotaxa project ID must be null when new Ecotaxa project is true.');
+                }
+                if (value !== null && (!Number.isInteger(value) || value <= 0)) {
+                    throw new Error('Ecotaxa project ID must be a number greater than 0 or null.');
+                }
+                return true;
+            }),
         // ecotaxa_instance_id Validation
         check('ecotaxa_instance_id').optional()
             .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.')
@@ -271,8 +278,16 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         check('project_creation_date')
             .isEmpty().withMessage('Project creation date cannot be set manually.'),
         // ecotaxa_project_id Validation
-        check('ecotaxa_project_id').optional()
-            .isInt({ min: 1 }).withMessage('Ecotaxa project ID must be a number and must be greater than 0.'),
+        check('ecotaxa_project_id').optional({ nullable: true })
+            .custom((value, { req }) => {
+                if (req.body.new_ecotaxa_project === true && value !== null) {
+                    throw new Error('Ecotaxa project ID must be null when new Ecotaxa project is true.');
+                }
+                if (value !== null && (!Number.isInteger(value) || value <= 0)) {
+                    throw new Error('Ecotaxa project ID must be a number greater than 0 or null.');
+                }
+                return true;
+            }),
         // ecotaxa_instance_id Validation
         check('ecotaxa_instance_id').optional()
             .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.'),
@@ -282,7 +297,6 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // ecotaxa_account_id Validation
         check('ecotaxa_account_id').optional()
             .isInt({ min: 1 }).withMessage('Ecotaxa account ID must be a number and must be greater than 0.'),
-
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);
