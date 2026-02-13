@@ -47,21 +47,44 @@ export interface SampleRequestCreationModel {
     instrument_settings_acq_shutter_speed: number | undefined;               // Acquisition shutter speed (in seconds or relevant unit)
     instrument_settings_acq_exposure: number | undefined;                    // Acquisition exposure (in seconds or relevant unit)
 
-    visual_qc_validator_user_id: number;                      // Quality check validator user identifier
-    sample_type_id: number;                                      // Sample type depth or time
-    project_id: number;                                          // Project identifier    
+    visual_qc_validator_user_id: number;                    // Quality check validator user identifier
+    sample_type_id: number;                                 // Sample type depth or time
+    project_id: number;                                     // Project identifier    
 }
 
 export interface PrivateSampleModel extends SampleRequestCreationModel {
-    sample_id: number;                         // Sample internal identifier
-    sample_creation_date: string;                     // Creation date in ISO format
-    visual_qc_status_id: number;               // Quality check status
+    sample_id: number;                          // Sample internal identifier
+    sample_creation_date: string;               // Creation date in ISO format
+    visual_qc_status_id: number;                // Quality check status
+    ecotaxa_import_status_id: number; // EcoTaxa import status
+    ecotaxa_sample_imported: boolean;        // EcoTaxa sample imported flag
+    ecotaxa_sample_import_date: string;      // EcoTaxa sample import date
+    ecotaxa_sample_id: number;               // EcoTaxa sample identifier
+    ecotaxa_sample_tsv_file_name: string;    // EcoTaxa TSV file name
+    ecotaxa_sample_local_folder_tsv_path: string; // Local path to the TSV file to import
+    ecotaxa_sample_nb_images: number;        // EcoTaxa number of images
+    ecotaxa_sample_task_id: number; // EcoTaxa sample task identifier
+
 }
 export interface PublicSampleModel extends PrivateSampleModel {
-    sample_type_label: string;                  // Sample type name
-    visual_qc_status_label: string;                    // Quality check status
+    sample_type_label: string;                    // Sample type name
+    visual_qc_status_label: string;               // Quality check status
     visual_qc_validator_user: string;             // Quality check validator user name same format as "last_name first_name (email)"}
+    ecotaxa_import_status_label: string; // EcoTaxa import status
 }
+export interface SampleUpdateModel {
+    [key: string]: any;
+    sample_id: number;                         // Sample internal identifier
+    ecotaxa_import_status_id?: number; // EcoTaxa import status
+    ecotaxa_sample_imported?: boolean;                           // EcoTaxa sample imported flag
+    ecotaxa_sample_import_date?: string;                         // EcoTaxa sample import date
+    ecotaxa_sample_id?: number;                                  // EcoTaxa sample identifier
+    ecotaxa_sample_tsv_file_name?: string;                       // EcoTaxa TSV file name
+    ecotaxa_sample_local_folder_tsv_path?: string; // Local path to the TSV file to import
+    ecotaxa_sample_nb_images?: number;                           // EcoTaxa number of images
+    ecotaxa_sample_task_id?: number; // EcoTaxa sample task identifier
+}
+
 export interface SampleRequestModel {
     sample_id?: number;                         // Sample internal identifier
     sample_name?: string;                       // Sample name
@@ -112,6 +135,14 @@ export interface SampleRequestModel {
     visual_qc_validator_user_id?: number;                      // Quality check validator user identifier
     sample_type_id?: number;                                      // Sample type depth or time
     project_id?: number;                                          // Project identifier
+    ecotaxa_import_status_id?: number; // EcoTaxa import status
+    ecotaxa_sample_imported?: boolean;                           // EcoTaxa sample imported flag
+    ecotaxa_sample_import_date?: string;                         // EcoTaxa sample import date
+    ecotaxa_sample_id?: number;                                  // EcoTaxa sample identifier
+    ecotaxa_sample_tsv_file_name?: string;                       // EcoTaxa TSV file name
+    ecotaxa_sample_local_folder_tsv_path?: string; // Local path to the TSV file to import
+    ecotaxa_sample_nb_images?: number;                           // EcoTaxa number of images
+    ecotaxa_sample_task_id?: number; // EcoTaxa sample task identifier
 }
 
 export interface MinimalSampleRequestModel {
@@ -166,6 +197,15 @@ export interface VisualQualityCheckStatusRequestModel {
     visual_qc_status_label?: string;                   // Can be pending, validated, rejected
 }
 
+/* ECOTAXA IMPORT STATUS */
+export interface EcoTaxaImportStatusModel {
+    ecotaxa_import_status_id: number;
+    ecotaxa_import_status_label: string;                   // Can be IN_PROGRESS, SUCCESS, ERROR
+}
+export interface EcoTaxaImportStatusRequestModel {
+    ecotaxa_import_status_id?: number;
+    ecotaxa_import_status_label?: string;                   // Can be IN_PROGRESS, SUCCESS, ERROR
+}
 
 /* HEADER */
 export interface PublicHeaderSampleResponseModel {
@@ -206,6 +246,7 @@ export interface HeaderSampleModel {
     argoId: string,
     pixelSize: number,
     sampleDateTime: string,
+    constantdepth: number, // if profile is in time?
 }
 
 /* METADATA INI */
@@ -319,3 +360,14 @@ export interface SampleFromInstallConfigModel {
     instrument_settings_process_gamma: number,    // gamma
     instrument_settings_vignettes_minimum_size_esd: number, // esdmin
 }
+
+/* Ecotaxa samples */
+
+export interface PublicImportableEcoTaxaSampleResponseModel {
+    sample_id: number,
+    sample_name: string,
+    tsv_file_name: string,
+    local_folder_tsv_path: string,
+    images: number
+}
+

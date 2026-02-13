@@ -67,3 +67,7 @@ export interface EcotaxaAccountUser {
     can_do: number[],
     last_used_projects: object[],
 }
+
+export interface EcoTaxaProject {
+    highest_right: "Read" | "Annotate" | "Manage";
+}

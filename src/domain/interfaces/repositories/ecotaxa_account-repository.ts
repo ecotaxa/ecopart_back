@@ -1,9 +1,11 @@
 import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../../entities/project";
+import { PublicImportableEcoTaxaSampleResponseModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { UserUpdateModel } from "../../entities/user";
 
 export interface EcotaxaAccountRepository {
+    importEcoTaxaSamplesInEcoTaxa(ecotaxa_user: EcotaxaAccountRequestModel, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], project: ProjectResponseModel): Promise<string[]>;
     deleteEcopartUserFromEcotaxaProject(current_project: ProjectResponseModel, project_to_update_model: PublicProjectUpdateModel): Promise<void>;
     linkEcotaxaAndEcopartProject(public_project: PublicProjectRequestCreationModel): Promise<{ ecotaxa_project_id: number, ecotaxa_project_name: string }>;
     createEcotaxaProject(ecopart_project: PublicProjectRequestCreationModel): Promise<number>;

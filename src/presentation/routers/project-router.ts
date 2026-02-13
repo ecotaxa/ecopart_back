@@ -7,15 +7,21 @@ import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-v
 import { CreateProjectUseCase } from '../../domain/interfaces/use-cases/project/create-project'
 import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/delete-project'
 import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
+import { SearchProjectsUseCase } from '../../domain/interfaces/use-cases/project/search-project'
 import { BackupProjectUseCase } from '../../domain/interfaces/use-cases/project/backup-project'
 import { ExportBackupedProjectUseCase } from '../../domain/interfaces/use-cases/project/export-backuped-project'
 import { ImportSamplesUseCase } from '../../domain/interfaces/use-cases/sample/import-samples'
 import { DeleteSampleUseCase } from '../../domain/interfaces/use-cases/sample/delete-sample'
 import { SearchSamplesUseCase } from '../../domain/interfaces/use-cases/sample/search-samples'
+import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
+
+import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
+import { DeleteEcoTaxaSampleUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-sample'
+import { SearchEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples'
+import { ListImportableEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
+
 
 import { CustomRequest } from '../../domain/entities/auth'
-import { SearchProjectsUseCase } from '../../domain/interfaces/use-cases/project/search-project'
-import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
 import { IMiddlewareSampleValidation } from '../interfaces/middleware/sample-validation'
 
 export default function ProjectRouter(
@@ -32,6 +38,10 @@ export default function ProjectRouter(
     importSamplesUseCase: ImportSamplesUseCase,
     deleteSampleUseCase: DeleteSampleUseCase,
     searchSamplesUseCase: SearchSamplesUseCase,
+    listImportableEcoTaxaSamplesUseCase: ListImportableEcoTaxaSamplesUseCase,
+    importEcoTaxaSamplesUseCase: ImportEcoTaxaSamplesUseCase,
+    deleteEcoTaxaSampleUseCase: DeleteEcoTaxaSampleUseCase,
+    searchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase,
 ) {
     const router = express.Router()
 
@@ -189,7 +199,7 @@ export default function ProjectRouter(
         }
     })
 
-    /***********************************************SAMPLES***********************************************/
+    /***********************************************SAMPLES PARTICULES***********************************************/
 
     router.get('/:project_id/samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -365,5 +375,178 @@ export default function ProjectRouter(
 
     /***********************************************ECOTAXA SAMPLES***********************************************/
 
+    router.get('/:project_id/ecotaxa_samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
+        console.log("Received request to list importable EcoTaxa samples for project:", req.params.project_id);
+        try {
+            const tasks = await listImportableEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
+            res.status(200).send(tasks)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable EcoTaxa samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot list importable EcoTaxa samples"] })
+        }
+    })
+
+    const sendErrorResponseEcoTaxaSampleImport = (res: Response, err: Error, defaultMessage: string) => {
+        const errorMap: { [key: string]: { status: number; message: string } } = {
+            "User cannot be used": { status: 403, message: err.message },
+            "Logged user cannot list importable samples in this project": { status: 401, message: err.message },
+            "Cannot find project": { status: 404, message: err.message },
+            "Task type not found": { status: 404, message: err.message },
+            "Task status not found": { status: 404, message: err.message },
+            "Cannot create log file": { status: 500, message: err.message },
+            "Task not found": { status: 404, message: err.message },
+            "Task is already in this status": { status: 500, message: err.message },
+            "Cannot change status from": { status: 500, message: err.message },
+            "Cannot find task": { status: 404, message: err.message },
+            "An export backup is already running for this project": { status: 401, message: err.message },
+            "Folder does not exist at path": { status: 404, message: err.message },
+            "No samples to import": { status: 404, message: err.message },
+            "Samples not importable:": { status: 401, message: err.message },
+            "Unknown instrument model": { status: 404, message: err.message },
+            "Backup aborted": { status: 500, message: err.message },
+        };
+
+        for (const key in errorMap) {
+            if (err.message.includes(key)) {
+                const { status, message } = errorMap[key];
+                return { status, errors: [message] };
+            }
+        }
+
+        // Default error response if no match is found
+        return { status: 500, errors: [defaultMessage] };
+    };
+
+    router.post("/:project_id/ecotaxa_samples/import", middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
+        let importError, backupError;
+        let task_import_samples, task_backup_project;
+
+        try {
+            task_import_samples = await importEcoTaxaSamplesUseCase.execute(
+                (req as CustomRequest).token,
+                req.params.project_id as any,
+                { ...req.body }.samples,
+                req.body.ecotaxa_user
+            );
+
+            // Proceed with backup only if import is successful
+            if (req.body.backup_project === true) {
+                try {
+                    task_backup_project = await backupProjectUseCase.execute(
+                        (req as CustomRequest).token,
+                        req.params.project_id as any,
+                        req.body.backup_project_skip_already_imported
+                    );
+                } catch (err) {
+                    console.log(err);
+                    backupError = sendErrorResponseEcoTaxaSampleImport(res, err, "Cannot backup project");
+                }
+            }
+        } catch (err) {
+            if (req.body.backup_project === true) {
+                backupError = sendErrorResponseEcoTaxaSampleImport(res, err, "Backup aborted");
+            }
+            importError = sendErrorResponseEcoTaxaSampleImport(res, err, "Cannot import samples");
+        }
+
+        // Handle different outcomes
+
+        // Case 1: Both failed
+        if (importError && backupError) {
+            return res.status(500).send({
+                success: false,
+                errors: {
+                    import: importError.errors,
+                    backup: backupError.errors,
+                },
+            });
+        }
+
+        // Case 2: Import failed, but backup didn't execute (or was skipped)
+        if (importError) {
+            return res.status(importError.status).send({
+                success: false,
+                errors: {
+                    import: importError.errors,
+                },
+            });
+        }
+
+        // Case 3: Import succeeded, but backup failed
+        if (backupError) {
+            return res.status(backupError.status).send({
+                success: false,
+                task_import_samples,
+                errors: {
+                    backup: backupError.errors,
+                },
+            });
+        }
+
+        // Case 4: Both succeeded
+        return res.status(200).send({
+            success: true,
+            task_import_samples,
+            task_backup_project,
+        });
+    }
+    );
+
+    // Pagined and sorted list of all samples for the given project
+    router.get('/:project_id/ecotaxa_samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
+        try {
+            const project = await searchEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
+            res.status(200).send(project)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get samples"] })
+        }
+    })
+
+    // Pagined and sorted list of filtered samples for the given project
+    router.post('/:project_id/ecotaxa_samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
+        try {
+            const samples = await searchEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
+            res.status(200).send(samples)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot search samples"] })
+        }
+    })
+
+    // Delete a sample
+    router.delete('/:project_id/ecotaxa_samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            await deleteEcoTaxaSampleUseCase.execute((req as CustomRequest).token, req.params.sample_id as any, req.params.project_id as any);
+            res.status(200).send({ message: "Sample successfully deleted" })
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete sample") res.status(401).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot delete sample"] })
+        }
+    })
     return router
 }

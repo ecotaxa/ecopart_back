@@ -5,10 +5,10 @@ import { SearchRepository } from "../../interfaces/repositories/search-repositor
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
-import { SearchSamplesUseCase } from "../../interfaces/use-cases/sample/search-samples";
+import { SearchEcoTaxaSamplesUseCase } from "../../interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
 import { PublicSampleModel } from "../../entities/sample";
 
-export class SearchSamples implements SearchSamplesUseCase {
+export class SearchEcoTaxaSamples implements SearchEcoTaxaSamplesUseCase {
     userRepository: UserRepository
     sampleRepository: SampleRepository
     searchRepository: SearchRepository
@@ -23,7 +23,8 @@ export class SearchSamples implements SearchSamplesUseCase {
         this.privilegeRepository = privilegeRepository
     }
     async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id?: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
-
+        // not implemented yet
+        throw new Error("Not implemented yet");
         // Ensure the current user is valid and not deleted
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -57,11 +58,8 @@ export class SearchSamples implements SearchSamplesUseCase {
             options = await this.applySampleTypeFilter(options);
             options = await this.applyVisualQCStatusFilter(options);
         }
-        if (project_id !== undefined && project_id !== null) {
-            const numericProjectId = typeof project_id === "string" ? parseInt(project_id, 10) : project_id;
-            if (!isNaN(numericProjectId)) {
-                options.filter.push({ field: "project_id", operator: "=", value: numericProjectId });
-            }
+        if (project_id && typeof project_id === "number") {
+            options.filter.push({ field: "project_id", operator: "=", value: project_id });
         }
         return options;
     }

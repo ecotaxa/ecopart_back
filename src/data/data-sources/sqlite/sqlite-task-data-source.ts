@@ -24,7 +24,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         const sql_create = `
         CREATE TABLE IF NOT EXISTS 'task_status' (
             task_status_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_status_label TEXT NOT NULL
+            task_status_label TEXT UNIQUE NOT NULL
         );
         `;
         // Run the SQL query to create the table
@@ -60,7 +60,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         const sql_create = `
         CREATE TABLE IF NOT EXISTS 'task_type' (   
             task_type_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_type_label TEXT NOT NULL
+            task_type_label TEXT UNIQUE NOT NULL
         );
         `;
 
@@ -282,6 +282,10 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                     if (rows === undefined) resolve({ items: [], total: 0 });
                     const result: SearchResult<TaskResponseModel> = {
                         items: rows.map(row => ({
+                            task_id: row.task_id,
+                            task_creation_date: row.task_creation_date,
+                            task_start_date: row.task_start_date,
+                            task_end_date: row.task_end_date,
                             task_type_id: row.task_type_id,
                             task_type: row.task_type_label,
                             task_status_id: row.task_status_id,
@@ -298,10 +302,6 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_question: row.task_question,
                             task_reply: row.task_reply,
                             task_step: row.task_step,
-                            task_id: row.task_id,
-                            task_creation_date: row.task_creation_date,
-                            task_start_date: row.task_start_date,
-                            task_end_date: row.task_end_date,
                         })),
                         total: rows[0]?.total_count || 0
                     };
@@ -349,6 +349,10 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                     }
                     else {
                         const result = {
+                            task_id: row.task_id,
+                            task_creation_date: row.task_creation_date,
+                            task_start_date: row.task_start_date,
+                            task_end_date: row.task_end_date,
                             task_type_id: row.task_type_id,
                             task_type: row.task_type_label,
                             task_status_id: row.task_status_id,
@@ -365,10 +369,6 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_question: row.task_question,
                             task_reply: row.task_reply,
                             task_step: row.task_step,
-                            task_id: row.task_id,
-                            task_creation_date: row.task_creation_date,
-                            task_start_date: row.task_start_date,
-                            task_end_date: row.task_end_date,
                         };
                         resolve(result);
                     }

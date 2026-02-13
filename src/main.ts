@@ -30,15 +30,22 @@ import { UpdateProject } from './domain/use-cases/project/update-project'
 import { SearchProject } from './domain/use-cases/project/search-projects'
 import { GetOneInstrumentModel } from './domain/use-cases/instrument_model/get-one-instrument_model'
 import { SearchInstrumentModels } from './domain/use-cases/instrument_model/search-instrument_model'
-import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
-import { ImportSamples } from './domain/use-cases/sample/import-samples'
 import { DeleteTask } from './domain/use-cases/task/delete-task'
 import { SearchTask } from './domain/use-cases/task/search-tasks'
 import { GetOneTask } from './domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
+
+import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
+import { ImportSamples } from './domain/use-cases/sample/import-samples'
 import { DeleteSample } from './domain/use-cases/sample/delete-sample'
 import { SearchSamples } from './domain/use-cases/sample/search-samples'
+
+import { ListImportableEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
+import { ImportEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/import-ecotaxa-samples'
+import { DeleteEcoTaxaSample } from './domain/use-cases/ecotaxa_sample/delete-ecotaxa-sample'
+import { SearchEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/search-ecotaxa-samples'
+
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
 
@@ -172,7 +179,7 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
 
     const userMiddleWare =
         UserRouter(
@@ -216,6 +223,10 @@ async function getSQLiteDS() {
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo),
         new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new ListImportableEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
+        new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
+        new DeleteEcoTaxaSample(user_repo, sample_repo, privilege_repo),
+        new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
     )
 
     const taskMiddleWare = TaskRouter(

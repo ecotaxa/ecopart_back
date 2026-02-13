@@ -11,4 +11,9 @@ dist
 coverage
 
 .env
+prod.env
 .DS_Store
+
+*/FTP/*
+data_storage/*
+.vscode/launch.json

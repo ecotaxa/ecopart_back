@@ -81,12 +81,19 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(project)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + `project.${key} = (?) AND `
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
         // form final sql
-        const sql = `SELECT project.* , instrument_model.instrument_model_name FROM project LEFT JOIN instrument_model ON project.instrument_model = instrument_model.instrument_model_id WHERE ` + placeholders + `LIMIT 1;`;
+        const sql = `
+        SELECT project.*, instrument_model.instrument_model_name
+        FROM project
+        LEFT JOIN instrument_model
+            ON project.instrument_model = instrument_model.instrument_model_id
+        WHERE ${placeholders}
+        LIMIT 1;
+        `;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {

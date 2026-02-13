@@ -1,11 +1,18 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
+import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { UserUpdateModel } from "../entities/user";
+
+import path from 'path';
+import fetch, { FormData, fileFromSync, RequestInfo, RequestInit } from "node-fetch";
+import https from "https";
+
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
+import { Agent } from "http";
 
 export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     ecotaxa_accountDataSource: EcotaxaAccountDataSource
@@ -15,6 +22,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
 
     generic_ecotaxa_account_email: string
+    insecureHttpsAgent: Agent | undefined
 
     // TODO Define the mapping between EcoTaxa and EcoPart instruments in a .env or conf file 
     // ecopart ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']
@@ -31,10 +39,22 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         "UVP5Z": "UVP5SD-2024-01",
         "UVP6": "uvp6_beta_2022-01-26"
     };
+    JSON_HEADERS(token: string) {
+        return {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        };
+    }
 
-    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string) {
+    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string) {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
+        this.insecureHttpsAgent =
+            NODE_ENV === "DEV"
+                ? new https.Agent({ rejectUnauthorized: false })
+                : undefined;
+
     }
 
     async getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel> {
@@ -64,7 +84,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             password: ecotaxa_account_to_create.ecotaxa_user_password
         };
 
-        const response = await fetch(base_url + "api/login", {
+        const response = await this.fetchWithAgent(base_url + "api/login", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -95,12 +115,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
     }
     async api_ecotaxa_me(base_url: string, token: string): Promise<EcotaxaAccountUser> {
-        const response = await fetch(base_url + "api/users/me", {
+        const response = await this.fetchWithAgent(base_url + "api/users/me", {
             method: "GET",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            }
+            headers: this.JSON_HEADERS(token),
         });
 
         if (!response.ok) {
@@ -124,15 +141,10 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return data as EcotaxaAccountUser;
     }
     async api_create_ecotaxa_project(base_url: string, token: string, ecotaxa_project: any): Promise<number> {
-        const response = await fetch(base_url + "api/projects/create", {
+        const response = await this.fetchWithAgent(base_url + "api/projects/create", {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
+            headers: this.JSON_HEADERS(token),
             body: JSON.stringify(ecotaxa_project),
-            mode: "cors"
         });
 
         if (!response.ok) {
@@ -156,12 +168,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return data as number;
     }
     async api_get_ecotaxa_project(base_url: string, token: string, ecopart_project_id: number): Promise<any> {
-        const response = await fetch(base_url + "api/projects/" + ecopart_project_id, {
+        const response = await this.fetchWithAgent(base_url + "api/projects/" + ecopart_project_id, {
             method: "GET",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            }
+            headers: this.JSON_HEADERS(token),
         });
 
         if (!response.ok) {
@@ -185,17 +194,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return data;
     }
 
-    async api_update_ecotaxa_project(base_url: string, token: string, ecotaxa_project: any): Promise<null> {
+    async api_update_ecotaxa_project(base_url: string, token: string, ecotaxa_project: any): Promise<void> {
         // returns null uppon success
-        const response = await fetch(base_url + "api/projects/" + ecotaxa_project.projid, {
+        const response = await this.fetchWithAgent(base_url + "api/projects/" + ecotaxa_project.projid, {
             method: "PUT",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
+            headers: this.JSON_HEADERS(token),
             body: JSON.stringify(ecotaxa_project),
-            mode: "cors"
+            //mode: "cors"
         });
 
         if (!response.ok) {
@@ -214,10 +219,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
             throw new Error(`Cannot update EcoTaxa project, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${errorDetails}`);
         }
-
-        const data = await response.json();
-        return data;
     }
+
     async createEcotaxaProject(ecopart_project: PublicProjectRequestCreationModel): Promise<number> {
         const ecotaxa_account_id = ecopart_project.ecotaxa_account_id as number
         const ecotaxa_instance_id = ecopart_project.ecotaxa_instance_id as number
@@ -235,12 +238,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         }
 
         // create ecotaxa project with same title as ecopart project and mapped instrument
+        const parentInstrument = Object.keys(this.instrument_mapping).find((key) =>
+            this.instrument_mapping[key].includes(ecopart_project.instrument_model)
+        );
         const ecotaxa_minimal_project = {
             title: ecopart_project.project_title,
-            instrument: this.instrument_mapping[ecopart_project.instrument_model as string][0],
+            instrument: parentInstrument,
         };
         const created_ecotaxa_project_id = await this.api_create_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_minimal_project)
-
         // get ecotaxa project
         const ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, created_ecotaxa_project_id)
         if (!ecotaxa_project) {
@@ -307,7 +312,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const generic_ecotaxa_account = {
             name: result.ecotaxa_account_user_name,
             email: result.ecotaxa_account_user_email,
-            id: result.ecotaxa_account_ecotaxa_id
+            id: result.ecotaxa_account_ecotaxa_id,
+            organisation: ""
         };
 
         const exists = ecotaxa_project.managers.some((manager: { id: number; }) => manager.id === generic_ecotaxa_account.id);
@@ -552,5 +558,246 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const ecotaxa_project_withour_generic_ecotaxa_user = await this.removeEcotaxaGenericAccountFromProject(ecotaxa_instance, ecotaxa_project)
 
         await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_withour_generic_ecotaxa_user)
+    }
+
+    // ---- Helper: safe fetch with better errors ---------------------------------
+    async http<T = any>(input: RequestInfo, init?: RequestInit): Promise<T> {
+        const res = await this.fetchWithAgent(input, init);
+        const text = await res.text(); // read once
+
+        if (!res.ok) {
+            // throw a helpful error (include status & body)
+            throw new Error(
+                `HTTP ${res.status} ${res.statusText} for ${typeof input === "string" ? input : (input as any).url}\n${text}`
+            );
+        }
+        try {
+            return text ? (JSON.parse(text) as T) : (undefined as unknown as T);
+        } catch {
+            // not JSON — return as any
+            return text as any;
+        }
+    }
+    private fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
+        return fetch(input, {
+            ...init,
+            agent: this.insecureHttpsAgent,
+        });
+    }
+
+
+    // ---- Create (or get) folder in user files ----------------------------------
+    /**
+     * Ensures folder "from_EcoPart/<projectId>" exists under the EcoTaxa user files space.
+     * Returns the **absolute server path** to the folder (required by upload & import).
+     */
+    async ensureUserFilesFolder(
+        baseUrl: string,
+        token: string,
+        importFolderPrefix: string,
+        projectId: number
+    ): Promise<string> {
+        const targetFolder = `${importFolderPrefix}/${projectId}/`;
+
+        // Create the folder via form-urlencoded POST request
+        const response = await this.fetchWithAgent(`${baseUrl}api/user_files/create/`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: `source_path=${encodeURIComponent(targetFolder)}`,
+        });
+        if (response.status === 422) {
+            return targetFolder;
+        }
+        if (!response.ok) {
+            let errorDetails;
+            try {
+                errorDetails = await response.text();
+            } catch {
+                errorDetails = "Unknown error";
+            }
+            throw new Error(`Failed to create folder ${targetFolder}: HTTP ${response.status} - ${errorDetails}`);
+        }
+
+        return targetFolder;
+    }
+
+    // ---- Upload local files into the user files folder -------------------------
+    /**
+     * Uploads files via POST /api/user_files/ (multipart/form-data)
+     * API expects field: "file" (binary) and "path" (full path including filename)
+     * Returns the server_path for each uploaded file
+     */
+    async uploadFilesToUserFolder(baseUrl: string, token: string, destFolderAbsPath: string, localPaths: string[]): Promise<string[]> {
+        const serverPaths: string[] = [];
+
+        for (const localPath of localPaths) {
+            // Extract filename from local path
+            const fileName = localPath.split(path.sep).pop() as string;
+            // Build full destination path including filename (API requires path to end with filename)
+            const fullDestPath = `${destFolderAbsPath}${fileName}`;
+
+            const formData = new FormData();
+
+            const file = fileFromSync(localPath, "application/zip");
+            formData.append("path", fullDestPath);
+            formData.append("file", file);
+
+            const response = await this.fetchWithAgent(`${baseUrl}api/user_files/`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                let errorDetails;
+                try {
+                    errorDetails = await response.text();
+                } catch {
+                    errorDetails = "Unknown error";
+                }
+                throw new Error(`Upload failed for ${localPath}: HTTP ${response.status} - ${errorDetails}`);
+            }
+
+            const serverPath = await response.json() as string;
+            serverPaths.push(serverPath);
+        }
+
+        return serverPaths;
+    }
+
+
+    // ---- Trigger import from the uploaded folder -------------------------------
+    /**
+     * Kicks off an import job for the given project using the user-files folder.
+     * Different EcoTaxa versions expose different endpoints. We try two common ones:
+     *  1) POST /api/imports/from_userfiles
+     *  2) POST /api/imports/from_folder
+     * Replace with your canonical endpoint if known.
+     */
+    async startImportFromFolder(
+        baseUrl: string,
+        token: string,
+        projectId: number,
+        folderAbsPath: string
+    ): Promise<{ job_id: number | string }> {
+        // API file_import/{projectId}/
+        // payload: {
+        //   "source_path": "/import_test.zip",
+        //   "taxo_mappings": {
+        //     "23444": 76543
+        //   },
+        //   "skip_loaded_files": false,
+        //   "skip_existing_objects": false,
+        //   "update_mode": "Yes"
+        // }
+        const response = await this.http(`${baseUrl}api/file_import/${projectId}`, {
+            method: "POST",
+            headers: this.JSON_HEADERS(token),
+            body: JSON.stringify({
+                source_path: folderAbsPath, // TODO should be a .zip
+                skip_loaded_files: false,
+                skip_existing_objects: false
+            })
+        }).catch(async (e) => {
+            throw new Error(`Failed to start import from folder. EcoTaxa HTTP Error: ${e.message}`);
+        });
+        return { job_id: response.job_id };
+    }
+
+    // ---- Poll a background job until completion --------------------------------
+    async pollJobUntilDone(
+        baseUrl: string,
+        token: string,
+        jobId: number | string,
+        opts: { intervalMs?: number; maxMinutes?: number } = {}
+    ): Promise<any> {
+        const intervalMs = opts.intervalMs ?? 2000;
+        const maxMinutes = opts.maxMinutes ?? 20;
+        const deadline = Date.now() + maxMinutes * 60_000;
+
+        while (Date.now() < deadline) {
+            // Common pattern: GET /api/jobs/{jobId}/
+            try {
+                const status1 = await this.http(`${baseUrl}api/jobs/${jobId}/`, {
+                    method: "GET",
+                    headers: this.JSON_HEADERS(token),
+                });
+                //Finished
+                if (status1?.state === "F") return status1;
+                //Error
+                if (status1?.state === "E") {
+                    throw new Error(`Import job failed: ${JSON.stringify(status1)}`);
+                }
+            } catch (e) {
+                throw new Error(`Failed to poll job status for job ${jobId}: ${e.message}`);
+            }
+            await new Promise((r) => setTimeout(r, intervalMs));
+        }
+        throw new Error(`Timeout waiting for import job ${jobId} to finish.`);
+    }
+
+    // ---- Main API ---------------------------------------------------------------
+    async importEcoTaxaSamplesInEcoTaxa(
+        ecotaxa_user: EcotaxaAccountRequestModel,
+        samples_to_import: PublicImportableEcoTaxaSampleResponseModel[],
+        project: ProjectResponseModel
+    ): Promise<string[]> {
+        const ecotaxa_instance_id = project.ecotaxa_instance_id as number;
+        const ecotaxa_project_id = project.ecotaxa_project_id as number;
+        const import_folder_prefix = "from_EcoPart"; // parent folder in user files
+
+        if (!ecotaxa_project_id) throw new Error("No linked EcoTaxa project");
+
+        // 1) Resolve account & instance
+        const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
+        if (!ecotaxa_instance) throw new Error("Ecotaxa instance not found");
+
+        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_user.ecotaxa_account_id);
+        if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
+
+        // 2) Get EcoTaxa project & check rights
+        let ecotaxa_project: EcoTaxaProject;
+        try {
+            ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_id);
+        } catch (error: any) {
+            if (String(error?.message ?? error).includes("404")) {
+                throw new Error("EcoTaxa project not found, cannot import samples");
+            }
+            throw error;
+        }
+        if (ecotaxa_project.highest_right !== "Manage") {
+            throw new Error("Given EcoTaxa account is not manager in the EcoTaxa project and cannot import samples");
+        }
+
+        // 3) Ensure user-files folder exists: from_EcoPart/<project_id>
+        const destFolderAbsPath = await this.ensureUserFilesFolder(
+            ecotaxa_instance.ecotaxa_instance_url,
+            ecotaxa_account.ecotaxa_account_token,
+            import_folder_prefix,
+            project.project_id
+        );
+        // 4) Upload files for all samples
+        const localPaths = samples_to_import.map((s) => s.local_folder_tsv_path);
+        await this.uploadFilesToUserFolder(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, destFolderAbsPath, localPaths);
+        // 5) Start import from that folder
+        const { job_id } = await this.startImportFromFolder(
+            ecotaxa_instance.ecotaxa_instance_url,
+            ecotaxa_account.ecotaxa_account_token,
+            ecotaxa_project_id,
+            destFolderAbsPath
+        );
+
+        // 6) Poll until done
+        await this.pollJobUntilDone(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, job_id, { intervalMs: 2500, maxMinutes: 30 }); //TODO make maxMinutes configurable?
+
+        // Return uploaded filenames as a convenience
+        const imported_sample_names = samples_to_import.map((s) => s.local_folder_tsv_path.split(path.sep).pop() as string);
+        return imported_sample_names;
     }
 }

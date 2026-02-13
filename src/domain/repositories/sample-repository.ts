@@ -6,7 +6,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
@@ -37,10 +37,16 @@ export class SampleRepositoryImpl implements SampleRepository {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
+    // Format a sample to import from fs storage 
     async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
-
-        const file_system_storage_project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, (base_sample.project_id || "") as string);
-
+        const projectIdSegment = base_sample?.project_id != null
+            ? String(base_sample.project_id)
+            : "";
+        const file_system_storage_project_folder = path.join(
+            this.base_folder,
+            this.DATA_STORAGE_FS_STORAGE,
+            projectIdSegment
+        );
         // foreach sample in samples_names_to_import
         const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
         return sample_to_return;
@@ -78,9 +84,14 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
     // Method to parse and return ComputeVignettes data
     async readComputeVignettes(file_system_storage_project_folder: string, sample_name: string): Promise<ComputeVignettesModel> {
-        const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Images.zip`);
-        const fileContent = await this.readFileFromZip(zipPath, 'compute_vignette.txt', undefined);
-        return this.parseComputeVignettes(fileContent);
+        try {
+            const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Images.zip`);
+            const fileContent = await this.readFileFromZip(zipPath, 'compute_vignette.txt', undefined);
+            return this.parseComputeVignettes(fileContent);
+        } catch (error) {
+            throw new Error(`Error reading compute_vignette.txt for sample ${sample_name}: ${error}`);
+        }
+
     }
 
     // Method to parse and return pressures from particules.csv
@@ -152,42 +163,42 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async getSampleFromInstallConfig(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromInstallConfigModel> {
         const filePath = 'config/process_install_config.txt';
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
         const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
         return this.parseInstallConfig(fileContent);
     }
     async getSampleFromConfigurationData(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromConfigurationDataModel> {
         const filePath = 'config/uvp5_settings/uvp5_configuration_data.txt';
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
         const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
         return this.parseConfigurationData(fileContent);
     }
     async getSampleFromCruiseInfo(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromCruiseInfoModel> {
         const filePath = 'config/cruise_info.txt';
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
         const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
         return this.parseCruiseInfo(fileContent);
     }
     async getSampleFromWorkHDR(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkHDRModel> {
         // Construct the file path to match files starting with "HDR" and ending with ".txt"
-        const filePathPattern = new RegExp(`^work/${sample_name}/HDR.*\\.txt$`);
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const filePathPattern = new RegExp(`^HDR.*\\.txt$`);
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_work.zip");
         const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
         return this.parseWorkHDR(fileContent);
     }
     async getSampleFromWorkDatfile(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkDatfileModel> {
-        const filePath = 'work/' + sample_name + '/' + sample_name + '_datfile.txt'; // perle3_003_datfile.txt
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const filePath = sample_name + '_datfile.txt'; // perle3_003_datfile.txt
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_work.zip");
         const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
         return this.parseWorkDatfile(fileContent);
     }
     async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
         const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
-        const zipPath = path.join(file_system_storage_project_folder, `${sample_name}.zip`);
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
         const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
         const fileName = await this.getFileNameFromZip(zipPath, filePathPattern);
 
-        return this.parseMetaHeader(fileContent, fileName);
+        return this.parseMetaHeader(fileContent, fileName, sample_name);
     }
 
     async getFileNameFromZip(zipPath: string, filePathPattern: RegExp): Promise<string> {
@@ -213,7 +224,6 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async getSampleFromFsStorageUVP6(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
-
         /***
          *  
             fetch data from metadata.ini:
@@ -233,16 +243,13 @@ export class SampleRepositoryImpl implements SampleRepository {
         // Complete/reprocess the sample object
         // Get sample info from metadata.ini
         const sample_metadata_ini = await this.getSampleFromMetadataIni(file_system_storage_project_folder, sample_name);
-        // Process sample_type_id
         const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini.sampleType);
         // Process latitude and longitude
         const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw);
-
         // Compute max_pressure
         const max_pressure = await this.computeMaxPressure(file_system_storage_project_folder, sample_name);
         // Get instrument_settings_process_gamma
         const instrument_settings_process_gamma = await this.getInstrumentSettingsProcessGamma(sample_metadata_ini, file_system_storage_project_folder, sample_name);
-
 
         // Construct the sample object
         delete (sample_metadata_ini as any).sampleType;
@@ -251,6 +258,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         const sample_to_return: Partial<SampleRequestCreationModel> = {
             ...sample_metadata_ini,
+            sample_name: sample_name,
             sample_type_id,
             latitude: coords.latitude,
             longitude: coords.longitude,
@@ -273,7 +281,6 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseComputeVignettes(data: string): ComputeVignettesModel {
         const result: Partial<ComputeVignettesModel> = {};
         const lines = data.split('\n');
-
         for (const line of lines) {
             const [key, value] = line.split('=').map(part => part.trim());
 
@@ -319,7 +326,6 @@ export class SampleRepositoryImpl implements SampleRepository {
         const pressures = await this.getPressuresFromParticulesCsv(file_system_storage_project_folder, sample_name);
         // Compute the max pressure
         const max_pressure = this.getMaxPressure(pressures);
-
         return max_pressure;
     }
 
@@ -343,20 +349,30 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     extractPressures(input: string): (number | "NaN")[] {
-        // Split the input by lines
         const lines = input.split("\n");
         const pressures: (number | "NaN")[] = [];
 
         lines.forEach((line) => {
-            // Match lines that start with a timestamp and have a pressure value
-            const match = line.match(/^\d{8}-\d{6},([0-9.]+|NaN),/);
-            if (match) {
-                const pressure = match[1];
-                // Convert to number or retain "NaN" as string
-                pressures.push(pressure === "NaN" ? "NaN" : parseFloat(pressure));
-            }
-        });
 
+            // 1) Check if the line starts with YYYYMMDD
+            if (!/^\d{8}/.test(line)) return;
+
+            // 2) Split col by comma
+            const parts = line.split(",");
+
+            // We need at least 2 columns: timestamp + pressure
+            if (parts.length < 2) return;
+            const rawPressure = parts[1]; // pressure column
+
+            // 3) Validate: must be a number or "NaN"
+            if (rawPressure !== "NaN" && isNaN(parseFloat(rawPressure))) return;
+
+            // 4) Convert to number or keep "NaN"
+            const pressure =
+                rawPressure === "NaN" ? "NaN" : parseFloat(rawPressure);
+
+            pressures.push(pressure);
+        });
         return pressures;
     }
 
@@ -414,7 +430,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         // Compute sample_type_id
         if (sampleType == "T" || sampleType == "H") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Time" }))?.sample_type_id;
-        } else if (sampleType == "D" || sampleType == "N" || sampleType == "Y") {
+        } else if (sampleType == "D" || sampleType == "N" || sampleType == "Y" || sampleType == "P") {
             sample_type_id = (await this.getSampleType({ sample_type_label: "Depth" }))?.sample_type_id;
         } else throw new Error("Unknown sample type : " + sampleType);
 
@@ -552,57 +568,67 @@ export class SampleRepositoryImpl implements SampleRepository {
         return sample;
     }
 
+    parseMetaHeader(
+        data: string,
+        fileName: string,
+        sample_name: string
+    ): SampleFromMetaHeaderModel {
 
+        // Extract instrument serial number from filename
+        const instrumentSerialMatch = fileName.match(/sn(\d+)/i);
+        if (!instrumentSerialMatch) {
+            throw new Error('Instrument serial number not found in meta header filename');
+        }
+        const instrumentSerialNumber = instrumentSerialMatch[1];
 
-    parseMetaHeader(data: string, fileName: string): SampleFromMetaHeaderModel {
-        // Compute instrument serial number from the file name
-        const instrumentSerialMatch = fileName.match(/sn(\d+)/i); // Example: matches "sn205" in "uvp5_header_sn205_perle_03_2020.txt"
-        if (!instrumentSerialMatch) throw new Error('Instrument serial number not found');
-        const instrumentSerialNumber = instrumentSerialMatch[1]
-
-        // Prepare the object to store the parsed data
-        const meta_header_content: any = {};
-
-        // Split the input data by lines
+        // Split file into non-empty lines
         const lines = data.split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            throw new Error('Meta header file contains no data rows');
+        }
 
-        // Extract the headers (first line)
-        const headers = lines[0].split(';');
+        // Parse headers
+        const headers = lines[0].split(';').map(h => h.trim());
 
-        // Parse the remaining lines into objects
+        // Parse rows
         const rows = lines.slice(1).map(line => {
             const values = line.split(';');
-            const rowObject: any = {};
+            const row: any = {};
             headers.forEach((header, index) => {
-                rowObject[header.trim()] = values[index] ? values[index].trim() : null;
+                row[header] = values[index]?.trim() ?? null;
             });
-            return rowObject;
+            return row;
         });
 
-        // Assign the first row (or any specific row) to `meta_header_content`
-        meta_header_content.sample_metadata = rows[0]; // Assuming we want the first row's data
+        // Select the correct row for this sample
+        const row = rows.find(r => r.profileid === sample_name);
+        if (!row) {
+            throw new Error(`No meta header entry found for sample ${sample_name}`);
+        }
 
+        // Build the sample object
         const sample: SampleFromMetaHeaderModel = {
-            sample_name: meta_header_content.sample_metadata['profileid'],
-            comment: meta_header_content.sample_metadata['comment'],
-            instrument_serial_number: instrumentSerialNumber,//TODO : is the sn205 in uvp5_header_sn205_perle_03_2020.txt
-            station_id: meta_header_content.sample_metadata['stationid'],
-            sampling_date: meta_header_content.sample_metadata['filename'],
-            latitude_raw: meta_header_content.sample_metadata['latitude'],
-            longitude_raw: meta_header_content.sample_metadata['longitude'],
-            wind_direction: meta_header_content.sample_metadata['winddir'],
-            wind_speed: parseFloat(meta_header_content.sample_metadata['windspeed']),
-            sea_state: meta_header_content.sample_metadata['seastate'],
-            nebulousness: parseFloat(meta_header_content.sample_metadata['nebuloussness']),
-            bottom_depth: parseFloat(meta_header_content.sample_metadata['bottomdepth']),
-            filename: meta_header_content.sample_metadata['filename'],
-            filter_first_image: meta_header_content.sample_metadata['firstimage'],
-            filter_last_image: meta_header_content.sample_metadata['endimg'],
-            sampleType: meta_header_content.sample_metadata['yoyo'],
-            instrument_settings_aa: parseFloat(meta_header_content.sample_metadata['aa']),
-            instrument_settings_exp: parseFloat(meta_header_content.sample_metadata['exp']),
-            instrument_settings_image_volume_l: parseFloat(meta_header_content.sample_metadata['volimage']),
+            sample_name: row.profileid,
+            comment: row.comment,
+            instrument_serial_number: instrumentSerialNumber,
+            station_id: row.stationid,
+            sampling_date: row.filename,
+            latitude_raw: row.latitude,
+            longitude_raw: row.longitude,
+            wind_direction: row.winddir,
+            wind_speed: parseFloat(row.windspeed),
+            sea_state: row.seastate,
+            nebulousness: parseFloat(row.nebuloussness),
+            bottom_depth: parseFloat(row.bottomdepth),
+            filename: row.filename,
+            filter_first_image: row.firstimage,
+            filter_last_image: row.endimg,
+            sampleType: row.yoyo,
+            instrument_settings_aa: parseFloat(row.aa),
+            instrument_settings_exp: parseFloat(row.exp),
+            instrument_settings_image_volume_l: parseFloat(row.volimage),
         };
+
         return sample;
     }
 
@@ -847,7 +873,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             integrationTime: parseFloat(fields[22]),
             argoId: fields[23],
             pixelSize: parseFloat(fields[24]),
-            sampleDateTime: fields[25]
+            sampleDateTime: fields[25],
+            constantdepth: parseFloat(fields[26])
         };
         return sample;
     }
@@ -918,11 +945,11 @@ export class SampleRepositoryImpl implements SampleRepository {
 
             // Copy specific files and directories
             const filesToCopy = [
-                { source: 'work/' + sample, dest: 'work/' + sample },
-                { source: 'meta', dest: 'meta' },
-                { source: 'config/cruise_info.txt', dest: 'config/cruise_info.txt' },
-                { source: 'config/uvp5_settings/uvp5_configuration_data.txt', dest: 'config/uvp5_settings/uvp5_configuration_data.txt' },
-                { source: 'config/process_install_config.txt', dest: 'config/process_install_config.txt' },
+                { source: 'work/' + sample, dest: `${sample}_work/` },
+                { source: 'meta', dest: `${sample}_meta_conf/meta` },
+                { source: 'config/cruise_info.txt', dest: `${sample}_meta_conf/config/cruise_info.txt` },
+                { source: 'config/uvp5_settings/uvp5_configuration_data.txt', dest: `${sample}_meta_conf/config/uvp5_settings/uvp5_configuration_data.txt` },
+                { source: 'config/process_install_config.txt', dest: `${sample}_meta_conf/config/process_install_config.txt` },
             ];
 
             for (const file of filesToCopy) {
@@ -941,12 +968,16 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
 
             // Zip the sample folder
-            const zipFilePath = path.join(this.base_folder, dest_folder, `${sample}.zip`);
+            const workZipFilePath = path.join(this.base_folder, dest_folder, `${sample}`, `${sample}_work.zip`);
+            const workFolderPath = path.join(destPath, `${sample}_work`);
+            const metaConfZipFilePath = path.join(this.base_folder, dest_folder, `${sample}`, `${sample}_meta_conf.zip`);
+            const metaConfFolderPath = path.join(destPath, `${sample}_meta_conf`);
             try {
-                await this.zipFolder(destPath, zipFilePath);
-
+                await this.zipFolder(workFolderPath, workZipFilePath);
+                await this.zipFolder(metaConfFolderPath, metaConfZipFilePath);
                 // Remove the unzipped folder after zipping
-                await fsPromises.rm(destPath, { recursive: true, force: true });
+                await fsPromises.rm(workFolderPath, { recursive: true, force: true });
+                await fsPromises.rm(metaConfFolderPath, { recursive: true, force: true });
             } catch (error) {
                 throw new Error(`Error zipping folder for sample ${sample}: ${error.message}`);
             }
@@ -982,9 +1013,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             // Check if the sample directory exists and list files
             const files = await fsPromises.readdir(sourcePath);
 
-            // Filter and copy only .zip files
+            // Filter and copy only .zip files with _Particule or _Images in the name
             for (const file of files) {
-                if (path.extname(file) === '.zip') {
+                if (path.extname(file) === '.zip' && (file.includes('_Particule') || file.includes('_Images'))) {
                     const sourceFilePath = path.join(sourcePath, file);
                     const destFilePath = path.join(destPath, file);
 
@@ -1039,42 +1070,51 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    // private async updateSample(sample: SampleUpdateModel, params: string[]): Promise<number> {
-    //     const filteredSample: Partial<SampleUpdateModel> = {};
-    //     const unauthorizedParams: string[] = [];
+    async standardUpdateSample(sample: SampleUpdateModel): Promise<number> {
+        const params_restricted: string[] = [
+            "sample_id",
+            "ecotaxa_sample_imported",
+            "ecotaxa_import_status_id",
+            "ecotaxa_sample_import_date",
+            "ecotaxa_sample_id",
+            "ecotaxa_sample_tsv_file_name",
+            "ecotaxa_sample_local_folder_tsv_path",
+            "ecotaxa_sample_nb_images",
+            "ecotaxa_sample_task_id"
+        ];
+        const updated_sample_nb = await this.updateSample(sample, params_restricted)
+        return updated_sample_nb
+    }
+    private async updateSample(sample: SampleUpdateModel, params: string[]): Promise<number> {
+        const filteredSample: Partial<SampleUpdateModel> = {};
+        const unauthorizedParams: string[] = [];
 
-    //     // Filter the sample object based on authorized parameters
-    //     Object.keys(sample).forEach(key => {
-    //         if (key === 'sample_id') {
-    //             filteredSample[key] = sample[key];
-    //         } else if (params.includes(key)) {
-    //             filteredSample[key] = sample[key];
-    //         } else {
-    //             unauthorizedParams.push(key);
-    //         }
-    //     });
+        // Filter the sample object based on authorized parameters
+        Object.keys(sample).forEach(key => {
+            if (key === 'sample_id') {
+                filteredSample[key] = sample[key];
+            } else if (params.includes(key)) {
+                filteredSample[key] = sample[key];
+            } else {
+                unauthorizedParams.push(key);
+            }
+        });
 
-    //     // If unauthorized params are found, throw an error
-    //     if (unauthorizedParams.length > 0) {
-    //         throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
-    //     }
-    //     // If there are valid parameters, update the sample
-    //     if (Object.keys(filteredSample).length <= 1) {
-    //         throw new Error('Please provide at least one valid parameter to update');
-    //     }
-    //     const updatedSampleCount = await this.sampleDataSource.updateOne(filteredSample as SampleUpdateModel);
-    //     return updatedSampleCount;
-    // }
-
-    // async standardUpdateSample(sample: SampleUpdateModel): Promise<number> {
-    //     const params_restricted = ["sample_id", "root_folder_path", "sample_title", "sample_acronym", "sample_description", "sample_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number"]
-    //     const updated_sample_nb = await this.updateSample(sample, params_restricted)
-    //     return updated_sample_nb
-    // }
+        // If unauthorized params are found, throw an error
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+        // If there are valid parameters, update the sample
+        if (Object.keys(filteredSample).length <= 1) {
+            throw new Error('Please provide at least one valid parameter to update');
+        }
+        const updatedSampleCount = await this.sampleDataSource.updateOne(filteredSample as SampleUpdateModel);
+        return updatedSampleCount;
+    }
 
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
+        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported"]
 
         // Can be sort_by 
         const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
@@ -1148,5 +1188,169 @@ export class SampleRepositoryImpl implements SampleRepository {
         // Get the result from the data source
         const result = await this.sampleDataSource.getVisualQCStatus(cleaned_visual_qc_status);
         return result;
+    }
+
+
+    /* Ecotaxa Samples */
+
+    async listImportableEcoTaxaSamples(instrument_model: string, dest_folder: string, project_id: number): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
+        let db_fs_importable_filtered_samples: PublicImportableEcoTaxaSampleResponseModel[] = [];
+        const folderPath = dest_folder;
+        // 2 - get particules samples already imported in ecopart and not to ecotaxa to allow only to import ecotaxa samples linked to already imported particules samples
+        const options: PreparedSearchOptions = {
+            filter: [
+                { field: 'project_id', operator: '=', value: project_id },
+                { field: 'ecotaxa_sample_imported', operator: '=', value: 0 }
+            ],
+            sort_by: [
+
+            ],
+            page: 1,
+            limit: 10000000
+        }
+        const db_importable_samples_ecotaxa_name = (await this.sampleDataSource.getAll(options)).items.map(ecotaxa_sample => { return { sample_name: ecotaxa_sample.sample_name, sample_id: ecotaxa_sample.sample_id } }) as SampleRequestModel[];
+
+        // list ecotaxa samples that exist in source folder and Filter from list of samples that are not already imported into ecotaxa the ones have no images or no tsv file
+        if (instrument_model.startsWith('UVP6')) {
+            // filter and Read from folderPath/ecodata and return the list of ecotaxa samples
+            db_fs_importable_filtered_samples = await this.getEcoTaxaSamplesFromUVP6Format(folderPath, db_importable_samples_ecotaxa_name);
+        } else if (instrument_model.startsWith('UVP5')) {
+            // filter and Read from folderPath/ecotaxa and return the list of ecotaxa samples
+            db_fs_importable_filtered_samples = await this.getEcoTaxaSamplesFromUVP5Format(folderPath, db_importable_samples_ecotaxa_name);
+        }
+
+        return db_fs_importable_filtered_samples;
+    }
+    async getEcoTaxaSamplesFromUVP6Format(folderPath: string, db_importable_samples_ecotaxa: SampleRequestModel[]): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
+        const samples_response: PublicImportableEcoTaxaSampleResponseModel[] = [];
+
+        // List ecotaxa samples names from folder name
+        const samples: string[] = await fsPromises.readdir(path.join(folderPath));
+        // retrieve the .tsv file and number of images for each sample
+        for (const sample of samples) {
+            // retrieve the ecotaxa sample metadata
+            // ecotaxa_lohafex_ps73_102.tsv
+            const tsv_file_name = "ecotaxa_" + sample + ".tsv";
+            // verify that tsv exists and read number of images img_file_name
+            const zipPath = path.join(folderPath, sample, `${sample}_Images.zip`);
+            try {
+                const fileContent = await this.readFileFromZip(zipPath, tsv_file_name, undefined);
+                const images = this.extractNumberOfImages(fileContent);
+                const db_sample_id = db_importable_samples_ecotaxa.find(s => s.sample_name === sample)?.sample_id as number;
+                if (db_sample_id === undefined) {
+                    console.warn(`Warning: Sample ${sample} not found in database. Skipping this sample.`);
+                    continue;
+                }
+                samples_response.push({
+                    sample_id: db_sample_id,
+                    sample_name: sample,
+                    tsv_file_name: tsv_file_name,
+                    local_folder_tsv_path: zipPath,
+                    images: images,
+                });
+            } catch (error) {
+                // If the file is not found in the zip, skip this sample
+                if (error.message.includes('not found in the zip archive')) {
+                    console.warn(`Warning: ${tsv_file_name} not found in ${zipPath}. Skipping this sample.`);
+                    continue;
+                } else {
+                    new Error(`Error reading files: ${error.message}`);
+                }
+            }
+        }
+        return samples_response;
+    }
+
+    async getEcoTaxaSamplesFromUVP5Format(folderPath: string, db_importable_samples_ecotaxa: SampleRequestModel[]): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
+        const samples_response: PublicImportableEcoTaxaSampleResponseModel[] = [];
+
+        // List ecotaxa samples names from folder name
+        const samples: string[] = await fsPromises.readdir(path.join(folderPath));
+
+        // retrieve the ecotaxa samples metadata and number of images for each sample
+        for (const sample of samples) {
+            // retrieve the ecotaxa sample metadata
+            // ecotaxa_lohafex_ps73_102.tsv
+            const tsv_file_name = "ecotaxa_" + sample + ".tsv";
+
+
+            // verify that tsv exists and read number of images img_file_name
+            const zip_path = path.join(folderPath, sample, sample + "_work.zip");
+            const local_folder_tsv_path = path.join(folderPath, sample, sample + "_work.zip");//TODO PAS SUR
+            try {
+
+                const tsv_content = await this.readFileFromZip(zip_path, tsv_file_name, undefined);
+                const images = this.extractNumberOfImages(tsv_content);
+                const db_sample_id = db_importable_samples_ecotaxa.find(s => s.sample_name === sample)?.sample_id as number;
+                if (db_sample_id === undefined) {
+                    console.warn(`Warning: Sample ${sample} not found in database. Skipping this sample.`);
+                    continue;
+                }
+                samples_response.push({
+                    sample_id: db_sample_id,
+                    sample_name: sample,
+                    tsv_file_name: tsv_file_name,
+                    local_folder_tsv_path: local_folder_tsv_path,
+                    images: images,
+                });
+            } catch (error) {
+                //if the tsv file does not exist skip this sample
+                if (error.code === 'ENOENT') {
+                    console.warn(`Warning: ${tsv_file_name} not found in ${folderPath}/ecotaxa. Skipping this sample.`);
+                    continue;
+                } else {
+                    new Error(`Error reading files: ${error.message}`);
+                }
+            }
+        }
+
+        return samples_response;
+    }
+
+    extractNumberOfImages(tsvString: string): number {
+        const lines = tsvString.split('\n').map(line => line.trim()).filter(line => line);
+        if (lines.length < 2) return 0;
+
+        const headers = lines[0].split('\t');
+        const imgIndex = headers.indexOf('img_file_name');
+        if (imgIndex === -1) throw new Error("Column 'img_file_name' not found");
+
+        const uniqueImages = new Set();
+        for (let i = 1; i < lines.length; i++) {
+            const columns = lines[i].split('\t');
+            if (columns[imgIndex]) uniqueImages.add(columns[imgIndex]);
+        }
+
+        return uniqueImages.size;
+    }
+
+    // Delete ecotaxa related samples fields from sample in db
+    async deleteEcoTaxaSamples(samples: SampleIdModel[]): Promise<number> {
+        let updated_sample_nb: number = 0
+        for (const sample of samples) {
+            const sample_update: SampleUpdateModel = {
+                sample_id: sample.sample_id,
+                ecotaxa_sample_imported: false,
+                ecotaxa_import_status_id: undefined,
+                ecotaxa_sample_import_date: undefined,
+                ecotaxa_sample_id: undefined,
+                ecotaxa_sample_tsv_file_name: undefined,
+                ecotaxa_sample_local_folder_tsv_path: undefined,
+                ecotaxa_sample_nb_images: undefined,
+                ecotaxa_sample_task_id: undefined
+            }
+            const nb_updated = await this.standardUpdateSample(sample_update);
+            updated_sample_nb += nb_updated;
+        }
+        return updated_sample_nb;
+    }
+
+    async createManyEcoTaxaSamples(samples: SampleUpdateModel[]): Promise<number> {
+        let updated_sample_nb: number = 0
+        for (const sample of samples) {
+            const nb_updated = await this.standardUpdateSample(sample);
+            updated_sample_nb += nb_updated;
+        }
+        return updated_sample_nb;
     }
 }

@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 //SampleRequestModel, SampleUpdateModel, SampleResponseModel 
-import { MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
+import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -16,6 +16,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     init_sample_db(): void {
         this.createSampleTypeTable()
+        this.createEcoTaxaImportStatusTable()
         this.createVisualQualityCheckTable()
         this.createSampleTable()
     }
@@ -25,7 +26,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         const sql_sample_type = `
             CREATE TABLE IF NOT EXISTS sample_type (
                 sample_type_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sample_type_label TEXT NOT NULL,
+                sample_type_label TEXT UNIQUE NOT NULL,
                 sample_type_description TEXT NOT NULL
             );
         `;
@@ -53,13 +54,45 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             }
         });
     }
+    createEcoTaxaImportStatusTable(): void {
+        // SQL statement to create the ecotaxa_import_status table if it does not exist
+        const sql_ecotaxa_import_status = `
+            CREATE TABLE IF NOT EXISTS ecotaxa_import_status (
+                ecotaxa_import_status_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ecotaxa_import_status_label TEXT UNIQUE NOT NULL
+            );
+        `;
+
+        // Run the SQL query to create the table
+        const db_tables = this.db;
+        db_tables.run(sql_ecotaxa_import_status, [], function (err: Error | null) {
+            if (err) {
+                console.log("DB error--", err);
+            } else {
+                // Insert default ecotaxa_import_status entries
+                const sql_admin = `
+                    INSERT OR IGNORE INTO ecotaxa_import_status (ecotaxa_import_status_label) 
+                    VALUES 
+                        ('IN_PROGRESS'),
+                        ('SUCCESS'),
+                        ('ERROR');
+                `;
+
+                db_tables.run(sql_admin, [], function (err: Error | null) {
+                    if (err) {
+                        console.log("DB error--", err);
+                    }
+                });
+            }
+        });
+    }
 
     createVisualQualityCheckTable(): void {
         // SQL statement to create the visual_quality_check_status table if it does not exist
         const sql_sample_visual_quality_check_status = `
             CREATE TABLE IF NOT EXISTS visual_quality_check_status (
                 visual_qc_status_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                visual_qc_status_label TEXT NOT NULL
+                visual_qc_status_label TEXT UNIQUE NOT NULL
             );
         `;
 
@@ -144,11 +177,21 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         visual_qc_status_id INTEGER NOT NULL DEFAULT 1,
         sample_type_id INTEGER NOT NULL,
         project_id INTEGER NOT NULL,
+        ecotaxa_import_status_id INTEGER,
+
+        ecotaxa_sample_imported BOOLEAN NOT NULL DEFAULT 0,
+        ecotaxa_sample_import_date TIMESTAMP,
+        ecotaxa_sample_id INTEGER,
+        ecotaxa_sample_tsv_file_name TEXT,
+        ecotaxa_sample_local_folder_tsv_path TEXT,
+        ecotaxa_sample_nb_images INTEGER,
+        ecotaxa_sample_task_id INTEGER,
 
         FOREIGN KEY (visual_qc_validator_user_id) REFERENCES user(user_id),
         FOREIGN KEY (visual_qc_status_id) REFERENCES visual_quality_check_status(visual_qc_status_id)
         FOREIGN KEY (sample_type_id) REFERENCES sample_type(sample_type_id),
-        FOREIGN KEY (project_id) REFERENCES project(project_id)
+        FOREIGN KEY (project_id) REFERENCES project(project_id),
+        FOREIGN KEY (ecotaxa_import_status_id) REFERENCES ecotaxa_import_status(ecotaxa_import_status_id),
 
         CONSTRAINT Unique_proj_id_sample_name UNIQUE (project_id, sample_name)
     );
@@ -184,7 +227,6 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     async createMany(samples: SampleRequestCreationModel[]): Promise<number[]> {
         return new Promise((resolve, reject) => {
             const insertedIds: number[] = [];
-
             // Begin transaction
             this.db.run('BEGIN TRANSACTION', (beginErr: Error) => {
                 if (beginErr) {
@@ -289,7 +331,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         }
 
         // form final sql
-        const sql = `SELECT sample.*, user.first_name, user.last_name, user.email, sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label FROM sample LEFT JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id LEFT JOIN visual_quality_check_status on sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id LEFT JOIN user on sample.visual_qc_validator_user_id=user.user_id WHERE ` + placeholders + `LIMIT 1;`;
+        const sql = `SELECT sample.*, user.first_name, user.last_name, user.email, sample_type.sample_type_label, ecotaxa_import_status.ecotaxa_import_status_label, visual_quality_check_status.visual_qc_status_label FROM sample LEFT JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id LEFT JOIN visual_quality_check_status on sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id LEFT JOIN user on sample.visual_qc_validator_user_id=user.user_id LEFT JOIN ecotaxa_import_status ON sample.ecotaxa_import_status_id = ecotaxa_import_status.ecotaxa_import_status_id WHERE ` + placeholders + `LIMIT 1;`;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -352,7 +394,16 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             visual_qc_status_label: row.visual_qc_status_label,
                             sample_type_id: row.sample_type_id,
                             sample_type_label: row.sample_type_label,
-                            project_id: row.project_id
+                            project_id: row.project_id,
+                            ecotaxa_sample_imported: row.ecotaxa_sample_imported,
+                            ecotaxa_sample_import_date: row.ecotaxa_sample_import_date,
+                            ecotaxa_sample_id: row.ecotaxa_sample_id,
+                            ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
+                            ecotaxa_sample_local_folder_tsv_path: row.ecotaxa_sample_local_folder_tsv_path,
+                            ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
+                            ecotaxa_import_status_id: row.ecotaxa_import_status_id,
+                            ecotaxa_import_status_label: row.ecotaxa_import_status_label,
+                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id
                         };
                         resolve(result);
                     }
@@ -377,6 +428,21 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         })
     }
 
+    async deleteOneEcoTaxaSample(sample: SampleIdModel): Promise<number> {
+        // reset to null and 0 ecotaxa fields based on sample_id
+        const sql = `UPDATE sample SET ecotaxa_sample_imported = 0, ecotaxa_sample_import_date = NULL, ecotaxa_sample_id = NULL, ecotaxa_sample_tsv_file_name = NULL, ecotaxa_sample_local_folder_tsv_path = NULL, ecotaxa_sample_nb_images = NULL, ecotaxa_import_status_id = NULL, ecotaxa_sample_task_id = NULL WHERE sample_id = (?)`;
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, [sample.sample_id], function (err) {
+                if (err) {
+                    console.log("DB error--", err)
+                    reject(err);
+                } else {
+                    const result = this.changes; //RETURN NB OF CHANGES
+                    resolve(result);
+                }
+            });
+        })
+    }
 
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
@@ -427,8 +493,18 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         // Add params_filtering to params
         params.push(...params_filtering)
 
-        sql += `) AS total_count FROM sample LEFT JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id LEFT JOIN visual_quality_check_status on sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id LEFT JOIN user on sample.visual_qc_validator_user_id=user.user_id`
-
+        sql += `
+        ) AS total_count
+        FROM sample
+        LEFT JOIN sample_type
+            ON sample.sample_type_id = sample_type.sample_type_id
+        LEFT JOIN visual_quality_check_status
+            ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
+        LEFT JOIN user
+            ON sample.visual_qc_validator_user_id = user.user_id
+        LEFT JOIN ecotaxa_import_status
+            ON sample.ecotaxa_import_status_id = ecotaxa_import_status.ecotaxa_import_status_id
+        `;
 
         // Add filtering_sql to sql
         sql += filtering_sql
@@ -514,7 +590,16 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             visual_qc_status_label: row.visual_qc_status_label,
                             sample_type_id: row.sample_type_id,
                             sample_type_label: row.sample_type_label,
-                            project_id: row.project_id
+                            project_id: row.project_id,
+                            ecotaxa_sample_imported: row.ecotaxa_sample_imported,
+                            ecotaxa_sample_import_date: row.ecotaxa_sample_import_date,
+                            ecotaxa_sample_id: row.ecotaxa_sample_id,
+                            ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
+                            ecotaxa_sample_local_folder_tsv_path: row.ecotaxa_sample_local_folder_tsv_path,
+                            ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
+                            ecotaxa_import_status_id: row.ecotaxa_import_status_id,
+                            ecotaxa_import_status_label: row.ecotaxa_import_status_label,
+                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id
                         })),
                         total: rows[0]?.total_count || 0
                     };
@@ -532,7 +617,12 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         let placeholders: string = ""
         // Generate sql and params
         for (const [key, value] of Object.entries(sampleData)) {
-            params.push(value)
+            // if value is boolean, convert to integer 1 or 0
+            if (typeof value === "boolean") {
+                params.push(value ? 1 : 0)
+            } else {
+                params.push(value)
+            }
             placeholders = placeholders + key + "=(?),"
         }
         // Remove last ,
@@ -586,6 +676,43 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             sample_type_id: row.sample_type_id,
                             sample_type_label: row.sample_type_label,
                             sample_type_description: row.sample_type_description
+                        };
+                        resolve(result);
+                    }
+                }
+            });
+        })
+    }
+    async getEcoTaxaImportStatus(ecotaxaImportStatus: EcoTaxaImportStatusRequestModel): Promise<EcoTaxaImportStatusModel | null> {
+        //can be search by ecotaxa_import_status_id, ecotaxa_import_status_label
+        const params: any[] = []
+        let placeholders: string = ""
+        // generate sql and params
+        for (const [key, value] of Object.entries(ecotaxaImportStatus)) {
+            params.push(value)
+            placeholders = placeholders + key + "=(?) AND "
+        }
+        // remove last AND
+        placeholders = placeholders.slice(0, -4);
+
+        // if no params, return null
+        if (params.length == 0) {
+            return null
+        }
+        const sql = `SELECT * FROM ecotaxa_import_status WHERE ` + placeholders + `LIMIT 1;`;
+        return await new Promise((resolve, reject) => {
+            this.db.get(sql, params, (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (row === undefined) {
+                        resolve(null);
+                        return;
+                    }
+                    else {
+                        const result = {
+                            ecotaxa_import_status_id: row.ecotaxa_import_status_id,
+                            ecotaxa_import_status_label: row.ecotaxa_import_status_label
                         };
                         resolve(result);
                     }

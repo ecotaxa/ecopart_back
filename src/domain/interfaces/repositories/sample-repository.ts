@@ -1,4 +1,4 @@
-import { PublicHeaderSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
@@ -16,4 +16,13 @@ export interface SampleRepository {
     standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>>;
     getSampleType(sample_type: SampleTypeRequestModel): Promise<SampleTypeModel | null>;
     getVisualQCStatus(visual_qc_status: VisualQualityCheckStatusRequestModel): Promise<VisualQualityCheckStatusModel | null>;
+
+    // EcoTaxa specific methods TO sort 
+    deleteEcoTaxaSamples(sample: SampleIdModel[]): Promise<number>;
+    listImportableEcoTaxaSamples(instrument_model: string, dest_folder: string, project_id: number): Promise<PublicImportableEcoTaxaSampleResponseModel[]>
+    // UVP6copyEcoTaxaSamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>;
+    // UVP5copyEcoTaxaSamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>;
+    // deleteEcoTaxaSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>;
+    // standardGetEcoTaxaSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>>;
+    createManyEcoTaxaSamples(samples: SampleUpdateModel[]): Promise<number>;
 }

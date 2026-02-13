@@ -91,7 +91,8 @@ export class UpdateProject implements UpdateProjectUseCase {
 
     private async updateProject(current_user: UserUpdateModel, project: ProjectUpdateModel, public_project_to_update: PublicProjectUpdateModel, current_project: ProjectResponseModel): Promise<void> {
         // Privilege updated flag
-        let privilegeUpdated: boolean = false
+        let privilegeUpdated: boolean = false;
+
         // Validate and update privileges if provided
         if (this.isPrivilegeUpdate(public_project_to_update)) {
             const privilege: PublicPrivilege = {
@@ -99,7 +100,8 @@ export class UpdateProject implements UpdateProjectUseCase {
                 members: public_project_to_update.members as MinimalUserModel[],
                 managers: public_project_to_update.managers as MinimalUserModel[],
                 contact: public_project_to_update.contact as MinimalUserModel
-            }
+            };
+
             await this.validateAndUpdatePrivileges(privilege);
             privilegeUpdated = true;
         } else {
@@ -107,17 +109,36 @@ export class UpdateProject implements UpdateProjectUseCase {
             this.ensurePrivilegesAreNotPartiallyFilled(public_project_to_update);
         }
 
-        // Validate and manage ecotaxa links if provided
-        // ecotaxa_project_id, ecotaxa_instance_id, new_ecotaxa_project, ecotaxa_account_id
-        if ((public_project_to_update.ecotaxa_project_id !== undefined || public_project_to_update.new_ecotaxa_project == true) && public_project_to_update.ecotaxa_instance_id !== undefined && public_project_to_update.ecotaxa_account_id !== undefined) {
-            project = await this.handleEcotaxaProjectLinks(public_project_to_update, current_user, current_project, project);
-        }
-        //else if one is valuated but not the others throw error
-        else if ((public_project_to_update.ecotaxa_project_id == undefined && public_project_to_update.new_ecotaxa_project == undefined) || public_project_to_update.ecotaxa_instance_id == undefined || !public_project_to_update.ecotaxa_account_id == undefined) {
-            throw new Error("To update ecotaxa project you must provide ecotaxa_project_id or ask for new_ecotaxa_project and provide ecotaxa_instance_id and ecotaxa_account_id")
+        // Validate and update ecotaxa links if provided
+        const wantsEcotaxaUpdate =
+            public_project_to_update.ecotaxa_project_id !== undefined ||
+            public_project_to_update.new_ecotaxa_project === true ||
+            public_project_to_update.ecotaxa_instance_id !== undefined ||
+            public_project_to_update.ecotaxa_account_id !== undefined;
+
+        if (wantsEcotaxaUpdate) {
+            const hasValidEcotaxaPayload =
+                (public_project_to_update.ecotaxa_project_id !== undefined ||
+                    public_project_to_update.new_ecotaxa_project === true) &&
+                public_project_to_update.ecotaxa_instance_id !== undefined &&
+                public_project_to_update.ecotaxa_account_id !== undefined;
+
+            if (!hasValidEcotaxaPayload) {
+                throw new Error(
+                    "To update EcoTaxa project you must provide ecotaxa_project_id or set new_ecotaxa_project=true, " +
+                    "and also provide ecotaxa_instance_id and ecotaxa_account_id"
+                );
+            }
+
+            project = await this.handleEcotaxaProjectLinks(
+                public_project_to_update,
+                current_user,
+                current_project,
+                project
+            );
         }
 
-        // Update the project
+        // Update project 
         await this.updateProjectProperties(project, privilegeUpdated);
     }
 

@@ -11,4 +11,5 @@ export interface SampleDataSource {
     updateOne(sample: PrivateSampleUpdateModel): Promise<number>;
     getSampleType(sampleType: SampleTypeRequestModel): Promise<SampleTypeModel | null>;
     getVisualQCStatus(visualQCStatus: VisualQualityCheckStatusRequestModel): Promise<VisualQualityCheckStatusModel | null>;
+    deleteOneEcoTaxaSample(sample: SampleIdModel): Promise<number>;
 }

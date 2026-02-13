@@ -124,13 +124,13 @@ export class ImportSamples implements ImportSamplesUseCase {
     }
     async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number) {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/4 sample validation : start");
-        this.ensureSamplesAreBothInHeadersAndInRawData(samples, samples_names_to_import);
+        this.ensureSamplesAreBothInHeadersAndInDataFolder(samples, samples_names_to_import);
         //TODO LATER add more validation
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 20, "Step 1/4 sample validation : done");
 
     }
 
-    ensureSamplesAreBothInHeadersAndInRawData(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[]) {
+    ensureSamplesAreBothInHeadersAndInDataFolder(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[]) {
         const samples_names_set = new Set(samples.map(sample => sample.sample_name));
 
         const missing_samples = samples_names_to_import.filter(sample_id => !samples_names_set.has(sample_id));
@@ -172,7 +172,6 @@ export class ImportSamples implements ImportSamplesUseCase {
 
     async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[]): Promise<number[]> {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
-
         // Common sample data
         const base_sample: Partial<SampleRequestCreationModel> = {
             project_id: project.project_id,
@@ -182,7 +181,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         const formated_samples: SampleRequestCreationModel[] = await Promise.all(
             samples_names_to_import.map(async (sample_name) => {
                 const sample = await this.sampleRepository.formatSampleToImport(
-                    { ...base_sample, sample_name },
+                    { ...base_sample, sample_name: sample_name },
                     project.instrument_model
                 );
                 return sample;
@@ -190,7 +189,6 @@ export class ImportSamples implements ImportSamplesUseCase {
         );
         // Create samples
         const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
-
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/4 samples db creation done");
         return created_samples_ids;
     }
