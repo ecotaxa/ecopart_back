@@ -14,7 +14,11 @@
     "prod:start": "npm run prod:build && node dist/main.js",
     "dev:build": "npm-run-all clean tsc copy-assets",
     "dev:serve": "nodemon -e js -w dist dist/main.js",
-    "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts"
+    "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts",
+    "migrate:create": "ts-node tools/migrate.ts create",
+    "migrate:up": "ts-node tools/migrate.ts up",
+    "migrate:down": "ts-node tools/migrate.ts down",
+    "migrate:status": "ts-node tools/migrate.ts status"
   },
   "keywords": [],
   "author": "Julie Coustenoble",

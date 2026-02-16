@@ -81,6 +81,8 @@ import path from 'path'
 import fs from 'fs';
 import 'dotenv/config'
 import { SearchEcotaxaAccounts } from './domain/use-cases/ecotaxa_account/search-ecotaxa_account'
+import { MigrationManager } from './data/migrations/migration-manager'
+import { MigrationLogger } from './data/migrations/migration-logger'
 
 sqlite3.verbose()
 
@@ -146,6 +148,13 @@ async function getSQLiteDS() {
         }
     });
     const db = await getSQLiteDS();
+
+    // Run database migrations before initializing data sources
+    const migrationLogFile = path.resolve(config.DATA_STORAGE_FOLDER, 'migrations.log');
+    const migrationLogger = new MigrationLogger(migrationLogFile);
+    const migrationManager = new MigrationManager(db, migrationLogger);
+    const migrationsDir = path.resolve(__dirname, 'data', 'migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
