@@ -446,4 +446,8 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             throw new Error("EcoTaxa project is already linked to an EcoPart project");
         }
     }
+
+    async getDistinctShips(): Promise<string[]> {
+        return await this.projectDataSource.getDistinctShips();
+    }
 }

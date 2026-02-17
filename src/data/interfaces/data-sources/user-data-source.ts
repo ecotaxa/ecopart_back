@@ -8,4 +8,5 @@ export interface UserDataSource {
     updateOne(user: UserUpdateModel): Promise<number>;
     getOne(user: UserRequestModel): Promise<UserResponseModel | null>;
     getUserLogin(email: string): Promise<AuthUserCredentialsModel | null>;
+    getDistinctOrganisations(): Promise<string[]>;
 }

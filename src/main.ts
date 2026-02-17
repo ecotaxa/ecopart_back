@@ -52,6 +52,8 @@ import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-
 
 import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
 import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
+import { ListOrganisations } from './domain/use-cases/user/list-organisations'
+import { ListShips } from './domain/use-cases/project/list-ships'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -197,7 +199,8 @@ async function getSQLiteDS() {
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo),
-            new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo)
+            new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
+            new ListOrganisations(user_repo)
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
@@ -232,6 +235,7 @@ async function getSQLiteDS() {
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteEcoTaxaSamples(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
         new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new ListShips(project_repo),
     )
 
     const taskMiddleWare = TaskRouter(

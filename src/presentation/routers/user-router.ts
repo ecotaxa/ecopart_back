@@ -11,6 +11,7 @@ import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/searc
 import { SearchEcotaxaAccountsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
+import { ListOrganisationsUseCase } from '../../domain/interfaces/use-cases/user/list-organisations'
 import { CustomRequest } from '../../domain/entities/auth'
 import { MiddlewareAuthValidation } from '../middleware/auth-validation'
 
@@ -25,9 +26,21 @@ export default function UsersRouter(
     loginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase,
     logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
     searchUsersUseCase: SearchUsersUseCase,
-    searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase
+    searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase,
+    listOrganisationsUseCase: ListOrganisationsUseCase
 ) {
     const router = express.Router()
+
+    // List of all distinct organisations
+    router.get('/organisations', async (req: Request, res: Response) => {
+        try {
+            const organisations = await listOrganisationsUseCase.execute();
+            res.status(200).send(organisations)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            res.status(500).send({ errors: ["Cannot get organisations"] })
+        }
+    })
 
     // Pagined and sorted list of all users
     router.get('/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {

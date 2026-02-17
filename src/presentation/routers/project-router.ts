@@ -19,6 +19,7 @@ import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/e
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples'
 import { ListImportableEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
+import { ListShipsUseCase } from '../../domain/interfaces/use-cases/project/list-ships'
 
 
 import { CustomRequest } from '../../domain/entities/auth'
@@ -42,8 +43,20 @@ export default function ProjectRouter(
     importEcoTaxaSamplesUseCase: ImportEcoTaxaSamplesUseCase,
     deleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase,
     searchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase,
+    listShipsUseCase: ListShipsUseCase,
 ) {
     const router = express.Router()
+
+    // List of all distinct ships
+    router.get('/ships', async (req: Request, res: Response) => {
+        try {
+            const ships = await listShipsUseCase.execute();
+            res.status(200).send(ships)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            res.status(500).send({ errors: ["Cannot get ships"] })
+        }
+    })
 
     // Pagined and sorted list of all project
     router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {

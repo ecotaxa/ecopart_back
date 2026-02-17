@@ -7,4 +7,5 @@ export interface ProjectDataSource {
     updateOne(project: ProjectUpdateModel): Promise<number>;
     getOne(project: ProjectRequestModel): Promise<ProjectResponseModel | null>;
     deleteOne(project: ProjectRequestModel): Promise<number>;
+    getDistinctShips(): Promise<string[]>;
 }

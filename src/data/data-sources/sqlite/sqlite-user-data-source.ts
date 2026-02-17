@@ -265,5 +265,18 @@ export class SQLiteUserDataSource implements UserDataSource {
 
     }
 
+    async getDistinctOrganisations(): Promise<string[]> {
+        const sql = `SELECT DISTINCT organisation FROM user WHERE deleted IS NULL ORDER BY organisation ASC;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows.map((row: any) => row.organisation));
+                }
+            });
+        })
+    }
+
 }
 

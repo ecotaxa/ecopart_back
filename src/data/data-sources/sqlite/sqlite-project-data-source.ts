@@ -303,6 +303,18 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         })
     }
 
+    async getDistinctShips(): Promise<string[]> {
+        const sql = `SELECT DISTINCT ship FROM project ORDER BY ship ASC;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows.map((row: any) => row.ship));
+                }
+            });
+        })
+    }
 
 }
 
