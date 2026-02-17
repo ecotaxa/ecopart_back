@@ -203,6 +203,7 @@ async function getSQLiteDS() {
         new ChangePassword(user_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
+        new SearchUsers(user_repo, search_repo),
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),

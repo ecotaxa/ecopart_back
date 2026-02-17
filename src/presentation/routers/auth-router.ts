@@ -10,6 +10,7 @@ import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refr
 import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/change-password'
 import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
 import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
+import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
 
 // Password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
@@ -19,7 +20,8 @@ export default function AuthRouter(
     refreshTokenUseCase: RefreshTokenUseCase,
     changePasswordUseCase: ChangePasswordUseCase,
     resetPasswordRequestUseCase: ResetPasswordRequestUseCase,
-    resetPasswordUseCase: ResetPasswordUseCase
+    resetPasswordUseCase: ResetPasswordUseCase,
+    searchUsersUseCase: SearchUsersUseCase
 ) {
     const router = express.Router()
 
@@ -47,7 +49,20 @@ export default function AuthRouter(
     })
 
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
-        res.status(200).send((req as CustomRequest).token)
+        try {
+            // Fetch fresh user data from the database using the user_id from the token
+            const token = (req as CustomRequest).token
+            const result = await searchUsersUseCase.execute((req as CustomRequest).token, { page: 1, limit: 1, sort_by: 'asc(user_id)' }, [{ field: 'user_id', operator: '=', value: token.user_id }])
+            if (result.users.length === 0) {
+                res.status(404).send({ errors: ['Cannot find user'] })
+                return
+            }
+            res.status(200).send(result.users[0])
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === 'User cannot be used') res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ['Cannot get user info'] })
+        }
     })
 
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
