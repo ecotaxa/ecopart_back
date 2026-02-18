@@ -512,7 +512,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseWorkHDR(data: string): SampleFromWorkHDRModel {
         const work_hdr_content: any = {};
         // Parse the input data string into a key-value object
-        const lines = data.split("\n");
+        const lines = data.split(/\r\n|\n|\r/);
         lines.forEach(line => {
             const [key, value] = line.split("=");
             if (key && value) {
