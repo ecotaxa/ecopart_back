@@ -512,7 +512,8 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseWorkHDR(data: string): SampleFromWorkHDRModel {
         const work_hdr_content: any = {};
         // Parse the input data string into a key-value object
-        const lines = data.split("\n");
+        const lines = data.split(/\r\n|\n|\r/);
+
         lines.forEach(line => {
             const [key, value] = line.split("=");
             if (key && value) {
@@ -1353,4 +1354,25 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         return updated_sample_nb;
     }
+
+    async deleteEcoTaxaSamplesFromDb(samples_names_to_import: string[]) {
+        console.log("Deleting EcoTaxa samples from db for : ", samples_names_to_import);
+        // update samples from db to empty ecotaxa related fields
+        const options: PreparedSearchOptions = {
+            filter: [
+                { field: "sample_name", operator: "IN", value: samples_names_to_import },
+                { field: "ecotaxa_sample_imported", operator: "=", value: true }
+            ],
+            sort_by: [],
+            page: 1,
+            limit: 1
+        }
+        const ecotaxa_samples = await this.standardGetSamples(options);
+        if (ecotaxa_samples.total === 0) {
+            throw new Error("No EcoTaxa samples to delete");
+        }
+        // delete samples from db
+        await this.deleteEcoTaxaSamples(ecotaxa_samples.items);
+    }
+
 }

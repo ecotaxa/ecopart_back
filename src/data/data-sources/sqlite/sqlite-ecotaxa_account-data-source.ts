@@ -71,6 +71,8 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     VALUES 
                         ('FR', 'French instance of EcoTaxa, can be used world wilde.', 'https://ecotaxa.obs-vlfr.fr/');
                 `;
+                // const sql_test_instance = `
+                //     INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url) VALUES ('TEST', 'TEST instance for development', 'https://ecotaxa-dev.imev-mer.fr:5003/');`;
 
                 db_tables.run(sql_default_instance, [], function (err: Error | null) {
                     if (err) {

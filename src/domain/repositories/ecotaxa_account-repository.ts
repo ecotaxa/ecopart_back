@@ -800,4 +800,38 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const imported_sample_names = samples_to_import.map((s) => s.local_folder_tsv_path.split(path.sep).pop() as string);
         return imported_sample_names;
     }
+
+    // Query EcoTaxa objects by sample name in a project
+    // POST /api/object_set/query — returns list of object IDs
+    async api_ecotaxa_query_objects_by_samples(baseUrl: string, token: string, ecotaxa_project_id: number, sample_names: string[]): Promise<number[]> {
+        const queryPayload = {
+            project_id: ecotaxa_project_id,
+            filters: {
+                samples: sample_names
+            }
+        };
+        const queryResult = await this.http<{ object_ids: number[] }>(
+            `${baseUrl}api/object_set/query`,
+            {
+                method: "POST",
+                headers: this.JSON_HEADERS(token),
+                body: JSON.stringify(queryPayload),
+            }
+        );
+        return queryResult?.object_ids ?? [];
+    }
+
+    // Delete EcoTaxa objects by their IDs
+    // DELETE /api/object_set/ — body = list of object IDs
+    async api_ecotaxa_delete_objects(baseUrl: string, token: string, objectIds: number[]): Promise<void> {
+        await this.http(
+            `${baseUrl}api/object_set/`,
+            {
+                method: "DELETE",
+                headers: this.JSON_HEADERS(token),
+                body: JSON.stringify(objectIds),
+            }
+        );
+    }
+
 }

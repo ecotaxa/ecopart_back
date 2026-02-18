@@ -1,4 +1,5 @@
+import { EcotaxaAccountRequestModel } from "../../../entities/ecotaxa_account";
 import { UserUpdateModel } from "../../../entities/user";
 export interface DeleteEcoTaxaSampleUseCase {
-    execute(current_user: UserUpdateModel, sample_id_to_delete: number, project_id: number): Promise<void>;
+    execute(current_user: UserUpdateModel, samples_names_to_delete: string[], project_id: number, ecotaxa_account: EcotaxaAccountRequestModel): Promise<void>;
 }

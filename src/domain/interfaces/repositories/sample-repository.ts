@@ -2,6 +2,7 @@ import { PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseM
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
+    deleteEcoTaxaSamplesFromDb(samples_names_to_import: string[]): unknown;
     formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel>;
     createSample(sample: SampleRequestCreationModel): Promise<number>;
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;

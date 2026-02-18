@@ -125,7 +125,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         } catch (error) {
             console.error("Error during EcoTaxa samples import:", error);
             // rollback : delete created ecotaxa samples in db
-            await this.deleteEcoTaxaSamplesFromDb(samples_names_to_import);
+            await this.sampleRepository.deleteEcoTaxaSamplesFromDb(samples_names_to_import);
             this.taskRepository.failedTask(task_id, error);
             //todo abbort import in ecotaxa?
         }

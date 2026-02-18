@@ -226,7 +226,7 @@ async function getSQLiteDS() {
         new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
         new ListImportableEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
-        new DeleteEcoTaxaSample(user_repo, sample_repo, privilege_repo),
+        new DeleteEcoTaxaSample(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
         new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
     )
 

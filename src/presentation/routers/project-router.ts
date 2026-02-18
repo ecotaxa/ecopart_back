@@ -534,10 +534,10 @@ export default function ProjectRouter(
         }
     })
 
-    // Delete a sample
-    router.delete('/:project_id/ecotaxa_samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
+    // Delete samples
+    router.delete('/:project_id/ecotaxa_samples', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteEcoTaxaSampleUseCase.execute((req as CustomRequest).token, req.params.sample_id as any, req.params.project_id as any);
+            await deleteEcoTaxaSampleUseCase.execute((req as CustomRequest).token, req.body.samples as string[], Number(req.params.project_id), req.body.ecotaxa_user);
             res.status(200).send({ message: "Sample successfully deleted" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
