@@ -1325,7 +1325,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Delete ecotaxa related samples fields from sample in db
-    async deleteEcoTaxaSamples(samples: SampleIdModel[]): Promise<number> {
+    async deleteEcoTaxaSamplesFromDb(samples: SampleIdModel[]): Promise<number> {
         let updated_sample_nb: number = 0
         for (const sample of samples) {
             const sample_update: SampleUpdateModel = {

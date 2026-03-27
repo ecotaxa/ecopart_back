@@ -45,6 +45,15 @@ export class MockSampleRepository implements SampleRepository {
     getVisualQCStatus(): Promise<VisualQualityCheckStatusModel | null> {
         throw new Error("Method not implemented for getVisualQCStatus");
     }
+    deleteEcoTaxaSamplesFromDb(): Promise<number> {
+        throw new Error("Method not implemented for deleteEcoTaxaSamplesFromDb");
+    }
+    listImportableEcoTaxaSamples(): Promise<any[]> {
+        throw new Error("Method not implemented for listImportableEcoTaxaSamples");
+    }
+    createManyEcoTaxaSamples(): Promise<number> {
+        throw new Error("Method not implemented for createManyEcoTaxaSamples");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase

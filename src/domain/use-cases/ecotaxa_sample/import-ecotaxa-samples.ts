@@ -177,7 +177,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
             throw new Error("No EcoTaxa samples to delete");
         }
         // delete samples from db
-        await this.sampleRepository.deleteEcoTaxaSamples(ecotaxa_samples.items);
+        await this.sampleRepository.deleteEcoTaxaSamplesFromDb(ecotaxa_samples.items);
     }
 
     async importEcoTaxaSamplesInDb(task_id: number, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[]): Promise<number> {

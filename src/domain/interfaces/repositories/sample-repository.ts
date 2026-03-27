@@ -2,6 +2,7 @@ import { PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseM
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
+    deleteEcoTaxaSamplesFromDb(samples: SampleIdModel[]): Promise<number>;
     formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel>;
     createSample(sample: SampleRequestCreationModel): Promise<number>;
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
@@ -18,7 +19,6 @@ export interface SampleRepository {
     getVisualQCStatus(visual_qc_status: VisualQualityCheckStatusRequestModel): Promise<VisualQualityCheckStatusModel | null>;
 
     // EcoTaxa specific methods TO sort 
-    deleteEcoTaxaSamples(sample: SampleIdModel[]): Promise<number>;
     listImportableEcoTaxaSamples(instrument_model: string, dest_folder: string, project_id: number): Promise<PublicImportableEcoTaxaSampleResponseModel[]>
     // UVP6copyEcoTaxaSamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>;
     // UVP5copyEcoTaxaSamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>;

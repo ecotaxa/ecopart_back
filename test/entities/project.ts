@@ -28,6 +28,11 @@ export const projectRequestCreationModel: PublicProjectRequestCreationModel = {
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 
 }
 export const projectRequestCreationModelForRepository: ProjectRequestCreationModel = {
@@ -50,7 +55,10 @@ export const projectRequestCreationModelForRepository: ProjectRequestCreationMod
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 
 export const projectRequestCreationModel_2: PublicProjectRequestCreationModel = {
@@ -77,6 +85,11 @@ export const projectRequestCreationModel_2: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const data_source_projectRequestCreationModel_2: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -98,7 +111,10 @@ export const data_source_projectRequestCreationModel_2: ProjectRequestCreationMo
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 export const projectRequestCreationModel_3: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -124,6 +140,11 @@ export const projectRequestCreationModel_3: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const data_source_projectRequestCreationModel_3: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -144,7 +165,10 @@ export const data_source_projectRequestCreationModel_3: ProjectRequestCreationMo
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 export const projectRequestCreationModel_4: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -170,6 +194,11 @@ export const projectRequestCreationModel_4: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const data_source_projectRequestCreationModel_4: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -191,7 +220,10 @@ export const data_source_projectRequestCreationModel_4: ProjectRequestCreationMo
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 export const projectRequestCreationModel_5: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -217,6 +249,11 @@ export const projectRequestCreationModel_5: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const data_source_projectRequestCreationModel_5: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -238,7 +275,10 @@ export const data_source_projectRequestCreationModel_5: ProjectRequestCreationMo
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 export const projectRequestCreationModel_6: PublicProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -264,6 +304,11 @@ export const projectRequestCreationModel_6: PublicProjectRequestCreationModel = 
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const data_source_projectRequestCreationModel_6: ProjectRequestCreationModel = {
     root_folder_path: 'root_folder_path',
@@ -285,7 +330,10 @@ export const data_source_projectRequestCreationModel_6: ProjectRequestCreationMo
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 2, //"UVP5SD",
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 
 export const projectRequestCreationModel_withDataToSanitize: PublicProjectRequestCreationModel = {
@@ -312,6 +360,11 @@ export const projectRequestCreationModel_withDataToSanitize: PublicProjectReques
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 
 export const projectRequestCreationModel_withDataSanitized: PublicProjectRequestCreationModel = {
@@ -338,6 +391,11 @@ export const projectRequestCreationModel_withDataSanitized: PublicProjectRequest
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 
 export const projectRequestCreationModel_withmissingData = {

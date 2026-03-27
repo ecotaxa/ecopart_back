@@ -3,23 +3,30 @@ import { ProjectResponseModel, ProjectUpdateModel } from "../../../../src/domain
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
+import { SampleRepository } from "../../../../src/domain/interfaces/repositories/sample-repository";
+import { EcotaxaAccountRepository } from "../../../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 import { DeleteProject } from '../../../../src/domain/use-cases/project/delete-project'
 import { projectResponseModel } from "../../../entities/project";
 import { MockProjectRepository } from "../../../mocks/project-mock";
-import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockUserRepository, MockEcotaxaAccountRepository } from "../../../mocks/user-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
+import { MockSampleRepository } from "../../../mocks/sample-mock";
 
 describe("Delete Project Use Case", () => {
 
     let mockProjectRepository: ProjectRepository;
     let mockUserRepository: UserRepository;
     let mockPrivilegeRepository: PrivilegeRepository;
+    let mockSampleRepository: SampleRepository;
+    let mockEcotaxaAccountRepository: EcotaxaAccountRepository;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockProjectRepository = new MockProjectRepository()
         mockUserRepository = new MockUserRepository()
         mockPrivilegeRepository = new MockPrivilegeRepository()
+        mockSampleRepository = new MockSampleRepository()
+        mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
     })
 
 
@@ -37,8 +44,9 @@ describe("Delete Project Use Case", () => {
         jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
+        jest.spyOn(mockSampleRepository, "standardGetSamples").mockImplementation(() => Promise.resolve({ items: [], total: 0 }))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
         await deleteProjectUseCase.execute(current_user, project_to_delete);
 
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
@@ -46,8 +54,6 @@ describe("Delete Project Use Case", () => {
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockProjectRepository.deleteProject).toBeCalledWith(project_to_delete);
     });
-
-
 
     test("User is admin : delete a project : ok", async () => {
         const current_user: UserUpdateModel = {
@@ -58,14 +64,14 @@ describe("Delete Project Use Case", () => {
         }
         const preexistent_project: ProjectResponseModel = projectResponseModel
 
-
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(preexistent_project))
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
+        jest.spyOn(mockSampleRepository, "standardGetSamples").mockImplementation(() => Promise.resolve({ items: [], total: 0 }))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
         await deleteProjectUseCase.execute(current_user, project_to_delete);
 
         expect(mockProjectRepository.getProject).toBeCalledWith(project_to_delete);
@@ -90,7 +96,7 @@ describe("Delete Project Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockProjectRepository, "deleteProject")
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
@@ -117,7 +123,7 @@ describe("Delete Project Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockProjectRepository, "deleteProject")
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
 
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
@@ -147,8 +153,9 @@ describe("Delete Project Use Case", () => {
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(0))
+        jest.spyOn(mockSampleRepository, "standardGetSamples").mockImplementation(() => Promise.resolve({ items: [], total: 0 }))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {
@@ -174,7 +181,7 @@ describe("Delete Project Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
 
-        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository)
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
         try {
             await deleteProjectUseCase.execute(current_user, project_to_delete);
         } catch (err) {

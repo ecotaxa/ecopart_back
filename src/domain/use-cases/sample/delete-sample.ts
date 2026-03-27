@@ -1,6 +1,8 @@
 import { PublicSampleModel } from "../../entities/sample";
 import { UserUpdateModel } from "../../entities/user";
+import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { DeleteSampleUseCase } from "../../interfaces/use-cases/sample/delete-sample";
@@ -9,11 +11,15 @@ export class DeleteSample implements DeleteSampleUseCase {
     userRepository: UserRepository
     sampleRepository: SampleRepository
     privilegeRepository: PrivilegeRepository
+    ecotaxaAccountRepository: EcotaxaAccountRepository
+    projectRepository: ProjectRepository
 
-    constructor(userRepository: UserRepository, sampleRepository: SampleRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(userRepository: UserRepository, sampleRepository: SampleRepository, privilegeRepository: PrivilegeRepository, ecotaxaAccountRepository: EcotaxaAccountRepository, projectRepository: ProjectRepository) {
         this.userRepository = userRepository
         this.sampleRepository = sampleRepository
         this.privilegeRepository = privilegeRepository
+        this.ecotaxaAccountRepository = ecotaxaAccountRepository
+        this.projectRepository = projectRepository
     }
 
     async execute(current_user: UserUpdateModel, sample_id_to_delete: number, project_id?: number): Promise<void> {
@@ -30,6 +36,11 @@ export class DeleteSample implements DeleteSampleUseCase {
 
         // Ensure the current user has permission to delete the sample
         await this.ensureUserCanDelete(current_user, sample.project_id);
+
+        // If the sample has been imported to EcoTaxa, clean up EcoTaxa objects first
+        if (sample.ecotaxa_sample_imported) {
+            await this.deleteEcoTaxaObjects(sample);
+        }
 
         // Delete the sample
         await this.deleteSample(sample, sample.project_id);
@@ -75,5 +86,35 @@ export class DeleteSample implements DeleteSampleUseCase {
         if (deletedSamplesCount === 0) {
             throw new Error("Cannot delete sample");
         }
+    }
+
+    // Delete EcoTaxa objects associated with a sample
+    private async deleteEcoTaxaObjects(sample: PublicSampleModel): Promise<void> {
+        const project = await this.projectRepository.getProject({ project_id: sample.project_id });
+        if (!project || !project.ecotaxa_project_id || !project.ecotaxa_instance_id) return;
+
+        const ecotaxa_instance = await this.ecotaxaAccountRepository.getOneEcoTaxaInstance(project.ecotaxa_instance_id);
+        if (!ecotaxa_instance) return;
+
+        // Use the generic account for the ecotaxa instance
+        let baseUrl: string;
+        let token: string;
+        try {
+            const genericAccount = await this.ecotaxaAccountRepository.getEcotaxaGenericAccountForInstance(project.ecotaxa_instance_id);
+            baseUrl = ecotaxa_instance.ecotaxa_instance_url;
+            token = genericAccount.ecotaxa_account_token;
+        } catch {
+            // If no generic account found, skip ecotaxa cleanup
+            return;
+        }
+
+        // Query EcoTaxa objects by sample name and delete them
+        const objectIds = await this.ecotaxaAccountRepository.api_ecotaxa_query_objects_by_sample(baseUrl, token, project.ecotaxa_project_id, [sample.sample_name]);
+        if (objectIds.length > 0) {
+            await this.ecotaxaAccountRepository.api_ecotaxa_delete_objects(baseUrl, token, objectIds);
+        }
+
+        // Clear the ecotaxa fields on the sample in local DB
+        await this.sampleRepository.deleteEcoTaxaSamplesFromDb([sample]);
     }
 }

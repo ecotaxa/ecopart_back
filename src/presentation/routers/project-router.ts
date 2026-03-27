@@ -16,7 +16,7 @@ import { SearchSamplesUseCase } from '../../domain/interfaces/use-cases/sample/s
 import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
-import { DeleteEcoTaxaSampleUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-sample'
+import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples'
 import { ListImportableEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
 
@@ -40,7 +40,7 @@ export default function ProjectRouter(
     searchSamplesUseCase: SearchSamplesUseCase,
     listImportableEcoTaxaSamplesUseCase: ListImportableEcoTaxaSamplesUseCase,
     importEcoTaxaSamplesUseCase: ImportEcoTaxaSamplesUseCase,
-    deleteEcoTaxaSampleUseCase: DeleteEcoTaxaSampleUseCase,
+    deleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase,
     searchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase,
 ) {
     const router = express.Router()
@@ -535,10 +535,10 @@ export default function ProjectRouter(
     })
 
     // Delete a sample
-    router.delete('/:project_id/ecotaxa_samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.delete('/:project_id/ecotaxa_samples', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteEcoTaxaSampleUseCase.execute((req as CustomRequest).token, req.params.sample_id as any, req.params.project_id as any);
-            res.status(200).send({ message: "Sample successfully deleted" })
+            await deleteEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.samples as string[]);
+            res.status(200).send({ message: "Sample successfully deleted from EcoTaxa" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })

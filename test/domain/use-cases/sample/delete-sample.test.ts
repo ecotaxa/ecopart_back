@@ -2,15 +2,20 @@ import { UserUpdateModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { SampleRepository } from "../../../../src/domain/interfaces/repositories/sample-repository";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
-import { MockUserRepository } from "../../../mocks/user-mock";
+import { EcotaxaAccountRepository } from "../../../../src/domain/interfaces/repositories/ecotaxa_account-repository";
+import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
+import { MockUserRepository, MockEcotaxaAccountRepository } from "../../../mocks/user-mock";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
+import { MockProjectRepository } from "../../../mocks/project-mock";
 import { DeleteSample } from "../../../../src/domain/use-cases/sample/delete-sample";
 import { sampleModel_1 } from "../../../entities/sample";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
 let mockPrivilegeRepository: PrivilegeRepository;
+let mockEcotaxaAccountRepository: EcotaxaAccountRepository;
+let mockProjectRepository: ProjectRepository;
 
 let deleteSampleUseCase: DeleteSample;
 
@@ -19,8 +24,10 @@ beforeEach(async () => {
     mockUserRepository = new MockUserRepository()
     mockSampleRepository = new MockSampleRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
+    mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
+    mockProjectRepository = new MockProjectRepository()
 
-    deleteSampleUseCase = new DeleteSample(mockUserRepository, mockSampleRepository, mockPrivilegeRepository)
+    deleteSampleUseCase = new DeleteSample(mockUserRepository, mockSampleRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockProjectRepository)
 })
 
 

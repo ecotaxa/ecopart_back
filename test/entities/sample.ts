@@ -53,7 +53,16 @@ export const sampleModel_1: PublicSampleModel = {
     visual_qc_status_label: "PENDING",
     sample_type_id: 2,
     sample_type_label: "Depth",
-    project_id: 5
+    project_id: 5,
+    ecotaxa_import_status_id: 0,
+    ecotaxa_import_status_label: "",
+    ecotaxa_sample_imported: false,
+    ecotaxa_sample_import_date: "",
+    ecotaxa_sample_id: 0,
+    ecotaxa_sample_tsv_file_name: "",
+    ecotaxa_sample_local_folder_tsv_path: "",
+    ecotaxa_sample_nb_images: 0,
+    ecotaxa_sample_task_id: 0,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -108,7 +117,16 @@ export const sampleModel_2: PublicSampleModel =
     visual_qc_status_label: "PENDING",
     sample_type_id: 1,
     sample_type_label: "Time",
-    project_id: 6
+    project_id: 6,
+    ecotaxa_import_status_id: 0,
+    ecotaxa_import_status_label: "PENDING",
+    ecotaxa_sample_imported: false,
+    ecotaxa_sample_import_date: "",
+    ecotaxa_sample_id: 0,
+    ecotaxa_sample_tsv_file_name: "",
+    ecotaxa_sample_local_folder_tsv_path: "",
+    ecotaxa_sample_nb_images: 0,
+    ecotaxa_sample_task_id: 0,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {

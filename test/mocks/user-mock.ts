@@ -93,6 +93,36 @@ export class MockUserRepository implements UserRepository {
 }
 
 export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    api_ecotaxa_query_objects_by_sample(): Promise<number[]> {
+        throw new Error("Method not implemented for api_ecotaxa_query_objects_by_sample.");
+    }
+    api_ecotaxa_delete_objects(): Promise<void> {
+        throw new Error("Method not implemented for api_ecotaxa_delete_objects.");
+    }
+    api_delete_ecotaxa_project(): Promise<void> {
+        throw new Error("Method not implemented for api_delete_ecotaxa_project.");
+    }
+    importEcoTaxaSamplesInEcoTaxa(): Promise<string[]> {
+        throw new Error("Method not implemented for importEcoTaxaSamplesInEcoTaxa.");
+    }
+    deleteEcopartUserFromEcotaxaProject(): Promise<void> {
+        throw new Error("Method not implemented for deleteEcopartUserFromEcotaxaProject.");
+    }
+    linkEcotaxaAndEcopartProject(): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string }> {
+        throw new Error("Method not implemented for linkEcotaxaAndEcopartProject.");
+    }
+    createEcotaxaProject(): Promise<number> {
+        throw new Error("Method not implemented for createEcotaxaProject.");
+    }
+    ecotaxa_account_belongs(): Promise<boolean> {
+        throw new Error("Method not implemented for ecotaxa_account_belongs.");
+    }
+    ensureUserCanUseEcotaxaAccount(): Promise<void> {
+        throw new Error("Method not implemented for ensureUserCanUseEcotaxaAccount.");
+    }
+    ensureEcotaxaInstanceConsistency(): Promise<void> {
+        throw new Error("Method not implemented for ensureEcotaxaInstanceConsistency.");
+    }
     connectToEcotaxaInstance(): Promise<EcotaxaAccountModel> {
         throw new Error("Method not implemented for connectToEcotaxaInstance.");
     }
@@ -116,6 +146,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     }
     standardGetEcotaxaAccountsModels(): Promise<SearchResult<EcotaxaAccountResponseModel>> {
         throw new Error("Method not implemented for standardGetEcotaxaAccountsModels.");
+    }
+    getEcotaxaGenericAccountForInstance(): Promise<EcotaxaAccountResponseModel> {
+        throw new Error("Method not implemented for getEcotaxaGenericAccountForInstance.");
     }
 }
 export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
