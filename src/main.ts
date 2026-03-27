@@ -13,6 +13,7 @@ import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
 import TaskRouter from './presentation/routers/tasks-router'
+import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -48,6 +49,9 @@ import { SearchEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/search-e
 
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
+
+import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
+import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -245,6 +249,11 @@ async function getSQLiteDS() {
     server.use("/instrument_models", instrumentModelMiddleWare)
     server.use("/projects", projectMiddleWare)
     server.use("/tasks", taskMiddleWare)
+    server.use("/ecotaxa_instances", EcoTaxaInstanceRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new GetAllEcoTaxaInstances(ecotaxa_account_repo),
+        new CreateEcoTaxaInstance(user_repo, ecotaxa_account_repo)
+    ))
 
 
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))

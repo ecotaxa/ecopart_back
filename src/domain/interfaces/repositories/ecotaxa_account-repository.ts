@@ -1,4 +1,4 @@
-import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
+import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -21,6 +21,8 @@ export interface EcotaxaAccountRepository {
     deleteEcotaxaAccount(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number>;
     standardGetEcotaxaAccountsModels(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>>;
     getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null>;
+    getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]>;
+    createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number>;
     ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void>;
     ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void>;
     getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel>;

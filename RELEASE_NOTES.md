@@ -6,16 +6,19 @@
 
 #### Batch Delete EcoTaxa Samples
 - New `DELETE /projects/:id/ecotaxa_samples` endpoint to remove EcoTaxa objects for selected samples without deleting particle data from EcoPart.
-- Accepts an array of sample names and an EcoTaxa user account for authentication.
+- Accepts an array of sample names. 
+- Uses the generic EcoTaxa account (per instance) internally for API authentication.
 - Validates user permissions (admin or project manager) before proceeding.
 - Queries the EcoTaxa API to find matching object IDs, deletes them, and clears the `ecotaxa_sample_imported` flag in the local database.
 
 #### Cascading EcoTaxa Cleanup on Sample Deletion
 - `DELETE /projects/:id/samples/:sample_id` now automatically removes associated EcoTaxa objects before deleting the particle sample.
+- Validates user permissions (admin or project manager) before proceeding.
 - Uses a generic EcoTaxa account (per instance) for API authentication during cleanup.
 
 #### Cascading EcoTaxa Cleanup on Project Deletion
 - `DELETE /projects/:id` now cleans up all EcoTaxa samples and deletes the linked EcoTaxa project before removing the EcoPart project.
+- Validates user permissions (admin or project manager) before proceeding.
 - Full cascade: EcoTaxa objects → particle samples → EcoTaxa project → EcoPart project.
 
 ### New EcoTaxa API Integration Methods

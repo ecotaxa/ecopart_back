@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -399,6 +399,12 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     async getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null> {
         const ecotaxa_instance = await this.ecotaxa_accountDataSource.getOneEcoTaxaInstance(ecotaxa_instance_id);
         return ecotaxa_instance;
+    }
+    async getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]> {
+        return await this.ecotaxa_accountDataSource.getAllEcoTaxaInstances();
+    }
+    async createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number> {
+        return await this.ecotaxa_accountDataSource.createEcoTaxaInstance(instance);
     }
     async ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void> {
         if (!await this.ecotaxa_account_belongs(current_user.user_id, ecotaxa_account_id)) {

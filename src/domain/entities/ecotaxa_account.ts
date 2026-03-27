@@ -5,6 +5,11 @@ export interface EcotaxaInstanceModel {
     ecotaxa_instance_creation_date: string;
     ecotaxa_instance_url: string;
 }
+export interface EcotaxaInstanceRequestCreationModel {
+    ecotaxa_instance_name: string;
+    ecotaxa_instance_description: string;
+    ecotaxa_instance_url: string;
+}
 export interface EcotaxaAccountRequestCreationModel {
     ecotaxa_account_ecotaxa_id: number;
     ecotaxa_account_ecopart_user_id: number;
