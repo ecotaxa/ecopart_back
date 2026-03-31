@@ -4,7 +4,8 @@ import { UserRequestCreationModel, UserUpdateModel } from '../../../../src/domai
 import fs from 'fs';
 
 const config = {
-    TEST_DBSOURCE: 'TEST_DB_SOURCE_USER'
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_USER',
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
 function initializeUserDB() {
@@ -18,7 +19,7 @@ function initializeUserDB() {
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
-    return new SQLiteUserDataSource(db)
+    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
 }
 
 function cleanUserDB() {

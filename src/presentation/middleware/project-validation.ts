@@ -157,7 +157,7 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
                 return true;
             }),
         // ecotaxa_instance_id Validation
-        check('ecotaxa_instance_id').optional()
+        check('ecotaxa_instance_id').optional({ nullable: true })
             .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.')
             .default(null),
         // new_ecotaxa_project Validation
@@ -165,7 +165,7 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .isBoolean().withMessage('New Ecotaxa project must be a boolean value.')
             .default(false),
         // ecotaxa_account_id Validation
-        check('ecotaxa_account_id').optional()
+        check('ecotaxa_account_id').optional({ nullable: true })
             .isInt({ min: 1 }).withMessage('Ecotaxa account ID must be a number and must be greater than 0.')
             .default(null),
         // Error Handling Middleware
@@ -289,13 +289,13 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
                 return true;
             }),
         // ecotaxa_instance_id Validation
-        check('ecotaxa_instance_id').optional()
+        check('ecotaxa_instance_id').optional({ nullable: true })
             .isInt({ min: 1 }).withMessage('Ecotaxa instance ID must be a number and must be greater than 0.'),
         // new_ecotaxa_project Validation
         check('new_ecotaxa_project').optional()
             .isBoolean().withMessage('New Ecotaxa project must be a boolean value.'),
         // ecotaxa_account_id Validation
-        check('ecotaxa_account_id').optional()
+        check('ecotaxa_account_id').optional({ nullable: true })
             .isInt({ min: 1 }).withMessage('Ecotaxa account ID must be a number and must be greater than 0.'),
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {

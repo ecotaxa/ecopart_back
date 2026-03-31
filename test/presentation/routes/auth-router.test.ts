@@ -17,6 +17,8 @@ import { ResetPasswordUseCase } from "../../../src/domain/interfaces/use-cases/a
 import { MiddlewareAuthCookie } from "../../../src/presentation/middleware/auth-cookie";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth-validation";
+import { SearchInfo } from "../../../src/domain/entities/search";
+import { SearchUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/search-user";
 
 
 class MockLoginUserUseCase implements LoginUserUseCase {
@@ -52,6 +54,12 @@ class MockResetPasswordUseCase implements ResetPasswordUseCase {
         throw new Error("Method not implemented for ResetPasswordUseCase");
     }
 }
+class MockSearchUsersUseCase implements SearchUsersUseCase {
+    execute(): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
+        throw new Error("Method not implemented for SearchUsersUseCase");
+    }
+}
+
 describe("User Router", () => {
     // let mockMiddlewareAuth: MockMiddlewareAuth;
     let mockMiddlewareAuth: MiddlewareAuth;
@@ -62,6 +70,7 @@ describe("User Router", () => {
     let mockMiddlewareAuthValidation: MockMiddlewareAuthValidation;
     let mockResetPasswordRequestUseCase: MockResetPasswordRequestUseCase;
     let mockResetPasswordUseCase: MockResetPasswordUseCase;
+    let mockSearchUsersUseCase: MockSearchUsersUseCase;
 
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
@@ -77,8 +86,9 @@ describe("User Router", () => {
         mockChangePasswordUseCase = new MockChangePasswordUseCase()
         mockResetPasswordRequestUseCase = new MockResetPasswordRequestUseCase()
         mockResetPasswordUseCase = new MockResetPasswordUseCase()
+        mockSearchUsersUseCase = new MockSearchUsersUseCase()
 
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase))
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase, mockSearchUsersUseCase))
     })
 
     beforeEach(() => {

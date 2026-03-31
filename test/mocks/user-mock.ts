@@ -15,6 +15,7 @@ import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cas
 import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
 import { GetAllEcoTaxaInstancesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/get-all-ecotaxa-instances";
 import { CreateEcoTaxaInstanceUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/create-ecotaxa-instance";
+import { ListOrganisationsUseCase } from "../../src/domain/interfaces/use-cases/user/list-organisations";
 
 import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/auth";
 
@@ -91,6 +92,9 @@ export class MockUserRepository implements UserRepository {
     }
     verifyValidationToken(): DecodedToken | null {
         throw new Error("Method not implemented : verifyValidationToken");
+    }
+    getDistinctOrganisations(): Promise<string[]> {
+        throw new Error("Method not implemented : getDistinctOrganisations");
     }
 }
 
@@ -244,6 +248,12 @@ export class MockGetAllEcoTaxaInstancesUseCase implements GetAllEcoTaxaInstances
 export class MockCreateEcoTaxaInstanceUseCase implements CreateEcoTaxaInstanceUseCase {
     execute(): Promise<EcotaxaInstanceModel> {
         throw new Error("Method not implemented for CreateEcoTaxaInstanceUseCase");
+    }
+}
+
+export class MockListOrganisationsUseCase implements ListOrganisationsUseCase {
+    execute(): Promise<string[]> {
+        throw new Error("Method not implemented for ListOrganisationsUseCase");
     }
 }
 

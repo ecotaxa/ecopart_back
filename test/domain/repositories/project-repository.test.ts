@@ -248,7 +248,8 @@ describe("Project Repository", () => {
     describe("toPublicProject", () => {
         test("Should return public project", () => {
             const result = projectRepository.toPublicProject(projectResponseModel, publicPrivileges_WithMemberAndManager)
-            expect(result).toStrictEqual(projectResponseModel)
+            const { new_ecotaxa_project, ecotaxa_account_id, ...expectedResult } = projectResponseModel as any
+            expect(result).toStrictEqual(expectedResult)
         });
     });
 

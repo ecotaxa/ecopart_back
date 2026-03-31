@@ -31,6 +31,9 @@ class MockUserDataSource implements UserDataSource {
     getUserLogin(): Promise<AuthUserCredentialsModel | null> {
         throw new Error("Method not implemented for getUserLogin");
     }
+    getDistinctOrganisations(): Promise<string[]> {
+        throw new Error("Method not implemented for getDistinctOrganisations");
+    }
 
 }
 class MockBcryptAdapter extends BcryptAdapter {

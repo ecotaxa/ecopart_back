@@ -16,7 +16,7 @@ import { IMiddlewareProjectValidation } from "../../../src/presentation/interfac
 
 import { Request, Response, NextFunction } from "express";
 import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
-import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase } from "../../mocks/project-mock";
+import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase, MockListShipsUseCase, MockSearchEcoTaxaSamplesUseCase, MockDeleteEcoTaxaSamplesUseCase, MockImportEcoTaxaSamplesUseCase, MockListImportableEcoTaxaSamplesUseCase } from "../../mocks/project-mock";
 import { BackupProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/backup-project";
 import { ExportBackupedProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/export-backuped-project";
 import { DeleteSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/delete-sample";
@@ -28,7 +28,11 @@ import { TaskResponseModel_1, TaskResponseModel_2 } from "../../entities/task";
 import { PublicHeaderSampleResponseModel } from "../../../src/domain/entities/sample";
 import { SearchSampleResult } from "../../entities/sample";
 
-
+import { ListImportableEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples";
+import { ImportEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples";
+import { DeleteEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
+import { SearchEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
+import { ListShipsUseCase } from "../../../src/domain/interfaces/use-cases/project/list-ships";
 
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(req: Request, __: Response, next: NextFunction): void {
@@ -93,6 +97,11 @@ describe("Project Router", () => {
     let mockImportSamplesUseCase: ImportSamplesUseCase;
     let mockDeleteSampleUseCase: DeleteSampleUseCase;
     let mockSearchSamplesUseCase: SearchSamplesUseCase;
+    let mockListImportableEcoTaxaSamplesUseCase: ListImportableEcoTaxaSamplesUseCase;
+    let mockImportEcoTaxaSamplesUseCase: ImportEcoTaxaSamplesUseCase;
+    let mockDeleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase;
+    let mockSearchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase;
+    let mockListShipsUseCase: ListShipsUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -108,9 +117,14 @@ describe("Project Router", () => {
         mockImportSamplesUseCase = new MockImportSamplesUseCase()
         mockDeleteSampleUseCase = new MockDeleteSampleUseCase()
         mockSearchSamplesUseCase = new MockSearchSamplesUseCase()
+        mockListShipsUseCase = new MockListShipsUseCase()
+        mockListImportableEcoTaxaSamplesUseCase = new MockListImportableEcoTaxaSamplesUseCase()
+        mockImportEcoTaxaSamplesUseCase = new MockImportEcoTaxaSamplesUseCase()
+        mockDeleteEcoTaxaSamplesUseCase = new MockDeleteEcoTaxaSamplesUseCase()
+        mockSearchEcoTaxaSamplesUseCase = new MockSearchEcoTaxaSamplesUseCase()
+        mockListShipsUseCase = new MockListShipsUseCase()
 
-
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListShipsUseCase))
     })
 
     beforeEach(() => {

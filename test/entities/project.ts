@@ -470,6 +470,11 @@ export const projectRequestCreationModel_withmissingOverrideDepthOffset = {
     contact: { user_id: 1 } as MinimalUserModel,
     managers: [{ user_id: 1 } as MinimalUserModel],
     members: [{ user_id: 2 } as MinimalUserModel],
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
+    new_ecotaxa_project: false,
+    ecotaxa_account_id: null,
 }
 export const privateProjectRequestCreationModel_withmissingOverrideDepthOffset = {
     root_folder_path: 'root_folder_path',
@@ -490,7 +495,10 @@ export const privateProjectRequestCreationModel_withmissingOverrideDepthOffset =
     visible_duration: 1,
     public_duration: 1,
     instrument_model: 1,
-    serial_number: 'serial_number'
+    serial_number: 'serial_number',
+    ecotaxa_project_id: null,
+    ecotaxa_project_name: null,
+    ecotaxa_instance_id: null,
 }
 
 export const projectResponseModel: PublicProjectResponseModel = {
