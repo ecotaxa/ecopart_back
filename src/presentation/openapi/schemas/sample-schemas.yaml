@@ -15,13 +15,14 @@ components:
         sample_name:
           type: string
           description: Sample name.
-          example: "Station_A_001"
+          example: "Mooring_BATS_20240615"
         comment:
           type: string
           description: Optional comment.
         instrument_serial_number:
           type: string
           description: Instrument serial number.
+          example: "000002LP"
         optional_structure_id:
           type: string
           description: Optional structure ID (e.g., Argo or Glider ID).
@@ -156,7 +157,8 @@ components:
           description: Quality check status ID.
         visual_qc_status_label:
           type: string
-          description: "Quality check status label (e.g., pending, validated, rejected)."
+          description: "Quality check status label (e.g., PENDING, VALIDATED, REJECTED)."
+          example: "PENDING"
         visual_qc_validator_user:
           type: string
           description: "Quality check validator user name (format: last_name first_name (email))."
@@ -165,7 +167,8 @@ components:
           description: Sample type ID.
         sample_type_label:
           type: string
-          description: "Sample type label (e.g., Depth profile, Time serie)."
+          description: "Sample type label (e.g., Time, Depth)."
+          example: "Time"
         project_id:
           type: integer
           description: Parent project ID.

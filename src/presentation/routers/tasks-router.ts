@@ -81,7 +81,25 @@ export default function TaskRouter(
      * /tasks/searches:
      *   post:
      *     summary: Search tasks
-     *     description: Returns a paginated, sorted, and filtered list of tasks. Filters are passed in the request body.
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of tasks.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.
      *     tags: [Tasks]
      *     security:
      *       - cookieAccessToken: []
@@ -97,6 +115,10 @@ export default function TaskRouter(
      *             type: array
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "task_id"
+     *               operator: "="
+     *               value: 39
      *     responses:
      *       200:
      *         description: Paginated filtered list of tasks.

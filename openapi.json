@@ -285,7 +285,7 @@
           "field": {
             "type": "string",
             "description": "The field name to filter on.",
-            "example": "email"
+            "example": "instrument_model"
           },
           "operator": {
             "type": "string",
@@ -300,7 +300,7 @@
               "IN",
               "LIKE"
             ],
-            "example": "LIKE"
+            "example": "="
           },
           "value": {
             "description": "The value to compare against. Type depends on the field and operator.",
@@ -319,7 +319,7 @@
                 "items": {}
               }
             ],
-            "example": "%john%"
+            "example": "UVP5HD"
           }
         },
         "required": [
@@ -1082,7 +1082,7 @@
           "sample_name": {
             "type": "string",
             "description": "Sample name.",
-            "example": "Station_A_001"
+            "example": "Mooring_BATS_20240615"
           },
           "comment": {
             "type": "string",
@@ -1090,7 +1090,8 @@
           },
           "instrument_serial_number": {
             "type": "string",
-            "description": "Instrument serial number."
+            "description": "Instrument serial number.",
+            "example": "000002LP"
           },
           "optional_structure_id": {
             "type": "string",
@@ -1268,7 +1269,8 @@
           },
           "visual_qc_status_label": {
             "type": "string",
-            "description": "Quality check status label (e.g., pending, validated, rejected)."
+            "description": "Quality check status label (e.g., PENDING, VALIDATED, REJECTED).",
+            "example": "PENDING"
           },
           "visual_qc_validator_user": {
             "type": "string",
@@ -1280,7 +1282,8 @@
           },
           "sample_type_label": {
             "type": "string",
-            "description": "Sample type label (e.g., Depth profile, Time serie)."
+            "description": "Sample type label (e.g., Time, Depth).",
+            "example": "Time"
           },
           "project_id": {
             "type": "integer",
@@ -1669,7 +1672,8 @@
         "schema": {
           "type": "string"
         },
-        "description": "Sorting statement formatted as: asc(field1),desc(field2),..."
+        "description": "Sorting statement formatted as: asc(field1),desc(field2),...",
+        "example": "asc(project_id),desc(task_status_id)"
       }
     }
   },
@@ -2474,7 +2478,7 @@
     "/projects/searches": {
       "post": {
         "summary": "Search projects",
-        "description": "Returns a paginated, sorted, and filtered list of projects. Filters are passed in the request body.",
+        "description": "Returns a paginated, sorted, and filtered list of projects.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `!=` / `<>` | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `!= \"null\"` → `IS NOT NULL`).\n\n**Computed filter fields:**\n- `for_managing` (`= true`) — restricts results to projects where the current user has at least one privilege.\n- `instrument_model` — resolved to matching instrument model IDs internally.\n- `contact`, `managers`, `members`, `granted_users` — resolved to project IDs via the privilege system.\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.\n",
         "tags": [
           "Projects"
         ],
@@ -2503,7 +2507,35 @@
                 "items": {
                   "$ref": "#/components/schemas/FilterSearchOptions"
                 }
-              }
+              },
+              "example": [
+                {
+                  "field": "project_information",
+                  "operator": "LIKE",
+                  "value": "tes%"
+                },
+                {
+                  "field": "instrument_model",
+                  "operator": "=",
+                  "value": "UVP5HD"
+                },
+                {
+                  "field": "project_id",
+                  "operator": "IN",
+                  "value": [
+                    1,
+                    3,
+                    5,
+                    2,
+                    4
+                  ]
+                },
+                {
+                  "field": "for_managing",
+                  "operator": "=",
+                  "value": true
+                }
+              ]
             }
           }
         },
@@ -3153,7 +3185,7 @@
     "/projects/{project_id}/samples/searches": {
       "post": {
         "summary": "Search samples",
-        "description": "Returns a paginated, sorted, and filtered list of samples for the given project.",
+        "description": "Returns a paginated, sorted, and filtered list of samples for the given project.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `!=` / `<>` | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `!= \"null\"` → `IS NOT NULL`).\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.\n",
         "tags": [
           "Samples"
         ],
@@ -3191,7 +3223,32 @@
                 "items": {
                   "$ref": "#/components/schemas/FilterSearchOptions"
                 }
-              }
+              },
+              "example": [
+                {
+                  "field": "sample_name",
+                  "operator": "LIKE",
+                  "value": "Mooring%"
+                },
+                {
+                  "field": "instrument_serial_number",
+                  "operator": "=",
+                  "value": "000002LP"
+                },
+                {
+                  "field": "sample_type_label",
+                  "operator": "IN",
+                  "value": [
+                    "Time",
+                    "Depth"
+                  ]
+                },
+                {
+                  "field": "visual_qc_status_label",
+                  "operator": "=",
+                  "value": "PENDING"
+                }
+              ]
             }
           }
         },
@@ -3688,7 +3745,7 @@
     "/projects/{project_id}/ecotaxa_samples/searches": {
       "post": {
         "summary": "Search EcoTaxa samples",
-        "description": "Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.",
+        "description": "Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `!=` / `<>` | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `!= \"null\"` → `IS NOT NULL`).\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.\n",
         "tags": [
           "EcoTaxa Samples"
         ],
@@ -3726,7 +3783,22 @@
                 "items": {
                   "$ref": "#/components/schemas/FilterSearchOptions"
                 }
-              }
+              },
+              "example": [
+                {
+                  "field": "sample_name",
+                  "operator": "LIKE",
+                  "value": "UVPCRS002%"
+                },
+                {
+                  "field": "sample_type_label",
+                  "operator": "IN",
+                  "value": [
+                    "Time",
+                    "Depth"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -3854,7 +3926,7 @@
     "/tasks/searches": {
       "post": {
         "summary": "Search tasks",
-        "description": "Returns a paginated, sorted, and filtered list of tasks. Filters are passed in the request body.",
+        "description": "Returns a paginated, sorted, and filtered list of tasks.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `!=` / `<>` | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `!= \"null\"` → `IS NOT NULL`).\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.\n",
         "tags": [
           "Tasks"
         ],
@@ -3883,7 +3955,14 @@
                 "items": {
                   "$ref": "#/components/schemas/FilterSearchOptions"
                 }
-              }
+              },
+              "example": [
+                {
+                  "field": "task_id",
+                  "operator": "=",
+                  "value": 39
+                }
+              ]
             }
           }
         },
@@ -4391,7 +4470,7 @@
     "/users/searches": {
       "post": {
         "summary": "Search users",
-        "description": "Returns a paginated, sorted, and filtered list of users. Filters are passed in the request body.",
+        "description": "Returns a paginated, sorted, and filtered list of users.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `!=` / `<>` | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `!= \"null\"` → `IS NOT NULL`).\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(last_name),desc(user_id)`.\n",
         "tags": [
           "Users"
         ],
@@ -4420,7 +4499,19 @@
                 "items": {
                   "$ref": "#/components/schemas/FilterSearchOptions"
                 }
-              }
+              },
+              "example": [
+                {
+                  "field": "valid_email",
+                  "operator": "=",
+                  "value": true
+                },
+                {
+                  "field": "user_id",
+                  "operator": "=",
+                  "value": 1
+                }
+              ]
             }
           }
         },

@@ -78,7 +78,7 @@ components:
         field:
           type: string
           description: The field name to filter on.
-          example: "email"
+          example: "instrument_model"
         operator:
           type: string
           description: The comparison operator.
@@ -91,7 +91,7 @@ components:
             - "<="
             - "IN"
             - "LIKE"
-          example: "LIKE"
+          example: "="
         value:
           description: The value to compare against. Type depends on the field and operator.
           oneOf:
@@ -100,7 +100,7 @@ components:
             - type: boolean
             - type: array
               items: {}
-          example: "%john%"
+          example: "UVP5HD"
       required:
         - field
         - operator
@@ -154,3 +154,4 @@ components:
       schema:
         type: string
       description: "Sorting statement formatted as: asc(field1),desc(field2),..."
+      example: "asc(project_id),desc(task_status_id)"

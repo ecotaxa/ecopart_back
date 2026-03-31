@@ -147,7 +147,30 @@ export default function ProjectRouter(
      * /projects/searches:
      *   post:
      *     summary: Search projects
-     *     description: Returns a paginated, sorted, and filtered list of projects. Filters are passed in the request body.
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of projects.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Computed filter fields:**
+     *       - `for_managing` (`= true`) — restricts results to projects where the current user has at least one privilege.
+     *       - `instrument_model` — resolved to matching instrument model IDs internally.
+     *       - `contact`, `managers`, `members`, `granted_users` — resolved to project IDs via the privilege system.
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -163,6 +186,19 @@ export default function ProjectRouter(
      *             type: array
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "project_information"
+     *               operator: "LIKE"
+     *               value: "tes%"
+     *             - field: "instrument_model"
+     *               operator: "="
+     *               value: "UVP5HD"
+     *             - field: "project_id"
+     *               operator: "IN"
+     *               value: [1, 3, 5, 2, 4]
+     *             - field: "for_managing"
+     *               operator: "="
+     *               value: true
      *     responses:
      *       200:
      *         description: Paginated filtered list of projects.
@@ -896,7 +932,25 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples/searches:
      *   post:
      *     summary: Search samples
-     *     description: Returns a paginated, sorted, and filtered list of samples for the given project.
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of samples for the given project.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -918,6 +972,19 @@ export default function ProjectRouter(
      *             type: array
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "sample_name"
+     *               operator: "LIKE"
+     *               value: "Mooring%"
+     *             - field: "instrument_serial_number"
+     *               operator: "="
+     *               value: "000002LP"
+     *             - field: "sample_type_label"
+     *               operator: "IN"
+     *               value: ["Time", "Depth"]
+     *             - field: "visual_qc_status_label"
+     *               operator: "="
+     *               value: "PENDING"
      *     responses:
      *       200:
      *         description: Paginated filtered list of samples.
@@ -1340,7 +1407,25 @@ export default function ProjectRouter(
      * /projects/{project_id}/ecotaxa_samples/searches:
      *   post:
      *     summary: Search EcoTaxa samples
-     *     description: Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.
      *     tags: [EcoTaxa Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1362,6 +1447,13 @@ export default function ProjectRouter(
      *             type: array
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "sample_name"
+     *               operator: "LIKE"
+     *               value: "UVPCRS002%"
+     *             - field: "sample_type_label"
+     *               operator: "IN"
+     *               value: ["Time", "Depth"]
      *     responses:
      *       200:
      *         description: Paginated filtered list of EcoTaxa samples.

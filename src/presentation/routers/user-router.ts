@@ -129,7 +129,25 @@ export default function UsersRouter(
      * /users/searches:
      *   post:
      *     summary: Search users
-     *     description: Returns a paginated, sorted, and filtered list of users. Filters are passed in the request body.
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of users.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(last_name),desc(user_id)`.
      *     tags: [Users]
      *     security:
      *       - cookieAccessToken: []
@@ -145,6 +163,13 @@ export default function UsersRouter(
      *             type: array
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "valid_email"
+     *               operator: "="
+     *               value: true
+     *             - field: "user_id"
+     *               operator: "="
+     *               value: 1
      *     responses:
      *       200:
      *         description: Paginated filtered list of users.
