@@ -47,6 +47,29 @@ export default function ProjectRouter(
 ) {
     const router = express.Router()
 
+    /**
+     * @openapi
+     * /projects/ships:
+     *   get:
+     *     summary: List all ships
+     *     description: Returns a list of all distinct ship names from projects.
+     *     tags: [Projects]
+     *     responses:
+     *       200:
+     *         description: List of ship names.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: string
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // List of all distinct ships
     router.get('/ships', async (req: Request, res: Response) => {
         try {
@@ -58,6 +81,51 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects:
+     *   get:
+     *     summary: List projects
+     *     description: Returns a paginated and sorted list of all projects visible to the authenticated user.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of projects.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ProjectSearchResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Instrument model or privileges not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of all project
     router.get('/', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {
         try {
@@ -74,6 +142,59 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/searches:
+     *   post:
+     *     summary: Search projects
+     *     description: Returns a paginated, sorted, and filtered list of projects. Filters are passed in the request body.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: array
+     *             items:
+     *               $ref: '#/components/schemas/FilterSearchOptions'
+     *     responses:
+     *       200:
+     *         description: Paginated filtered list of projects.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ProjectSearchResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters/filters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Instrument model or privileges not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of filtered project
     router.post('/searches', middlewareAuth.auth, middlewareProjectValidation.rulesGetProjects, async (req: Request, res: Response) => {
         try {
@@ -101,6 +222,59 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects:
+     *   post:
+     *     summary: Create project
+     *     description: Create a new project with instrument, privilege, and optional EcoTaxa configuration.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ProjectRequestCreation'
+     *     responses:
+     *       201:
+     *         description: Project successfully created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicProjectResponse'
+     *       401:
+     *         description: Unauthorized or EcoTaxa configuration error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Instrument or user not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post('/', middlewareAuth.auth, middlewareProjectValidation.rulesProjectRequestCreationModel, async (req: Request, res: Response) => {
         try {
             const created_project = await createProjectUseCase.execute((req as CustomRequest).token, req.body)
@@ -130,6 +304,60 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}:
+     *   patch:
+     *     summary: Update project
+     *     description: Update an existing project. Can update project info, privileges, and EcoTaxa settings.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID to update.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ProjectUpdate'
+     *     responses:
+     *       200:
+     *         description: Updated project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicProjectResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project, instrument, or user not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.patch('/:project_id/', middlewareProjectValidation.rulesProjectUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const updated_project = await updateProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
@@ -158,6 +386,54 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}:
+     *   delete:
+     *     summary: Delete project
+     *     description: Permanently delete a project and its associated data.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID to delete.
+     *     responses:
+     *       200:
+     *         description: Project successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Logged user cannot delete this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.delete('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             await deleteProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
@@ -171,6 +447,60 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/backup:
+     *   post:
+     *     summary: Backup project
+     *     description: Start a project backup task. Reads sample data from the filesystem and stores it in the database.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ProjectBackupRequest'
+     *     responses:
+     *       200:
+     *         description: Backup task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: User not authorized for this project or backup already running.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project, task type/status, or folder not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // L0-b project backup
     router.post('/:project_id/backup', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackup, async (req: Request, res: Response) => {
         try {
@@ -192,6 +522,60 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/backup/export:
+     *   post:
+     *     summary: Export project backup
+     *     description: Start a backup export task. Exports backed-up project data, optionally to FTP.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ProjectBackupExportRequest'
+     *     responses:
+     *       200:
+     *         description: Export task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: User not authorized for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project, backup folder, or task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // L0-b project backup export
     router.post('/:project_id/backup/export', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackup, async (req: Request, res: Response) => {
         try {
@@ -214,6 +598,56 @@ export default function ProjectRouter(
 
     /***********************************************SAMPLES PARTICULES***********************************************/
 
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/can_be_imported:
+     *   get:
+     *     summary: List importable samples
+     *     description: Returns a list of sample files that can be imported for the given project.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: List of importable sample names.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: string
+     *       401:
+     *         description: Not authorized for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or folder not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.get('/:project_id/samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const tasks = await listImportableSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
@@ -259,6 +693,60 @@ export default function ProjectRouter(
         return { status: 500, errors: [defaultMessage] };
     };
 
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/import:
+     *   post:
+     *     summary: Import samples
+     *     description: Import selected samples into the project. Optionally triggers a backup after import.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/SampleImportRequest'
+     *     responses:
+     *       200:
+     *         description: Import (and optional backup) completed successfully.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleImportResponse'
+     *       401:
+     *         description: User not authorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or samples not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error or partial failure.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post("/:project_id/samples/import", middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
         let importError, backupError;
         let task_import_samples, task_backup_project;
@@ -333,6 +821,57 @@ export default function ProjectRouter(
     }
     );
 
+    /**
+     * @openapi
+     * /projects/{project_id}/samples:
+     *   get:
+     *     summary: List samples
+     *     description: Returns a paginated and sorted list of all samples for the given project.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *       401:
+     *         description: Invalid parameters or unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of all samples for the given project
     router.get('/:project_id/samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
@@ -352,6 +891,65 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/searches:
+     *   post:
+     *     summary: Search samples
+     *     description: Returns a paginated, sorted, and filtered list of samples for the given project.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: array
+     *             items:
+     *               $ref: '#/components/schemas/FilterSearchOptions'
+     *     responses:
+     *       200:
+     *         description: Paginated filtered list of samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *       401:
+     *         description: Invalid parameters/filters or unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of filtered samples for the given project
     router.post('/:project_id/samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
@@ -371,6 +969,60 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/{sample_id}:
+     *   delete:
+     *     summary: Delete sample
+     *     description: Permanently delete a sample from a project.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The sample ID to delete.
+     *     responses:
+     *       200:
+     *         description: Sample successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: User cannot delete sample or project mismatch.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Delete a sample
     router.delete('/:project_id/samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -388,6 +1040,56 @@ export default function ProjectRouter(
 
     /***********************************************ECOTAXA SAMPLES***********************************************/
 
+    /**
+     * @openapi
+     * /projects/{project_id}/ecotaxa_samples/can_be_imported:
+     *   get:
+     *     summary: List importable EcoTaxa samples
+     *     description: Returns a list of EcoTaxa sample files that can be imported for the given project.
+     *     tags: [EcoTaxa Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: List of importable EcoTaxa sample names.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: string
+     *       401:
+     *         description: Not authorized for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or folder not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.get('/:project_id/ecotaxa_samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
         console.log("Received request to list importable EcoTaxa samples for project:", req.params.project_id);
         try {
@@ -434,6 +1136,60 @@ export default function ProjectRouter(
         return { status: 500, errors: [defaultMessage] };
     };
 
+    /**
+     * @openapi
+     * /projects/{project_id}/ecotaxa_samples/import:
+     *   post:
+     *     summary: Import EcoTaxa samples
+     *     description: Import selected EcoTaxa samples into the project. Optionally triggers a backup after import.
+     *     tags: [EcoTaxa Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/SampleImportRequest'
+     *     responses:
+     *       200:
+     *         description: Import (and optional backup) completed successfully.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleImportResponse'
+     *       401:
+     *         description: User not authorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or samples not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error or partial failure.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post("/:project_id/ecotaxa_samples/import", middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
         let importError, backupError;
         let task_import_samples, task_backup_project;
@@ -509,6 +1265,57 @@ export default function ProjectRouter(
     }
     );
 
+    /**
+     * @openapi
+     * /projects/{project_id}/ecotaxa_samples:
+     *   get:
+     *     summary: List EcoTaxa samples
+     *     description: Returns a paginated and sorted list of all EcoTaxa samples for the given project.
+     *     tags: [EcoTaxa Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of EcoTaxa samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *       401:
+     *         description: Invalid parameters or unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of all samples for the given project
     router.get('/:project_id/ecotaxa_samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
@@ -528,6 +1335,65 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/ecotaxa_samples/searches:
+     *   post:
+     *     summary: Search EcoTaxa samples
+     *     description: Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.
+     *     tags: [EcoTaxa Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: array
+     *             items:
+     *               $ref: '#/components/schemas/FilterSearchOptions'
+     *     responses:
+     *       200:
+     *         description: Paginated filtered list of EcoTaxa samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *       401:
+     *         description: Invalid parameters/filters or unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of filtered samples for the given project
     router.post('/:project_id/ecotaxa_samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
@@ -547,6 +1413,68 @@ export default function ProjectRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /projects/{project_id}/ecotaxa_samples:
+     *   delete:
+     *     summary: Delete EcoTaxa samples
+     *     description: Delete one or more EcoTaxa samples from a project.
+     *     tags: [EcoTaxa Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - samples
+     *             properties:
+     *               samples:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: Array of sample IDs to delete.
+     *     responses:
+     *       200:
+     *         description: EcoTaxa samples successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: User cannot delete sample or project mismatch.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Delete a sample
     router.delete('/:project_id/ecotaxa_samples', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {

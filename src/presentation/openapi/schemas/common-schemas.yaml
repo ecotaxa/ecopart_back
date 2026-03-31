@@ -1,0 +1,156 @@
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      description: Standard error response.
+      properties:
+        errors:
+          type: array
+          items:
+            type: string
+          description: List of error messages.
+          example: ["Cannot perform action"]
+      required:
+        - errors
+
+    MessageResponse:
+      type: object
+      description: Standard success message response.
+      properties:
+        message:
+          type: string
+          description: Success message.
+          example: "Operation successful"
+      required:
+        - message
+
+    ValidationErrorResponse:
+      type: object
+      description: Validation error response from express-validator.
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                example: "field"
+              value:
+                type: string
+              msg:
+                type: string
+                description: Validation error message.
+              path:
+                type: string
+                description: Field path that failed validation.
+              location:
+                type: string
+                description: Location of the field (body, query, params).
+                example: "body"
+
+    SearchOptions:
+      type: object
+      description: Pagination and sorting query parameters.
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Page number (1-indexed).
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          default: 10
+          description: Number of items per page.
+          example: 10
+        sort_by:
+          type: string
+          description: "Sorting statement formatted as: asc(field1),desc(field2),..."
+          default: "asc(user_id)"
+          example: "asc(user_id)"
+
+    FilterSearchOptions:
+      type: object
+      description: A single filter criterion for search endpoints.
+      properties:
+        field:
+          type: string
+          description: The field name to filter on.
+          example: "email"
+        operator:
+          type: string
+          description: The comparison operator.
+          enum:
+            - "="
+            - "!="
+            - ">"
+            - ">="
+            - "<"
+            - "<="
+            - "IN"
+            - "LIKE"
+          example: "LIKE"
+        value:
+          description: The value to compare against. Type depends on the field and operator.
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+              items: {}
+          example: "%john%"
+      required:
+        - field
+        - operator
+        - value
+
+    SearchInfo:
+      type: object
+      description: Pagination metadata returned with search results.
+      properties:
+        total:
+          type: integer
+          description: Total number of items matching the query.
+          example: 42
+        limit:
+          type: integer
+          description: Items per page.
+          example: 10
+        total_on_page:
+          type: integer
+          description: Number of items on the current page.
+          example: 10
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        pages:
+          type: integer
+          description: Total number of pages.
+          example: 5
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number (1-indexed).
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 10
+      description: Number of items per page.
+    SortByParam:
+      name: sort_by
+      in: query
+      schema:
+        type: string
+      description: "Sorting statement formatted as: asc(field1),desc(field2),..."

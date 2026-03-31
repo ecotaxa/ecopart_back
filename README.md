@@ -57,6 +57,34 @@ To deploy a new version of the application to production, follow these steps:
      ```
 
 ### Link with EcoTaxa
+
+### OpenAPI Documentation
+
+The API is documented using the [OpenAPI 3.0](https://swagger.io/specification/) specification. Documentation is auto-generated from `@openapi` JSDoc annotations in the router files and YAML schema definitions.
+
+**Interactive Swagger UI** is available at `/api-docs` when the server is running (disable it by setting `ENABLE_SWAGGER=false` in your `.env`). The raw JSON spec is served at `/api-docs.json`.
+
+**Generate `openapi.json`** (static file at project root):
+
+```bash
+npm run openapi:generate
+```
+
+**Validate the generated spec:**
+
+```bash
+npm run openapi:validate
+```
+
+**How it works:**
+- Router annotations live in `src/presentation/routers/*.ts` as `@openapi` JSDoc blocks.
+- Reusable schemas are defined in `src/presentation/openapi/schemas/*.yaml`.
+- The base OpenAPI config is in `src/presentation/openapi/swagger-definition.ts`.
+- `swagger-jsdoc` merges all of the above at runtime (Swagger UI) or build time (`tools/generateOpenApi.ts`).
+
+When you add or modify an endpoint, add/update the `@openapi` annotation above it. If the request/response shape changes, update the corresponding YAML schema file as well.
+
+### Link with EcoTaxa
 You can configure GENERIC_ECOTAXA_ACCOUNT_EMAIL in the .env file. Applicative accounts are created with this email in every EcoTaxa instances. You should then loggin to ecopart user that uses the same email as GENERIC_ECOTAXA_ACCOUNT_EMAIL and loggin for every instances to the related applicative ecotaxa account. For now you should reconnect to theses accounts every 30 day. We are working on an EcoTaxa feature to ease this process trough a refresh token or longer token.
 
 ### Glossary

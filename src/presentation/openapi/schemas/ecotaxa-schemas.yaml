@@ -1,0 +1,103 @@
+components:
+  schemas:
+    EcotaxaInstance:
+      type: object
+      description: EcoTaxa instance information.
+      properties:
+        ecotaxa_instance_id:
+          type: integer
+          description: Unique EcoTaxa instance identifier.
+          example: 1
+        ecotaxa_instance_name:
+          type: string
+          description: Name of the EcoTaxa instance.
+          example: "EcoTaxa Main"
+        ecotaxa_instance_description:
+          type: string
+          description: Description of the EcoTaxa instance.
+          example: "Main EcoTaxa production instance."
+        ecotaxa_instance_creation_date:
+          type: string
+          description: Instance creation date.
+          example: "2024-01-15T10:30:00.000Z"
+        ecotaxa_instance_url:
+          type: string
+          description: URL of the EcoTaxa instance.
+          example: "https://ecotaxa.obs-vlfr.fr"
+
+    EcotaxaInstanceRequestCreation:
+      type: object
+      description: Request body for creating a new EcoTaxa instance.
+      properties:
+        ecotaxa_instance_name:
+          type: string
+          description: Name of the EcoTaxa instance.
+          example: "EcoTaxa Main"
+        ecotaxa_instance_description:
+          type: string
+          description: Description of the EcoTaxa instance.
+          example: "Main EcoTaxa production instance."
+        ecotaxa_instance_url:
+          type: string
+          description: URL of the EcoTaxa instance.
+          example: "https://ecotaxa.obs-vlfr.fr"
+      required:
+        - ecotaxa_instance_name
+        - ecotaxa_instance_description
+        - ecotaxa_instance_url
+
+    EcotaxaAccountLogin:
+      type: object
+      description: Request body for logging into an EcoTaxa account.
+      properties:
+        ecotaxa_user_login:
+          type: string
+          format: email
+          description: EcoTaxa user login (email).
+          example: "user@ecotaxa.obs-vlfr.fr"
+        ecotaxa_user_password:
+          type: string
+          format: password
+          description: EcoTaxa user password.
+        ecotaxa_instance_id:
+          type: integer
+          description: EcoTaxa instance ID to log into.
+          example: 1
+      required:
+        - ecotaxa_user_login
+        - ecotaxa_user_password
+        - ecotaxa_instance_id
+
+    PublicEcotaxaAccountResponse:
+      type: object
+      description: Public EcoTaxa account information.
+      properties:
+        ecotaxa_account_instance_id:
+          type: integer
+          description: EcoTaxa instance ID.
+        ecotaxa_account_id:
+          type: integer
+          description: EcoPart internal account ID.
+        ecotaxa_account_ecotaxa_id:
+          type: integer
+          description: User ID in the EcoTaxa system.
+        ecotaxa_user_name:
+          type: string
+          description: User name in EcoTaxa.
+        ecotaxa_expiration_date:
+          type: string
+          description: Token expiration date.
+        ecotaxa_account_instance_name:
+          type: string
+          description: Name of the EcoTaxa instance.
+
+    EcotaxaAccountSearchResponse:
+      type: object
+      description: Paginated EcoTaxa account search results.
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        ecotaxa_accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicEcotaxaAccountResponse"

@@ -1,0 +1,395 @@
+components:
+  schemas:
+    ProjectRequestCreation:
+      type: object
+      description: Request body for creating a new project.
+      properties:
+        root_folder_path:
+          type: string
+          description: Path to the project root data folder.
+          example: "/data/projects/my_project"
+        project_title:
+          type: string
+          description: Full title of the project.
+          example: "Mediterranean Particle Survey 2024"
+        project_acronym:
+          type: string
+          description: Short acronym for the project.
+          example: "MPS2024"
+        project_description:
+          type: string
+          description: Description of the project.
+          example: "Survey of marine particles in the Mediterranean Sea."
+        project_information:
+          type: string
+          description: Additional project information (optional).
+        cruise:
+          type: string
+          description: Name of the research cruise.
+          example: "MOOSE-GE 2024"
+        ship:
+          type: string
+          description: Name of the research vessel.
+          example: "Thalassa"
+        data_owner_name:
+          type: string
+          description: Name of the data owner.
+          example: "John Smith"
+        data_owner_email:
+          type: string
+          format: email
+          description: Email of the data owner.
+          example: "john.smith@example.com"
+        operator_name:
+          type: string
+          description: Name of the instrument operator.
+          example: "Jane Doe"
+        operator_email:
+          type: string
+          format: email
+          description: Email of the instrument operator.
+          example: "jane.doe@example.com"
+        chief_scientist_name:
+          type: string
+          description: Name of the chief scientist.
+          example: "Prof. Martin"
+        chief_scientist_email:
+          type: string
+          format: email
+          description: Email of the chief scientist.
+          example: "prof.martin@example.com"
+        override_depth_offset:
+          type: number
+          description: Optional depth offset override in meters.
+        enable_descent_filter:
+          type: boolean
+          description: Whether to enable the descent filter.
+          example: true
+        privacy_duration:
+          type: number
+          description: Duration in months for which the project data is private.
+          example: 24
+        visible_duration:
+          type: number
+          description: Duration in months for which the project data is visible (metadata only).
+          example: 36
+        public_duration:
+          type: number
+          description: Duration in months for which the project data is fully public.
+          example: 48
+        instrument_model:
+          type: string
+          description: Name or ID of the instrument model.
+          example: "UVP5HD"
+        serial_number:
+          type: string
+          description: Serial number of the instrument.
+          example: "SN001"
+        members:
+          type: array
+          description: List of project members (users with view access).
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        managers:
+          type: array
+          description: List of project managers (users with full access).
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        contact:
+          $ref: "#/components/schemas/MinimalUser"
+        ecotaxa_project_id:
+          type: integer
+          nullable: true
+          description: Linked EcoTaxa project ID (null if none).
+        ecotaxa_project_name:
+          type: string
+          nullable: true
+          description: Linked EcoTaxa project name.
+        ecotaxa_instance_id:
+          type: integer
+          nullable: true
+          description: EcoTaxa instance ID for the linked project.
+        new_ecotaxa_project:
+          type: boolean
+          description: Whether to create a new EcoTaxa project.
+        ecotaxa_account_id:
+          type: integer
+          nullable: true
+          description: EcoTaxa account ID to use for project creation.
+      required:
+        - root_folder_path
+        - project_title
+        - project_acronym
+        - cruise
+        - data_owner_name
+        - data_owner_email
+        - operator_name
+        - operator_email
+        - chief_scientist_name
+        - chief_scientist_email
+        - enable_descent_filter
+        - privacy_duration
+        - visible_duration
+        - public_duration
+        - instrument_model
+        - serial_number
+        - members
+        - managers
+        - contact
+
+    ProjectUpdate:
+      type: object
+      description: Request body for updating a project. All fields are optional.
+      properties:
+        root_folder_path:
+          type: string
+          description: Path to the project root data folder.
+        project_title:
+          type: string
+          description: Full title of the project.
+        project_acronym:
+          type: string
+          description: Short acronym for the project.
+        project_description:
+          type: string
+          description: Description of the project.
+        project_information:
+          type: string
+          description: Additional project information.
+        cruise:
+          type: string
+          description: Name of the research cruise.
+        ship:
+          type: string
+          description: Name of the research vessel.
+        data_owner_name:
+          type: string
+          description: Name of the data owner.
+        data_owner_email:
+          type: string
+          format: email
+          description: Email of the data owner.
+        operator_name:
+          type: string
+          description: Name of the instrument operator.
+        operator_email:
+          type: string
+          format: email
+          description: Email of the instrument operator.
+        chief_scientist_name:
+          type: string
+          description: Name of the chief scientist.
+        chief_scientist_email:
+          type: string
+          format: email
+          description: Email of the chief scientist.
+        override_depth_offset:
+          type: number
+          description: Optional depth offset override in meters.
+        enable_descent_filter:
+          type: boolean
+          description: Whether to enable the descent filter.
+        privacy_duration:
+          type: number
+          description: Duration in months for private data access.
+        visible_duration:
+          type: number
+          description: Duration in months for visible data access.
+        public_duration:
+          type: number
+          description: Duration in months for public data access.
+        instrument_model:
+          type: string
+          description: Instrument model name or ID.
+        serial_number:
+          type: string
+          description: Instrument serial number.
+        members:
+          type: array
+          description: List of project members.
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        managers:
+          type: array
+          description: List of project managers.
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        contact:
+          $ref: "#/components/schemas/MinimalUser"
+        ecotaxa_project_id:
+          type: integer
+          nullable: true
+          description: Linked EcoTaxa project ID.
+        ecotaxa_instance_id:
+          type: integer
+          nullable: true
+          description: EcoTaxa instance ID.
+
+    PublicProjectResponse:
+      type: object
+      description: Public project information returned by API endpoints.
+      properties:
+        project_id:
+          type: integer
+          description: Unique project identifier.
+          example: 1
+        project_creation_date:
+          type: string
+          description: Project creation date.
+          example: "2024-01-15T10:30:00.000Z"
+        root_folder_path:
+          type: string
+          description: Path to the project root data folder.
+        project_title:
+          type: string
+          description: Full title of the project.
+        project_acronym:
+          type: string
+          description: Short acronym for the project.
+        project_description:
+          type: string
+          description: Description of the project.
+        project_information:
+          type: string
+          description: Additional project information.
+        cruise:
+          type: string
+          description: Name of the research cruise.
+        ship:
+          type: string
+          description: Name of the research vessel.
+        data_owner_name:
+          type: string
+          description: Name of the data owner.
+        data_owner_email:
+          type: string
+          format: email
+          description: Email of the data owner.
+        operator_name:
+          type: string
+          description: Name of the instrument operator.
+        operator_email:
+          type: string
+          format: email
+          description: Email of the instrument operator.
+        chief_scientist_name:
+          type: string
+          description: Name of the chief scientist.
+        chief_scientist_email:
+          type: string
+          format: email
+          description: Email of the chief scientist.
+        override_depth_offset:
+          type: number
+          description: Depth offset override in meters.
+        enable_descent_filter:
+          type: boolean
+          description: Whether the descent filter is enabled.
+        privacy_duration:
+          type: number
+          description: Duration in months for private access.
+        visible_duration:
+          type: number
+          description: Duration in months for visible access.
+        public_duration:
+          type: number
+          description: Duration in months for public access.
+        instrument_model:
+          type: string
+          description: Instrument model name.
+        serial_number:
+          type: string
+          description: Instrument serial number.
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        managers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        contact:
+          $ref: "#/components/schemas/MinimalUser"
+        ecotaxa_project_id:
+          type: integer
+          nullable: true
+          description: Linked EcoTaxa project ID.
+        ecotaxa_project_name:
+          type: string
+          nullable: true
+          description: Linked EcoTaxa project name.
+        ecotaxa_instance_id:
+          type: integer
+          nullable: true
+          description: EcoTaxa instance ID.
+
+    ProjectSearchResponse:
+      type: object
+      description: Paginated project search results.
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicProjectResponse"
+
+    ProjectBackupRequest:
+      type: object
+      description: Request body for project backup operations.
+      properties:
+        skip_already_imported:
+          type: boolean
+          description: Whether to skip samples that have already been imported.
+          example: true
+
+    ProjectBackupExportRequest:
+      type: object
+      description: Request body for exporting a project backup.
+      properties:
+        out_to_ftp:
+          type: boolean
+          description: Whether to export the backup to FTP.
+          example: false
+
+    SampleImportRequest:
+      type: object
+      description: Request body for importing samples into a project.
+      properties:
+        samples:
+          type: array
+          description: List of sample names/identifiers to import.
+          items:
+            type: string
+        backup_project:
+          type: boolean
+          description: Whether to also create a project backup after import.
+          example: false
+        backup_project_skip_already_imported:
+          type: boolean
+          description: Whether to skip already imported samples in the backup.
+          example: true
+
+    SampleImportResponse:
+      type: object
+      description: Response from sample import operation.
+      properties:
+        success:
+          type: boolean
+          description: Whether the overall operation was successful.
+        task_import_samples:
+          $ref: "#/components/schemas/TaskResponse"
+        task_backup_project:
+          $ref: "#/components/schemas/TaskResponse"
+        errors:
+          type: object
+          description: Error details if any operation failed.
+          properties:
+            import:
+              type: array
+              items:
+                type: string
+            backup:
+              type: array
+              items:
+                type: string

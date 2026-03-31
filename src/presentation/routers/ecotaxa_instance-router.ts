@@ -12,6 +12,29 @@ export default function EcoTaxaInstanceRouter(
 ) {
     const router = express.Router()
 
+    /**
+     * @openapi
+     * /ecotaxa_instances:
+     *   get:
+     *     summary: List EcoTaxa instances
+     *     description: Returns all registered EcoTaxa instances.
+     *     tags: [EcoTaxa Instances]
+     *     responses:
+     *       200:
+     *         description: List of EcoTaxa instances.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 $ref: '#/components/schemas/EcotaxaInstance'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Get all EcoTaxa instances
     router.get('/', async (req: Request, res: Response) => {
         try {
@@ -23,6 +46,47 @@ export default function EcoTaxaInstanceRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /ecotaxa_instances:
+     *   post:
+     *     summary: Create EcoTaxa instance
+     *     description: Create a new EcoTaxa instance (admin only).
+     *     tags: [EcoTaxa Instances]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/EcotaxaInstanceRequestCreation'
+     *     responses:
+     *       201:
+     *         description: EcoTaxa instance created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/EcotaxaInstance'
+     *       401:
+     *         description: Logged user cannot create an EcoTaxa instance.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Create a new EcoTaxa instance (admin only)
     router.post('/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {

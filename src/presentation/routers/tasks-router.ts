@@ -22,6 +22,45 @@ export default function TaskRouter(
     searchTaskUseCase: SearchTasksUseCase
 ) {
     const router = express.Router()
+    /**
+     * @openapi
+     * /tasks:
+     *   get:
+     *     summary: List tasks
+     *     description: Returns a paginated and sorted list of all tasks visible to the authenticated user.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of tasks.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskSearchResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task type or status label not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // TODO Manage errors
     // Pagined and sorted list of all task
     router.get('/', middlewareAuth.auth, middlewareTaskValidation.rulesGetTasks, async (req: Request, res: Response) => {
@@ -37,6 +76,59 @@ export default function TaskRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /tasks/searches:
+     *   post:
+     *     summary: Search tasks
+     *     description: Returns a paginated, sorted, and filtered list of tasks. Filters are passed in the request body.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: array
+     *             items:
+     *               $ref: '#/components/schemas/FilterSearchOptions'
+     *     responses:
+     *       200:
+     *         description: Paginated filtered list of tasks.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskSearchResponse'
+     *       401:
+     *         description: Invalid filter value.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task type or status label not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of filtered task
     router.post('/searches', middlewareAuth.auth, middlewareTaskValidation.rulesGetTasks, async (req: Request, res: Response) => {
         try {
@@ -52,6 +144,48 @@ export default function TaskRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /tasks/{task_id}:
+     *   get:
+     *     summary: Get one task
+     *     description: Returns detailed information for a specific task.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: task_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The task ID.
+     *     responses:
+     *       200:
+     *         description: Task details.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       403:
+     *         description: User cannot be used or insufficient permissions.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Get one task
     router.get('/:task_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -66,6 +200,48 @@ export default function TaskRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /tasks/{task_id}:
+     *   delete:
+     *     summary: Delete task
+     *     description: Delete a task (admin only).
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: task_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The task ID to delete.
+     *     responses:
+     *       200:
+     *         description: Task successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       403:
+     *         description: User cannot be used or cannot delete this task.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // For admin only
     router.delete('/:task_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -80,6 +256,48 @@ export default function TaskRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /tasks/{task_id}/log:
+     *   get:
+     *     summary: Get task log
+     *     description: Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: task_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The task ID.
+     *     responses:
+     *       200:
+     *         description: Task log content.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: string
+     *       403:
+     *         description: User cannot be used or insufficient permissions.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Fetch log for admin or task owner or project member/managers
     router.get('/:task_id/log', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -95,6 +313,49 @@ export default function TaskRouter(
         }
     });
 
+    /**
+     * @openapi
+     * /tasks/{task_id}/file:
+     *   get:
+     *     summary: Download task file
+     *     description: Stream the ZIP file produced by a task. Available to admins, task owners, and project members/managers.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: task_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The task ID.
+     *     responses:
+     *       200:
+     *         description: ZIP file stream.
+     *         content:
+     *           application/zip:
+     *             schema:
+     *               type: string
+     *               format: binary
+     *       403:
+     *         description: User cannot be used or insufficient permissions.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task or file not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Fetch task file for admin or task owner or project member/managers
     router.get('/:task_id/file', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {

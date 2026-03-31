@@ -1,0 +1,203 @@
+components:
+  schemas:
+    PublicSample:
+      type: object
+      description: Public sample information returned by API endpoints.
+      properties:
+        sample_id:
+          type: integer
+          description: Unique sample identifier.
+          example: 1
+        sample_creation_date:
+          type: string
+          description: Sample creation date in ISO format.
+          example: "2024-01-15T10:30:00.000Z"
+        sample_name:
+          type: string
+          description: Sample name.
+          example: "Station_A_001"
+        comment:
+          type: string
+          description: Optional comment.
+        instrument_serial_number:
+          type: string
+          description: Instrument serial number.
+        optional_structure_id:
+          type: string
+          description: Optional structure ID (e.g., Argo or Glider ID).
+        max_pressure:
+          type: number
+          description: Maximum pressure recorded.
+        station_id:
+          type: string
+          description: Station identifier.
+        sampling_date:
+          type: string
+          description: Sampling date in ISO format.
+          example: "2024-06-15T08:00:00.000Z"
+        latitude:
+          type: number
+          description: "Latitude in decimal degrees (negative for South)."
+          example: 43.2965
+        longitude:
+          type: number
+          description: "Longitude in decimal degrees (negative for West)."
+          example: 5.3698
+        wind_direction:
+          type: number
+          description: Wind direction in degrees.
+        wind_speed:
+          type: number
+          description: Wind speed.
+        sea_state:
+          type: string
+          description: Description or classification of sea state.
+        nebulousness:
+          type: number
+          description: Cloud coverage percentage (0-100).
+          minimum: 0
+          maximum: 100
+        bottom_depth:
+          type: number
+          description: Bottom depth in meters.
+        instrument_operator_email:
+          type: string
+          format: email
+          description: Instrument operator email.
+        filename:
+          type: string
+          description: Source file name.
+        filter_first_image:
+          type: string
+          description: First image filter.
+        filter_last_image:
+          type: string
+          description: Last image filter.
+        instrument_settings_acq_gain:
+          type: number
+          description: Acquisition gain.
+        instrument_settings_acq_description:
+          type: string
+          description: Acquisition description.
+        instrument_settings_acq_task_type:
+          type: number
+          description: Acquisition task type.
+        instrument_settings_acq_choice:
+          type: number
+          description: Acquisition choice.
+        instrument_settings_acq_disk_type:
+          type: number
+          description: Acquisition disk type.
+        instrument_settings_acq_appendices_ratio:
+          type: number
+          description: Acquisition appendices ratio.
+        instrument_settings_acq_xsize:
+          type: number
+          description: Acquisition X size in pixels.
+        instrument_settings_acq_ysize:
+          type: number
+          description: Acquisition Y size in pixels.
+        instrument_settings_acq_erase_border:
+          type: number
+          description: "Acquisition erase border flag (0 or 1)."
+        instrument_settings_acq_threshold:
+          type: number
+          description: Acquisition threshold value.
+        instrument_settings_process_datetime:
+          type: string
+          description: Process date and time in ISO format.
+        instrument_settings_process_gamma:
+          type: number
+          description: Process gamma value.
+        instrument_settings_images_post_process:
+          type: string
+          description: Image post-processing details.
+        instrument_settings_aa:
+          type: number
+          description: "Aa value for UVP6 (divided by 10^6)."
+        instrument_settings_exp:
+          type: number
+          description: Exp value.
+        instrument_settings_image_volume_l:
+          type: number
+          description: Image volume in liters.
+        instrument_settings_pixel_size_mm:
+          type: number
+          description: Pixel size in millimeters.
+        instrument_settings_depth_offset_m:
+          type: number
+          description: Depth offset in meters.
+        instrument_settings_particle_minimum_size_pixels:
+          type: number
+          description: Particle minimum size in pixels.
+        instrument_settings_vignettes_minimum_size_pixels:
+          type: number
+          description: Vignettes minimum size in pixels.
+        instrument_settings_particle_minimum_size_esd:
+          type: number
+          description: Particle minimum size in ESD.
+        instrument_settings_vignettes_minimum_size_esd:
+          type: number
+          description: Vignettes minimum size in ESD.
+        instrument_settings_acq_shutter:
+          type: number
+          description: Acquisition shutter.
+        instrument_settings_acq_shutter_speed:
+          type: number
+          description: Acquisition shutter speed.
+        instrument_settings_acq_exposure:
+          type: number
+          description: Acquisition exposure.
+        visual_qc_validator_user_id:
+          type: integer
+          description: Quality check validator user ID.
+        visual_qc_status_id:
+          type: integer
+          description: Quality check status ID.
+        visual_qc_status_label:
+          type: string
+          description: "Quality check status label (e.g., pending, validated, rejected)."
+        visual_qc_validator_user:
+          type: string
+          description: "Quality check validator user name (format: last_name first_name (email))."
+        sample_type_id:
+          type: integer
+          description: Sample type ID.
+        sample_type_label:
+          type: string
+          description: "Sample type label (e.g., Depth profile, Time serie)."
+        project_id:
+          type: integer
+          description: Parent project ID.
+        ecotaxa_import_status_id:
+          type: integer
+          description: EcoTaxa import status ID.
+        ecotaxa_import_status_label:
+          type: string
+          description: EcoTaxa import status label.
+        ecotaxa_sample_imported:
+          type: boolean
+          description: Whether the sample has been imported to EcoTaxa.
+        ecotaxa_sample_import_date:
+          type: string
+          description: EcoTaxa import date.
+        ecotaxa_sample_id:
+          type: integer
+          description: EcoTaxa sample ID.
+        ecotaxa_sample_tsv_file_name:
+          type: string
+          description: EcoTaxa TSV file name.
+        ecotaxa_sample_nb_images:
+          type: integer
+          description: Number of EcoTaxa images.
+
+    SampleSearchResponse:
+      type: object
+      description: Paginated sample search results.
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicSample"

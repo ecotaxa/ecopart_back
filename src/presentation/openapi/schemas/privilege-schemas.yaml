@@ -1,0 +1,22 @@
+components:
+  schemas:
+    PublicPrivilege:
+      type: object
+      description: Project privilege information with members, managers, and contact.
+      properties:
+        project_id:
+          type: integer
+          description: Project ID.
+          example: 1
+        members:
+          type: array
+          description: List of project members.
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        managers:
+          type: array
+          description: List of project managers.
+          items:
+            $ref: "#/components/schemas/MinimalUser"
+        contact:
+          $ref: "#/components/schemas/MinimalUser"
