@@ -51,7 +51,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
         this.insecureHttpsAgent =
-            NODE_ENV === "DEV"
+            NODE_ENV !== "PROD"
                 ? new https.Agent({ rejectUnauthorized: false })
                 : undefined;
 
@@ -584,13 +584,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             return text as any;
         }
     }
+
     private fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
         return fetch(input, {
             ...init,
             agent: this.insecureHttpsAgent,
         });
     }
-
 
     // ---- Create (or get) folder in user files ----------------------------------
     /**
