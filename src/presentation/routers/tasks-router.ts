@@ -90,12 +90,12 @@ export default function TaskRouter(
      *       | Operator | Value type | Description |
      *       |----------|------------|-------------|
      *       | `=`      | string, number, boolean | Exact match |
-     *       | `!=` / `<>` | string, number, boolean | Not equal |
+     *       | `<>`     | string, number, boolean | Not equal |
      *       | `>` `>=` `<` `<=` | number | Numeric comparison |
      *       | `IN`     | array | Value is one of the given items |
      *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
      *
-     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `<> "null"` → `IS NOT NULL`).
      *
      *       **Filterable fields:**
      *       | Field | Type | Note |

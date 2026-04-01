@@ -264,7 +264,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '!=', value: 'null' }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '<>', value: 'null' }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(0);

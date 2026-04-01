@@ -67,7 +67,7 @@ components:
           example: 10
         sort_by:
           type: string
-          description: "Sorting statement formatted as: asc(field1),desc(field2),..."
+          description: "Sorting statement formatted as: asc(field1),desc(field2),... Allowed order directions: asc, desc."
           default: "asc(user_id)"
           example: "asc(user_id)"
 
@@ -81,14 +81,14 @@ components:
           example: "instrument_model"
         operator:
           type: string
-          description: The comparison operator.
+          description: "The comparison operator. Allowed values: =, >, <, >=, <=, <>, IN, LIKE."
           enum:
             - "="
-            - "!="
             - ">"
-            - ">="
             - "<"
+            - ">="
             - "<="
+            - "<>"
             - "IN"
             - "LIKE"
           example: "="
@@ -153,5 +153,5 @@ components:
       in: query
       schema:
         type: string
-      description: "Sorting statement formatted as: asc(field1),desc(field2),..."
+      description: "Sorting statement formatted as: asc(field1),desc(field2),... Allowed order directions: asc, desc."
       example: "asc(project_id),desc(task_status_id)"
