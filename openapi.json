@@ -463,6 +463,11 @@
             "type": "string",
             "description": "User name in EcoTaxa."
           },
+          "ecotaxa_user_email": {
+            "type": "string",
+            "format": "email",
+            "description": "User email in EcoTaxa."
+          },
           "ecotaxa_expiration_date": {
             "type": "string",
             "description": "Token expiration date."

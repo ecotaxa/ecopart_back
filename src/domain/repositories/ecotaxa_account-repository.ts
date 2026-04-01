@@ -386,6 +386,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             ecotaxa_account_id: ecotaxa_account.ecotaxa_account_id,
             ecotaxa_account_ecotaxa_id: ecotaxa_account.ecotaxa_account_ecotaxa_id,
             ecotaxa_user_name: ecotaxa_account.ecotaxa_account_user_name,
+            ecotaxa_user_email: ecotaxa_account.ecotaxa_account_user_email,
             ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_date,
             ecotaxa_account_instance_id: ecotaxa_account.ecotaxa_account_instance_id,
             ecotaxa_account_instance_name: ecotaxa_account.ecotaxa_account_instance_name

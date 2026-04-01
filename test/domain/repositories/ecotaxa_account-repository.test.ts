@@ -163,6 +163,7 @@ describe("EcotaxaAccount Repository", () => {
                 ecotaxa_account_id: 3,
                 ecotaxa_account_ecotaxa_id: 1,
                 ecotaxa_user_name: "ecotaxa_account_user_name",
+                ecotaxa_user_email: "ecotaxa_account_user_email",
                 ecotaxa_expiration_date: "2025-03-19T16:49:24.892Z",
                 ecotaxa_account_instance_id: 1,
                 ecotaxa_account_instance_name: "FR"
