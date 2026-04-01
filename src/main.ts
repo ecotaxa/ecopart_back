@@ -115,6 +115,7 @@ const config = {
     MAIL_AUTH_USER: process.env.MAIL_AUTH_USER || '',
     MAIL_AUTH_PASS: process.env.MAIL_AUTH_PASS || '',
     MAIL_SENDER: process.env.MAIL_SENDER || '',
+    MAIL_TEST_RECEIVER: process.env.MAIL_TEST_RECEIVER || '',
 
     NODE_ENV: process.env.NODE_ENV || '',
     ECOTAXA_ALLOW_SELF_SIGNED_CERT: (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || '').toLowerCase() === 'true',
@@ -156,7 +157,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV)
+    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.MAIL_TEST_RECEIVER)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
