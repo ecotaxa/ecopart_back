@@ -118,7 +118,9 @@ const config = {
 
     NODE_ENV: process.env.NODE_ENV || '',
 
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || ''
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
+    TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || ''
+
 }
 async function getSQLiteDS() {
     const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
@@ -155,7 +157,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV)
+    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
