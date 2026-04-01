@@ -117,6 +117,7 @@ const config = {
     MAIL_SENDER: process.env.MAIL_SENDER || '',
 
     NODE_ENV: process.env.NODE_ENV || '',
+    ECOTAXA_ALLOW_SELF_SIGNED_CERT: (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || '').toLowerCase() === 'true',
 
     GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || ''
 }
@@ -185,7 +186,12 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(
+        ecotaxa_account_dataSource,
+        config.GENERIC_ECOTAXA_ACCOUNT_EMAIL,
+        config.NODE_ENV,
+        config.ECOTAXA_ALLOW_SELF_SIGNED_CERT
+    )
 
     const userMiddleWare =
         UserRouter(

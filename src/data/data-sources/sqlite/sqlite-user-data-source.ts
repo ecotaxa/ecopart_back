@@ -88,11 +88,11 @@ export class SQLiteUserDataSource implements UserDataSource {
                 else if (filter.value == false || filter.value == "false") {
                     filtering_sql += filter.field + ` = 0`;
                 }
-                // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == "null") {
+                // Null comparisons must use IS NULL / IS NOT NULL in SQL.
+                else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
-                    } else if (filter.operator == "!=") {
+                    } else if (filter.operator == "!=" || filter.operator == "<>") {
                         filtering_sql += filter.field + ` IS NOT NULL`;
                     }
                 }

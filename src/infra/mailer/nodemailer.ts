@@ -42,7 +42,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: this.node_env == "PROD" ? created_user.email : "julie.coustenoble@imev-mer.fr", // TODO PROD : created_user.email,// list of receivers
+            to: this.node_env == "PROD" ? created_user.email : "brahim.lamjarad@imev-mer.fr", // TODO PROD : created_user.email,// list of receivers
             subject: "Validate your EcoPart account", // Subject line
             html: htmlContent.replaceAll("{{confirmation_path}}", custom_confirmation_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {
@@ -71,7 +71,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: this.node_env == "PROD" ? user.email : "julie.coustenoble@imev-mer.fr", // list of receivers
+            to: this.node_env == "PROD" ? user.email : "brahim.lamjarad@imev-mer.fr", // list of receivers
             subject: "Reset your EcoPart password", // Subject line
             html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {

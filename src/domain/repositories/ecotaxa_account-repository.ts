@@ -23,6 +23,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
     generic_ecotaxa_account_email: string
     insecureHttpsAgent: Agent | undefined
+    allowInsecureTls: boolean
 
     // TODO Define the mapping between EcoTaxa and EcoPart instruments in a .env or conf file 
     // ecopart ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']
@@ -47,11 +48,15 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         };
     }
 
-    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string) {
+    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string, ECOTAXA_ALLOW_SELF_SIGNED_CERT: boolean = false) {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
+        const envAllowSelfSigned = (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || "").toLowerCase() === "true"
+        const normalizedNodeEnv = (NODE_ENV || "").toLowerCase()
+        const allowInsecureTls = ECOTAXA_ALLOW_SELF_SIGNED_CERT || envAllowSelfSigned || normalizedNodeEnv === "dev" || normalizedNodeEnv === "development"
+        this.allowInsecureTls = allowInsecureTls
         this.insecureHttpsAgent =
-            NODE_ENV === "DEV"
+            allowInsecureTls
                 ? new https.Agent({ rejectUnauthorized: false })
                 : undefined;
 
@@ -584,11 +589,26 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             return text as any;
         }
     }
-    private fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
-        return fetch(input, {
-            ...init,
-            agent: this.insecureHttpsAgent,
-        });
+    private async fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
+        try {
+            return await fetch(input, {
+                ...init,
+                agent: this.insecureHttpsAgent,
+            });
+        } catch (error: any) {
+            const inputUrl = typeof input === "string" ? input : (input as any)?.url || ""
+            const isEcotaxaDev = inputUrl.includes("ecotaxa-dev.imev-mer.fr")
+            const isSelfSignedCertError = error?.code === "DEPTH_ZERO_SELF_SIGNED_CERT"
+
+            if (this.allowInsecureTls && isEcotaxaDev && isSelfSignedCertError) {
+                return await fetch(input, {
+                    ...init,
+                    agent: new https.Agent({ rejectUnauthorized: false }),
+                });
+            }
+
+            throw error
+        }
     }
 
 
