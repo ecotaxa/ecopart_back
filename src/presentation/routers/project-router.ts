@@ -163,10 +163,36 @@ export default function ProjectRouter(
      *
      *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
      *
-     *       **Computed filter fields:**
-     *       - `for_managing` (`= true`) — restricts results to projects where the current user has at least one privilege.
-     *       - `instrument_model` — resolved to matching instrument model IDs internally.
-     *       - `contact`, `managers`, `members`, `granted_users` — resolved to project IDs via the privilege system.
+     *       **Filterable fields:**
+     *       | Field | Type | Note |
+     *       |-------|------|------|
+     *       | `project_id` | number | |
+     *       | `project_title` | string | |
+     *       | `project_acronym` | string | |
+     *       | `project_description` | string | |
+     *       | `project_information` | string | |
+     *       | `cruise` | string | |
+     *       | `ship` | string | |
+     *       | `data_owner_name` | string | |
+     *       | `data_owner_email` | string | |
+     *       | `operator_name` | string | |
+     *       | `operator_email` | string | |
+     *       | `chief_scientist_name` | string | |
+     *       | `chief_scientist_email` | string | |
+     *       | `override_depth_offset` | number | |
+     *       | `enable_descent_filter` | boolean | |
+     *       | `privacy_duration` | number | |
+     *       | `visible_duration` | number | |
+     *       | `public_duration` | number | |
+     *       | `serial_number` | string | |
+     *       | `root_folder_path` | string | |
+     *       | `project_creation_date` | string (ISO timestamp) | |
+     *       | `instrument_model` | string | Computed — resolved to instrument model IDs |
+     *       | `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |
+     *       | `contact` | string or number | Computed — resolved to project IDs via privilege system |
+     *       | `managers` | string or number | Computed — resolved to project IDs via privilege system |
+     *       | `members` | string or number | Computed — resolved to project IDs via privilege system |
+     *       | `granted_users` | string or number | Computed — resolved to project IDs via privilege system |
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
@@ -948,6 +974,34 @@ export default function ProjectRouter(
      *
      *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
      *
+     *       **Filterable fields:**
+     *       | Field | Type | Note |
+     *       |-------|------|------|
+     *       | `sample_id` | number | |
+     *       | `sample_name` | string | |
+     *       | `comment` | string | |
+     *       | `instrument_serial_number` | string | |
+     *       | `optional_structure_id` | string or null | |
+     *       | `max_pressure` | number | |
+     *       | `station_id` | string | |
+     *       | `sampling_date` | string (ISO date) | |
+     *       | `latitude` | number | |
+     *       | `longitude` | number | |
+     *       | `wind_direction` | number | |
+     *       | `wind_speed` | number | |
+     *       | `sea_state` | string | |
+     *       | `nebulousness` | number | |
+     *       | `bottom_depth` | number | |
+     *       | `instrument_operator_email` | string | |
+     *       | `filename` | string | |
+     *       | `sample_creation_date` | string (ISO timestamp) | |
+     *       | `filter_first_image` | string | |
+     *       | `filter_last_image` | string | |
+     *       | `visual_qc_status_id` | number | |
+     *       | `sample_type_id` | number | |
+     *       | `sample_type_label` | string | Computed — resolved to `sample_type_id` |
+     *       | `visual_qc_status_label` | string | Computed — resolved to `visual_qc_status_id` |
+     *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
      *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.
@@ -1422,6 +1476,31 @@ export default function ProjectRouter(
      *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
      *
      *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
+     *
+     *       **Filterable fields:**
+     *       | Field | Type | Note |
+     *       |-------|------|------|
+     *       | `sample_id` | number | |
+     *       | `sample_name` | string | |
+     *       | `comment` | string | |
+     *       | `instrument_serial_number` | string | |
+     *       | `optional_structure_id` | string or null | |
+     *       | `max_pressure` | number | |
+     *       | `station_id` | string | |
+     *       | `sampling_date` | string (ISO date) | |
+     *       | `latitude` | number | |
+     *       | `longitude` | number | |
+     *       | `bottom_depth` | number | |
+     *       | `instrument_operator_email` | string | |
+     *       | `filename` | string | |
+     *       | `sample_creation_date` | string (ISO timestamp) | |
+     *       | `visual_qc_status_id` | number | |
+     *       | `sample_type_id` | number | |
+     *       | `ecotaxa_sample_imported` | boolean | |
+     *       | `ecotaxa_sample_import_date` | string (ISO timestamp) or null | |
+     *       | `ecotaxa_sample_id` | number or null | |
+     *       | `sample_type_label` | string | Computed — resolved to `sample_type_id` |
+     *       | `visual_qc_status_label` | string | Computed — resolved to `visual_qc_status_id` |
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *

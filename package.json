@@ -16,7 +16,8 @@
     "dev:serve": "nodemon -e js -w dist dist/main.js",
     "dev:watch": "nodemon --watch './**/*.ts' --exec 'ts-node' src/main.ts",
     "openapi:generate": "ts-node tools/generateOpenApi.ts",
-    "openapi:validate": "npx @apidevtools/swagger-cli validate openapi.json"
+    "openapi:validate": "npx @apidevtools/swagger-cli validate openapi.json",
+    "openapi:watch": "nodemon --watch 'src/presentation/routers' --watch 'src/presentation/openapi' -e 'ts,yaml' --exec 'ts-node tools/generateOpenApi.ts'"
   },
   "keywords": [],
   "author": "Julie Coustenoble",

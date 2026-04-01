@@ -145,6 +145,23 @@ export default function UsersRouter(
      *
      *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
      *
+     *       **Filterable fields:**
+     *       | Field | Type |
+     *       |-------|------|
+     *       | `user_id` | number |
+     *       | `first_name` | string |
+     *       | `last_name` | string |
+     *       | `email` | string |
+     *       | `valid_email` | boolean |
+     *       | `is_admin` | boolean |
+     *       | `organisation` | string |
+     *       | `country` | string |
+     *       | `user_planned_usage` | string |
+     *       | `user_creation_date` | string (ISO timestamp) |
+     *       | `confirmation_code` | string or null |
+     *       | `reset_password_code` | string or null |
+     *       | `deleted` | string (ISO timestamp) or null |
+     *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
      *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(last_name),desc(user_id)`.

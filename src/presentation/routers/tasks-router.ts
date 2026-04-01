@@ -97,6 +97,24 @@ export default function TaskRouter(
      *
      *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `!= "null"` → `IS NOT NULL`).
      *
+     *       **Filterable fields:**
+     *       | Field | Type | Note |
+     *       |-------|------|------|
+     *       | `task_id` | number | |
+     *       | `task_type_id` | number | |
+     *       | `task_status_id` | number | |
+     *       | `task_owner_id` | number | |
+     *       | `task_project_id` | number or null | |
+     *       | `task_progress_pct` | number | |
+     *       | `task_progress_msg` | string | |
+     *       | `task_step` | number | |
+     *       | `task_creation_date` | string (ISO timestamp) | |
+     *       | `task_start_date` | string (ISO timestamp) or null | |
+     *       | `task_end_date` | string (ISO timestamp) or null | |
+     *       | `task_type` | string | Computed — resolved to `task_type_id` |
+     *       | `task_status` | string | Computed — resolved to `task_status_id` |
+     *       | `for_managing` | boolean | Computed — restricts to tasks owned by or related to current user |
+     *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
      *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.
