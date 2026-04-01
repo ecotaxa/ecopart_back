@@ -18,6 +18,6 @@ export interface ProjectRepository {
     ensureBackupExist(project_id: number): Promise<void>;
     exportBackupedProjectToFtp(project: ProjectResponseModel, task_id: number): Promise<string>;
     exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string>;
-    ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void>;
+    ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void>;
     getDistinctShips(): Promise<string[]>;
 }

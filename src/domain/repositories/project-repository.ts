@@ -431,7 +431,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         // zip and copy backupedProjectPath to exportFolder
         await this.zipFolder(backupedProjectPath, exportFolder);
     }
-    async ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void> {
+    async ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void> {
         const options: PreparedSearchOptions = {
             filter: [
                 { field: "ecotaxa_project_id", operator: "=", value: ecotaxa_project_id },

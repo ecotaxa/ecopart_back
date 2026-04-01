@@ -62,13 +62,14 @@ export class CreateProject implements CreateProjectUseCase {
         if (!public_project.ecotaxa_account_id) return public_project
         await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project.ecotaxa_account_id);
         await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project);
-        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(public_project.ecotaxa_project_id as number, public_project.ecotaxa_instance_id as number);
+
         if (public_project.new_ecotaxa_project) {
             // Create ecotaxa project with same title as ecopart project
             public_project.ecotaxa_project_id = await this.ecotaxa_accountRepository.createEcotaxaProject(public_project);
             public_project.ecotaxa_project_name = public_project.project_title;
 
         } else if (public_project.ecotaxa_project_id) {
+            await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(public_project.ecotaxa_project_id, public_project.ecotaxa_instance_id as number);
             // Link ecotaxa project
             const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject(public_project);
             public_project.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;

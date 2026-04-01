@@ -62,8 +62,8 @@ export class MockProjectRepository implements ProjectRepository {
     standardGetProjects(): Promise<SearchResult<ProjectResponseModel>> {
         throw new Error("Method not implemented : standardGetProjects");
     }
-    ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(): Promise<void> {
-        throw new Error("Method not implemented : ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject");
+    ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(): Promise<void> {
+        throw new Error("Method not implemented : ensureEcotaxaProjectNotLinkedToAnotherEcopartProject");
     }
     getDistinctShips(): Promise<string[]> {
         throw new Error("Method not implemented : getDistinctShips");

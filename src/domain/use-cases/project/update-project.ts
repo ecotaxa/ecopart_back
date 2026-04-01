@@ -145,7 +145,7 @@ export class UpdateProject implements UpdateProjectUseCase {
     private async handleEcotaxaProjectLinks(public_project_to_update: PublicProjectUpdateModel, current_user: UserUpdateModel, current_project: ProjectResponseModel, project: ProjectUpdateModel): Promise<ProjectUpdateModel> {
         await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project_to_update.ecotaxa_account_id);
         await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project_to_update);
-        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
+        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
 
         const project_for_ecotaxa = { ...current_project, ...public_project_to_update };
         if (public_project_to_update.new_ecotaxa_project) {
