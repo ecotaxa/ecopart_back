@@ -47,6 +47,10 @@
     {
       "name": "EcoTaxa Instances",
       "description": "EcoTaxa instance management"
+    },
+    {
+      "name": "File System",
+      "description": "File system operations"
     }
   ],
   "components": {
@@ -462,11 +466,6 @@
           "ecotaxa_user_name": {
             "type": "string",
             "description": "User name in EcoTaxa."
-          },
-          "ecotaxa_user_email": {
-            "type": "string",
-            "format": "email",
-            "description": "User email in EcoTaxa."
           },
           "ecotaxa_expiration_date": {
             "type": "string",
@@ -2160,6 +2159,55 @@
           },
           "403": {
             "description": "User is deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file_system/import_folders": {
+      "get": {
+        "summary": "List import folders",
+        "description": "Returns the list of folder paths under the data import directory.",
+        "tags": [
+          "File System"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of import folder paths.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
             "content": {
               "application/json": {
                 "schema": {

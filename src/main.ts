@@ -14,6 +14,7 @@ import InstrumentModelRouter from './presentation/routers/instrument_model-route
 import ProjectRouter from './presentation/routers/project-router'
 import TaskRouter from './presentation/routers/tasks-router'
 import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
+import FileSystemRouter from './presentation/routers/file_system-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -54,6 +55,7 @@ import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-
 import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
 import { ListOrganisations } from './domain/use-cases/user/list-organisations'
 import { ListShips } from './domain/use-cases/project/list-ships'
+import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -259,6 +261,10 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new GetAllEcoTaxaInstances(ecotaxa_account_repo),
         new CreateEcoTaxaInstance(user_repo, ecotaxa_account_repo)
+    ))
+    server.use("/file_system", FileSystemRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new ListImportFolders(config.DATA_STORAGE_IMPORT)
     ))
 
 
