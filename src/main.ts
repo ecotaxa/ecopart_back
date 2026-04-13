@@ -56,6 +56,7 @@ import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/creat
 import { ListOrganisations } from './domain/use-cases/user/list-organisations'
 import { ListShips } from './domain/use-cases/project/list-ships'
 import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
+import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -264,7 +265,8 @@ async function getSQLiteDS() {
     ))
     server.use("/file_system", FileSystemRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-        new ListImportFolders(config.DATA_STORAGE_IMPORT)
+        new ListImportFolders(config.DATA_STORAGE_IMPORT),
+        new GetImportFolderMetadata(config.DATA_STORAGE_IMPORT, user_repo)
     ))
 
 

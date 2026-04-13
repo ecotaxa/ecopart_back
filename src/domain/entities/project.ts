@@ -154,6 +154,24 @@ export interface PublicProjectResponseModel extends PublicProjectRequestCreation
     project_creation_date: string;
 }
 
+export interface ProjectMetadataPersonModel {
+    name: string;
+    email: string;
+    ecopart_user_id: number | null;
+}
+
+export interface ProjectMetadataModel {
+    project_acronym: string | null;
+    project_description: string | null;
+    cruise: string | null;
+    ship: string | null;
+    serial_number: string | null;
+    instrument_model: string | null;
+    data_owner: ProjectMetadataPersonModel | null;
+    operator: ProjectMetadataPersonModel | null;
+    chief_scientist: ProjectMetadataPersonModel | null;
+}
+
 // // FOR acess permissions LATER
 // export interface ProjectVisibility {
 //     visibility_id: number;

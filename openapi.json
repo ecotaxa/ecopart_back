@@ -1069,6 +1069,106 @@
           }
         }
       },
+      "ProjectMetadataPerson": {
+        "type": "object",
+        "description": "Person information extracted from import folder metadata, with optional EcoPart user match.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the person.",
+            "example": "Jane DOE"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "example": "jane.doe@example.com"
+          },
+          "ecopart_user_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The EcoPart user ID if a matching account was found by email, null otherwise.",
+            "example": 42
+          }
+        }
+      },
+      "ProjectMetadata": {
+        "type": "object",
+        "description": "Project metadata extracted from an import folder. Used to pre-fill the project creation form.\nSources: `config/cruise_info.txt` (INI key=value) and `meta/*header*.txt` (semicolon-delimited CSV).\n",
+        "properties": {
+          "project_acronym": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source: `config/cruise_info.txt` → key `acron`.",
+            "example": "MPS2024"
+          },
+          "project_description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source: `config/cruise_info.txt` → key `description`.",
+            "example": "Particle survey in the Mediterranean Sea"
+          },
+          "cruise": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source: `meta/*header*.txt` → column 1 (cruise) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`.",
+            "example": "MPS2024"
+          },
+          "ship": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source: `meta/*header*.txt` → column 2 (ship) of the first data row.",
+            "example": "R/V Thalassa"
+          },
+          "serial_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Source: `config/cruise_info.txt` → key `sn`. Fallback: extracted from the header filename pattern `sn<serial_number>_` (e.g. `uvp6_header_sn000241lp_...txt`).",
+            "example": "002LP"
+          },
+          "instrument_model": {
+            "type": "string",
+            "nullable": true,
+            "description": "Deduced automatically from two sources:\n1. Folder structure: presence of `ecodata/` → UVP6, presence of `work/` → UVP5.\n2. Serial number suffix: LP → UVP6LP, HF → UVP6HF, MHP → UVP6MHP, MHF → UVP6MHF, HD → UVP5HD, SD → UVP5SD, ZD → UVP5Z.\nReturns null if instrument type cannot be determined.\n",
+            "example": "UVP6LP",
+            "enum": [
+              "UVP5HD",
+              "UVP5SD",
+              "UVP5Z",
+              "UVP6LP",
+              "UVP6HF",
+              "UVP6MHP",
+              "UVP6MHF"
+            ]
+          },
+          "data_owner": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectMetadataPerson"
+              }
+            ],
+            "description": "Source: `config/cruise_info.txt` → keys `do_name` (name) and `do_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          },
+          "operator": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectMetadataPerson"
+              }
+            ],
+            "description": "Source: `config/cruise_info.txt` → keys `op_name` (name) and `op_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          },
+          "chief_scientist": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectMetadataPerson"
+              }
+            ],
+            "description": "Source: `config/cruise_info.txt` → keys `cs_name` (name) and `cs_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          }
+        }
+      },
       "PublicSample": {
         "type": "object",
         "description": "Public sample information returned by API endpoints.",
@@ -2202,6 +2302,73 @@
                   "items": {
                     "type": "string"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/file_system/import_folder_metadata": {
+      "get": {
+        "summary": "Get metadata from an import folder",
+        "description": "Reads metadata files from the given import folder path and returns project-level metadata to pre-fill the project creation form. Works for both UVP5 and UVP6 folder structures.\n\n**Files read:**\n- `config/cruise_info.txt` — INI-style file (`[General]` section) containing cruise/project info and contact details.\n- `meta/*header*.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names.\n\n**Instrument detection:**\n- Presence of an `ecodata/` subdirectory → UVP6\n- Presence of a `work/` subdirectory → UVP5\n- The exact model (e.g. UVP6LP, UVP5HD) is deduced from the serial number suffix.\n\n**User lookup:** For each person (data_owner, operator, chief_scientist), the email is looked up in the EcoPart user database. If a match is found, `ecopart_user_id` is returned.\n",
+        "tags": [
+          "File System"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "folder_path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The full path of the import folder (as returned by /file_system/import_folders)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project metadata extracted from the import folder.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (missing or invalid folder_path).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
