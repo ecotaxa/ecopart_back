@@ -15,8 +15,8 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
     },
     servers: [
         {
-            url: process.env.API_URL || 'http://localhost:4000',
-            description: 'API server',
+            url: process.env.API_URL,
+            description: process.env.NODE_ENV === 'PROD' ? 'Production server' : process.env.NODE_ENV === 'TEST' ? 'Testing server' : 'Development server',
         },
     ],
     tags: [

@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import server from './server'
 
 import { MiddlewareAuthCookie } from './presentation/middleware/auth-cookie'
@@ -88,7 +89,6 @@ import { FsAdapter } from './infra/files/fs'
 import sqlite3 from 'sqlite3'
 import path from 'path'
 import fs from 'fs';
-import 'dotenv/config'
 import { SearchEcotaxaAccounts } from './domain/use-cases/ecotaxa_account/search-ecotaxa_account'
 
 sqlite3.verbose()
