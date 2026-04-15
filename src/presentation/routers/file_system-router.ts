@@ -94,7 +94,7 @@ export default function FileSystemRouter(
      *         required: true
      *         schema:
      *           type: string
-     *         description: The full path of the import folder (as returned by /file_system/import_folders).
+     *         description: Path relative to the import root (as returned by /file_system/import_folders).
      *     responses:
      *       200:
      *         description: Project metadata extracted from the import folder.

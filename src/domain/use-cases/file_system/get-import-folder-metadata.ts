@@ -15,7 +15,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
 
     async execute(folder_path: string): Promise<ProjectMetadataModel> {
         // Validate the folder_path is within the import folder
-        const fullPath = path.resolve(folder_path);
+        const fullPath = path.resolve(this.importFolderPath, folder_path);
         const basePath = path.resolve(this.importFolderPath);
         if (!fullPath.startsWith(basePath)) {
             throw new Error('Invalid folder path');
