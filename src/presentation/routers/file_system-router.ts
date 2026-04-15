@@ -17,10 +17,17 @@ export default function FileSystemRouter(
      * /file_system/import_folders:
      *   get:
      *     summary: List import folders
-     *     description: Returns the list of folder paths under the data import directory.
+     *     description: Returns the list of folder paths directly under the given path within the data import directory.
      *     tags: [File System]
      *     security:
      *       - cookieAccessToken: []
+     *     parameters:
+     *       - in: query
+     *         name: folder_path
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: The path to list folders under. If omitted, lists folders at the import root.
      *     responses:
      *       200:
      *         description: List of import folder paths.
@@ -30,6 +37,12 @@ export default function FileSystemRouter(
      *               type: array
      *               items:
      *                 type: string
+     *       400:
+     *         description: Bad request (missing or invalid folder_path).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       401:
      *         description: Unauthorized.
      *         content:
@@ -45,7 +58,8 @@ export default function FileSystemRouter(
      */
     router.get('/import_folders', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            const folders = await listImportFoldersUseCase.execute();
+            const folder_path = (req.query.folder_path as string) || '';
+            const folders = await listImportFoldersUseCase.execute(folder_path);
             res.status(200).send(folders)
         } catch (err) {
             console.log(new Date().toISOString(), err)

@@ -1,3 +1,3 @@
 export interface ListImportFoldersUseCase {
-    execute(): Promise<string[]>;
+    execute(folder_path: string): Promise<string[]>;
 }

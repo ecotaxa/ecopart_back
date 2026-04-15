@@ -9,20 +9,22 @@ export class ListImportFolders implements ListImportFoldersUseCase {
         this.importFolderPath = importFolderPath
     }
 
-    async execute(): Promise<string[]> {
-        const folders: string[] = [];
-        await this.listFoldersRecursive(this.importFolderPath, folders);
-        return folders.sort((a, b) => a.localeCompare(b));
-    }
+    async execute(folder_path: string): Promise<string[]> {
+        const resolvedPath = path.resolve(this.importFolderPath, folder_path);
+        const resolvedRoot = path.resolve(this.importFolderPath);
 
-    private async listFoldersRecursive(dirPath: string, result: string[]): Promise<void> {
-        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        // Prevent directory traversal outside the import root
+        if (!resolvedPath.startsWith(resolvedRoot)) {
+            throw new Error("Invalid folder path");
+        }
+
+        const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
+        const folders: string[] = [];
         for (const entry of entries) {
             if (entry.isDirectory()) {
-                const fullPath = path.join(dirPath, entry.name);
-                result.push(fullPath);
-                await this.listFoldersRecursive(fullPath, result);
+                folders.push(path.join(resolvedPath, entry.name));
             }
         }
+        return folders.sort((a, b) => a.localeCompare(b));
     }
 }
