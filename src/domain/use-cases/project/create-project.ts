@@ -15,14 +15,16 @@ export class CreateProject implements CreateProjectUseCase {
     privilegeRepository: PrivilegeRepository
     ecotaxa_accountRepository: EcotaxaAccountRepository
     DATA_STORAGE_FS_STORAGE: string
+    DATA_STORAGE_IMPORT: string
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE: string) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.instrument_modelRepository = instrument_modelRepository
         this.privilegeRepository = privilegeRepository
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
+        this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
     }
 
     async execute(current_user: UserUpdateModel, public_project: PublicProjectRequestCreationModel): Promise<PublicProjectResponseModel> {
@@ -40,6 +42,9 @@ export class CreateProject implements CreateProjectUseCase {
 
         // Create or validate and retrieve the ecotaxa project and user ecotaxa_account_preferences
         const public_project_with_ecotaxa_proj_info = await this.handleEcotaxaProjectCreation(public_project, current_user);
+
+        // Prepend import storage path to root_folder_path for internal storage
+        public_project_with_ecotaxa_proj_info.root_folder_path = path.join(this.DATA_STORAGE_IMPORT, public_project_with_ecotaxa_proj_info.root_folder_path);
 
         // Format the provided information
         const project: ProjectRequestCreationModel = this.projectRepository.formatProjectRequestCreationModel(public_project_with_ecotaxa_proj_info, instrument);

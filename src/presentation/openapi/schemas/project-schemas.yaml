@@ -6,8 +6,8 @@ components:
       properties:
         root_folder_path:
           type: string
-          description: Path to the project root data folder.
-          example: "/data/projects/my_project"
+          description: Import folder path relative to the import root (as returned by /file_system/import_folders).
+          example: "remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_hope02"
         project_title:
           type: string
           description: Full title of the project.
@@ -143,7 +143,7 @@ components:
       properties:
         root_folder_path:
           type: string
-          description: Path to the project root data folder.
+          description: Import folder path relative to the import root (as returned by /file_system/import_folders).
         project_title:
           type: string
           description: Full title of the project.
@@ -239,7 +239,7 @@ components:
           example: "2024-01-15T10:30:00.000Z"
         root_folder_path:
           type: string
-          description: Path to the project root data folder.
+          description: Import folder path relative to the import root.
         project_title:
           type: string
           description: Full title of the project.

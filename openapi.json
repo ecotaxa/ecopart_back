@@ -566,8 +566,8 @@
         "properties": {
           "root_folder_path": {
             "type": "string",
-            "description": "Path to the project root data folder.",
-            "example": "/data/projects/my_project"
+            "description": "Import folder path relative to the import root (as returned by /file_system/import_folders).",
+            "example": "remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_hope02"
           },
           "project_title": {
             "type": "string",
@@ -735,7 +735,7 @@
         "properties": {
           "root_folder_path": {
             "type": "string",
-            "description": "Path to the project root data folder."
+            "description": "Import folder path relative to the import root (as returned by /file_system/import_folders)."
           },
           "project_title": {
             "type": "string",
@@ -861,7 +861,7 @@
           },
           "root_folder_path": {
             "type": "string",
-            "description": "Path to the project root data folder."
+            "description": "Import folder path relative to the import root."
           },
           "project_title": {
             "type": "string",
@@ -2299,7 +2299,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The path to list folders under. If omitted, lists folders at the import root."
+            "description": "Path relative to the import root. If omitted, lists folders at the import root."
           }
         ],
         "responses": {
@@ -2369,7 +2369,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "The full path of the import folder (as returned by /file_system/import_folders)."
+            "description": "Path relative to the import root (as returned by /file_system/import_folders)."
           }
         ],
         "responses": {
