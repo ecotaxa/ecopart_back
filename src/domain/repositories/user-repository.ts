@@ -291,4 +291,8 @@ export class UserRepositoryImpl implements UserRepository {
         return nb_of_updated_user
 
     }
+
+    async getDistinctOrganisations(): Promise<string[]> {
+        return await this.userDataSource.getDistinctOrganisations();
+    }
 }

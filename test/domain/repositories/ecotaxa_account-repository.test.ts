@@ -15,7 +15,7 @@ describe("EcotaxaAccount Repository", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockEcotaxaAccountDataSource = new MockEcotaxaAccountDataSource()
-        ecotaxa_accountRepository = new EcotaxaAccountRepositoryImpl(mockEcotaxaAccountDataSource)
+        ecotaxa_accountRepository = new EcotaxaAccountRepositoryImpl(mockEcotaxaAccountDataSource, "julie.coustenoble@imev-mer.fr", "TST")
     })
 
     describe("CreateEcotaxaAccount", () => {
@@ -63,7 +63,7 @@ describe("EcotaxaAccount Repository", () => {
             try { await ecotaxa_accountRepository.connectToEcotaxaInstance(unexisting_ecotaxa_account) }
             catch (e) {
                 expect(e).toBeInstanceOf(Error)
-                expect(e.message).toBe("HTTP Error: 403")
+                expect(e.message).toContain("Cannot login into EcoTaxa")
             }
             expect(mockEcotaxaAccountDataSource.getOneEcoTaxaInstance).toBeCalledWith(unexisting_ecotaxa_account.ecotaxa_instance_id)
         });
@@ -106,32 +106,50 @@ describe("EcotaxaAccount Repository", () => {
         test("Should get one ecotaxa account", async () => {
             const ecotaxa_account_id = 1
 
-            jest.spyOn(mockEcotaxaAccountDataSource, 'getOne').mockResolvedValue(ecotaxaAccountResponseModel_1)
+            jest.spyOn(mockEcotaxaAccountDataSource, 'getAll').mockResolvedValue({ total: 1, items: [ecotaxaAccountResponseModel_1] })
 
             const result = await ecotaxa_accountRepository.getOneEcotaxaAccount(ecotaxa_account_id)
 
-            expect(mockEcotaxaAccountDataSource.getOne).toBeCalledWith(ecotaxa_account_id)
+            expect(mockEcotaxaAccountDataSource.getAll).toBeCalledWith({
+                filter: [{ field: "ecotaxa_account_id", operator: "=", value: ecotaxa_account_id }],
+                sort_by: [],
+                page: 1,
+                limit: 1
+            })
             expect(result).toBe(ecotaxaAccountResponseModel_1)
         })
         test("Should return null if ecotaxa account not found", async () => {
             const ecotaxa_account_id = 1
 
-            jest.spyOn(mockEcotaxaAccountDataSource, 'getOne').mockResolvedValue(null)
+            jest.spyOn(mockEcotaxaAccountDataSource, 'getAll').mockResolvedValue({ total: 0, items: [] })
 
             const result = await ecotaxa_accountRepository.getOneEcotaxaAccount(ecotaxa_account_id)
 
-            expect(mockEcotaxaAccountDataSource.getOne).toBeCalledWith(ecotaxa_account_id)
+            expect(mockEcotaxaAccountDataSource.getAll).toBeCalledWith({
+                filter: [{ field: "ecotaxa_account_id", operator: "=", value: ecotaxa_account_id }],
+                sort_by: [],
+                page: 1,
+                limit: 1
+            })
             expect(result).toBe(null)
         });
         test("Should return null if the ecopart_user_id is specified and does not match the ecotaxa_account", async () => {
             const ecotaxa_account_id = 1
             const ecopart_user_id = 2
 
-            jest.spyOn(mockEcotaxaAccountDataSource, 'getOne').mockResolvedValue(ecotaxaAccountResponseModel_1)
+            jest.spyOn(mockEcotaxaAccountDataSource, 'getAll').mockResolvedValue({ total: 0, items: [] })
 
             const result = await ecotaxa_accountRepository.getOneEcotaxaAccount(ecotaxa_account_id, ecopart_user_id)
 
-            expect(mockEcotaxaAccountDataSource.getOne).toBeCalledWith(ecotaxa_account_id)
+            expect(mockEcotaxaAccountDataSource.getAll).toBeCalledWith({
+                filter: [
+                    { field: "ecotaxa_account_id", operator: "=", value: ecotaxa_account_id },
+                    { field: "ecotaxa_account_ecopart_user_id", operator: "=", value: ecopart_user_id }
+                ],
+                sort_by: [],
+                page: 1,
+                limit: 1
+            })
             expect(result).toBe(null)
         });
     });
@@ -143,7 +161,9 @@ describe("EcotaxaAccount Repository", () => {
 
             expect(result).toEqual({
                 ecotaxa_account_id: 3,
+                ecotaxa_account_ecotaxa_id: 1,
                 ecotaxa_user_name: "ecotaxa_account_user_name",
+                ecotaxa_user_email: "ecotaxa_account_user_email",
                 ecotaxa_expiration_date: "2025-03-19T16:49:24.892Z",
                 ecotaxa_account_instance_id: 1,
                 ecotaxa_account_instance_name: "FR"

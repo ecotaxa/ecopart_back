@@ -1,0 +1,98 @@
+components:
+  schemas:
+    AuthUserCredentials:
+      type: object
+      description: User login credentials.
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address.
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: "User password. Must be at least 8 characters with at least one digit, one lowercase letter, one uppercase letter, and one special character (@!#$%^&*()_+.,;:)."
+          example: "P@ssw0rd!"
+      required:
+        - email
+        - password
+
+    AuthJwtResponse:
+      type: object
+      description: JWT token pair returned on successful login.
+      properties:
+        jwt:
+          type: string
+          description: JWT access token.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        jwt_refresh:
+          type: string
+          description: JWT refresh token.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      required:
+        - jwt
+        - jwt_refresh
+
+    AuthJwtRefreshedResponse:
+      type: object
+      description: Refreshed JWT access token.
+      properties:
+        jwt:
+          type: string
+          description: New JWT access token.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      required:
+        - jwt
+
+    ChangePasswordRequest:
+      type: object
+      description: Request to change the current user password.
+      properties:
+        user_id:
+          type: integer
+          description: The user ID.
+          example: 1
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Current password.
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: "New password. Must be at least 8 characters with at least one digit, one lowercase letter, one uppercase letter, and one special character."
+      required:
+        - user_id
+        - password
+        - new_password
+
+    ResetPasswordRequest:
+      type: object
+      description: Request a password reset email.
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address of the account to reset.
+          example: "user@example.com"
+      required:
+        - email
+
+    ResetPasswordConfirm:
+      type: object
+      description: Confirm a password reset with a new password and reset token.
+      properties:
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: "New password. Must meet complexity requirements."
+        reset_password_token:
+          type: string
+          description: Token received in the password reset email.
+      required:
+        - new_password
+        - reset_password_token

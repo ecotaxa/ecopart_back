@@ -28,6 +28,11 @@ jobs:
           echo TEST_REFRESH_TOKEN_SECRET = refresh_secret >> .env
           cat .env
 
+      - name: Check OpenAPI spec is up to date
+        run: |
+          npm run openapi:generate
+          git diff --exit-code openapi.json || (echo "::error::openapi.json is out of date. Run 'npm run openapi:generate' and commit the result." && exit 1)
+
       - name: Run tests
         run: npm run test-CI
       

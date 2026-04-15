@@ -1,4 +1,4 @@
-import { EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel } from "../../../domain/entities/ecotaxa_account";
+import { EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel } from "../../../domain/entities/ecotaxa_account";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
 export interface EcotaxaAccountDataSource {
@@ -7,4 +7,6 @@ export interface EcotaxaAccountDataSource {
     getAll(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>>;
     deleteOne(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number>;
     getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null>;
+    getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]>;
+    createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number>;
 }

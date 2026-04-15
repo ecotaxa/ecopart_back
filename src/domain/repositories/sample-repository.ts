@@ -280,7 +280,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     parseComputeVignettes(data: string): ComputeVignettesModel {
         const result: Partial<ComputeVignettesModel> = {};
-        const lines = data.split('\n');
+        const lines = data.split(/\r\n|\n|\r/);
         for (const line of lines) {
             const [key, value] = line.split('=').map(part => part.trim());
 
@@ -349,7 +349,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     extractPressures(input: string): (number | "NaN")[] {
-        const lines = input.split("\n");
+        const lines = input.split(/\r\n|\n|\r/);
         const pressures: (number | "NaN")[] = [];
 
         lines.forEach((line) => {
@@ -448,7 +448,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseInstallConfig(data: string): SampleFromInstallConfigModel {
         const install_config_content: any = {};
         // Split the data by new lines and process each line
-        const lines = data.split('\n');
+        const lines = data.split(/\r\n|\n|\r/);
         lines.forEach(line => {
             // Split each line by the equal sign and trim whitespace
             const [key, value] = line.split('=').map(str => str.trim());
@@ -470,7 +470,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const configuration_data_content: any = {};
 
         // Split the data into lines and process each line
-        const lines = data.split('\n');
+        const lines = data.split(/\r\n|\n|\r/);
 
         lines.forEach(line => {
             // Skip lines that don't contain key-value pairs (like headers or empty lines)
@@ -493,7 +493,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseCruiseInfo(data: string): SampleFromCruiseInfoModel {
         const cruise_info_content: any = {};
         // Parse the input data string into a key-value object
-        const lines = data.split("\n");
+        const lines = data.split(/\r\n|\n|\r/);
         lines.forEach(line => {
             const [key, value] = line.split("=");
             if (key && value) {
@@ -512,7 +512,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     parseWorkHDR(data: string): SampleFromWorkHDRModel {
         const work_hdr_content: any = {};
         // Parse the input data string into a key-value object
-        const lines = data.split("\n");
+        const lines = data.split(/\r\n|\n|\r/);
         lines.forEach(line => {
             const [key, value] = line.split("=");
             if (key && value) {
@@ -542,7 +542,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const work_datfile_content: any = {};
 
         // Split the data into lines and process each line
-        const lines = data.trim().split("\n");
+        const lines = data.trim().split(/\r\n|\n|\r/);
         const pressures: number[] = [];
 
         lines.forEach((line) => {
@@ -582,7 +582,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const instrumentSerialNumber = instrumentSerialMatch[1];
 
         // Split file into non-empty lines
-        const lines = data.split('\n').filter(line => line.trim() !== '');
+        const lines = data.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
         if (lines.length < 2) {
             throw new Error('Meta header file contains no data rows');
         }
@@ -638,7 +638,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         let currentSection: string | null = null;
 
         // Split the data into lines and process each line
-        const lines = data.split(/\r?\n/);
+        const lines = data.split(/\r\n|\n|\r/);
         lines.forEach((line) => {
             line = line.trim();
 
@@ -831,7 +831,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                     const filePath = path.join(header_path, file);
                     const content = await fsPromises.readFile(filePath, 'utf8');
 
-                    const lines = content.trim().split('\n');
+                    const lines = content.trim().split(/\r\n|\n|\r/);
                     for (let i = 1; i < lines.length; i++) {
                         samples.push(this.getSampleFromHeaderLine(lines[i]));
                     }
@@ -1308,7 +1308,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     extractNumberOfImages(tsvString: string): number {
-        const lines = tsvString.split('\n').map(line => line.trim()).filter(line => line);
+        const lines = tsvString.split(/\r\n|\n|\r/).map(line => line.trim()).filter(line => line);
         if (lines.length < 2) return 0;
 
         const headers = lines[0].split('\t');
@@ -1325,7 +1325,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Delete ecotaxa related samples fields from sample in db
-    async deleteEcoTaxaSamples(samples: SampleIdModel[]): Promise<number> {
+    async deleteEcoTaxaSamplesFromDb(samples: SampleIdModel[]): Promise<number> {
         let updated_sample_nb: number = 0
         for (const sample of samples) {
             const sample_update: SampleUpdateModel = {

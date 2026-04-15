@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import server from './server'
 
 import { MiddlewareAuthCookie } from './presentation/middleware/auth-cookie'
@@ -13,6 +14,8 @@ import AuthRouter from './presentation/routers/auth-router'
 import InstrumentModelRouter from './presentation/routers/instrument_model-router'
 import ProjectRouter from './presentation/routers/project-router'
 import TaskRouter from './presentation/routers/tasks-router'
+import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
+import FileSystemRouter from './presentation/routers/file_system-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -43,11 +46,18 @@ import { SearchSamples } from './domain/use-cases/sample/search-samples'
 
 import { ListImportableEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
 import { ImportEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/import-ecotaxa-samples'
-import { DeleteEcoTaxaSample } from './domain/use-cases/ecotaxa_sample/delete-ecotaxa-sample'
+import { DeleteEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/search-ecotaxa-samples'
 
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
+
+import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
+import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
+import { ListOrganisations } from './domain/use-cases/user/list-organisations'
+import { ListShips } from './domain/use-cases/project/list-ships'
+import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
+import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
 import { UserRepositoryImpl } from './domain/repositories/user-repository'
 import { AuthRepositoryImpl } from './domain/repositories/auth-repository'
@@ -79,7 +89,6 @@ import { FsAdapter } from './infra/files/fs'
 import sqlite3 from 'sqlite3'
 import path from 'path'
 import fs from 'fs';
-import 'dotenv/config'
 import { SearchEcotaxaAccounts } from './domain/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { MigrationManager } from './data/migrations/migration-manager'
 import { MigrationLogger } from './data/migrations/migration-logger'
@@ -114,7 +123,9 @@ const config = {
 
     NODE_ENV: process.env.NODE_ENV || '',
 
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || ''
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
+    TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || ''
+
 }
 async function getSQLiteDS() {
     const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
@@ -158,7 +169,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV)
+    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
@@ -184,7 +195,7 @@ async function getSQLiteDS() {
     const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
-    const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER)
+    const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER, config.DATA_STORAGE_IMPORT)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
@@ -202,7 +213,8 @@ async function getSQLiteDS() {
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo),
-            new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo)
+            new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
+            new ListOrganisations(user_repo)
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
@@ -212,6 +224,7 @@ async function getSQLiteDS() {
         new ChangePassword(user_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
+        new SearchUsers(user_repo, search_repo)
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),
@@ -222,20 +235,21 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareProjectValidation(),
         new MiddlewareSampleValidation(),
-        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
-        new DeleteProject(user_repo, project_repo, privilege_repo),
-        new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo),
+        new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_IMPORT),
+        new DeleteProject(user_repo, project_repo, privilege_repo, sample_repo, ecotaxa_account_repo),
+        new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, config.DATA_STORAGE_IMPORT),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.BASE_URL_PUBLIC),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
-        new DeleteSample(user_repo, sample_repo, privilege_repo),
+        new DeleteSample(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
         new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
         new ListImportableEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
-        new DeleteEcoTaxaSample(user_repo, sample_repo, privilege_repo),
+        new DeleteEcoTaxaSamples(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
         new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new ListShips(project_repo),
     )
 
     const taskMiddleWare = TaskRouter(
@@ -253,6 +267,16 @@ async function getSQLiteDS() {
     server.use("/instrument_models", instrumentModelMiddleWare)
     server.use("/projects", projectMiddleWare)
     server.use("/tasks", taskMiddleWare)
+    server.use("/ecotaxa_instances", EcoTaxaInstanceRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new GetAllEcoTaxaInstances(ecotaxa_account_repo),
+        new CreateEcoTaxaInstance(user_repo, ecotaxa_account_repo)
+    ))
+    server.use("/file_system", FileSystemRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new ListImportFolders(config.DATA_STORAGE_IMPORT),
+        new GetImportFolderMetadata(config.DATA_STORAGE_IMPORT, user_repo)
+    ))
 
 
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))

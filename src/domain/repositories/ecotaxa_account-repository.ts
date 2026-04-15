@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -51,7 +51,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
         this.insecureHttpsAgent =
-            NODE_ENV === "DEV"
+            NODE_ENV !== "PROD"
                 ? new https.Agent({ rejectUnauthorized: false })
                 : undefined;
 
@@ -386,6 +386,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             ecotaxa_account_id: ecotaxa_account.ecotaxa_account_id,
             ecotaxa_account_ecotaxa_id: ecotaxa_account.ecotaxa_account_ecotaxa_id,
             ecotaxa_user_name: ecotaxa_account.ecotaxa_account_user_name,
+            ecotaxa_user_email: ecotaxa_account.ecotaxa_account_user_email,
             ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_date,
             ecotaxa_account_instance_id: ecotaxa_account.ecotaxa_account_instance_id,
             ecotaxa_account_instance_name: ecotaxa_account.ecotaxa_account_instance_name
@@ -399,6 +400,12 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     async getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null> {
         const ecotaxa_instance = await this.ecotaxa_accountDataSource.getOneEcoTaxaInstance(ecotaxa_instance_id);
         return ecotaxa_instance;
+    }
+    async getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]> {
+        return await this.ecotaxa_accountDataSource.getAllEcoTaxaInstances();
+    }
+    async createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number> {
+        return await this.ecotaxa_accountDataSource.createEcoTaxaInstance(instance);
     }
     async ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void> {
         if (!await this.ecotaxa_account_belongs(current_user.user_id, ecotaxa_account_id)) {
@@ -578,13 +585,13 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             return text as any;
         }
     }
+
     private fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
         return fetch(input, {
             ...init,
             agent: this.insecureHttpsAgent,
         });
     }
-
 
     // ---- Create (or get) folder in user files ----------------------------------
     /**
@@ -800,4 +807,64 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const imported_sample_names = samples_to_import.map((s) => s.local_folder_tsv_path.split(path.sep).pop() as string);
         return imported_sample_names;
     }
+
+    // Query EcoTaxa objects by sample name in a project
+    // GET /api/samples/search to resolve names → numeric IDs
+    // POST /api/object_set/{project_id}/query with ProjectFilters.samples
+    async api_ecotaxa_query_objects_by_sample(baseUrl: string, token: string, ecotaxa_project_id: number, sample_names: string[]): Promise<number[]> {
+        // Step 1: resolve sample names to EcoTaxa numeric sample IDs
+        const sampleIds: number[] = [];
+        for (const name of sample_names) {
+            const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
+                `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
+                {
+                    method: "GET",
+                    headers: this.JSON_HEADERS(token),
+                }
+            );
+            for (const s of samples) {
+                sampleIds.push(s.sampleid);
+            }
+        }
+        if (sampleIds.length === 0) return [];
+
+        // Step 2: query objects filtered by those sample IDs
+        const queryResult = await this.http<{ object_ids: number[] }>(
+            `${baseUrl}api/object_set/${ecotaxa_project_id}/query`,
+            {
+                method: "POST",
+                headers: this.JSON_HEADERS(token),
+                body: JSON.stringify({
+                    samples: sampleIds.join(",")
+                }),
+            }
+        );
+        return queryResult?.object_ids ?? [];
+    }
+
+    // Delete EcoTaxa objects by their IDs
+    // DELETE /api/object_set/ — body = list of object IDs
+    async api_ecotaxa_delete_objects(baseUrl: string, token: string, objectIds: number[]): Promise<void> {
+        await this.http(
+            `${baseUrl}api/object_set/`,
+            {
+                method: "DELETE",
+                headers: this.JSON_HEADERS(token),
+                body: JSON.stringify(objectIds),
+            }
+        );
+    }
+
+    // Delete an EcoTaxa project
+    // DELETE /api/projects/{project_id}
+    async api_delete_ecotaxa_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<void> {
+        await this.http(
+            `${baseUrl}api/projects/${ecotaxa_project_id}`,
+            {
+                method: "DELETE",
+                headers: this.JSON_HEADERS(token),
+            }
+        );
+    }
+
 }

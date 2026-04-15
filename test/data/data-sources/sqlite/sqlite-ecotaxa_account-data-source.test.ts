@@ -8,7 +8,8 @@ import sqlite3 from 'sqlite3'
 import { PreparedSearchOptions } from '../../../../src/domain/entities/search';
 
 const config = {
-    TEST_DBSOURCE: 'TEST_DB_SOURCE_ECOTAXA_ACCOUNT'
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_ECOTAXA_ACCOUNT',
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
 function initializeDB() {
@@ -25,7 +26,7 @@ function initializeDB() {
     return db
 }
 function initializeUserDB(db: sqlite3.Database) {
-    return new SQLiteUserDataSource(db)
+    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
 }
 function initializeEcotaxaAccountDB(db: sqlite3.Database) {
     return new SQLiteEcotaxaAccountDataSource(db)
@@ -36,8 +37,8 @@ function cleanDB() {
         // Delete db file
         fs.unlinkSync(config.TEST_DBSOURCE);
         console.log("Database file deleted successfully.");
-    } catch (error) {
-        if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
             console.log("Database file does not exist. No action needed.");
         } else {
             console.error("Error occurred while deleting database file:", error);
@@ -88,9 +89,9 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             // Call the create method
             try {
                 await dataSource_EcotaxaAccount.create(ecotaxa_account);
-            } catch (error) {
+            } catch (error: unknown) {
                 expect(error).toBeDefined();
-                expect(error.message).toEqual("SQLITE_CONSTRAINT: FOREIGN KEY constraint failed");
+                expect((error as Error).message).toEqual("SQLITE_CONSTRAINT: FOREIGN KEY constraint failed");
             }
         });
         test('should not create an ecotaxa_account for the same account (instance email and ecopart user id) ', async () => {
@@ -99,9 +100,9 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             // Call the create method
             try {
                 await dataSource_EcotaxaAccount.create(ecotaxa_account);
-            } catch (error) {
+            } catch (error: unknown) {
                 expect(error).toBeDefined();
-                expect(error.message).toEqual("SQLITE_CONSTRAINT: UNIQUE constraint failed: ecotaxa_account.ecotaxa_account_instance_id, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_ecopart_user_id");
+                expect((error as Error).message).toEqual("SQLITE_CONSTRAINT: UNIQUE constraint failed: ecotaxa_account.ecotaxa_account_instance_id, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_ecopart_user_id");
             }
         });
     });

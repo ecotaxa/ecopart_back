@@ -11,7 +11,7 @@ export interface PaginedSearchOptions {
 
 export interface FilterSearchOptions {
     field: string;
-    operator: string; // DONE =, !=, >, >=, <, <=, IN, LIKE, // TODO BETWEEN, NOT BETWEEN  NOT LIKE,NOT IN,
+    operator: string; // DONE =, <>, >, >=, <, <=, IN, LIKE, // TODO BETWEEN, NOT BETWEEN  NOT LIKE,NOT IN,
     value: string | number | boolean | Date | null | undefined | any[];
 }
 

@@ -10,6 +10,7 @@ import { RefreshTokenUseCase } from '../../domain/interfaces/use-cases/auth/refr
 import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/change-password'
 import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
 import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
+import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
 
 // Password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
@@ -19,7 +20,8 @@ export default function AuthRouter(
     refreshTokenUseCase: RefreshTokenUseCase,
     changePasswordUseCase: ChangePasswordUseCase,
     resetPasswordRequestUseCase: ResetPasswordRequestUseCase,
-    resetPasswordUseCase: ResetPasswordUseCase
+    resetPasswordUseCase: ResetPasswordUseCase,
+    searchUsersUseCase: SearchUsersUseCase
 ) {
     const router = express.Router()
 
@@ -29,6 +31,45 @@ export default function AuthRouter(
     }
 
     /* LOGIN MANAGEMENT */
+    /**
+     * @openapi
+     * /auth/login:
+     *   post:
+     *     summary: User login
+     *     description: Authenticate a user with email and password. Returns JWT tokens as httpOnly cookies and in the response body.
+     *     tags: [Auth]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/AuthUserCredentials'
+     *     responses:
+     *       200:
+     *         description: Login successful. JWT tokens are set as httpOnly cookies.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/AuthJwtResponse'
+     *       401:
+     *         description: Invalid credentials.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or email not verified.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post('/login', middlewareAuthValidation.rulesAuthUserCredentialsModel, async (req: Request, res: Response) => {
         try {
             const tokens = await loginUserUseCase.execute(req.body)
@@ -46,10 +87,93 @@ export default function AuthRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /auth/user/me:
+     *   get:
+     *     summary: Get current user
+     *     description: Returns the authenticated user's profile information based on the JWT token.
+     *     tags: [Auth]
+     *     security:
+     *       - cookieAccessToken: []
+     *     responses:
+     *       200:
+     *         description: Current user information.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicUser'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: User not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.get('/user/me', middlewareAuth.auth, async (req: Request, res: Response) => {
-        res.status(200).send((req as CustomRequest).token)
+        try {
+            // Fetch fresh user data from the database using the user_id from the token
+            const token = (req as CustomRequest).token
+            const result = await searchUsersUseCase.execute((req as CustomRequest).token, { page: 1, limit: 1, sort_by: 'asc(user_id)' }, [{ field: 'user_id', operator: '=', value: token.user_id }])
+            if (result.users.length === 0) {
+                res.status(404).send({ errors: ['Cannot find user'] })
+                return
+            }
+            res.status(200).send(result.users[0])
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === 'User cannot be used') res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ['Cannot get user info'] })
+        }
     })
 
+    /**
+     * @openapi
+     * /auth/refreshToken:
+     *   post:
+     *     summary: Refresh access token
+     *     description: Uses the refresh token cookie to generate a new access token.
+     *     tags: [Auth]
+     *     security:
+     *       - cookieRefreshToken: []
+     *     responses:
+     *       200:
+     *         description: New access token generated and set as cookie.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/AuthJwtRefreshedResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: User not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post('/refreshToken', middlewareAuth.auth_refresh, async (req: Request, res: Response) => {
         try {
             const user = (req as CustomRequest).token
@@ -66,6 +190,21 @@ export default function AuthRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /auth/logout:
+     *   post:
+     *     summary: Logout
+     *     description: Clears the access and refresh token cookies to log the user out.
+     *     tags: [Auth]
+     *     responses:
+     *       200:
+     *         description: Successfully logged out.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     */
     router.post('/logout', async (req: Request, res: Response) => {
         res
             .clearCookie("access_token")
@@ -75,6 +214,53 @@ export default function AuthRouter(
     })
 
     /* PASSWORD MANAGEMENT */
+    /**
+     * @openapi
+     * /auth/password/change:
+     *   post:
+     *     summary: Change password
+     *     description: Change the password of the authenticated user. Requires current and new password.
+     *     tags: [Auth]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ChangePasswordRequest'
+     *     responses:
+     *       200:
+     *         description: Password successfully changed.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: New password must be different from old password.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Change password
     router.post('/password/change', middlewareAuthValidation.rulesPassword, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
@@ -92,6 +278,39 @@ export default function AuthRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /auth/password/reset:
+     *   post:
+     *     summary: Request password reset
+     *     description: Sends a password reset email to the given address. Always returns 200 to prevent email enumeration.
+     *     tags: [Auth]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ResetPasswordRequest'
+     *     responses:
+     *       200:
+     *         description: Reset password request email sent (or user not found, same response for security).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       403:
+     *         description: Cannot reset password.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Reset password request
     router.post('/password/reset', middlewareAuthValidation.rulesRequestResetPassword, async (req: Request, res: Response) => {
         try {
@@ -110,6 +329,57 @@ export default function AuthRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /auth/password/reset:
+     *   put:
+     *     summary: Confirm password reset
+     *     description: Completes the password reset process using a reset token and new password.
+     *     tags: [Auth]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ResetPasswordConfirm'
+     *     responses:
+     *       200:
+     *         description: Password successfully reset.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Token is not valid or no token provided.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or email not validated.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: User not found or reset code invalid.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Reset password confirm
     router.put('/password/reset', middlewareAuthValidation.rulesResetPassword, async (req: Request, res: Response) => {
         try {

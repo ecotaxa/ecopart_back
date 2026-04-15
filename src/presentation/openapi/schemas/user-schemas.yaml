@@ -1,0 +1,149 @@
+components:
+  schemas:
+    UserRequestCreation:
+      type: object
+      description: Request body for creating a new user account.
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: "Password. Must be at least 8 characters with at least one digit, one lowercase letter, one uppercase letter, and one special character (@!#$%^&*()_+.,;:)."
+        first_name:
+          type: string
+          description: User first name.
+          example: "Jane"
+        last_name:
+          type: string
+          description: User last name.
+          example: "Doe"
+        email:
+          type: string
+          format: email
+          description: User email address.
+          example: "jane.doe@example.com"
+        organisation:
+          type: string
+          description: User organisation or institution.
+          example: "CNRS"
+        country:
+          type: string
+          description: "User country (ISO 3166-1 alpha-2 code)."
+          example: "FR"
+        user_planned_usage:
+          type: string
+          description: Description of planned usage of EcoPart.
+          example: "Research on marine particles"
+      required:
+        - password
+        - first_name
+        - last_name
+        - email
+        - organisation
+        - country
+        - user_planned_usage
+
+    UserUpdate:
+      type: object
+      description: Request body for updating user profile. All fields are optional.
+      properties:
+        first_name:
+          type: string
+          description: User first name.
+        last_name:
+          type: string
+          description: User last name.
+        email:
+          type: string
+          format: email
+          description: User email address.
+        valid_email:
+          type: boolean
+          description: Whether the user email is validated.
+        is_admin:
+          type: boolean
+          description: Whether the user is an administrator. Only settable by admins.
+        organisation:
+          type: string
+          description: User organisation.
+        country:
+          type: string
+          description: "User country (ISO 3166-1 alpha-2 code)."
+        user_planned_usage:
+          type: string
+          description: Description of planned usage.
+
+    PublicUser:
+      type: object
+      description: Public user information returned by API endpoints.
+      properties:
+        user_id:
+          type: integer
+          description: Unique user identifier.
+          example: 1
+        first_name:
+          type: string
+          description: User first name.
+          example: "Jane"
+        last_name:
+          type: string
+          description: User last name.
+          example: "Doe"
+        email:
+          type: string
+          format: email
+          description: User email address.
+          example: "jane.doe@example.com"
+        is_admin:
+          type: boolean
+          description: Whether the user is an administrator.
+          example: false
+        organisation:
+          type: string
+          description: User organisation.
+          example: "CNRS"
+        country:
+          type: string
+          description: User country code.
+          example: "FR"
+        user_planned_usage:
+          type: string
+          description: Planned usage description.
+          example: "Research on marine particles"
+        user_creation_date:
+          type: string
+          description: Account creation date.
+          example: "2024-01-15T10:30:00.000Z"
+
+    MinimalUser:
+      type: object
+      description: Minimal user information used in privilege/member listings.
+      properties:
+        user_id:
+          type: integer
+          description: Unique user identifier.
+          example: 1
+        user_name:
+          type: string
+          description: User display name.
+          example: "Doe Jane"
+        email:
+          type: string
+          format: email
+          description: User email address.
+          example: "jane.doe@example.com"
+      required:
+        - user_id
+        - user_name
+        - email
+
+    UserSearchResponse:
+      type: object
+      description: Paginated user search results.
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicUser"

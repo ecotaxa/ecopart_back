@@ -18,6 +18,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     DATA_STORAGE_FS_STORAGE: string
     DATA_STORAGE_EXPORT: string
     DATA_STORAGE_FOLDER: string
+    DATA_STORAGE_IMPORT: string
 
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
@@ -25,11 +26,12 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
     base_folder = path.join(__dirname, '..', '..', '..');
 
-    constructor(projectDataSource: ProjectDataSource, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_EXPORT: string, DATA_STORAGE_FOLDER: string) {
+    constructor(projectDataSource: ProjectDataSource, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_EXPORT: string, DATA_STORAGE_FOLDER: string, DATA_STORAGE_IMPORT: string) {
         this.projectDataSource = projectDataSource
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
         this.DATA_STORAGE_EXPORT = DATA_STORAGE_EXPORT
         this.DATA_STORAGE_FOLDER = DATA_STORAGE_FOLDER
+        this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
     }
 
     async createProject(project: ProjectRequestCreationModel): Promise<number> {
@@ -168,10 +170,15 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     toPublicProject(project: ProjectResponseModel, privileges: PublicPrivilege): PublicProjectResponseModel {
+        // Strip DATA_STORAGE_IMPORT prefix from root_folder_path for API response
+        let publicRootFolderPath = project.root_folder_path;
+        if (publicRootFolderPath.startsWith(this.DATA_STORAGE_IMPORT)) {
+            publicRootFolderPath = publicRootFolderPath.substring(this.DATA_STORAGE_IMPORT.length);
+        }
 
         const publicProject: PublicProjectResponseModel = {
             project_id: project.project_id,
-            root_folder_path: project.root_folder_path,
+            root_folder_path: publicRootFolderPath,
             project_title: project.project_title,
             project_acronym: project.project_acronym,
             project_description: project.project_description,
@@ -431,7 +438,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         // zip and copy backupedProjectPath to exportFolder
         await this.zipFolder(backupedProjectPath, exportFolder);
     }
-    async ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void> {
+    async ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void> {
         const options: PreparedSearchOptions = {
             filter: [
                 { field: "ecotaxa_project_id", operator: "=", value: ecotaxa_project_id },
@@ -445,5 +452,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         if (linked_projects.total > 0) {
             throw new Error("EcoTaxa project is already linked to an EcoPart project");
         }
+    }
+
+    async getDistinctShips(): Promise<string[]> {
+        return await this.projectDataSource.getDistinctShips();
     }
 }

@@ -117,7 +117,7 @@ describe('SQLiteProjectDataSource', () => {
         });
         test('should return all projects with filtering on not null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'override_depth_offset', operator: '!=', value: 'null' }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'override_depth_offset', operator: '<>', value: 'null' }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(1);

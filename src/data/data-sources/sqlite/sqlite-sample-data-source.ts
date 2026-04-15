@@ -471,10 +471,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                     filtering_sql += `sample.` + filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == "null") {
+                else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += `sample.` + filter.field + ` IS NULL`;
-                    } else if (filter.operator == "!=") {
+                    } else if (filter.operator == "<>") {
                         filtering_sql += `sample.` + filter.field + ` IS NOT NULL`;
                     }
                 }

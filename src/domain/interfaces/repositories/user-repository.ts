@@ -25,4 +25,5 @@ export interface UserRepository {
     canUserBeUse(user_id: number): Promise<boolean>
     ensureUserCanBeUsed(user_id: number): Promise<void>;
     ensureTypedUserCanBeUsed(user_id: number, userType: string): Promise<void>
+    getDistinctOrganisations(): Promise<string[]>;
 }

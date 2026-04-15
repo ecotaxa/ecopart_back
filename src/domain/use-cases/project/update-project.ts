@@ -1,3 +1,4 @@
+import path from "path";
 import { MinimalUserModel, UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../entities/project";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
@@ -14,13 +15,15 @@ export class UpdateProject implements UpdateProjectUseCase {
     instrument_modelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
     ecotaxa_accountRepository: EcotaxaAccountRepository;
+    DATA_STORAGE_IMPORT: string
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.instrument_modelRepository = instrument_modelRepository
         this.privilegeRepository = privilegeRepository
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
+        this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
     }
 
     async execute(current_user: UserUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<PublicProjectResponseModel> {
@@ -79,7 +82,11 @@ export class UpdateProject implements UpdateProjectUseCase {
                     project_to_update[key] = instrument.instrument_model_id;
                     // Else if not in members, managers and contact add it to project_to_update
                 } else if (key !== "members" && key !== "managers" && key !== "contact") {
-                    project_to_update[key] = public_project_to_update[key];
+                    if (key === "root_folder_path") {
+                        project_to_update[key] = path.join(this.DATA_STORAGE_IMPORT, public_project_to_update[key] as string);
+                    } else {
+                        project_to_update[key] = public_project_to_update[key];
+                    }
                 }
             }
         }
@@ -145,7 +152,7 @@ export class UpdateProject implements UpdateProjectUseCase {
     private async handleEcotaxaProjectLinks(public_project_to_update: PublicProjectUpdateModel, current_user: UserUpdateModel, current_project: ProjectResponseModel, project: ProjectUpdateModel): Promise<ProjectUpdateModel> {
         await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project_to_update.ecotaxa_account_id);
         await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project_to_update);
-        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcotaxaProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
+        await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(public_project_to_update.ecotaxa_project_id as number, public_project_to_update.ecotaxa_instance_id as number);
 
         const project_for_ecotaxa = { ...current_project, ...public_project_to_update };
         if (public_project_to_update.new_ecotaxa_project) {

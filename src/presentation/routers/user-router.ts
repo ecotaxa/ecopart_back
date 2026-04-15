@@ -11,6 +11,7 @@ import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/searc
 import { SearchEcotaxaAccountsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
+import { ListOrganisationsUseCase } from '../../domain/interfaces/use-cases/user/list-organisations'
 import { CustomRequest } from '../../domain/entities/auth'
 import { MiddlewareAuthValidation } from '../middleware/auth-validation'
 
@@ -25,10 +26,90 @@ export default function UsersRouter(
     loginEcotaxaAccountUseCase: LoginEcotaxaAccountUseCase,
     logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
     searchUsersUseCase: SearchUsersUseCase,
-    searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase
+    searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase,
+    listOrganisationsUseCase: ListOrganisationsUseCase
 ) {
     const router = express.Router()
 
+    /**
+     * @openapi
+     * /users/organisations:
+     *   get:
+     *     summary: List all organisations
+     *     description: Returns a list of all distinct organisation names from registered users.
+     *     tags: [Users]
+     *     responses:
+     *       200:
+     *         description: List of organisation names.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: string
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    // List of all distinct organisations
+    router.get('/organisations', async (req: Request, res: Response) => {
+        try {
+            const organisations = await listOrganisationsUseCase.execute();
+            res.status(200).send(organisations)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            res.status(500).send({ errors: ["Cannot get organisations"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /users:
+     *   get:
+     *     summary: List users
+     *     description: Returns a paginated and sorted list of all users. Requires authentication.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of users.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/UserSearchResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of all users
     router.get('/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
         try {
@@ -43,6 +124,95 @@ export default function UsersRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /users/searches:
+     *   post:
+     *     summary: Search users
+     *     description: |
+     *       Returns a paginated, sorted, and filtered list of users.
+     *
+     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
+     *
+     *       Supported operators:
+     *       | Operator | Value type | Description |
+     *       |----------|------------|-------------|
+     *       | `=`      | string, number, boolean | Exact match |
+     *       | `<>`     | string, number, boolean | Not equal |
+     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
+     *       | `IN`     | array | Value is one of the given items |
+     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
+     *
+     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `<> "null"` → `IS NOT NULL`).
+     *
+     *       **Filterable fields:**
+     *       | Field | Type |
+     *       |-------|------|
+     *       | `user_id` | number |
+     *       | `first_name` | string |
+     *       | `last_name` | string |
+     *       | `email` | string |
+     *       | `valid_email` | boolean |
+     *       | `is_admin` | boolean |
+     *       | `organisation` | string |
+     *       | `country` | string |
+     *       | `user_planned_usage` | string |
+     *       | `user_creation_date` | string (ISO timestamp) |
+     *       | `confirmation_code` | string or null |
+     *       | `reset_password_code` | string or null |
+     *       | `deleted` | string (ISO timestamp) or null |
+     *
+     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
+     *
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(last_name),desc(user_id)`.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: array
+     *             items:
+     *               $ref: '#/components/schemas/FilterSearchOptions'
+     *           example:
+     *             - field: "valid_email"
+     *               operator: "="
+     *               value: true
+     *             - field: "user_id"
+     *               operator: "="
+     *               value: 1
+     *     responses:
+     *       200:
+     *         description: Paginated filtered list of users.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/UserSearchResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters/filters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of filtered users
     router.post('/searches', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
         try {
@@ -58,6 +228,51 @@ export default function UsersRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /users:
+     *   post:
+     *     summary: Create user
+     *     description: Register a new user account. Does not require authentication. A confirmation email will be sent.
+     *     tags: [Users]
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/UserRequestCreation'
+     *     responses:
+     *       201:
+     *         description: User successfully created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       403:
+     *         description: User already exists or is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Cannot find created user.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.post('/', middlewareUserValidation.rulesUserRequestCreationModel, async (req: Request, res: Response) => {
         try {
             await createUserUseCase.execute(req.body)
@@ -73,6 +288,66 @@ export default function UsersRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /users/{user_id}:
+     *   patch:
+     *     summary: Update user
+     *     description: Update an existing user's profile. Requires authentication. Users can update their own profile; admins can update any user.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The user ID to update.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/UserUpdate'
+     *     responses:
+     *       200:
+     *         description: Updated user profile.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicUser'
+     *       401:
+     *         description: Unauthorized to update this user or property.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Cannot find user to update.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.patch('/:user_id/', middlewareUserValidation.rulesUserUpdateModel, middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const updated_user = await updateUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
@@ -88,6 +363,58 @@ export default function UsersRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /users/{user_id}/welcome/{confirmation_token}:
+     *   get:
+     *     summary: Activate user account
+     *     description: Validates a user's email using the confirmation token sent by email.
+     *     tags: [Users]
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The user ID to activate.
+     *       - name: confirmation_token
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: string
+     *         description: The confirmation token from the welcome email.
+     *     responses:
+     *       200:
+     *         description: Account activated.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Invalid confirmation token.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User validation forbidden or user is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Cannot find user with confirmation code.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.get('/:user_id/welcome/:confirmation_token', async (req: Request, res: Response) => {
         try {
             // Call usecase validate user email
@@ -108,6 +435,54 @@ export default function UsersRouter(
         }
     })
 
+    /**
+     * @openapi
+     * /users/{user_id}:
+     *   delete:
+     *     summary: Delete user
+     *     description: Permanently delete a user account. Users can delete their own account (which also logs them out); admins can delete any user.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The user ID to delete.
+     *     responses:
+     *       200:
+     *         description: User successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Logged user cannot delete this user.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or is deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Cannot find user to delete.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     router.delete('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
@@ -130,6 +505,66 @@ export default function UsersRouter(
         }
     })
     /********** ECOTAXA ACCOUNTS ENDPOINTS ***********/
+    /**
+     * @openapi
+     * /users/{user_id}/ecotaxa_account:
+     *   post:
+     *     summary: Login to EcoTaxa account
+     *     description: Link an EcoTaxa account to the specified user by providing EcoTaxa credentials.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart user ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/EcotaxaAccountLogin'
+     *     responses:
+     *       200:
+     *         description: EcoTaxa account successfully linked.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicEcotaxaAccountResponse'
+     *       401:
+     *         description: Unauthorized or account already exists.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or EcoTaxa login forbidden.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: EcoTaxa instance not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // login to an ecotaxa Account
     router.post('/:user_id/ecotaxa_account', middlewareAuth.auth, middlewareAuthValidation.rulesAuthEcoTaxaAccountCredentialsModel, async (req: Request, res: Response) => {
         try {
@@ -148,6 +583,66 @@ export default function UsersRouter(
             else res.status(500).send({ errors: ["Cannot login ecotaxa account"] })
         }
     })
+    /**
+     * @openapi
+     * /users/{user_id}/ecotaxa_account/{ecotaxa_account_id}:
+     *   delete:
+     *     summary: Logout from EcoTaxa account
+     *     description: Unlink an EcoTaxa account from the specified user.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart user ID.
+     *       - name: ecotaxa_account_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoTaxa account ID to unlink.
+     *     responses:
+     *       200:
+     *         description: Successfully logged out from EcoTaxa account.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Unauthorized to delete this account.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used or cannot logout.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: EcoTaxa account not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     //    logout from an ecotaxa Account
     router.delete('/:user_id/ecotaxa_account/:ecotaxa_account_id', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
         try {
@@ -162,6 +657,51 @@ export default function UsersRouter(
             else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
         }
     })
+    /**
+     * @openapi
+     * /users/{user_id}/ecotaxa_account:
+     *   get:
+     *     summary: List EcoTaxa accounts
+     *     description: Returns a paginated list of EcoTaxa accounts linked to the specified user.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart user ID.
+     *       - $ref: '#/components/parameters/PageParam'
+     *       - $ref: '#/components/parameters/LimitParam'
+     *       - $ref: '#/components/parameters/SortByParam'
+     *     responses:
+     *       200:
+     *         description: Paginated list of EcoTaxa accounts.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/EcotaxaAccountSearchResponse'
+     *       401:
+     *         description: Unauthorized or invalid parameters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
     // Pagined and sorted list of all ecotaxa accounts for a user
     router.get('/:user_id/ecotaxa_account/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
         try {

@@ -4,7 +4,8 @@ import { UserRequestCreationModel, UserUpdateModel } from '../../../../src/domai
 import fs from 'fs';
 
 const config = {
-    TEST_DBSOURCE: 'TEST_DB_SOURCE_USER'
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_USER',
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
 function initializeUserDB() {
@@ -18,7 +19,7 @@ function initializeUserDB() {
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
-    return new SQLiteUserDataSource(db)
+    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
 }
 
 function cleanUserDB() {
@@ -263,7 +264,7 @@ describe('SQLiteUserDataSource', () => {
         });
         test('should return all users with sorting and filtering and pagination null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '!=', value: 'null' }], sort_by: [] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'deleted', operator: '<>', value: 'null' }], sort_by: [] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(0);

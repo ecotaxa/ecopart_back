@@ -136,7 +136,7 @@ describe('SQLiteInstrumentModelDataSource', () => {
         });
         test('should return all instrument_models with filtering on not null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument_model_name', operator: '!=', value: 'null' }], sort_by: [{ sort_by: 'instrument_model_id', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'instrument_model_name', operator: '<>', value: 'null' }], sort_by: [{ sort_by: 'instrument_model_id', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(8);

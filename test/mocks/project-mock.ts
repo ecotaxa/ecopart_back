@@ -1,5 +1,5 @@
 import { ProjectRequestCreationModel, ProjectResponseModel, PublicProjectResponseModel } from "../../src/domain/entities/project";
-import { PublicHeaderSampleResponseModel, PublicSampleModel } from "../../src/domain/entities/sample";
+import { PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel } from "../../src/domain/entities/sample";
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { TaskResponseModel } from "../../src/domain/entities/task";
 import { ProjectRepository } from "../../src/domain/interfaces/repositories/project-repository"
@@ -13,6 +13,11 @@ import { DeleteSampleUseCase } from "../../src/domain/interfaces/use-cases/sampl
 import { ImportSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/import-samples";
 import { ListImportableSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/list-importable-samples";
 import { SearchSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/search-samples";
+import { ListShipsUseCase } from "../../src/domain/interfaces/use-cases/project/list-ships";
+import { SearchEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
+import { DeleteEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
+import { ImportEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples";
+import { ListImportableEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples";
 
 export class MockProjectRepository implements ProjectRepository {
     createProjectRootFolder(): Promise<void> {
@@ -57,6 +62,12 @@ export class MockProjectRepository implements ProjectRepository {
     standardGetProjects(): Promise<SearchResult<ProjectResponseModel>> {
         throw new Error("Method not implemented : standardGetProjects");
     }
+    ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(): Promise<void> {
+        throw new Error("Method not implemented : ensureEcotaxaProjectNotLinkedToAnotherEcopartProject");
+    }
+    getDistinctShips(): Promise<string[]> {
+        throw new Error("Method not implemented : getDistinctShips");
+    }
 
 }
 
@@ -75,6 +86,9 @@ export class MockProjectDataSource {
     }
     deleteOne(): Promise<number> {
         throw new Error("Method not implemented : deleteOne");
+    }
+    getDistinctShips(): Promise<string[]> {
+        throw new Error("Method not implemented : getDistinctShips");
     }
 }
 
@@ -130,5 +144,35 @@ export class MockDeleteSampleUseCase implements DeleteSampleUseCase {
 export class MockSearchSamplesUseCase implements SearchSamplesUseCase {
     execute(): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for search samples")
+    }
+}
+
+export class MockListShipsUseCase implements ListShipsUseCase {
+    execute(): Promise<string[]> {
+        throw new Error("Method not implemented for ListShipsUseCase");
+    }
+}
+
+export class MockListImportableEcoTaxaSamplesUseCase implements ListImportableEcoTaxaSamplesUseCase {
+    execute(): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
+        throw new Error("Method not implemented for list importable eco taxa samples");
+    }
+}
+
+export class MockImportEcoTaxaSamplesUseCase implements ImportEcoTaxaSamplesUseCase {
+    execute(): Promise<TaskResponseModel> {
+        throw new Error("Method not implemented for import eco taxa samples");
+    }
+}
+
+export class MockDeleteEcoTaxaSamplesUseCase implements DeleteEcoTaxaSamplesUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for delete eco taxa samples");
+    }
+}
+
+export class MockSearchEcoTaxaSamplesUseCase implements SearchEcoTaxaSamplesUseCase {
+    execute(): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
+        throw new Error("Method not implemented for search eco taxa samples");
     }
 }

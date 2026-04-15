@@ -84,6 +84,7 @@ export const public_ecotaxa_request_creation_model_test_user: PublicEcotaxaAccou
     ecopart_user_id: 1
 }
 export const ecotaxaAccountRequestCreationModel: EcotaxaAccountRequestCreationModel = {
+    ecotaxa_account_ecotaxa_id: 1,
     ecotaxa_account_ecopart_user_id: 1,
     ecotaxa_account_token: "ecotaxa_token",
     ecotaxa_account_user_name: "ecotaxa_user_name",
@@ -92,6 +93,7 @@ export const ecotaxaAccountRequestCreationModel: EcotaxaAccountRequestCreationMo
     ecotaxa_account_expiration_date: "2025-03-19T16:49:24.892Z"
 }
 export const ecotaxaAccountRequestCreationModel_unexistingUser: EcotaxaAccountRequestCreationModel = {
+    ecotaxa_account_ecotaxa_id: 1,
     ecotaxa_account_ecopart_user_id: 100,
     ecotaxa_account_token: "ecotaxa_token",
     ecotaxa_account_user_name: "ecotaxa_user_name",
@@ -103,7 +105,9 @@ export const ecotaxaAccountRequestCreationModel_unexistingUser: EcotaxaAccountRe
 export const public_ecotaxa_account_response_model: PublicEcotaxaAccountResponseModel =
 {
     "ecotaxa_account_id": 3,
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_user_name": "Test API user",
+    "ecotaxa_user_email": "test@ecotaxa.obs-vlfr.fr",
     "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR"
@@ -111,7 +115,9 @@ export const public_ecotaxa_account_response_model: PublicEcotaxaAccountResponse
 export const public_ecotaxa_account_response_model_2: PublicEcotaxaAccountResponseModel =
 {
     "ecotaxa_account_id": 3,
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_user_name": "ecotaxa_account_user_name",
+    "ecotaxa_user_email": "ecotaxa_account_user_email",
     "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR"
@@ -119,6 +125,7 @@ export const public_ecotaxa_account_response_model_2: PublicEcotaxaAccountRespon
 
 export const ecotaxaAccountResponseModel: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
@@ -130,6 +137,7 @@ export const ecotaxaAccountResponseModel: EcotaxaAccountResponseModel = {
 }
 export const ecotaxaAccountResponseModel_2: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 4,
+    "ecotaxa_account_ecotaxa_id": 2,
     "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
@@ -142,6 +150,7 @@ export const ecotaxaAccountResponseModel_2: EcotaxaAccountResponseModel = {
 
 export const ecotaxaAccountResponseModel_lena: EcotaxaAccountResponseModel = {
     "ecotaxa_account_creation_date": "2025-02-26 13:50:00",
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_account_ecopart_user_id": 1,
     "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_id": 1,
@@ -171,11 +180,13 @@ export const ecotaxa_instance_test_ecotaxa: EcotaxaInstanceModel = {
 export const ecotaxa_account_1: EcotaxaAccountModel = {
     ecotaxa_token: "ecotaxa_token",
     ecotaxa_user_name: "ecotaxa_user_name",
+    ecotaxa_account_ecotaxa_id: 1,
     ecotaxa_expiration_date: "2025-03-19T16:49:24.892Z"
 }
 
 export const ecotaxaAccountResponseModel_1: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
@@ -188,7 +199,9 @@ export const ecotaxaAccountResponseModel_1: EcotaxaAccountResponseModel = {
 
 export const publicEcotaxaAccountResponseModel_1: PublicEcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
+    "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_user_name": "Test API user",
+    "ecotaxa_user_email": "test@ecotaxa.obs-vlfr.fr",
     "ecotaxa_expiration_date": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR"

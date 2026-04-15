@@ -1,0 +1,33 @@
+components:
+  schemas:
+    InstrumentModelResponse:
+      type: object
+      description: Instrument model information.
+      properties:
+        instrument_model_id:
+          type: integer
+          description: Unique instrument model identifier.
+          example: 1
+        instrument_model_name:
+          type: string
+          description: Name of the instrument model.
+          example: "UVP5HD"
+        bodc_url:
+          type: string
+          description: BODC vocabulary URL for this instrument.
+          example: "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/"
+        instrument_model_creation_date:
+          type: string
+          description: Record creation date.
+          example: "2024-01-15T10:30:00.000Z"
+
+    InstrumentModelSearchResponse:
+      type: object
+      description: Paginated instrument model search results.
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        instrument_models:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstrumentModelResponse"

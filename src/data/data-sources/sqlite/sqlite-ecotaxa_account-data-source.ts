@@ -1,4 +1,4 @@
-import { EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel } from "../../../domain/entities/ecotaxa_account";
+import { EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel } from "../../../domain/entities/ecotaxa_account";
 import { EcotaxaAccountDataSource } from "../../interfaces/data-sources/ecotaxa_account-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -71,6 +71,8 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     VALUES 
                         ('FR', 'French instance of EcoTaxa, can be used world wilde.', 'https://ecotaxa.obs-vlfr.fr/');
                 `;
+                // const sql_test_instance = `
+                //     INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url) VALUES ('TEST', 'TEST instance for development', 'https://ecotaxa-dev.imev-mer.fr:5003/');`;
 
                 db_tables.run(sql_default_instance, [], function (err: Error | null) {
                     if (err) {
@@ -155,10 +157,10 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     filtering_sql += filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == "null") {
+                else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
-                    } else if (filter.operator == "!=") {
+                    } else if (filter.operator == "<>") {
                         filtering_sql += filter.field + ` IS NOT NULL`;
                     }
                 }
@@ -267,6 +269,45 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         ecotaxa_instance_url: row.ecotaxa_instance_url
                     };
                     resolve(result)
+                }
+            });
+        })
+    }
+
+    async getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]> {
+        const sql = "SELECT * FROM ecotaxa_instance";
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (rows === undefined) {
+                        resolve([]);
+                        return;
+                    }
+                    const result: EcotaxaInstanceModel[] = rows.map(row => ({
+                        ecotaxa_instance_id: row.ecotaxa_instance_id,
+                        ecotaxa_instance_name: row.ecotaxa_instance_name,
+                        ecotaxa_instance_description: row.ecotaxa_instance_description,
+                        ecotaxa_instance_creation_date: row.ecotaxa_instance_creation_date,
+                        ecotaxa_instance_url: row.ecotaxa_instance_url
+                    }));
+                    resolve(result)
+                }
+            });
+        })
+    }
+
+    async createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number> {
+        const sql = "INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url) VALUES ((?), (?), (?))";
+        const params = [instance.ecotaxa_instance_name, instance.ecotaxa_instance_description, instance.ecotaxa_instance_url];
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    const result = this.lastID;
+                    resolve(result);
                 }
             });
         })

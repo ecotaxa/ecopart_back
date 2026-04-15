@@ -1,6 +1,6 @@
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { UserResponseModel } from "../../src/domain/entities/user";
-import { EcotaxaAccountModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
+import { EcotaxaAccountModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
 import { EcotaxaAccountRepository } from "../../src/domain/interfaces/repositories/ecotaxa_account-repository";
@@ -13,6 +13,9 @@ import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/s
 import { LoginEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
 import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
+import { GetAllEcoTaxaInstancesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/get-all-ecotaxa-instances";
+import { CreateEcoTaxaInstanceUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/create-ecotaxa-instance";
+import { ListOrganisationsUseCase } from "../../src/domain/interfaces/use-cases/user/list-organisations";
 
 import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/auth";
 
@@ -90,9 +93,42 @@ export class MockUserRepository implements UserRepository {
     verifyValidationToken(): DecodedToken | null {
         throw new Error("Method not implemented : verifyValidationToken");
     }
+    getDistinctOrganisations(): Promise<string[]> {
+        throw new Error("Method not implemented : getDistinctOrganisations");
+    }
 }
 
 export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    api_ecotaxa_query_objects_by_sample(): Promise<number[]> {
+        throw new Error("Method not implemented for api_ecotaxa_query_objects_by_sample.");
+    }
+    api_ecotaxa_delete_objects(): Promise<void> {
+        throw new Error("Method not implemented for api_ecotaxa_delete_objects.");
+    }
+    api_delete_ecotaxa_project(): Promise<void> {
+        throw new Error("Method not implemented for api_delete_ecotaxa_project.");
+    }
+    importEcoTaxaSamplesInEcoTaxa(): Promise<string[]> {
+        throw new Error("Method not implemented for importEcoTaxaSamplesInEcoTaxa.");
+    }
+    deleteEcopartUserFromEcotaxaProject(): Promise<void> {
+        throw new Error("Method not implemented for deleteEcopartUserFromEcotaxaProject.");
+    }
+    linkEcotaxaAndEcopartProject(): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string }> {
+        throw new Error("Method not implemented for linkEcotaxaAndEcopartProject.");
+    }
+    createEcotaxaProject(): Promise<number> {
+        throw new Error("Method not implemented for createEcotaxaProject.");
+    }
+    ecotaxa_account_belongs(): Promise<boolean> {
+        throw new Error("Method not implemented for ecotaxa_account_belongs.");
+    }
+    ensureUserCanUseEcotaxaAccount(): Promise<void> {
+        throw new Error("Method not implemented for ensureUserCanUseEcotaxaAccount.");
+    }
+    ensureEcotaxaInstanceConsistency(): Promise<void> {
+        throw new Error("Method not implemented for ensureEcotaxaInstanceConsistency.");
+    }
     connectToEcotaxaInstance(): Promise<EcotaxaAccountModel> {
         throw new Error("Method not implemented for connectToEcotaxaInstance.");
     }
@@ -117,6 +153,15 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     standardGetEcotaxaAccountsModels(): Promise<SearchResult<EcotaxaAccountResponseModel>> {
         throw new Error("Method not implemented for standardGetEcotaxaAccountsModels.");
     }
+    getEcotaxaGenericAccountForInstance(): Promise<EcotaxaAccountResponseModel> {
+        throw new Error("Method not implemented for getEcotaxaGenericAccountForInstance.");
+    }
+    getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]> {
+        throw new Error("Method not implemented for getAllEcoTaxaInstances.");
+    }
+    createEcoTaxaInstance(): Promise<number> {
+        throw new Error("Method not implemented for createEcoTaxaInstance.");
+    }
 }
 export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     create(): Promise<number> {
@@ -133,6 +178,12 @@ export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     }
     getOneEcoTaxaInstance(): Promise<EcotaxaInstanceModel | null> {
         throw new Error("Method not implemented for getOneEcoTaxaInstance.");
+    }
+    getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]> {
+        throw new Error("Method not implemented for getAllEcoTaxaInstances.");
+    }
+    createEcoTaxaInstance(): Promise<number> {
+        throw new Error("Method not implemented for createEcoTaxaInstance.");
     }
 }
 
@@ -186,6 +237,23 @@ export class MockLogoutEcotaxaAccountUseCase implements LogoutEcotaxaAccountUseC
 export class MockSearchEcotaxaAccountsUseCase implements SearchEcotaxaAccountsUseCase {
     execute(): Promise<{ ecotaxa_accounts: PublicEcotaxaAccountResponseModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for SearchEcotaxaAccountsUseCase");
+    }
+}
+
+export class MockGetAllEcoTaxaInstancesUseCase implements GetAllEcoTaxaInstancesUseCase {
+    execute(): Promise<EcotaxaInstanceModel[]> {
+        throw new Error("Method not implemented for GetAllEcoTaxaInstancesUseCase");
+    }
+}
+export class MockCreateEcoTaxaInstanceUseCase implements CreateEcoTaxaInstanceUseCase {
+    execute(): Promise<EcotaxaInstanceModel> {
+        throw new Error("Method not implemented for CreateEcoTaxaInstanceUseCase");
+    }
+}
+
+export class MockListOrganisationsUseCase implements ListOrganisationsUseCase {
+    execute(): Promise<string[]> {
+        throw new Error("Method not implemented for ListOrganisationsUseCase");
     }
 }
 

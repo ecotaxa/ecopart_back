@@ -211,10 +211,10 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                     filtering_sql += filter.field + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
-                else if (filter.value == "null") {
+                else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += filter.field + ` IS NULL`;
-                    } else if (filter.operator == "!=") {
+                    } else if (filter.operator == "<>") {
                         filtering_sql += filter.field + ` IS NOT NULL`;
                     }
                 }
@@ -303,6 +303,18 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         })
     }
 
+    async getDistinctShips(): Promise<string[]> {
+        const sql = `SELECT DISTINCT ship FROM project ORDER BY ship ASC;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows.map((row: any) => row.ship));
+                }
+            });
+        })
+    }
 
 }
 

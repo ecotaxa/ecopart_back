@@ -12,7 +12,8 @@ import { projectRequestCreationModelForRepository } from '../../../entities/proj
 import { PrivilegeRequestModel } from '../../../../src/domain/entities/privilege';
 
 const config = {
-    TEST_DBSOURCE: 'TEST_DB_SOURCE_PRIVILEGE'
+    TEST_DBSOURCE: 'TEST_DB_SOURCE_PRIVILEGE',
+    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
 function initializeDB() {
@@ -34,7 +35,7 @@ function initializeProjectDB(db: sqlite3.Database) {
     return new SQLiteProjectDataSource(db)
 }
 function initializeUserDB(db: sqlite3.Database) {
-    return new SQLiteUserDataSource(db)
+    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
 }
 function initializeInstrumentModelDB(db: sqlite3.Database) {
     return new SQLiteInstrumentModelDataSource(db)
