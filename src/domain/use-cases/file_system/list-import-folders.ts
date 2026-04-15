@@ -10,7 +10,8 @@ export class ListImportFolders implements ListImportFoldersUseCase {
     }
 
     async execute(folder_path: string): Promise<string[]> {
-        const resolvedPath = path.resolve(this.importFolderPath, folder_path);
+        const targetPath = path.join(this.importFolderPath, folder_path);
+        const resolvedPath = path.resolve(targetPath);
         const resolvedRoot = path.resolve(this.importFolderPath);
 
         // Prevent directory traversal outside the import root
@@ -22,7 +23,7 @@ export class ListImportFolders implements ListImportFoldersUseCase {
         const folders: string[] = [];
         for (const entry of entries) {
             if (entry.isDirectory()) {
-                folders.push(path.join(resolvedPath, entry.name));
+                folders.push(path.join(folder_path, entry.name));
             }
         }
         return folders.sort((a, b) => a.localeCompare(b));

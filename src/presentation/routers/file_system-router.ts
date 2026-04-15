@@ -27,7 +27,7 @@ export default function FileSystemRouter(
      *         required: false
      *         schema:
      *           type: string
-     *         description: The path to list folders under. If omitted, lists folders at the import root.
+     *         description: Path relative to the import root. If omitted, lists folders at the import root.
      *     responses:
      *       200:
      *         description: List of import folder paths.
