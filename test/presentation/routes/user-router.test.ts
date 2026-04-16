@@ -65,6 +65,7 @@ class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesUserUpdateModel = []
     rulesUserResponseModel = []
     rulesGetUsers = []
+    rulesGetEcotaxaAccounts = []
 }
 
 describe("User Router", () => {

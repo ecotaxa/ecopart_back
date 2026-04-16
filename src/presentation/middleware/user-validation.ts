@@ -157,6 +157,23 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
         },
     ];
 
+    rulesGetEcotaxaAccounts = [
+        query('page').default(1)
+            .isInt({ min: 1 }).withMessage('Page must be a number and must be greater than 0.'),
+        query('limit').default(10)
+            .isInt({ min: 1 }).withMessage('Limit must be a number and must be greater than 0.'),
+        query('sort_by').default("asc(ecotaxa_account_expiration_date)"),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
     rulesLogoutEcoTaxaAccount = [
         param('user_id')
             .not().isEmpty().withMessage('User id is required.')
