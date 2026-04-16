@@ -675,7 +675,13 @@ export default function UsersRouter(
      *         description: The EcoPart user ID.
      *       - $ref: '#/components/parameters/PageParam'
      *       - $ref: '#/components/parameters/LimitParam'
-     *       - $ref: '#/components/parameters/SortByParam'
+     *       - name: sort_by
+     *         in: query
+     *         schema:
+     *           type: string
+     *           default: "asc(ecotaxa_account_expiration_date)"
+     *         description: "Sorting statement. Allowed fields: ecotaxa_account_expiration_date. Format: asc(field) or desc(field)."
+     *         example: "asc(ecotaxa_account_expiration_date)"
      *     responses:
      *       200:
      *         description: Paginated list of EcoTaxa accounts.
@@ -703,7 +709,7 @@ export default function UsersRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      */
     // Pagined and sorted list of all ecotaxa accounts for a user
-    router.get('/:user_id/ecotaxa_account/', middlewareAuth.auth, middlewareUserValidation.rulesGetUsers, async (req: Request, res: Response) => {
+    router.get('/:user_id/ecotaxa_account/', middlewareAuth.auth, middlewareUserValidation.rulesGetEcotaxaAccounts, async (req: Request, res: Response) => {
         try {
             const ecotaxa_accounts = await searchEcotaxaAccountsUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), { ...req.query } as any);
             res.status(200).send(ecotaxa_accounts)

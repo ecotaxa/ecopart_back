@@ -5176,7 +5176,14 @@
             "$ref": "#/components/parameters/LimitParam"
           },
           {
-            "$ref": "#/components/parameters/SortByParam"
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "asc(ecotaxa_account_expiration_date)"
+            },
+            "description": "Sorting statement. Allowed fields: ecotaxa_account_expiration_date. Format: asc(field) or desc(field).",
+            "example": "asc(ecotaxa_account_expiration_date)"
           }
         ],
         "responses": {
