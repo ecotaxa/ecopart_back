@@ -253,7 +253,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         }
 
         // add generic user to the project
-        this.add_default_values_to_ecotaxa_project(ecotaxa_instance, ecotaxa_account, ecotaxa_project)
+        await this.add_default_values_to_ecotaxa_project(ecotaxa_instance, ecotaxa_account, ecotaxa_project)
         return created_ecotaxa_project_id;
     }
     async linkEcotaxaAndEcopartProject(public_project: PublicProjectRequestCreationModel): Promise<{ ecotaxa_project_id: number, ecotaxa_project_name: string }> {
@@ -288,7 +288,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         // check that the ecotaxa account is manager in the ecotaxa project
         if (ecotaxa_project.highest_right !== "Manage") throw new Error("EcoTaxa account is not manager in the ecotaxa project");
 
-        this.add_default_values_to_ecotaxa_project(ecotaxa_instance, ecotaxa_account, ecotaxa_project)
+        await this.add_default_values_to_ecotaxa_project(ecotaxa_instance, ecotaxa_account, ecotaxa_project)
         return { ecotaxa_project_id: ecotaxa_project.projid as number, ecotaxa_project_name: ecotaxa_project.title as string };
     }
     async add_default_values_to_ecotaxa_project(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_account: EcotaxaAccountResponseModel, ecotaxa_project: any): Promise<void> {

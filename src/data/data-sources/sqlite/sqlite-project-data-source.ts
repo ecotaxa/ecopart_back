@@ -85,7 +85,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             project_creation_date: row.project_creation_date,
                             ecotaxa_project_id: row.ecotaxa_project_id,
                             ecotaxa_project_name: row.ecotaxa_project_name,
-                            ecotaxa_instance_id: row.ecotaxa_instance_id
+                            ecotaxa_instance_id: row.ecotaxa_instance_id,
+                            last_backup_date: row.last_backup_date ?? null
                         };
                         resolve(result);
                     }
@@ -249,7 +250,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             project_creation_date: row.project_creation_date,
                             ecotaxa_project_id: row.ecotaxa_project_id,
                             ecotaxa_project_name: row.ecotaxa_project_name,
-                            ecotaxa_instance_id: row.ecotaxa_instance_id
+                            ecotaxa_instance_id: row.ecotaxa_instance_id,
+                            last_backup_date: row.last_backup_date ?? null
                         })),
                         total: rows[0]?.total_count || 0
                     };

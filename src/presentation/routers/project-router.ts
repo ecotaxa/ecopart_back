@@ -586,6 +586,73 @@ export default function ProjectRouter(
 
     /**
      * @openapi
+     * /projects/{project_id}/backup/last-date:
+     *   get:
+     *     summary: Get last backup date
+     *     description: Returns the date of the last successful backup for the given project, or null if no backup has been performed yet.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: Last backup date (ISO timestamp) or null.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 last_backup_date:
+     *                   type: string
+     *                   format: date-time
+     *                   nullable: true
+     *       401:
+     *         description: User not authorized for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    // Get last backup date for a project
+    router.get('/:project_id/backup/last-date', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const last_backup_date = await backupProjectUseCase.getLastBackupDate((req as CustomRequest).token, req.params.project_id as any);
+            res.status(200).send({ last_backup_date })
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get last backup date"] })
+        }
+    })
+
+    /**
+     * @openapi
      * /projects/{project_id}/backup/export:
      *   post:
      *     summary: Export project backup

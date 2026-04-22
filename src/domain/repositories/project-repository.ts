@@ -204,7 +204,8 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             project_creation_date: project.project_creation_date,
             ecotaxa_project_id: project.ecotaxa_project_id,
             ecotaxa_project_name: project.ecotaxa_project_name,
-            ecotaxa_instance_id: project.ecotaxa_instance_id
+            ecotaxa_instance_id: project.ecotaxa_instance_id,
+            last_backup_date: project.last_backup_date ?? null
         };
 
         return publicProject;

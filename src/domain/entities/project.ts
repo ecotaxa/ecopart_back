@@ -54,6 +54,7 @@ export interface ProjectResponseModel {
     public_duration: number;
     instrument_model: string;
     serial_number: string;
+    last_backup_date?: string | null;
 }
 export interface ProjectRequestModel {
     project_id: number;
@@ -152,6 +153,7 @@ export interface PublicProjectRequestCreationModel extends PublicProjectRequestC
 export interface PublicProjectResponseModel extends PublicProjectRequestCreationModel_base {
     project_id: number;
     project_creation_date: string;
+    last_backup_date?: string | null;
 }
 
 export interface ProjectMetadataPersonModel {

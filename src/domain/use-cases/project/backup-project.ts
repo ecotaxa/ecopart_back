@@ -100,6 +100,9 @@ export class BackupProject implements BackupProjectUseCase {
             // 3/3 Copy source files to hiden project folder 25->100%
             await this.copySourcesToBackupProjectFolder(task_id, project, skip_already_imported);
 
+            // Record the backup date on the project
+            await this.projectRepository.standardUpdateProject({ project_id: project.project_id, last_backup_date: new Date().toISOString() });
+
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
         } catch (error) {
@@ -156,6 +159,13 @@ export class BackupProject implements BackupProjectUseCase {
         // Copy sources files to project folder
         await this.projectRepository.copyL0bToProjectFolder(root_folder_path, dest_folder, skip_already_imported);
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 99, "Step 3/3 L0-b backup folders copy : done");
+    }
+
+    async getLastBackupDate(current_user: UserUpdateModel, project_id: number): Promise<string | null> {
+        await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
+        await this.ensureUserCanGet(current_user, project_id);
+        const project = await this.getProjectIfExist(project_id);
+        return project.last_backup_date ?? null;
     }
 
 }
