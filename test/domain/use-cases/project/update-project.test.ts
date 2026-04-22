@@ -53,7 +53,7 @@ test("Current_user is deleted or invalid", async () => {
     jest.spyOn(mockProjectRepository, "standardUpdateProject")
     jest.spyOn(mockProjectRepository, "getProject")
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -87,7 +87,7 @@ test("User can update project", async () => {
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
 
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
 
@@ -115,7 +115,7 @@ test("Cannot update project", async () => {
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(0))
 
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -147,7 +147,7 @@ test("Cannot find updated project", async () => {
     //jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     //jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -176,7 +176,7 @@ test("User try to update an unexisting project", async () => {
     jest.spyOn(mockUserRepository, "isAdmin")
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -206,7 +206,7 @@ test("User is not admin and have no privilege on the project", async () => {
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -238,7 +238,7 @@ test("Admin can update privilege part", async () => {
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
 
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
@@ -269,7 +269,7 @@ test("Manager can update privilege part", async () => {
     jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
@@ -294,7 +294,7 @@ test("Member cannot update privilege part", async () => {
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges")
     jest.spyOn(mockProjectRepository, "toPublicProject")
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -324,7 +324,7 @@ test("Update instrument model", async () => {
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
     jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockImplementationOnce(() => Promise.resolve(instrument_model_response))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
 
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
@@ -356,7 +356,7 @@ test("Update project with privileges partially filled", async () => {
     jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -394,7 +394,7 @@ test("Update project with privileges partially created", async () => {
     jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -434,7 +434,7 @@ test("Please provide at least one property to update", async () => {
     jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
@@ -470,7 +470,7 @@ test("Cannot find updated privileges", async () => {
     jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(1))
 
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
     try {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)

@@ -7,16 +7,17 @@ import { SQLiteInstrumentModelDataSource } from '../../../../src/data/data-sourc
 
 import sqlite3 from 'sqlite3'
 import fs from 'fs';
+import path from 'path';
+import { MigrationManager } from '../../../../src/data/migrations/migration-manager';
 import { userRequestCreationModel_1, userRequestCreationModel_2 } from '../../../entities/user';
 import { projectRequestCreationModelForRepository } from '../../../entities/project';
 import { PrivilegeRequestModel } from '../../../../src/domain/entities/privilege';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_PRIVILEGE',
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
-function initializeDB() {
+async function initializeDB() {
     const db = new sqlite3.Database(config.TEST_DBSOURCE, (err) => {
         if (err) {
             // Cannot open database
@@ -26,19 +27,13 @@ function initializeDB() {
     });
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
+
+    // Run migrations to create schema
+    const migrationManager = new MigrationManager(db);
+    const migrationsDir = path.resolve(__dirname, '../../../../src/data/migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
+
     return db
-}
-function initializePrivilegeDB(db: sqlite3.Database) {
-    return new SQLitePrivilegeDataSource(db)
-}
-function initializeProjectDB(db: sqlite3.Database) {
-    return new SQLiteProjectDataSource(db)
-}
-function initializeUserDB(db: sqlite3.Database) {
-    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
-}
-function initializeInstrumentModelDB(db: sqlite3.Database) {
-    return new SQLiteInstrumentModelDataSource(db)
 }
 
 function cleanDB() {
@@ -62,12 +57,12 @@ describe('SQLitePrivilegeDataSource', () => {
     let dataSource_User: SQLiteUserDataSource;
     let dataSource_InstrumentModel: SQLiteInstrumentModelDataSource;
 
-    beforeAll(() => {
-        db = initializeDB();
-        dataSource_Privilege = initializePrivilegeDB(db);
-        dataSource_Project = initializeProjectDB(db);
-        dataSource_User = initializeUserDB(db);
-        dataSource_InstrumentModel = initializeInstrumentModelDB(db);
+    beforeAll(async () => {
+        db = await initializeDB();
+        dataSource_Privilege = new SQLitePrivilegeDataSource(db);
+        dataSource_Project = new SQLiteProjectDataSource(db);
+        dataSource_User = new SQLiteUserDataSource(db);
+        dataSource_InstrumentModel = new SQLiteInstrumentModelDataSource(db);
     });
 
     afterAll(() => {
@@ -260,7 +255,7 @@ describe('SQLitePrivilegeDataSource', () => {
 
         test('should return all privileges with filtering on not null', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource_Privilege.getAll({ page: 1, limit: 10, filter: [{ field: 'privilege_name', operator: '!=', value: 'null' }], sort_by: [{ sort_by: 'privilege_id', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource_Privilege.getAll({ page: 1, limit: 10, filter: [{ field: 'privilege_name', operator: '<>', value: 'null' }], sort_by: [{ sort_by: 'privilege_id', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(2);

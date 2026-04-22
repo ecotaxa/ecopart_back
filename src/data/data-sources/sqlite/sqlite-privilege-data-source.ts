@@ -11,31 +11,6 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
     private db: SQLiteDatabaseWrapper
     constructor(db: SQLiteDatabaseWrapper) {
         this.db = db
-        this.init_instrument_db()
-    }
-
-    init_instrument_db(): void {
-        // SQL statement to create the privilege table if it does not exist
-        const sql_create = `
-        CREATE TABLE IF NOT EXISTS 'privilege' (
-            privilege_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            privilege_name TEXT NOT NULL,
-            user_id INTEGER,
-            project_id INTEGER,
-            privilege_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            contact BOOLEAN CHECK (contact IN (0, 1)) DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
-            FOREIGN KEY (project_id) REFERENCES project(project_id) ON DELETE CASCADE
-        );
-        `;
-
-        // Run the SQL query to create the table
-        this.db.run(sql_create, [], (err: Error | null) => {
-            if (err) {
-                console.error("Error creating the 'privilege' table:", err.message);
-                return; // Return early if there's an error creating the table
-            }
-        });
     }
 
     async create(privilege: PrivilegeRequestCreationModel): Promise<number> {

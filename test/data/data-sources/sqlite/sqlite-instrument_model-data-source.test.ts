@@ -2,12 +2,14 @@
 import { SQLiteInstrumentModelDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import sqlite3 from 'sqlite3'
 import fs from 'fs';
+import path from 'path';
+import { MigrationManager } from '../../../../src/data/migrations/migration-manager';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_INSTRUMENT_MODEL'
 }
 
-function initializeInstrumentModelDB() {
+async function initializeInstrumentModelDB() {
     const db = new sqlite3.Database(config.TEST_DBSOURCE, (err) => {
         if (err) {
             // Cannot open database
@@ -17,6 +19,11 @@ function initializeInstrumentModelDB() {
     });
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
+
+    // Run migrations to create schema
+    const migrationManager = new MigrationManager(db);
+    const migrationsDir = path.resolve(__dirname, '../../../../src/data/migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
 
     return new SQLiteInstrumentModelDataSource(db)
 
@@ -39,8 +46,8 @@ function cleanInstrumentModelDB() {
 describe('SQLiteInstrumentModelDataSource', () => {
     let dataSource: SQLiteInstrumentModelDataSource;
 
-    beforeAll(() => {
-        dataSource = initializeInstrumentModelDB();
+    beforeAll(async () => {
+        dataSource = await initializeInstrumentModelDB();
     });
 
     afterAll(() => {

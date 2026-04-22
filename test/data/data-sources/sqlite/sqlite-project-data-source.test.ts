@@ -3,13 +3,15 @@ import { SQLiteInstrumentModelDataSource } from '../../../../src/data/data-sourc
 import sqlite3 from 'sqlite3'
 import { ProjectRequestCreationModel, ProjectUpdateModel } from '../../../../src/domain/entities/project';
 import fs from 'fs';
+import path from 'path';
+import { MigrationManager } from '../../../../src/data/migrations/migration-manager';
 import { data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4, data_source_projectRequestCreationModel_5, data_source_projectRequestCreationModel_6, privateProjectUpdateModel, projectRequestCreationModel_3 } from '../../../entities/project';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_PROJECT'
 }
 
-function initializeProjectDB() {
+async function initializeProjectDB() {
     const db = new sqlite3.Database(config.TEST_DBSOURCE, (err) => {
         if (err) {
             // Cannot open database
@@ -20,7 +22,11 @@ function initializeProjectDB() {
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
-    new SQLiteInstrumentModelDataSource(db)
+    // Run migrations to create schema
+    const migrationManager = new MigrationManager(db);
+    const migrationsDir = path.resolve(__dirname, '../../../../src/data/migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
+
     return new SQLiteProjectDataSource(db)
 }
 
@@ -41,8 +47,8 @@ function cleanProjectDB() {
 describe('SQLiteProjectDataSource', () => {
     let dataSource: SQLiteProjectDataSource;
 
-    beforeAll(() => {
-        dataSource = initializeProjectDB();
+    beforeAll(async () => {
+        dataSource = await initializeProjectDB();
     });
 
     afterAll(() => {

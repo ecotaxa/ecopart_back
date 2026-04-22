@@ -2,13 +2,14 @@ import { SQLiteUserDataSource } from '../../../../src/data/data-sources/sqlite/s
 import sqlite3 from 'sqlite3'
 import { UserRequestCreationModel, UserUpdateModel } from '../../../../src/domain/entities/user';
 import fs from 'fs';
+import path from 'path';
+import { MigrationManager } from '../../../../src/data/migrations/migration-manager';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_USER',
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
-function initializeUserDB() {
+async function initializeUserDB() {
     const db = new sqlite3.Database(config.TEST_DBSOURCE, (err) => {
         if (err) {
             // Cannot open database
@@ -19,7 +20,12 @@ function initializeUserDB() {
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
-    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
+    // Run migrations to create schema
+    const migrationManager = new MigrationManager(db);
+    const migrationsDir = path.resolve(__dirname, '../../../../src/data/migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
+
+    return new SQLiteUserDataSource(db)
 }
 
 function cleanUserDB() {
@@ -42,9 +48,7 @@ describe('SQLiteUserDataSource', () => {
 
 
     beforeAll(async () => {
-        dataSource = initializeUserDB();
-        // wait for the database to be ready
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        dataSource = await initializeUserDB();
     });
 
     afterAll(() => {

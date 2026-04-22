@@ -14,6 +14,15 @@ export interface UserRequestCreationModel {
     country: string;
     user_planned_usage: string;
 }
+export interface UserSeedModel {
+    first_name: string;
+    last_name: string;
+    email: string;
+    password_hash: string;
+    organisation: string;
+    country: string;
+    user_planned_usage: string;
+}
 export interface UserRequestModel {
     user_id?: number;
     first_name?: string;

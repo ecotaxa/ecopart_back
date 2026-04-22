@@ -24,7 +24,8 @@ describe("Project Repository", () => {
         DATA_STORAGE_FS_STORAGE = "test/data_storage/";
         DATA_STORAGE_EXPORT = "test/data_storage/files_system_storage/";
         DATA_STORAGE_FOLDER = "test/data_storage/FTP/ecopart_exported_data/";
-        projectRepository = new ProjectRepositoryImpl(mockProjectDataSource, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, DATA_STORAGE_FOLDER)
+        const DATA_STORAGE_IMPORT = "test/data_storage/ecopart_data_to_import/";
+        projectRepository = new ProjectRepositoryImpl(mockProjectDataSource, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, DATA_STORAGE_FOLDER, DATA_STORAGE_IMPORT)
     })
 
 

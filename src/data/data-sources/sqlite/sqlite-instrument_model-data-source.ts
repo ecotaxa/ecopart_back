@@ -9,29 +9,6 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
     private db: SQLiteDatabaseWrapper
     constructor(db: SQLiteDatabaseWrapper) {
         this.db = db
-        this.init_instrument_db()
-    }
-
-    init_instrument_db() {
-        // Create table if not exist
-        const sql_create = "CREATE TABLE IF NOT EXISTS 'instrument_model' (instrument_model_id INTEGER PRIMARY KEY AUTOINCREMENT, instrument_model_name TEXT NOT NULL UNIQUE, bodc_url TEXT NOT NULL, instrument_model_creation_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);"
-        const db_tables = this.db
-        db_tables.run(sql_create, [], function (err: Error | null) {
-            if (err) {
-                console.log("DB error--", err);
-                return; // Return early if there's an error creating the table
-            }
-            else {
-
-                const sql_admin = "INSERT OR IGNORE INTO instrument_model (instrument_model_name, bodc_url) VALUES ('UVP5HD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5SD', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP5Z', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/'), ('UVP6LP', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6HF', 'https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/'), ('UVP6MHP','Not registred in BODC for now'), ('UVP6MHF', 'Not registred in BODC for now');"
-
-                db_tables.run(sql_admin, [], function (err: Error | null) {
-                    if (err) {
-                        console.log("DB error--", err);
-                    }
-                });
-            }
-        });
     }
 
     async create(instrument_model: InstrumentModelRequestCreationModel): Promise<number> {

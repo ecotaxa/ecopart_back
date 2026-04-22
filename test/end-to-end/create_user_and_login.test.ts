@@ -15,6 +15,7 @@ import UserRouter from '../../src/presentation/routers/user-router'
 import AuthRouter from '../../src/presentation/routers/auth-router'
 import ProjectRouter from '../../src/presentation/routers/project-router'
 import TaskRouter from '../../src/presentation/routers/tasks-router'
+import EcoTaxaInstanceRouter from '../../src/presentation/routers/ecotaxa_instance-router'
 import { MiddlewareProjectValidation } from '../../src/presentation/middleware/project-validation'
 import { MiddlewareSampleValidation } from '../../src/presentation/middleware/sample-validation'
 import { MiddlewareTaskValidation } from '../../src/presentation/middleware/task-validation'
@@ -32,6 +33,7 @@ import { DeleteUser } from '../../src/domain/use-cases/user/delete-user'
 import { LoginEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { SearchEcotaxaAccounts } from '../../src/domain/use-cases/ecotaxa_account/search-ecotaxa_account'
+import { ListOrganisations } from '../../src/domain/use-cases/user/list-organisations'
 import { CreateProject } from '../../src/domain/use-cases/project/create-project'
 import { DeleteProject } from '../../src/domain/use-cases/project/delete-project'
 import { UpdateProject } from '../../src/domain/use-cases/project/update-project'
@@ -46,7 +48,10 @@ import { ListImportableEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa
 import { ImportEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/search-ecotaxa-samples'
+import { ListShips } from '../../src/domain/use-cases/project/list-ships'
 import { DeleteTask } from '../../src/domain/use-cases/task/delete-task'
+import { GetAllEcoTaxaInstances } from '../../src/domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
+import { CreateEcoTaxaInstance } from '../../src/domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
 import { GetOneTask } from '../../src/domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from '../../src/domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from '../../src/domain/use-cases/task/stream-zip-file'
@@ -75,6 +80,7 @@ import { JwtAdapter } from '../../src/infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from '../../src/infra/mailer/nodemailer'
 import { CountriesAdapter } from '../../src/infra/countries/country'
 import { FsAdapter } from '../../src/infra/files/fs'
+import { MigrationManager } from '../../src/data/migrations/migration-manager'
 
 sqlite3.verbose()
 
@@ -102,8 +108,8 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
     let capturedEcotaxaEcotaxaId: number
     let testInstanceId: number
     let capturedProjectId: number
-    let capturedSampleNames: string[] = []
-    let capturedSampleIds: number[] = []
+    const capturedSampleNames: string[] = []
+    const capturedSampleIds: number[] = []
     const testRunId = `${Date.now()}`
     const testProjectTitle = `TEST_import_UVP6_AUTO_${testRunId}`
     const testProjectAcronym = `UVP6_AUTO_${testRunId}`
@@ -137,7 +143,7 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
         // Adapters
         const bcryptAdapter = new BcryptAdapter()
         const jwtAdapter = new JwtAdapter()
-        mailerAdapter = new NodemailerAdapter("http://localhost:0", "test@test.com", NODE_ENV)
+        mailerAdapter = new NodemailerAdapter("http://localhost:0", "test@test.com", NODE_ENV, "julie.imev-mer.fr")
         const countriesAdapter = new CountriesAdapter()
 
         // Spy on send_confirmation_email to capture the confirmation token without sending real emails
@@ -146,17 +152,19 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
         // Dummy transporter (will not actually be used since send_confirmation_email is spied)
         const transporter = {} as any
 
+        // Run migrations to create schema
+        const migrationManager = new MigrationManager(db);
+        const migrationsDir = path.resolve(__dirname, '../../src/data/migrations');
+        await migrationManager.runAllMigrations(migrationsDir);
+
         // Data sources
-        const userDS = new SQLiteUserDataSource(db, GENERIC_ECOTAXA_ACCOUNT_EMAIL)
+        const userDS = new SQLiteUserDataSource(db)
         const privilegeDS = new SQLitePrivilegeDataSource(db)
         const ecotaxaAccountDS = new SQLiteEcotaxaAccountDataSource(db)
         const instrumentModelDS = new SQLiteInstrumentModelDataSource(db)
         const projectDS = new SQLiteProjectDataSource(db)
         const taskDS = new SQLiteTaskDataSource(db)
         const sampleDS = new SQLiteSampleDataSource(db)
-
-        // Wait for async DB table creation to complete
-        await new Promise(resolve => setTimeout(resolve, 3000))
 
         const fsAdapter = new FsAdapter()
 
@@ -168,7 +176,7 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
         const ecotaxaAccountRepo = new EcotaxaAccountRepositoryImpl(ecotaxaAccountDS, GENERIC_ECOTAXA_ACCOUNT_EMAIL, NODE_ENV)
         const instrumentModelRepo = new InstrumentModelRepositoryImpl(instrumentModelDS)
         const relTmpDir = path.relative(projectRoot, tmpDir)
-        const projectRepo = new ProjectRepositoryImpl(projectDS, fsStorage, exportDir, relTmpDir)
+        const projectRepo = new ProjectRepositoryImpl(projectDS, fsStorage, exportDir, relTmpDir, 'data_storage/ecopart_data_to_import/')
         const sampleRepo = new SampleRepositoryImpl(sampleDS, fsStorage)
         const taskRepo = new TaskRepositoryImpl(taskDS, fsAdapter, relTmpDir)
 
@@ -184,7 +192,8 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new LoginEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new LogoutEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new SearchUsers(userRepo, searchRepo),
-            new SearchEcotaxaAccounts(userRepo, ecotaxaAccountRepo, searchRepo)
+            new SearchEcotaxaAccounts(userRepo, ecotaxaAccountRepo, searchRepo),
+            new ListOrganisations(userRepo)
         )
 
         // Mount auth router
@@ -204,9 +213,9 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
             new MiddlewareProjectValidation(),
             new MiddlewareSampleValidation(),
-            new CreateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, fsStorage),
+            new CreateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, fsStorage, 'data_storage/ecopart_data_to_import/'),
             new DeleteProject(userRepo, projectRepo, privilegeRepo, sampleRepo, ecotaxaAccountRepo),
-            new UpdateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo),
+            new UpdateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, 'data_storage/ecopart_data_to_import/'),
             new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo),
             new BackupProject(userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage),
             new ExportBackupedProject(userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage, exportDir, "http://localhost:0"),
@@ -218,6 +227,7 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
             new DeleteEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
             new SearchEcoTaxaSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new ListShips(projectRepo),
         )
 
         // Mount task router
@@ -231,10 +241,18 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo)
         )
 
+        // Mount ecotaxa instance router
+        const ecotaxaInstanceMiddleware = EcoTaxaInstanceRouter(
+            new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
+            new GetAllEcoTaxaInstances(ecotaxaAccountRepo),
+            new CreateEcoTaxaInstance(userRepo, ecotaxaAccountRepo)
+        )
+
         server.use("/users", userMiddleware)
         server.use("/auth", authMiddleware)
         server.use("/projects", projectMiddleware)
         server.use("/tasks", taskMiddleware)
+        server.use("/ecotaxa_instances", ecotaxaInstanceMiddleware)
     })
 
     afterAll(() => {
@@ -314,21 +332,31 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
 
     // ─── Phase 4: Create Test EcoTaxa Instance & Link Account ────────────
     test("POST /users/:user_id/ecotaxa_account should link an ecotaxa account", async () => {
-        // Insert the TEST ecotaxa instance directly via SQL
-        testInstanceId = await new Promise<number>((resolve, reject) => {
-            db.run(
-                `INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url) VALUES (?, ?, ?)`,
-                ["TEST", "TEST instance for development", "https://ecotaxa-dev.imev-mer.fr:5003/"],
-                function (err) {
-                    if (err) reject(err)
-                    else resolve(this.lastID)
-                }
-            )
+        // Promote the test user to admin so they can create an EcoTaxa instance via the API
+        await new Promise<void>((resolve, reject) => {
+            db.run(`UPDATE user SET is_admin = 1 WHERE user_id = ?`, [capturedUserId], (err) => {
+                if (err) reject(err)
+                else resolve()
+            })
         })
-        expect(testInstanceId).toBeGreaterThan(0)
 
         // Build cookie header from login cookies
         const cookieHeader = loginCookies.map((c: string) => c.split(";")[0]).join("; ")
+
+        // Create the TEST ecotaxa instance via the API
+        const instanceResponse = await request(server)
+            .post("/ecotaxa_instances/")
+            .set("Cookie", cookieHeader)
+            .send({
+                ecotaxa_instance_name: "TEST",
+                ecotaxa_instance_description: "TEST instance for development",
+                ecotaxa_instance_url: "https://ecotaxa-dev.imev-mer.fr:5003/"
+            })
+
+        expect(instanceResponse.status).toBe(201)
+        expect(instanceResponse.body.ecotaxa_instance_id).toBeDefined()
+        testInstanceId = instanceResponse.body.ecotaxa_instance_id
+        expect(testInstanceId).toBeGreaterThan(0)
 
         const response = await request(server)
             .post(`/users/${capturedUserId}/ecotaxa_account`)
@@ -387,7 +415,7 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             .post("/projects/")
             .set("Cookie", cookieHeader)
             .send({
-                root_folder_path: "data_storage/ecopart_data_to_import/remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_hope02",
+                root_folder_path: "remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_hope02",
                 project_title: testProjectTitle,
                 project_acronym: testProjectAcronym,
                 project_description: "description",

@@ -22,6 +22,9 @@ class MockUserDataSource implements UserDataSource {
     create(): Promise<number> {
         throw new Error("Method not implemented for create");
     }
+    ensureSeedUser(): Promise<void> {
+        throw new Error("Method not implemented for ensureSeedUser");
+    }
     getAll(): Promise<SearchResult<UserResponseModel>> {
         throw new Error("Method not implemented for getAll");
     }

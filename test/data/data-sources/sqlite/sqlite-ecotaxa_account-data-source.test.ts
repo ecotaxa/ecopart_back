@@ -4,15 +4,16 @@ import { SQLiteUserDataSource } from '../../../../src/data/data-sources/sqlite/s
 import { EcotaxaAccountRequestCreationModel } from '../../../../src/domain/entities/ecotaxa_account';
 import { ecotaxaAccountRequestCreationModel, ecotaxaAccountRequestCreationModel_unexistingUser, ecotaxaAccountResponseModel_lena } from '../../../entities/user';
 import fs from 'fs';
+import path from 'path';
 import sqlite3 from 'sqlite3'
+import { MigrationManager } from '../../../../src/data/migrations/migration-manager';
 import { PreparedSearchOptions } from '../../../../src/domain/entities/search';
 
 const config = {
     TEST_DBSOURCE: 'TEST_DB_SOURCE_ECOTAXA_ACCOUNT',
-    GENERIC_ECOTAXA_ACCOUNT_EMAIL: 'generic_ecotaxa_account_email@email.fr'
 }
 
-function initializeDB() {
+async function initializeDB() {
     const db = new sqlite3.Database(config.TEST_DBSOURCE, (err) => {
         if (err) {
             // Cannot open database
@@ -23,15 +24,13 @@ function initializeDB() {
     // Enable foreign keys in sqlite
     db.get("PRAGMA foreign_keys = ON")
 
+    // Run migrations to create schema
+    const migrationManager = new MigrationManager(db);
+    const migrationsDir = path.resolve(__dirname, '../../../../src/data/migrations');
+    await migrationManager.runAllMigrations(migrationsDir);
+
     return db
 }
-function initializeUserDB(db: sqlite3.Database) {
-    return new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
-}
-function initializeEcotaxaAccountDB(db: sqlite3.Database) {
-    return new SQLiteEcotaxaAccountDataSource(db)
-}
-
 function cleanDB() {
     try {
         // Delete db file
@@ -52,12 +51,9 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
     let dataSource_User: SQLiteUserDataSource;
 
     beforeAll(async () => {
-        db = initializeDB();
-        dataSource_EcotaxaAccount = initializeEcotaxaAccountDB(db);
-        dataSource_User = initializeUserDB(db);
-
-        // wait for the database to be ready
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        db = await initializeDB();
+        dataSource_EcotaxaAccount = new SQLiteEcotaxaAccountDataSource(db);
+        dataSource_User = new SQLiteUserDataSource(db);
     });
 
     afterAll(() => {
@@ -228,7 +224,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             expect(ecotaxa_instance).toMatchObject({
                 ecotaxa_instance_id: 1,
                 ecotaxa_instance_name: "FR",
-                ecotaxa_instance_description: "French instance of EcoTaxa, can be used world wilde.",
+                ecotaxa_instance_description: "French ecotaxa instance",
                 ecotaxa_instance_url: "https://ecotaxa.obs-vlfr.fr/",
                 ecotaxa_instance_creation_date: expect.any(String)
             });

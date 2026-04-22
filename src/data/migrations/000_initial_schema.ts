@@ -1,4 +1,4 @@
-import { Migration } from "./migration-manager";
+import { Migration, runSQL } from "./migration-manager";
 import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapper";
 
 /**
@@ -8,15 +8,6 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
  *
  * Uses CREATE TABLE IF NOT EXISTS so it is safe to run on an existing database.
  */
-
-function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: any[] = []): Promise<void> {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve();
-        });
-    });
-}
 
 export const migration: Migration = {
     id: "000_initial_schema",
@@ -86,6 +77,12 @@ export const migration: Migration = {
                 deleted TIMESTAMP DEFAULT NULL
             );
         `);
+
+        // Seed admin user
+        await runSQL(db,
+            "INSERT OR IGNORE INTO user (first_name, last_name, email, password_hash, valid_email, is_admin, organisation, country, user_planned_usage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+            ['admin', 'admin', 'julie.coustenoble@imev-mer.fr', '$2b$12$5jAAgUpv8hE3LmWGtL7tdeDNnJbQzYo8Bqa.tFiT9YFCyl.GsiJLm', 1, 1, 'admin', 'admin', 'admin']
+        );
 
         // ─── project ───
         await runSQL(db, `

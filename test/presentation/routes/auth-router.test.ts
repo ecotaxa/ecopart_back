@@ -200,27 +200,26 @@ describe("User Router", () => {
     describe("Test /users/me endpoint", () => {
         test("Get user information with valid token", async () => {
             const valid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3RfbmFtZSI6IkpvaG4iLCJsYXN0X25hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwiaXNfYWRtaW4iOmZhbHNlLCJvcmdhbmlzYXRpb24iOiJMT1YiLCJjb3VudHJ5IjoiRnJhbmNlIiwidXNlcl9wbGFubmVkX3VzYWdlIjoiTW9uIHVzYWdlIiwidXNlcl9jcmVhdGlvbl9kYXRlIjoiMjAyMy0xMC0yNiAxMjo1NzoyNyIsImlhdCI6MTY5ODMyNTI3NSwiZXhwIjo1ODUwMjAwNTI3NX0.LkhqGRdUJ8X5X0ZnqU4HeRIANFj84bk-jtQlSo_dXz8"
-            const expectedDecodedAccessToken = {
-                "id": 1,
-                "first_name": "John",
-                "last_name": "Smith",
-                "email": "john@gmail.com",
-                "is_admin": false,
-                "status": "Pending",
-                "organisation": "LOV",
-                "country": "France",
-                "user_planned_usage": "Mon usage",
-                "user_creation_date": "2023-10-26 12:57:27",
-                "exp": 58502005275,
-                "iat": 1698325275
+            const expectedUser: UserResponseModel = {
+                user_id: 1,
+                first_name: "John",
+                last_name: "Smith",
+                email: "john@gmail.com",
+                is_admin: false,
+                organisation: "LOV",
+                country: "France",
+                user_planned_usage: "Mon usage",
+                user_creation_date: "2023-10-26 12:57:27",
             }
+
+            jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => Promise.resolve({ users: [expectedUser], search_info: { total: 1, limit: 1, total_on_page: 1, page: 1, pages: 1 } }))
 
             const response = await request(server)
                 .get("/auth/user/me")
                 .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`);
 
             expect(response.status).toBe(200);
-            expect(response.body).toStrictEqual(expectedDecodedAccessToken);
+            expect(response.body).toStrictEqual(expectedUser);
         });
 
         test("get user information with missing token", async () => {

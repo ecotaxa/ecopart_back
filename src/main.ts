@@ -124,7 +124,14 @@ const config = {
     NODE_ENV: process.env.NODE_ENV || '',
 
     GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
-    TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || ''
+    TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || '',
+
+    ECOPART_USER_FIRST_NAME: process.env.ECOPART_USER_FIRST_NAME || '',
+    ECOPART_USER_LAST_NAME: process.env.ECOPART_USER_LAST_NAME || '',
+    ECOPART_USER_PASSWORD_HASH: process.env.ECOPART_USER_PASSWORD_HASH || '',
+    ECOPART_USER_ORGANISATION: process.env.ECOPART_USER_ORGANISATION || '',
+    ECOPART_USER_COUNTRY: process.env.ECOPART_USER_COUNTRY || '',
+    ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || ''
 
 }
 async function getSQLiteDS() {
@@ -167,13 +174,25 @@ async function getSQLiteDS() {
     const migrationsDir = path.resolve(__dirname, 'data', 'migrations');
     await migrationManager.runAllMigrations(migrationsDir);
 
+    const user_dataSource = new SQLiteUserDataSource(db)
+
+    // Seed EcoPart app user (depends on runtime config, so done after migrations)
+    await user_dataSource.ensureSeedUser({
+        first_name: config.ECOPART_USER_FIRST_NAME,
+        last_name: config.ECOPART_USER_LAST_NAME,
+        email: config.GENERIC_ECOTAXA_ACCOUNT_EMAIL,
+        password_hash: config.ECOPART_USER_PASSWORD_HASH,
+        organisation: config.ECOPART_USER_ORGANISATION,
+        country: config.ECOPART_USER_COUNTRY,
+        user_planned_usage: config.ECOPART_USER_PLANNED_USAGE
+    });
+
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
     const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
-    const user_dataSource = new SQLiteUserDataSource(db, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL)
     const instrument_model_dataSource = new SQLiteInstrumentModelDataSource(db)
     const project_dataSource = new SQLiteProjectDataSource(db)
     const privilege_dataSource = new SQLitePrivilegeDataSource(db)

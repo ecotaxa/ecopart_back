@@ -4,6 +4,19 @@ import fs from "fs";
 import { MigrationLogger } from "./migration-logger";
 
 /**
+ * Promisified SQLite helper — runs a single SQL statement.
+ * Exported so migration files can use it without redefining it.
+ */
+export function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: unknown[] = []): Promise<void> {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+}
+
+/**
  * Represents a single database migration.
  */
 export interface Migration {
@@ -46,13 +59,8 @@ export class MigrationManager {
 
     // ──────────────── helpers to promisify the sqlite3 callback API ────────────────
 
-    private runSQL(sql: string, params: any[] = []): Promise<void> {
-        return new Promise((resolve, reject) => {
-            this.db.run(sql, params, function (err) {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+    private runSQL(sql: string, params: unknown[] = []): Promise<void> {
+        return runSQL(this.db, sql, params);
     }
 
     private allSQL<T = any>(sql: string, params: any[] = []): Promise<T[]> {
