@@ -10,5 +10,13 @@ module.exports = {
   ],
   collectCoverageFrom: [
     "src/**"
-  ]
+  ],
+  // Transform ESM-only packages (node-fetch v3 and its dependencies) so Jest can process them
+  transformIgnorePatterns: [
+    "/node_modules/(?!(node-fetch|data-uri-to-buffer|fetch-blob|formdata-polyfill)/)"
+  ],
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.jsx?$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],
+  },
 };
