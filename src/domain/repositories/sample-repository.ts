@@ -896,13 +896,19 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Function to read and return samples from work folder names
+    // Supports both plain directories (work/<sample>/) and zipped subdirectories (work/<sample>.zip)
     async getSamplesFromWork(folderPath: string): Promise<string[]> {
         const samples: string[] = [];
         try {
             const files = await fsPromises.readdir(path.join(folderPath, 'work'));
 
             for (const file of files) {
-                samples.push(file);
+                if (file.endsWith('.zip')) {
+                    // Zipped work subdirectory — strip the .zip extension to get the sample name
+                    samples.push(file.slice(0, -4));
+                } else {
+                    samples.push(file);
+                }
             }
         } catch (err) {
             throw new Error(`Error reading files: ${err.message}`);
@@ -943,44 +949,142 @@ export class SampleRepositoryImpl implements SampleRepository {
             // Ensure the destination sample folder exists
             await fsPromises.mkdir(destPath, { recursive: true });
 
-            // Copy specific files and directories
-            const filesToCopy = [
-                { source: 'work/' + sample, dest: `${sample}_work/` },
+            // ── work: detect whether the source is a directory or a pre-zipped file ──
+            const workDirPath = path.join(sourcePath, 'work', sample);
+            const workZipSourcePath = path.join(sourcePath, 'work', sample + '.zip');
+            const workZipFilePath = path.join(destPath, `${sample}_work.zip`);
+
+            let workIsZipped = false;
+            try {
+                await fsPromises.access(workZipSourcePath);
+                workIsZipped = true;
+            } catch {
+                // zip not found — fall back to directory
+            }
+
+            if (workIsZipped) {
+                // The work subdirectory is a pre-existing zip.
+                // Its internal layout may have a top-level folder prefix (e.g. omer2_1/omer2_1_datfile.txt).
+                // Extract while stripping that prefix, then re-zip — so the result matches
+                // the layout expected by getSampleFromWorkDatfile / getSampleFromWorkHDR (files at root).
+                const workFolderPath = path.join(destPath, `${sample}_work`);
+                try {
+                    await this.extractZipNormalized(workZipSourcePath, workFolderPath);
+                    await this.zipFolder(workFolderPath, workZipFilePath);
+                    await fsPromises.rm(workFolderPath, { recursive: true, force: true });
+                } catch (error) {
+                    throw new Error(`Error normalizing work zip for sample ${sample}: ${error.message}`);
+                }
+            } else {
+                // The work subdirectory is a plain folder — copy then zip it
+                const workFolderPath = path.join(destPath, `${sample}_work`);
+                try {
+                    await fsPromises.mkdir(path.dirname(workFolderPath), { recursive: true });
+                    await fsPromises.cp(workDirPath, workFolderPath, { recursive: true });
+                } catch (error) {
+                    throw new Error(`Error copying work folder for sample ${sample}: ${error.message}`);
+                }
+                try {
+                    await this.zipFolder(workFolderPath, workZipFilePath);
+                    await fsPromises.rm(workFolderPath, { recursive: true, force: true });
+                } catch (error) {
+                    throw new Error(`Error zipping work folder for sample ${sample}: ${error.message}`);
+                }
+            }
+
+            // ── meta_conf: always copy from meta/ and config/ directories then zip ──
+            const metaConfFilesToCopy = [
                 { source: 'meta', dest: `${sample}_meta_conf/meta` },
                 { source: 'config/cruise_info.txt', dest: `${sample}_meta_conf/config/cruise_info.txt` },
                 { source: 'config/uvp5_settings/uvp5_configuration_data.txt', dest: `${sample}_meta_conf/config/uvp5_settings/uvp5_configuration_data.txt` },
                 { source: 'config/process_install_config.txt', dest: `${sample}_meta_conf/config/process_install_config.txt` },
             ];
 
-            for (const file of filesToCopy) {
+            for (const file of metaConfFilesToCopy) {
                 const sourceFilePath = path.join(sourcePath, file.source);
                 const destFilePath = path.join(destPath, file.dest);
 
                 try {
-                    // Ensure the parent folder exists for nested files
                     await fsPromises.mkdir(path.dirname(destFilePath), { recursive: true });
-
-                    // Copy the file or directory
                     await fsPromises.cp(sourceFilePath, destFilePath, { recursive: true });
                 } catch (error) {
                     throw new Error(`Error copying ${file.source} for sample ${sample}: ${error.message}`);
                 }
             }
 
-            // Zip the sample folder
-            const workZipFilePath = path.join(this.base_folder, dest_folder, `${sample}`, `${sample}_work.zip`);
-            const workFolderPath = path.join(destPath, `${sample}_work`);
-            const metaConfZipFilePath = path.join(this.base_folder, dest_folder, `${sample}`, `${sample}_meta_conf.zip`);
+            const metaConfZipFilePath = path.join(destPath, `${sample}_meta_conf.zip`);
             const metaConfFolderPath = path.join(destPath, `${sample}_meta_conf`);
             try {
-                await this.zipFolder(workFolderPath, workZipFilePath);
                 await this.zipFolder(metaConfFolderPath, metaConfZipFilePath);
-                // Remove the unzipped folder after zipping
-                await fsPromises.rm(workFolderPath, { recursive: true, force: true });
                 await fsPromises.rm(metaConfFolderPath, { recursive: true, force: true });
             } catch (error) {
-                throw new Error(`Error zipping folder for sample ${sample}: ${error.message}`);
+                throw new Error(`Error zipping meta_conf folder for sample ${sample}: ${error.message}`);
             }
+        }
+    }
+
+    /**
+     * Extract a zip archive to destFolder, stripping a common top-level directory prefix if present.
+     * For example, if every entry starts with "omer2_1/", that prefix is removed so files land at root.
+     */
+    async extractZipNormalized(zipPath: string, destFolder: string): Promise<void> {
+        // Buffer all file entries (skip directory entries)
+        const fileEntries: { name: string; content: Uint8Array }[] = [];
+
+        await new Promise<void>((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) return reject(err || new Error('Failed to open zip'));
+                zipfile.readEntry();
+
+                zipfile.on('entry', (entry) => {
+                    if (/\/$/.test(entry.fileName)) {
+                        // directory entry — skip
+                        zipfile.readEntry();
+                        return;
+                    }
+                    zipfile.openReadStream(entry, (streamErr, stream) => {
+                        if (streamErr || !stream) return reject(streamErr || new Error('Failed to open stream'));
+                        const chunks: Uint8Array[] = [];
+                        stream.on('data', (chunk: Uint8Array) => chunks.push(chunk));
+                        stream.on('end', () => {
+                            const total = chunks.reduce((acc, c) => acc + c.length, 0);
+                            const merged = new Uint8Array(total);
+                            let offset = 0;
+                            for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+                            fileEntries.push({ name: entry.fileName, content: merged });
+                            zipfile.readEntry();
+                        });
+                        stream.on('error', reject);
+                    });
+                });
+
+                zipfile.on('end', () => resolve());
+                zipfile.on('error', reject);
+            });
+        });
+
+        // Determine a common top-level directory prefix to strip
+        let stripPrefix = '';
+        if (fileEntries.length > 0) {
+            const firstParts = fileEntries[0].name.split('/');
+            if (firstParts.length > 1) {
+                const candidate = firstParts[0] + '/';
+                if (fileEntries.every(e => e.name.startsWith(candidate))) {
+                    stripPrefix = candidate;
+                }
+            }
+        }
+
+        // Write files to destFolder with the prefix stripped
+        await fsPromises.mkdir(destFolder, { recursive: true });
+        for (const entry of fileEntries) {
+            const normalizedName = entry.name.startsWith(stripPrefix)
+                ? entry.name.slice(stripPrefix.length)
+                : entry.name;
+            if (!normalizedName) continue;
+            const destPath = path.join(destFolder, normalizedName);
+            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
+            await fsPromises.writeFile(destPath, entry.content);
         }
     }
 
