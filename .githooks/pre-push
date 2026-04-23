@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+echo "[pre-push] Generating OpenAPI spec..."
+npm run openapi:generate
+
+if ! git diff --quiet -- openapi.json; then
+  echo "[pre-push] openapi.json changed after generation."
+  echo "[pre-push] Please commit the updated openapi.json before pushing."
+  git --no-pager diff -- openapi.json
+  exit 1
+fi
+
+echo "[pre-push] OpenAPI spec is up to date."

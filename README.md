@@ -70,6 +70,9 @@ The API is documented using the [OpenAPI 3.0](https://swagger.io/specification/)
 npm run openapi:generate
 ```
 
+`openapi:generate` is also run automatically on every `git push` via a versioned `pre-push` hook (`.githooks/pre-push`).
+If the generated `openapi.json` changed, the push is blocked so you can commit the updated file first.
+
 **Validate the generated spec:**
 
 ```bash

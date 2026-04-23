@@ -6,7 +6,9 @@
   "scripts": {
     "test": "jest --watchAll --collectCoverage --collectCoverageFrom='src/**' --coveragePathIgnorePatterns '/test/' '/src/infra/' '/src/domain/entities/' '/src/domain/mocks/' ",
     "test-CI": "jest --collectCoverage  --collectCoverageFrom='src/**' --coveragePathIgnorePatterns '/test/' '/src/infra/' '/src/domain/entities/' '/src/domain/mocks/' ",
+    "prepare": "npm run hooks:install",
     "clean": "rimraf ./dist",
+    "hooks:install": "git config core.hooksPath .githooks",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
     "prod:build": " rimraf ./dist && tsc && ts-node tools/copyAssets",

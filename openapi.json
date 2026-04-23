@@ -3082,6 +3082,90 @@
         }
       }
     },
+    "/projects/{project_id}/backup/last-date": {
+      "get": {
+        "summary": "Get last backup date",
+        "description": "Returns the date of the last successful backup for the given project, or null if no backup has been performed yet.",
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Last backup date (ISO timestamp) or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "last_backup_date": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User not authorized for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project_id}/backup/export": {
       "post": {
         "summary": "Export project backup",
