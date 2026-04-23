@@ -504,13 +504,15 @@ export const privateProjectRequestCreationModel_withmissingOverrideDepthOffset =
 export const projectResponseModel: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 1,
-    project_creation_date: '2024-04-29 15:43:10'
+    project_creation_date: '2024-04-29 15:43:10',
+    last_backup_date: null
 }
 
 export const projectResponseModel2: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 2,
-    project_creation_date: '2024-04-30 12:15:11'
+    project_creation_date: '2024-04-30 12:15:11',
+    last_backup_date: null
 }
 
 export const projectResponseModelArray: PublicProjectResponseModel[] = [projectResponseModel, projectResponseModel2]

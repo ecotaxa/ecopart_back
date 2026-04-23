@@ -120,6 +120,9 @@ export class MockBackupProjectUseCase implements BackupProjectUseCase {
     execute(): Promise<TaskResponseModel> {
         throw new Error("Method not implemented for backup project")
     }
+    getLastBackupDate(): Promise<string | null> {
+        throw new Error("Method not implemented for getLastBackupDate")
+    }
 }
 export class MockExportBackupedProjectUseCase implements ExportBackupedProjectUseCase {
     execute(): Promise<TaskResponseModel> {

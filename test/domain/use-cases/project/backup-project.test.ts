@@ -348,8 +348,9 @@ test("user should be able to backup project, runs all steps before fier and forg
     jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValueOnce(null)
     jest.spyOn(mockProjectRepository, "ensureFolderStructureForBackup").mockResolvedValue()
     jest.spyOn(mockProjectRepository, "copyL0bToProjectFolder").mockResolvedValue()
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
     jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue()
-    jest.spyOn(mockTaskRepository, "failedTask")
+    jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue()
 
 
     await expect(backupProjectUseCase.execute(current_user, project_id, skip_already_imported)).resolves.toBe(task)
@@ -389,8 +390,9 @@ test("user should be able to backup project, runs all fier and forgot steps suce
     jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(null)
     jest.spyOn(mockProjectRepository, "ensureFolderStructureForBackup").mockResolvedValue()
     jest.spyOn(mockProjectRepository, "copyL0bToProjectFolder").mockResolvedValue()
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
     jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue()
-    jest.spyOn(mockTaskRepository, "failedTask")
+    jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue()
 
     // Act
     const bp = new BackupProject(mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE)

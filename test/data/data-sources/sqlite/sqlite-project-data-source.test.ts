@@ -300,7 +300,7 @@ describe('SQLiteProjectDataSource', () => {
                 const projectKeys = Object.keys(project);
                 const projectByIdKeys = Object.keys(project_by_id);
                 const additionalKeys = projectKeys.filter(key => !projectByIdKeys.includes(key));
-                expect(additionalKeys).toHaveLength(1);
+                expect(additionalKeys).toHaveLength(2);
             }
         });
     });
