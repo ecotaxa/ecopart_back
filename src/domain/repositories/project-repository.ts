@@ -300,6 +300,11 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
                 // Zip the folder and write to the destination
                 await this.zipFolder(sourceSubfolder, destZipFile);
+            } else if (entry.isFile() && entry.name.endsWith('.zip')) {
+                // Raw subfolder is already zipped — copy it directly
+                const sourceZipFile = path.join(sourcePath, entry.name);
+                const destZipFile = path.join(destPath, entry.name);
+                await fsPromises.copyFile(sourceZipFile, destZipFile);
             }
         }
     }
@@ -361,8 +366,16 @@ export class ProjectRepositoryImpl implements ProjectRepository {
                     await this.zipFolder(sourceSubfolder, destSubfolder);
                 }
                 // else {
-                //     TODO LOG IN TASK LOG FILE `Skipping already existing folder: ${entry.name}`);
+                //     TODO LOG IN TASK LOG FILE `Skipping already existing folder: ${entry.name}`)
                 // }
+            } else if (entry.isFile() && entry.name.endsWith('.zip')) {
+                // Raw subfolder is already zipped — copy it directly if not already backed up
+                const sourceZipFile = path.join(sourcePath, entry.name);
+                const destZipFile = path.join(destPath, entry.name);
+                const alreadyBacked = await this.checkFileExists(destZipFile);
+                if (!alreadyBacked) {
+                    await fsPromises.copyFile(sourceZipFile, destZipFile);
+                }
             }
         }
     }
