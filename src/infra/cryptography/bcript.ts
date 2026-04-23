@@ -1,6 +1,6 @@
 import { CryptoWrapper } from "./crypto-wrapper"
 import bcrypt from "bcrypt"
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export class BcryptAdapter implements CryptoWrapper {//implements Hasher, HashComparer 
     // hash password
@@ -14,7 +14,7 @@ export class BcryptAdapter implements CryptoWrapper {//implements Hasher, HashCo
     }
     //generate unique id
     generate_uuid(): string {
-        return uuidv4();
+        return randomUUID();
     }
 }
 
