@@ -19,6 +19,10 @@ import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/e
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples'
 import { ListImportableEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples'
+import { ListImportableCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/list-importable-ctd-samples'
+import { ImportCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/import-ctd-samples'
+import { ListImportedCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/list-imported-ctd-samples'
+import { DeleteImportedCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/delete-imported-ctd-samples'
 import { ListShipsUseCase } from '../../domain/interfaces/use-cases/project/list-ships'
 
 
@@ -43,6 +47,10 @@ export default function ProjectRouter(
     importEcoTaxaSamplesUseCase: ImportEcoTaxaSamplesUseCase,
     deleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase,
     searchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase,
+    listImportableCTDSamplesUseCase: ListImportableCTDSamplesUseCase,
+    importCTDSamplesUseCase: ImportCTDSamplesUseCase,
+    listImportedCTDSamplesUseCase: ListImportedCTDSamplesUseCase,
+    deleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase,
     listShipsUseCase: ListShipsUseCase,
 ) {
     const router = express.Router()
@@ -949,6 +957,360 @@ export default function ProjectRouter(
         });
     }
     );
+
+    /**
+     * @openapi
+     * /projects/{project_id}/ctd_samples/can_be_imported:
+     *   get:
+     *     summary: List importable CTD samples
+     *     description: |
+     *       Returns the list of CTD sample names that can be imported for the given project.
+     *
+     *       Importability checks are based on two mandatory criteria:
+     *       1. A particle sample with the same `sample_name` is already imported in EcoPart for this project.
+     *       2. The CTD file follows the expected format.
+     *
+     *       IMPORTANT NOTE on the format of CTD data files to be imported:
+     *       - One file per sample/profile
+     *       - File location:
+     *         - UVP5: `ctd_data_cnv` folder of the project
+     *         - UVP6: `ctd_DATA` folder of the project
+     *       - Filename: `<profileid>.ctd` (same `profileid` as in `*_header_*.txt`)
+     *       - Separator: Tab
+     *       - File encoding: Latin1
+     *       - Column titles: case-insensitive. You can add custom parameter names, but:
+     *         - `pressure [db]` is mandatory for depth profiles
+     *         - `time [yyyymmddhhmmssmmm]` is mandatory for time series
+     *
+     *       Standard column names:
+     *       - chloro fluo [mg chl m-3]
+     *       - conductivity [ms cm-1]
+     *       - cpar [%]
+     *       - depth [m]
+     *       - fcdom [ppb qse]
+     *       - in situ density anomaly [kg m-3]
+     *       - nitrate [umol l-1]
+     *       - oxygen [umol kg-1]
+     *       - oxygen [ml l-1]
+     *       - par [umol m-2 s-1]
+     *       - potential density anomaly [kg m-3]
+     *       - potential temperature [degc]
+     *       - practical salinity [psu]
+     *       - pressure [db]
+     *       - qc flag
+     *       - spar [umol m-2 s-1]
+     *       - temperature [degc]
+     *       - time [yyyymmddhhmmssmmm]
+     *     tags: [CTD Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: List of importable CTD sample names.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: string
+     *       401:
+     *         description: Not authorized for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or CTD folder not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:project_id/ctd_samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const samples = await listImportableCTDSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
+            res.status(200).send(samples);
+        } catch (err) {
+            console.log(new Date().toISOString(), err);
+            if (err.message === 'User cannot be used') res.status(403).send({ errors: [err.message] });
+            else if (err.message === 'Logged user cannot list importable CTD samples in this project') res.status(401).send({ errors: [err.message] });
+            else if (err.message === 'Cannot find project') res.status(404).send({ errors: [err.message] });
+            else if (err.message.includes('Folder does not exist at path')) res.status(404).send({ errors: [err.message] });
+            else if (err.message === 'Unknown instrument model') res.status(404).send({ errors: [err.message] });
+            else res.status(500).send({ errors: ['Cannot list importable CTD samples'] });
+        }
+    });
+
+    const sendErrorResponseCTDSampleImport = (err: Error, defaultMessage: string) => {
+        const errorMap: { [key: string]: { status: number; message: string } } = {
+            'User cannot be used': { status: 403, message: err.message },
+            'Logged user cannot import CTD samples in this project': { status: 401, message: err.message },
+            'Cannot find project': { status: 404, message: err.message },
+            'Task type not found': { status: 404, message: err.message },
+            'Task status not found': { status: 404, message: err.message },
+            'Cannot create log file': { status: 500, message: err.message },
+            'Task not found': { status: 404, message: err.message },
+            'Cannot find task': { status: 404, message: err.message },
+            'Unknown instrument model': { status: 404, message: err.message },
+            'CTD samples not importable:': { status: 401, message: err.message },
+            'Folder does not exist at path': { status: 404, message: err.message },
+        };
+
+        for (const key in errorMap) {
+            if (err.message.includes(key)) {
+                const { status, message } = errorMap[key];
+                return { status, errors: [message] };
+            }
+        }
+
+        return { status: 500, errors: [defaultMessage] };
+    };
+
+    /**
+     * @openapi
+     * /projects/{project_id}/ctd_samples/import:
+     *   post:
+     *     summary: Import CTD samples
+     *     description: Imports selected CTD files into the project backup storage.
+     *     tags: [CTD Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [samples]
+     *             properties:
+     *               samples:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: List of sample/profile IDs to import from `<profileid>.ctd` files.
+     *     responses:
+     *       200:
+     *         description: CTD import task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: User not authorized or provided non-importable samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project, folder, or task metadata not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/:project_id/ctd_samples/import', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackupFromImport, async (req: Request, res: Response) => {
+        try {
+            const task = await importCTDSamplesUseCase.execute(
+                (req as CustomRequest).token,
+                req.params.project_id as any,
+                { ...req.body }.samples
+            );
+            return res.status(200).send(task);
+        } catch (err) {
+            const errorResponse = sendErrorResponseCTDSampleImport(err as Error, 'Cannot import CTD samples');
+            return res.status(errorResponse.status).send({ errors: errorResponse.errors });
+        }
+    });
+
+    /**
+     * @openapi
+     * /projects/{project_id}/ctd_samples:
+     *   get:
+     *     summary: List imported CTD samples
+     *     description: Returns imported CTD samples for a project.
+     *     tags: [CTD Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: Imported CTD samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *       401:
+     *         description: User is not allowed to list imported CTD samples.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:project_id/ctd_samples', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const result = await listImportedCTDSamplesUseCase.execute(
+                (req as CustomRequest).token,
+                req.params.project_id as any
+            );
+            return res.status(200).send(result);
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") return res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list imported CTD samples in this project") return res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") return res.status(404).send({ errors: [err.message] })
+            else return res.status(500).send({ errors: ["Cannot list imported CTD samples"] })
+        }
+    });
+
+    /**
+     * @openapi
+     * /projects/{project_id}/ctd_samples:
+     *   delete:
+     *     summary: Delete imported CTD samples
+     *     description: Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples.
+     *     tags: [CTD Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - samples
+     *             properties:
+     *               samples:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: Sample names to delete CTD files for.
+     *     responses:
+     *       200:
+     *         description: CTD samples successfully deleted.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: User is not allowed or sample is not currently CTD-imported.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project or CTD sample not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.delete('/:project_id/ctd_samples', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            await deleteImportedCTDSamplesUseCase.execute(
+                (req as CustomRequest).token,
+                req.params.project_id as any,
+                req.body.samples as string[]
+            );
+            return res.status(200).send({ message: "CTD samples successfully deleted" });
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") return res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete imported CTD samples in this project") return res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") return res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find CTD samples to delete") return res.status(404).send({ errors: [err.message] })
+            else if (err.message.startsWith("Some CTD samples to delete were not found:")) return res.status(404).send({ errors: [err.message] })
+            else if (err.message.startsWith("Some samples do not have an imported CTD file:")) return res.status(401).send({ errors: [err.message] })
+            else return res.status(500).send({ errors: ["Cannot delete CTD samples"] })
+        }
+    });
 
     /**
      * @openapi

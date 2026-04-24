@@ -787,6 +787,159 @@ export class SampleRepositoryImpl implements SampleRepository {
         return db_fs_filtered_samples;
     }
 
+    private getCTDFolderRelativePath(instrument_model: string): string {
+        if (instrument_model.startsWith("UVP5")) {
+            return "ctd_data_cnv";
+        }
+        if (instrument_model.startsWith("UVP6")) {
+            return "ctd_DATA";
+        }
+        throw new Error(`Unknown instrument model: ${instrument_model}`);
+    }
+
+    private normalizeHeaderName(header: string): string {
+        return header.trim().toLowerCase();
+    }
+
+    private async isValidCTDFile(file_path: string, sample_type_label: string | undefined): Promise<boolean> {
+        const file_buffer = await fsPromises.readFile(file_path);
+        const file_content = file_buffer.toString("latin1");
+
+        const lines = file_content.split(/\r\n|\n|\r/).filter((line) => line.trim().length > 0);
+        if (lines.length < 2) {
+            return false;
+        }
+
+        const header_line = lines[0];
+        if (!header_line.includes("\t")) {
+            return false;
+        }
+
+        const header_columns = header_line
+            .split("\t")
+            .map((col) => this.normalizeHeaderName(col))
+            .filter((col) => col.length > 0);
+
+        if (header_columns.length === 0) {
+            return false;
+        }
+
+        const header_set = new Set(header_columns);
+        if (sample_type_label === "Depth" && !header_set.has("pressure [db]")) {
+            return false;
+        }
+        if (sample_type_label === "Time" && !header_set.has("time [yyyymmddhhmmssmmm]")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<string[]> {
+        const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
+        const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
+
+        try {
+            await fsPromises.access(ctd_folder_path);
+        } catch {
+            throw new Error(`Folder does not exist at path: ${ctd_folder_path}`);
+        }
+
+        const imported_samples = await this.sampleDataSource.getAll({
+            filter: [{ field: "project_id", operator: "=", value: project_id }],
+            sort_by: [],
+            page: 1,
+            limit: 10000000,
+        });
+
+        const imported_samples_by_name = new Map(
+            imported_samples.items.map((sample) => [sample.sample_name, { sample_type_label: sample.sample_type_label, sample_id: sample.sample_id, ctd_imported: sample.ctd_imported }])
+        );
+
+        const ctd_files = await fsPromises.readdir(ctd_folder_path);
+        const importable_samples: string[] = [];
+
+        for (const file_name of ctd_files) {
+            if (path.extname(file_name).toLowerCase() !== ".ctd") {
+                continue;
+            }
+
+            const sample_name = path.basename(file_name, ".ctd");
+            const sample_info = imported_samples_by_name.get(sample_name);
+
+            // Criterion 1: the EcoPart sample with the same name must already be imported.
+            if (!sample_info) {
+                continue;
+            }
+
+            // Criterion 2: the CTD file must not already be imported.
+            if (sample_info.ctd_imported) {
+                continue;
+            }
+
+            // Criterion 3: the CTD file must follow the expected import format.
+            const file_path = path.join(ctd_folder_path, file_name);
+            const valid_file = await this.isValidCTDFile(file_path, sample_info.sample_type_label);
+            if (valid_file) {
+                importable_samples.push(sample_name);
+            }
+        }
+
+        return importable_samples;
+    }
+
+    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void> {
+        const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
+        const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
+        const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+
+        const all_samples = await this.sampleDataSource.getAll({
+            filter: [{ field: "project_id", operator: "=", value: project_id }],
+            sort_by: [],
+            page: 1,
+            limit: 10000000,
+        });
+        const sample_id_by_name = new Map(
+            all_samples.items.map((sample) => [sample.sample_name, { sample_id: sample.sample_id, station_id: sample.station_id }])
+        );
+
+        for (const sample_name of samples_names_to_import) {
+            const source_file_path = path.join(ctd_folder_path, `${sample_name}.ctd`);
+            const ctd_file_extension = path.extname(source_file_path).replace(/^\./, ""); // e.g. "ctd"
+            const sample_storage_folder = path.join(project_storage_path, sample_name);
+            const dest_file_path = path.join(sample_storage_folder, `${sample_name}.ctd`);
+
+            try {
+                await fsPromises.access(source_file_path);
+            } catch {
+                throw new Error(`CTD file not found for sample '${sample_name}': ${source_file_path}`);
+            }
+
+            try {
+                await fsPromises.mkdir(sample_storage_folder, { recursive: true });
+            } catch (err) {
+                throw new Error(`Failed to create destination folder for sample '${sample_name}' at '${sample_storage_folder}': ${err.message}`);
+            }
+
+            try {
+                await fsPromises.copyFile(source_file_path, dest_file_path);
+            } catch (err) {
+                throw new Error(`Failed to copy CTD file for sample '${sample_name}' to '${dest_file_path}': ${err.message}`);
+            }
+
+            const sample_info = sample_id_by_name.get(sample_name);
+            if (sample_info !== undefined) {
+                await this.sampleDataSource.updateOne({
+                    sample_id: sample_info.sample_id,
+                    ctd_imported: true,
+                    ctd_station_id: sample_info.station_id ?? null,
+                    ctd_file_extension: ctd_file_extension,
+                    ctd_import_date: new Date().toISOString(),
+                } as any);
+            }
+        }
+    }
+
     async getSamplesFromFsStorage(folderPath: string): Promise<string[]> {
         // list folders names in folderPath
         const samples: string[] = [];
@@ -1456,5 +1609,30 @@ export class SampleRepositoryImpl implements SampleRepository {
             updated_sample_nb += nb_updated;
         }
         return updated_sample_nb;
+    }
+
+    async deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void> {
+        const project_id = samples[0]?.project_id;
+        const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+
+        for (const sample of samples) {
+            const sample_storage_folder = path.join(project_storage_path, sample.sample_name);
+            const ctd_file_path = path.join(sample_storage_folder, `${sample.sample_name}.ctd`);
+
+            try {
+                await fsPromises.unlink(ctd_file_path);
+            } catch (err) {
+                throw new Error(`Failed to delete CTD file for sample '${sample.sample_name}' at '${ctd_file_path}': ${err.message}`);
+            }
+
+            const sample_update: SampleUpdateModel = {
+                sample_id: sample.sample_id,
+                ctd_imported: false,
+                ctd_station_id: undefined,
+                ctd_file_extension: undefined,
+                ctd_import_date: undefined,
+            };
+            await this.standardUpdateSample(sample_update);
+        }
     }
 }

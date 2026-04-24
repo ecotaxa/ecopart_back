@@ -211,7 +211,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
                             ecotaxa_import_status_id: row.ecotaxa_import_status_id,
                             ecotaxa_import_status_label: row.ecotaxa_import_status_label,
-                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id
+                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id,
+                            ctd_imported: !!row.ctd_imported,
+                            ctd_station_id: row.ctd_station_id ?? null,
+                            ctd_file_extension: row.ctd_file_extension ?? null,
+                            ctd_import_date: row.ctd_import_date ?? null
                         };
                         resolve(result);
                     }
@@ -407,7 +411,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
                             ecotaxa_import_status_id: row.ecotaxa_import_status_id,
                             ecotaxa_import_status_label: row.ecotaxa_import_status_label,
-                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id
+                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id,
+                            ctd_imported: !!row.ctd_imported,
+                            ctd_station_id: row.ctd_station_id ?? null,
+                            ctd_file_extension: row.ctd_file_extension ?? null,
+                            ctd_import_date: row.ctd_import_date ?? null
                         })),
                         total: rows[0]?.total_count || 0
                     };

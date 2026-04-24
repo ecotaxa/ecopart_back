@@ -48,6 +48,10 @@ import { ListImportableEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/
 import { ImportEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamples } from './domain/use-cases/ecotaxa_sample/search-ecotaxa-samples'
+import { ListImportableCTDSamples } from './domain/use-cases/ctd_sample/list-importable-ctd-samples'
+import { ImportCTDSamples } from './domain/use-cases/ctd_sample/import-ctd-samples'
+import { ListImportedCTDSamples } from './domain/use-cases/ctd_sample/list-imported-ctd-samples'
+import { DeleteImportedCTDSamples } from './domain/use-cases/ctd_sample/delete-imported-ctd-samples'
 
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
@@ -268,6 +272,10 @@ async function getSQLiteDS() {
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteEcoTaxaSamples(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
         new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new ListImportableCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
+        new ImportCTDSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo),
+        new ListImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
+        new DeleteImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new ListShips(project_repo),
     )
 
