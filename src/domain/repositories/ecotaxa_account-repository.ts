@@ -751,7 +751,6 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
     // ---- Main API ---------------------------------------------------------------
     async importEcoTaxaSamplesInEcoTaxa(
-        ecotaxa_user: EcotaxaAccountRequestModel,
         samples_to_import: PublicImportableEcoTaxaSampleResponseModel[],
         project: ProjectResponseModel
     ): Promise<string[]> {
@@ -765,7 +764,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
         if (!ecotaxa_instance) throw new Error("Ecotaxa instance not found");
 
-        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_user.ecotaxa_account_id);
+        const ecotaxa_account = await this.getEcotaxaGenericAccountForInstance(ecotaxa_instance_id);
         if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
 
         // 2) Get EcoTaxa project & check rights

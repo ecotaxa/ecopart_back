@@ -12,7 +12,6 @@ import { PublicImportableEcoTaxaSampleResponseModel, SampleUpdateModel } from ".
 import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
-import { EcotaxaAccountRequestModel } from "../../entities/ecotaxa_account";
 
 import path from "path";
 import { PreparedSearchOptions } from "../../entities/search";
@@ -37,7 +36,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[], ecotaxa_user: EcotaxaAccountRequestModel): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<TaskResponseModel> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -47,7 +46,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         const project: ProjectResponseModel = await this.getProjectIfExist(project_id);
 
         // create a task to import ecotaxa samples
-        const task_id = await this.createImportEcoTaxaSamplesTask(current_user, project, samples_names_to_import, ecotaxa_user);
+        const task_id = await this.createImportEcoTaxaSamplesTask(current_user, project, samples_names_to_import);
 
         // get the task
         const task = await this.taskRepository.getOneTask({ task_id: task_id });
@@ -56,18 +55,18 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
 
         // start the task
-        this.startImportEcoTaxaSamplesTask(task, samples_names_to_import, project.instrument_model, project, current_user, ecotaxa_user);
+        this.startImportEcoTaxaSamplesTask(task, samples_names_to_import, project.instrument_model, project);
 
         return task;
     }
 
-    async createImportEcoTaxaSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[], ecotaxa_user: EcotaxaAccountRequestModel): Promise<number> {
+    async createImportEcoTaxaSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]): Promise<number> {
         const task: PublicTaskRequestCreationModel = {
             task_type: TaskType.Import_EcoTaxa,
             task_status: TasksStatus.Pending,
             task_owner_id: current_user.user_id,
             task_project_id: project.project_id,
-            task_params: { ecotaxa_user: ecotaxa_user, samples: samples }
+            task_params: { samples: samples }
         }
         return await this.taskRepository.createTask(task);
     }
@@ -91,7 +90,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
     }
 
-    private async startImportEcoTaxaSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel, ecotaxa_user: EcotaxaAccountRequestModel) {
+    private async startImportEcoTaxaSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel) {
         const task_id = task.task_id;
         let importable_samples: PublicImportableEcoTaxaSampleResponseModel[] = [];
         try {
@@ -117,7 +116,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
 
             // 5/5  import samples in ecotaxa
             //const ecotaxa_tasks_id = 
-            await this.importEcoTaxaSamplesToEcotaxa(samples_to_import, project, ecotaxa_user);
+            await this.importEcoTaxaSamplesToEcotaxa(samples_to_import, project);
             //this.sampleRepository.updateEcoTaxaSamplesInDbWithEcotaxaInfo(samples_names_to_import, ecotaxa_tasks_id, task_id);
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -131,8 +130,8 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
 
     }
-    async importEcoTaxaSamplesToEcotaxa(samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], project: ProjectResponseModel, ecotaxa_user: EcotaxaAccountRequestModel) {
-        await this.ecotaxa_accountRepository.importEcoTaxaSamplesInEcoTaxa(ecotaxa_user, samples_to_import, project);
+    async importEcoTaxaSamplesToEcotaxa(samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], project: ProjectResponseModel) {
+        await this.ecotaxa_accountRepository.importEcoTaxaSamplesInEcoTaxa(samples_to_import, project);
     }
     private async listImportableEcoTaxaSamples(project: ProjectResponseModel): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);

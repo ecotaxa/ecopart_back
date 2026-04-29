@@ -1748,8 +1748,7 @@ export default function ProjectRouter(
             task_import_samples = await importEcoTaxaSamplesUseCase.execute(
                 (req as CustomRequest).token,
                 req.params.project_id as any,
-                { ...req.body }.samples,
-                req.body.ecotaxa_user
+                { ...req.body }.samples
             );
 
             // Proceed with backup only if import is successful
