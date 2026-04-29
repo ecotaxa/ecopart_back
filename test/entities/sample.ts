@@ -63,6 +63,10 @@ export const sampleModel_1: PublicSampleModel = {
     ecotaxa_sample_local_folder_tsv_path: "",
     ecotaxa_sample_nb_images: 0,
     ecotaxa_sample_task_id: 0,
+    ctd_imported: false,
+    ctd_station_id: null,
+    ctd_file_extension: null,
+    ctd_import_date: null,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -127,6 +131,10 @@ export const sampleModel_2: PublicSampleModel =
     ecotaxa_sample_local_folder_tsv_path: "",
     ecotaxa_sample_nb_images: 0,
     ecotaxa_sample_task_id: 0,
+    ctd_imported: false,
+    ctd_station_id: null,
+    ctd_file_extension: null,
+    ctd_import_date: null,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {

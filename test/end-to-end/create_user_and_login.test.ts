@@ -48,6 +48,10 @@ import { ListImportableEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa
 import { ImportEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
 import { SearchEcoTaxaSamples } from '../../src/domain/use-cases/ecotaxa_sample/search-ecotaxa-samples'
+import { ListImportableCTDSamples } from '../../src/domain/use-cases/ctd_sample/list-importable-ctd-samples'
+import { ImportCTDSamples } from '../../src/domain/use-cases/ctd_sample/import-ctd-samples'
+import { ListImportedCTDSamples } from '../../src/domain/use-cases/ctd_sample/list-imported-ctd-samples'
+import { DeleteImportedCTDSamples } from '../../src/domain/use-cases/ctd_sample/delete-imported-ctd-samples'
 import { ListShips } from '../../src/domain/use-cases/project/list-ships'
 import { DeleteTask } from '../../src/domain/use-cases/task/delete-task'
 import { GetAllEcoTaxaInstances } from '../../src/domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
@@ -227,6 +231,10 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
             new DeleteEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
             new SearchEcoTaxaSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new ListImportableCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
+            new ImportCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo),
+            new ListImportedCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
+            new DeleteImportedCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
             new ListShips(projectRepo),
         )
 
