@@ -974,13 +974,14 @@ export class SampleRepositoryImpl implements SampleRepository {
         return samples_response;
     }
     // Function to read and return samples from header.txt files
+    // Only the canonical header file is read: uvp5_header_<name>.txt or uvp6_header_<name>.txt
     async getSamplesFromHeaders(folderPath: string): Promise<HeaderSampleModel[]> {
         const samples: HeaderSampleModel[] = [];
         try {
             const header_path = path.join(folderPath, 'meta');
             const files = await fsPromises.readdir(header_path);
             for (const file of files) {
-                if (file.includes('header') && file.endsWith('.txt')) {
+                if (/^uvp[56]_header.*\.txt$/i.test(file)) {
                     const filePath = path.join(header_path, file);
                     const content = await fsPromises.readFile(filePath, 'utf8');
 
@@ -988,6 +989,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                     for (let i = 1; i < lines.length; i++) {
                         samples.push(this.getSampleFromHeaderLine(lines[i]));
                     }
+                    break; // only one canonical header file expected
                 }
             }
         } catch (err) {
