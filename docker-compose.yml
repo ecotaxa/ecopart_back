@@ -1,6 +1,8 @@
 services:
   api:
-    image: "ecotaxa/ecopart_back:latest"
+    build:
+      context: .
+      dockerfile: Dockerfile
     env_file: .env
     volumes:
       - ./data_storage:/src/data_storage
