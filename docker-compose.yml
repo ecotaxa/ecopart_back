@@ -1,6 +1,6 @@
 services:
   api:
-    image: 'ecotaxa/ecopart_back:latest'
+    image: "ecotaxa/ecopart_back:latest"
     env_file: .env
     volumes:
       - ./data_storage:/src/data_storage
@@ -9,4 +9,3 @@ services:
     ports:
       - "4000:4000"
     restart: unless-stopped
-    command: npm run prod:serve
