@@ -11,12 +11,14 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
     mail_sender: string;
     node_env: string;
     TEST_MAIL_DEFAULT_RECIPIENT: string
+    frontend_url: string;
 
-    constructor(base_url_path: string, mail_sender: string, node_env: string, TEST_MAIL_DEFAULT_RECIPIENT: string) {
+    constructor(base_url_path: string, mail_sender: string, node_env: string, TEST_MAIL_DEFAULT_RECIPIENT: string, frontend_url: string = '') {
         this.base_url_path = base_url_path;
         this.mail_sender = mail_sender;
         this.node_env = node_env;
         this.TEST_MAIL_DEFAULT_RECIPIENT = TEST_MAIL_DEFAULT_RECIPIENT;
+        this.frontend_url = frontend_url;
     }
 
     // createTransport
@@ -38,7 +40,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         }
 
         // prepare the custom confirmation path
-        const custom_confirmation_path = this.base_url_path + "/users/" + created_user.user_id + "/welcome/" + confirmation_code
+        const custom_confirmation_path = this.frontend_url + "/users/" + created_user.user_id + "/welcome/" + confirmation_code
         const mail_sender = this.mail_sender
 
         // Send the email
