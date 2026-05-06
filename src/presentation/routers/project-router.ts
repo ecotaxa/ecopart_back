@@ -1054,7 +1054,7 @@ export default function ProjectRouter(
             if (err.message === 'User cannot be used') res.status(403).send({ errors: [err.message] });
             else if (err.message === 'Logged user cannot list importable CTD samples in this project') res.status(401).send({ errors: [err.message] });
             else if (err.message === 'Cannot find project') res.status(404).send({ errors: [err.message] });
-            else if (err.message.includes('Folder does not exist at path')) res.status(404).send({ errors: [err.message] });
+            else if (err.message === 'No CTD folder found in project folder') res.status(404).send({ errors: [err.message] });
             else if (err.message === 'Unknown instrument model') res.status(404).send({ errors: [err.message] });
             else res.status(500).send({ errors: ['Cannot list importable CTD samples'] });
         }
@@ -1072,7 +1072,7 @@ export default function ProjectRouter(
             'Cannot find task': { status: 404, message: err.message },
             'Unknown instrument model': { status: 404, message: err.message },
             'CTD samples not importable:': { status: 401, message: err.message },
-            'Folder does not exist at path': { status: 404, message: err.message },
+            'No CTD folder found in project folder': { status: 404, message: err.message },
         };
 
         for (const key in errorMap) {

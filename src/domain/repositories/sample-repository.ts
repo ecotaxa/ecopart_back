@@ -825,7 +825,8 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
 
         const header_set = new Set(header_columns);
-        if (sample_type_label === "Depth" && !header_set.has("pressure [db]")) {
+        const has_pressure_column = header_columns.some((col) => col.startsWith("pressure") && col.includes("[db]"));
+        if (sample_type_label === "Depth" && !has_pressure_column) {
             return false;
         }
         if (sample_type_label === "Time" && !header_set.has("time [yyyymmddhhmmssmmm]")) {
@@ -842,7 +843,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         try {
             await fsPromises.access(ctd_folder_path);
         } catch {
-            throw new Error(`Folder does not exist at path: ${ctd_folder_path}`);
+            throw new Error(`No CTD folder found in project folder`);
         }
 
         const imported_samples = await this.sampleDataSource.getAll({
@@ -892,6 +893,12 @@ export class SampleRepositoryImpl implements SampleRepository {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
         const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+
+        try {
+            await fsPromises.access(ctd_folder_path);
+        } catch {
+            throw new Error(`No CTD folder found in project folder`);
+        }
 
         const all_samples = await this.sampleDataSource.getAll({
             filter: [{ field: "project_id", operator: "=", value: project_id }],
@@ -1339,7 +1346,11 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ecotaxa_sample_tsv_file_name",
             "ecotaxa_sample_local_folder_tsv_path",
             "ecotaxa_sample_nb_images",
-            "ecotaxa_sample_task_id"
+            "ecotaxa_sample_task_id",
+            "ctd_imported",
+            "ctd_station_id",
+            "ctd_file_extension",
+            "ctd_import_date"
         ];
         const updated_sample_nb = await this.updateSample(sample, params_restricted)
         return updated_sample_nb
@@ -1373,7 +1384,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported"]
+        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported"]
 
         // Can be sort_by 
         const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
@@ -1619,12 +1630,15 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         for (const sample of samples) {
             const sample_storage_folder = path.join(project_storage_path, sample.sample_name);
-            const ctd_file_path = path.join(sample_storage_folder, `${sample.sample_name}.ctd`);
+            const file_extension = sample.ctd_file_extension ?? "ctd";
+            const ctd_file_path = path.join(sample_storage_folder, `${sample.sample_name}.${file_extension}`);
 
             try {
                 await fsPromises.unlink(ctd_file_path);
             } catch (err) {
-                throw new Error(`Failed to delete CTD file for sample '${sample.sample_name}' at '${ctd_file_path}': ${err.message}`);
+                if (err.code !== "ENOENT") {
+                    throw new Error(`Failed to delete CTD file for sample '${sample.sample_name}' at '${ctd_file_path}': ${err.message}`);
+                }
             }
 
             const sample_update: SampleUpdateModel = {
