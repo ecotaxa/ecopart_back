@@ -23,6 +23,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'Users', description: 'User account management' },
         { name: 'Projects', description: 'Project management' },
         { name: 'Samples', description: 'Sample data within projects' },
+        { name: 'CTD Samples', description: 'CTD sample management within projects' },
         { name: 'EcoTaxa Samples', description: 'EcoTaxa sample management within projects' },
         { name: 'Tasks', description: 'Background task management' },
         { name: 'Instrument Models', description: 'Instrument model reference data' },

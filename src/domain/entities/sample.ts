@@ -64,6 +64,10 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
     ecotaxa_sample_local_folder_tsv_path: string; // Local path to the TSV file to import
     ecotaxa_sample_nb_images: number;        // EcoTaxa number of images
     ecotaxa_sample_task_id: number; // EcoTaxa sample task identifier
+    ctd_imported: boolean;                   // CTD file imported flag
+    ctd_station_id: string | null;           // CTD station identifier (from sample station_id at import time)
+    ctd_file_extension: string | null;       // CTD file extension (e.g. 'ctd')
+    ctd_import_date: string | null;          // CTD import date in ISO format
 
 }
 export interface PublicSampleModel extends PrivateSampleModel {
@@ -83,6 +87,10 @@ export interface SampleUpdateModel {
     ecotaxa_sample_local_folder_tsv_path?: string; // Local path to the TSV file to import
     ecotaxa_sample_nb_images?: number;                           // EcoTaxa number of images
     ecotaxa_sample_task_id?: number; // EcoTaxa sample task identifier
+    ctd_imported?: boolean;                                      // CTD file imported flag
+    ctd_station_id?: string | null;                             // CTD station identifier
+    ctd_file_extension?: string | null;                         // CTD file extension
+    ctd_import_date?: string | null;                            // CTD import date in ISO format
 }
 
 export interface SampleRequestModel {
@@ -143,6 +151,10 @@ export interface SampleRequestModel {
     ecotaxa_sample_local_folder_tsv_path?: string; // Local path to the TSV file to import
     ecotaxa_sample_nb_images?: number;                           // EcoTaxa number of images
     ecotaxa_sample_task_id?: number; // EcoTaxa sample task identifier
+    ctd_imported?: boolean;                                      // CTD file imported flag
+    ctd_station_id?: string | null;                             // CTD station identifier
+    ctd_file_extension?: string | null;                         // CTD file extension
+    ctd_import_date?: string | null;                            // CTD import date in ISO format
 }
 
 export interface MinimalSampleRequestModel {

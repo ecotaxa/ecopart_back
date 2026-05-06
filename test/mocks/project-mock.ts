@@ -18,6 +18,10 @@ import { SearchEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cas
 import { DeleteEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
 import { ImportEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples";
 import { ListImportableEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples";
+import { ListImportableCTDSamplesUseCase } from "../../src/domain/interfaces/use-cases/ctd_sample/list-importable-ctd-samples";
+import { ImportCTDSamplesUseCase } from "../../src/domain/interfaces/use-cases/ctd_sample/import-ctd-samples";
+import { ListImportedCTDSamplesUseCase } from "../../src/domain/interfaces/use-cases/ctd_sample/list-imported-ctd-samples";
+import { DeleteImportedCTDSamplesUseCase } from "../../src/domain/interfaces/use-cases/ctd_sample/delete-imported-ctd-samples";
 
 export class MockProjectRepository implements ProjectRepository {
     createProjectRootFolder(): Promise<void> {
@@ -177,5 +181,29 @@ export class MockDeleteEcoTaxaSamplesUseCase implements DeleteEcoTaxaSamplesUseC
 export class MockSearchEcoTaxaSamplesUseCase implements SearchEcoTaxaSamplesUseCase {
     execute(): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for search eco taxa samples");
+    }
+}
+
+export class MockListImportableCTDSamplesUseCase implements ListImportableCTDSamplesUseCase {
+    execute(): Promise<string[]> {
+        throw new Error("Method not implemented for list importable CTD samples");
+    }
+}
+
+export class MockImportCTDSamplesUseCase implements ImportCTDSamplesUseCase {
+    execute(): Promise<TaskResponseModel> {
+        throw new Error("Method not implemented for import CTD samples");
+    }
+}
+
+export class MockListImportedCTDSamplesUseCase implements ListImportedCTDSamplesUseCase {
+    execute(): Promise<SearchResult<PublicSampleModel>> {
+        throw new Error("Method not implemented for list imported CTD samples");
+    }
+}
+
+export class MockDeleteImportedCTDSamplesUseCase implements DeleteImportedCTDSamplesUseCase {
+    execute(): Promise<void> {
+        throw new Error("Method not implemented for delete imported CTD samples");
     }
 }

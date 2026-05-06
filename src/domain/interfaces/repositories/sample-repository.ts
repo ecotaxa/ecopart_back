@@ -25,4 +25,9 @@ export interface SampleRepository {
     // deleteEcoTaxaSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>;
     // standardGetEcoTaxaSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>>;
     createManyEcoTaxaSamples(samples: SampleUpdateModel[]): Promise<number>;
+
+    // CTD-specific methods
+    listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<string[]>;
+    importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void>;
+    deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void>;
 }

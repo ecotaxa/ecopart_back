@@ -54,6 +54,15 @@ export class MockSampleRepository implements SampleRepository {
     createManyEcoTaxaSamples(): Promise<number> {
         throw new Error("Method not implemented for createManyEcoTaxaSamples");
     }
+    listImportableCTDSamples(): Promise<string[]> {
+        throw new Error("Method not implemented for listImportableCTDSamples");
+    }
+    importCTDSamples(): Promise<void> {
+        throw new Error("Method not implemented for importCTDSamples");
+    }
+    deleteImportedCTDSamplesFromDb(): Promise<void> {
+        throw new Error("Method not implemented for deleteImportedCTDSamplesFromDb");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase

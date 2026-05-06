@@ -5,7 +5,8 @@ WORKDIR /src
 
 COPY package*.json .
 
-RUN npm install --ignore-scripts \
+RUN npm install \
+    && npm rebuild sqlite3 --build-from-source \
     && npm install typescript -g
 
 COPY . .

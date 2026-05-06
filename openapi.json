@@ -3420,6 +3420,369 @@
         }
       }
     },
+    "/projects/{project_id}/ctd_samples/can_be_imported": {
+      "get": {
+        "summary": "List importable CTD samples",
+        "description": "Returns the list of CTD sample names that can be imported for the given project.\n\nImportability checks are based on two mandatory criteria:\n1. A particle sample with the same `sample_name` is already imported in EcoPart for this project.\n2. The CTD file follows the expected format.\n\nIMPORTANT NOTE on the format of CTD data files to be imported:\n- One file per sample/profile\n- File location:\n  - UVP5: `ctd_data_cnv` folder of the project\n  - UVP6: `ctd_DATA` folder of the project\n- Filename: `<profileid>.ctd` (same `profileid` as in `*_header_*.txt`)\n- Separator: Tab\n- File encoding: Latin1\n- Column titles: case-insensitive. You can add custom parameter names, but:\n  - `pressure [db]` is mandatory for depth profiles\n  - `time [yyyymmddhhmmssmmm]` is mandatory for time series\n\nStandard column names:\n- chloro fluo [mg chl m-3]\n- conductivity [ms cm-1]\n- cpar [%]\n- depth [m]\n- fcdom [ppb qse]\n- in situ density anomaly [kg m-3]\n- nitrate [umol l-1]\n- oxygen [umol kg-1]\n- oxygen [ml l-1]\n- par [umol m-2 s-1]\n- potential density anomaly [kg m-3]\n- potential temperature [degc]\n- practical salinity [psu]\n- pressure [db]\n- qc flag\n- spar [umol m-2 s-1]\n- temperature [degc]\n- time [yyyymmddhhmmssmmm]\n",
+        "tags": [
+          "CTD Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of importable CTD sample names.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authorized for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or CTD folder not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/ctd_samples/import": {
+      "post": {
+        "summary": "Import CTD samples",
+        "description": "Imports selected CTD files into the project backup storage.",
+        "tags": [
+          "CTD Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "samples"
+                ],
+                "properties": {
+                  "samples": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of sample/profile IDs to import from `<profileid>.ctd` files."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CTD import task created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User not authorized or provided non-importable samples.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, folder, or task metadata not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/ctd_samples": {
+      "get": {
+        "summary": "List imported CTD samples",
+        "description": "Returns imported CTD samples for a project.",
+        "tags": [
+          "CTD Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imported CTD samples.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleSearchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is not allowed to list imported CTD samples.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete imported CTD samples",
+        "description": "Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples.",
+        "tags": [
+          "CTD Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "samples"
+                ],
+                "properties": {
+                  "samples": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Sample names to delete CTD files for."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CTD samples successfully deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is not allowed or sample is not currently CTD-imported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or CTD sample not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project_id}/samples": {
       "get": {
         "summary": "List samples",
