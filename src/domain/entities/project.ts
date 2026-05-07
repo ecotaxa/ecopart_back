@@ -174,6 +174,17 @@ export interface ProjectMetadataModel {
     chief_scientist: ProjectMetadataPersonModel | null;
 }
 
+export interface MigrateEcotaxaProjectRequestModel {
+    ecotaxa_project_id: number;
+    ecotaxa_instance_id: number;
+}
+
+export interface MigrateEcotaxaProjectResponseModel {
+    project: PublicProjectResponseModel;
+    matched_samples: number;
+    unmatched_samples: string[];
+}
+
 // // FOR acess permissions LATER
 // export interface ProjectVisibility {
 //     visibility_id: number;

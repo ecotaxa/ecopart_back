@@ -60,6 +60,7 @@ import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-
 import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
 import { ListOrganisations } from './domain/use-cases/user/list-organisations'
 import { ListShips } from './domain/use-cases/project/list-ships'
+import { MigrateEcotaxaProject } from './domain/use-cases/project/migrate-ecotaxa-project'
 import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
 import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
@@ -278,6 +279,7 @@ async function getSQLiteDS() {
         new ListImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new DeleteImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new ListShips(project_repo),
+        new MigrateEcotaxaProject(user_repo, project_repo, sample_repo, privilege_repo, ecotaxa_account_repo),
     )
 
     const taskMiddleWare = TaskRouter(

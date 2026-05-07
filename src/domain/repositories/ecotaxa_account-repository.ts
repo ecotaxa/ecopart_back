@@ -807,6 +807,19 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return imported_sample_names;
     }
 
+    // List all samples in an EcoTaxa project
+    // GET /api/samples/search?project_ids={ecotaxa_project_id}
+    async api_ecotaxa_get_samples_in_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<Array<{ sampleid: number; orig_id: string }>> {
+        const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
+            `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}`,
+            {
+                method: "GET",
+                headers: this.JSON_HEADERS(token),
+            }
+        );
+        return samples ?? [];
+    }
+
     // Query EcoTaxa objects by sample name in a project
     // GET /api/samples/search to resolve names → numeric IDs
     // POST /api/object_set/{project_id}/query with ProjectFilters.samples

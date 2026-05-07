@@ -5,6 +5,7 @@ import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { UserUpdateModel } from "../../entities/user";
 
 export interface EcotaxaAccountRepository {
+    api_ecotaxa_get_samples_in_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<Array<{ sampleid: number; orig_id: string }>>;
     api_ecotaxa_query_objects_by_sample(baseUrl: string, token: string, ecotaxa_project_id: number, sample_name: string[]): Promise<number[]>;
     api_ecotaxa_delete_objects(baseUrl: string, token: string, objectIds: number[]): Promise<void>;
     api_delete_ecotaxa_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<void>;

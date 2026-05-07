@@ -24,6 +24,7 @@ import { ImportCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_s
 import { ListImportedCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/list-imported-ctd-samples'
 import { DeleteImportedCTDSamplesUseCase } from '../../domain/interfaces/use-cases/ctd_sample/delete-imported-ctd-samples'
 import { ListShipsUseCase } from '../../domain/interfaces/use-cases/project/list-ships'
+import { MigrateEcotaxaProjectUseCase } from '../../domain/interfaces/use-cases/project/migrate-ecotaxa-project'
 
 
 import { CustomRequest } from '../../domain/entities/auth'
@@ -52,6 +53,7 @@ export default function ProjectRouter(
     listImportedCTDSamplesUseCase: ListImportedCTDSamplesUseCase,
     deleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase,
     listShipsUseCase: ListShipsUseCase,
+    migrateEcotaxaProjectUseCase: MigrateEcotaxaProjectUseCase,
 ) {
     const router = express.Router()
 
@@ -2088,5 +2090,121 @@ export default function ProjectRouter(
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/migrate_ecotaxa:
+     *   post:
+     *     summary: Migrate EcoTaxa project (admin only)
+     *     description: |
+     *       Admin-only endpoint for migrating old projects that already have an EcoTaxa project and
+     *       samples imported. Links the given EcoTaxa project to the EcoPart project and automatically
+     *       matches already-imported EcoTaxa samples by name, marking them as imported in EcoPart.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart project ID to migrate.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - ecotaxa_project_id
+     *               - ecotaxa_instance_id
+     *             properties:
+     *               ecotaxa_project_id:
+     *                 type: integer
+     *                 description: The EcoTaxa project ID to link.
+     *               ecotaxa_instance_id:
+     *                 type: integer
+     *                 description: The EcoTaxa instance ID. The default generic account for this instance will be used.
+     *     responses:
+     *       200:
+     *         description: Migration successful. Returns updated project and sample match summary.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 project:
+     *                   $ref: '#/components/schemas/PublicProjectResponse'
+     *                 matched_samples:
+     *                   type: integer
+     *                   description: Number of EcoPart samples successfully matched and marked as imported.
+     *                 unmatched_samples:
+     *                   type: array
+     *                   items:
+     *                     type: string
+     *                   description: Names of EcoPart samples that had no matching EcoTaxa sample.
+     *       401:
+     *         description: Not admin, or EcoTaxa account/instance/project validation failed.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project, EcoTaxa account, or EcoTaxa project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error or EcoTaxa API error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/:project_id/migrate_ecotaxa', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const project_id = parseInt(req.params.project_id, 10);
+            if (isNaN(project_id)) {
+                return res.status(422).send({ errors: ["Invalid project_id"] });
+            }
+            const { ecotaxa_project_id, ecotaxa_instance_id } = req.body;
+            if (typeof ecotaxa_project_id !== 'number' || typeof ecotaxa_instance_id !== 'number') {
+                return res.status(422).send({ errors: ["ecotaxa_project_id and ecotaxa_instance_id are required and must be numbers"] });
+            }
+            const result = await migrateEcotaxaProjectUseCase.execute(
+                (req as CustomRequest).token,
+                project_id,
+                { ecotaxa_project_id, ecotaxa_instance_id }
+            );
+            res.status(200).send(result);
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message.includes("Admin only")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found.") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa generic account not found for instance")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa project not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa instance ID is required")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Mismatch: Ecotaxa instance ID does not match")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Instruments do not match")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("already linked")) res.status(409).send({ errors: [err.message] })
+            else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot find updated project")) res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Cannot find project privileges")) res.status(500).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot migrate ecotaxa project"] })
+        }
+    })
+
     return router
 }

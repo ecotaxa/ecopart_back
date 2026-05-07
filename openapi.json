@@ -4543,6 +4543,123 @@
         }
       }
     },
+    "/projects/{project_id}/migrate_ecotaxa": {
+      "post": {
+        "summary": "Migrate EcoTaxa project (admin only)",
+        "description": "Admin-only endpoint for migrating old projects that already have an EcoTaxa project and\nsamples imported. Links the given EcoTaxa project to the EcoPart project and automatically\nmatches already-imported EcoTaxa samples by name, marking them as imported in EcoPart.\n",
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The EcoPart project ID to migrate."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ecotaxa_project_id",
+                  "ecotaxa_instance_id"
+                ],
+                "properties": {
+                  "ecotaxa_project_id": {
+                    "type": "integer",
+                    "description": "The EcoTaxa project ID to link."
+                  },
+                  "ecotaxa_instance_id": {
+                    "type": "integer",
+                    "description": "The EcoTaxa instance ID. The default generic account for this instance will be used."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Migration successful. Returns updated project and sample match summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/PublicProjectResponse"
+                    },
+                    "matched_samples": {
+                      "type": "integer",
+                      "description": "Number of EcoPart samples successfully matched and marked as imported."
+                    },
+                    "unmatched_samples": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Names of EcoPart samples that had no matching EcoTaxa sample."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not admin, or EcoTaxa account/instance/project validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, EcoTaxa account, or EcoTaxa project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error or EcoTaxa API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks": {
       "get": {
         "summary": "List tasks",
