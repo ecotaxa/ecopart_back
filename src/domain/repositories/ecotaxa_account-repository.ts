@@ -285,8 +285,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         // check that instruments match 
         this.ensureInstrumentsMatch(ecotaxa_project.instrument, public_project.instrument_model)
 
-        // check that the ecotaxa account is manager in the ecotaxa project
-        if (ecotaxa_project.highest_right !== "Manage") throw new Error("EcoTaxa account is not manager in the ecotaxa project");
+        // check that the ecotaxa account is manager in the ecotaxa project, or is an EcoTaxa system admin (can_do includes 3)
+        if (ecotaxa_project.highest_right !== "Manage") {
+            const me = await this.api_ecotaxa_me(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token);
+            const isEcotaxaAdmin = Array.isArray(me.can_do) && me.can_do.includes(3);
+            if (!isEcotaxaAdmin) {
+                throw new Error("EcoTaxa account is not manager in the ecotaxa project");
+            }
+        }
 
         await this.add_default_values_to_ecotaxa_project(ecotaxa_instance, ecotaxa_account, ecotaxa_project)
         return { ecotaxa_project_id: ecotaxa_project.projid as number, ecotaxa_project_name: ecotaxa_project.title as string };
