@@ -532,13 +532,16 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     }
 
     async deleteEcopartUserFromEcotaxaProject(current_project: ProjectResponseModel, project_to_update_model: PublicProjectUpdateModel): Promise<void> {
-        const ecotaxa_account_id = project_to_update_model.ecotaxa_account_id as number
+        const ecotaxa_account_id = project_to_update_model.ecotaxa_account_id
         const ecotaxa_instance_id = current_project.ecotaxa_instance_id as number
         const ecotaxa_project_id = current_project.ecotaxa_project_id as number
         let ecotaxa_project: any
 
         // if no linked project, return
         if (!ecotaxa_project_id) return
+
+        // Unlink-only payloads can omit account info; skip cleanup instead of blocking project update.
+        if (ecotaxa_account_id === undefined || ecotaxa_account_id === null) return
 
         // get ecotaxa account
         const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
