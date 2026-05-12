@@ -540,19 +540,24 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         // if no linked project, return
         if (!ecotaxa_project_id) return
 
-        // Unlink-only payloads can omit account info; skip cleanup instead of blocking project update.
-        if (ecotaxa_account_id === undefined || ecotaxa_account_id === null) return
-
-        // get ecotaxa account
-        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
-        if (!ecotaxa_account) {
-            throw new Error("Ecotaxa account not found");
-        }
-
-        // get ecotaxa instance
+        // get ecotaxa instance (needed regardless of whether we have an account in the payload)
         const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
         if (!ecotaxa_instance) {
             throw new Error("Ecotaxa instance not found");
+        }
+
+        // Resolve the EcoTaxa account to use.
+        // For link/create payloads ecotaxa_account_id is provided.
+        // For unlink-only payloads it is omitted, so fall back to the generic account for the instance.
+        let ecotaxa_account: EcotaxaAccountResponseModel
+        if (ecotaxa_account_id !== undefined && ecotaxa_account_id !== null) {
+            const found = await this.getOneEcotaxaAccount(ecotaxa_account_id);
+            if (!found) {
+                throw new Error("Ecotaxa account not found");
+            }
+            ecotaxa_account = found
+        } else {
+            ecotaxa_account = await this.getEcotaxaGenericAccountForInstance(ecotaxa_instance_id);
         }
 
         // get ecotaxa project
