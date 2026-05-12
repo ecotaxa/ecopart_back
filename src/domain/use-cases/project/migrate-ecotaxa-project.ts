@@ -44,9 +44,9 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
             throw new Error("Cannot find project");
         }
 
-        const { ecotaxa_project_id, ecotaxa_instance_id } = migrate_request;
+        const { ecotaxa_project_id, ecotaxa_instance_id, ecotaxa_user_login, ecotaxa_user_password } = migrate_request;
 
-        // 3. Resolve the generic EcoTaxa account for the given instance
+        // 3. Resolve the EcoTaxa instance (needed for sample fetching later)
         const ecotaxa_instance = await this.ecotaxa_accountRepository.getOneEcoTaxaInstance(ecotaxa_instance_id);
         if (!ecotaxa_instance) {
             throw new Error("Ecotaxa instance not found");
@@ -56,17 +56,15 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
         // 4. Ensure the EcoTaxa project is not already linked to another EcoPart project
         await this.projectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id, ecotaxa_instance_id);
 
-        // 5. Link EcoTaxa project: validates existence, instrument match, and manager rights on EcoTaxa side
-        const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaAndEcopartProject({
-            ...project,
-            ecotaxa_project_id,
+        // 5. Login with provided admin credentials (transient), validate project, add generic account as manager
+        console.log(new Date().toISOString(), `[MigrateEcotaxaProject] Linking ecotaxa_project_id=${ecotaxa_project_id} to ecopart project_id=${project_id} using transient login for user=${ecotaxa_user_login}`);
+        const ecotaxa_values = await this.ecotaxa_accountRepository.linkEcotaxaProjectWithTransientCredentials(
             ecotaxa_instance_id,
-            ecotaxa_account_id: generic_account.ecotaxa_account_id,
-            new_ecotaxa_project: false,
-            members: [],
-            managers: [],
-            contact: { user_id: current_user.user_id }
-        } as any);
+            ecotaxa_user_login,
+            ecotaxa_user_password,
+            ecotaxa_project_id,
+            project.instrument_model
+        );
 
         // 6. Update EcoPart project with ecotaxa link
         const project_update: ProjectUpdateModel = {

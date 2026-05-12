@@ -2119,13 +2119,22 @@ export default function ProjectRouter(
      *             required:
      *               - ecotaxa_project_id
      *               - ecotaxa_instance_id
+     *               - ecotaxa_user_login
+     *               - ecotaxa_user_password
      *             properties:
      *               ecotaxa_project_id:
      *                 type: integer
      *                 description: The EcoTaxa project ID to link.
      *               ecotaxa_instance_id:
      *                 type: integer
-     *                 description: The EcoTaxa instance ID. The default generic account for this instance will be used.
+     *                 description: The EcoTaxa instance ID.
+     *               ecotaxa_user_login:
+     *                 type: string
+     *                 description: EcoTaxa admin account email. Used transiently to add the EcoPart generic account as manager. Not persisted.
+     *               ecotaxa_user_password:
+     *                 type: string
+     *                 format: password
+     *                 description: EcoTaxa admin account password. Used transiently. Not persisted or logged.
      *     responses:
      *       200:
      *         description: Migration successful. Returns updated project and sample match summary.
@@ -2175,14 +2184,20 @@ export default function ProjectRouter(
             if (isNaN(project_id)) {
                 return res.status(422).send({ errors: ["Invalid project_id"] });
             }
-            const { ecotaxa_project_id, ecotaxa_instance_id } = req.body;
+            const { ecotaxa_project_id, ecotaxa_instance_id, ecotaxa_user_login, ecotaxa_user_password } = req.body;
             if (typeof ecotaxa_project_id !== 'number' || typeof ecotaxa_instance_id !== 'number') {
                 return res.status(422).send({ errors: ["ecotaxa_project_id and ecotaxa_instance_id are required and must be numbers"] });
+            }
+            if (typeof ecotaxa_user_login !== 'string' || !ecotaxa_user_login.trim()) {
+                return res.status(422).send({ errors: ["ecotaxa_user_login is required"] });
+            }
+            if (typeof ecotaxa_user_password !== 'string' || !ecotaxa_user_password) {
+                return res.status(422).send({ errors: ["ecotaxa_user_password is required"] });
             }
             const result = await migrateEcotaxaProjectUseCase.execute(
                 (req as CustomRequest).token,
                 project_id,
-                { ecotaxa_project_id, ecotaxa_instance_id }
+                { ecotaxa_project_id, ecotaxa_instance_id, ecotaxa_user_login, ecotaxa_user_password }
             );
             res.status(200).send(result);
         } catch (err) {

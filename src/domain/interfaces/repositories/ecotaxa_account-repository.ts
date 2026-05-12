@@ -6,6 +6,7 @@ import { UserUpdateModel } from "../../entities/user";
 
 export interface EcotaxaAccountRepository {
     api_ecotaxa_get_samples_in_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<Array<{ sampleid: number; orig_id: string }>>;
+    linkEcotaxaProjectWithTransientCredentials(ecotaxa_instance_id: number, ecotaxa_user_login: string, ecotaxa_user_password: string, ecotaxa_project_id: number, instrument_model: string): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string }>;
     api_ecotaxa_query_objects_by_sample(baseUrl: string, token: string, ecotaxa_project_id: number, sample_name: string[]): Promise<number[]>;
     api_ecotaxa_delete_objects(baseUrl: string, token: string, objectIds: number[]): Promise<void>;
     api_delete_ecotaxa_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<void>;

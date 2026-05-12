@@ -4574,7 +4574,9 @@
                 "type": "object",
                 "required": [
                   "ecotaxa_project_id",
-                  "ecotaxa_instance_id"
+                  "ecotaxa_instance_id",
+                  "ecotaxa_user_login",
+                  "ecotaxa_user_password"
                 ],
                 "properties": {
                   "ecotaxa_project_id": {
@@ -4583,7 +4585,16 @@
                   },
                   "ecotaxa_instance_id": {
                     "type": "integer",
-                    "description": "The EcoTaxa instance ID. The default generic account for this instance will be used."
+                    "description": "The EcoTaxa instance ID."
+                  },
+                  "ecotaxa_user_login": {
+                    "type": "string",
+                    "description": "EcoTaxa admin account email. Used transiently to add the EcoPart generic account as manager. Not persisted."
+                  },
+                  "ecotaxa_user_password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "EcoTaxa admin account password. Used transiently. Not persisted or logged."
                   }
                 }
               }

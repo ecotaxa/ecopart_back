@@ -177,6 +177,8 @@ export interface ProjectMetadataModel {
 export interface MigrateEcotaxaProjectRequestModel {
     ecotaxa_project_id: number;
     ecotaxa_instance_id: number;
+    ecotaxa_user_login: string;
+    ecotaxa_user_password: string;
 }
 
 export interface MigrateEcotaxaProjectResponseModel {

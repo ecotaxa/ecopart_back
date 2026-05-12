@@ -813,6 +813,55 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return imported_sample_names;
     }
 
+    // Link an EcoTaxa project to an EcoPart project using transient admin credentials.
+    // Logs in with the provided credentials, validates the project, adds the generic EcoPart
+    // account as manager, then discards the token.
+    async linkEcotaxaProjectWithTransientCredentials(
+        ecotaxa_instance_id: number,
+        ecotaxa_user_login: string,
+        ecotaxa_user_password: string,
+        ecotaxa_project_id: number,
+        instrument_model: string
+    ): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string }> {
+        // 1. Resolve instance
+        const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
+        if (!ecotaxa_instance) {
+            throw new Error("Ecotaxa instance not found");
+        }
+
+        // 2. Login transiently — token is never persisted
+        const token = await this.api_ecotaxa_login(ecotaxa_instance.ecotaxa_instance_url, {
+            ecopart_user_id: 0,
+            ecotaxa_user_login,
+            ecotaxa_user_password,
+            ecotaxa_instance_id
+        });
+
+        // 3. Verify the EcoTaxa project exists and fetch it
+        const ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, token, ecotaxa_project_id);
+        if (!ecotaxa_project) {
+            throw new Error("EcoTaxa project not found");
+        }
+
+        // 4. Check instrument compatibility
+        this.ensureInstrumentsMatch(ecotaxa_project.instrument, instrument_model);
+
+        // 5. Verify the provided account has manager rights or is an EcoTaxa admin
+        if (ecotaxa_project.highest_right !== "Manage") {
+            const me = await this.api_ecotaxa_me(ecotaxa_instance.ecotaxa_instance_url, token);
+            const isEcotaxaAdmin = Array.isArray(me.can_do) && me.can_do.includes(3);
+            if (!isEcotaxaAdmin) {
+                console.log(new Date().toISOString(), `[linkEcotaxaProjectWithTransientCredentials] Account not manager and not admin: ecotaxa_user_login=${ecotaxa_user_login}, ecotaxa_project_id=${ecotaxa_project_id} (projid=${ecotaxa_project.projid}, title="${ecotaxa_project.title}"), highest_right="${ecotaxa_project.highest_right}", can_do=${JSON.stringify(me.can_do)}, instance_id=${ecotaxa_instance_id}`);
+                throw new Error("EcoTaxa account is not manager in the ecotaxa project");
+            }
+        }
+
+        // 6. Add the EcoPart generic account as manager and set CNN defaults
+        await this.add_default_values_to_ecotaxa_project(ecotaxa_instance, { ecotaxa_account_token: token } as any, ecotaxa_project);
+
+        return { ecotaxa_project_id: ecotaxa_project.projid as number, ecotaxa_project_name: ecotaxa_project.title as string };
+    }
+
     // List all samples in an EcoTaxa project
     // GET /api/samples/search?project_ids={ecotaxa_project_id}
     async api_ecotaxa_get_samples_in_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<Array<{ sampleid: number; orig_id: string }>> {
