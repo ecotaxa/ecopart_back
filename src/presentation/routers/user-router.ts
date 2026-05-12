@@ -420,7 +420,6 @@ export default function UsersRouter(
             // Call usecase validate user email
             await validUserUseCase.execute(parseInt(req.params.user_id), req.params.confirmation_token)
 
-            // Redirect to login page // TODO?
             res.status(200).send({ message: "Account activated, please login" })
         } catch (err) {
             console.log(new Date().toISOString(), err)

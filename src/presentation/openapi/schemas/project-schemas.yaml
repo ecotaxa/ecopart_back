@@ -6,8 +6,10 @@ components:
       properties:
         root_folder_path:
           type: string
-          description: Import folder path relative to the import root (as returned by /file_system/import_folders).
-          example: "remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_hope02"
+          description: Import folder path relative to the import root (as returned by
+            /file_system/import_folders).
+          example: "remote/ftp_plankton/Ecotaxa_Data_to_import/uvp6_sn000241lp_20240404_h\
+            ope02"
         project_title:
           type: string
           description: Full title of the project.
@@ -71,7 +73,8 @@ components:
           example: 24
         visible_duration:
           type: number
-          description: Duration in months for which the project data is visible (metadata only).
+          description: Duration in months for which the project data is visible (metadata
+            only).
           example: 36
         public_duration:
           type: number
@@ -143,7 +146,8 @@ components:
       properties:
         root_folder_path:
           type: string
-          description: Import folder path relative to the import root (as returned by /file_system/import_folders).
+          description: Import folder path relative to the import root (as returned by
+            /file_system/import_folders).
         project_title:
           type: string
           description: Full title of the project.
@@ -219,11 +223,22 @@ components:
         ecotaxa_project_id:
           type: integer
           nullable: true
-          description: Linked EcoTaxa project ID.
+          description: Linked EcoTaxa project ID. Set to null to unlink the project from
+            EcoTaxa.
         ecotaxa_instance_id:
           type: integer
           nullable: true
-          description: EcoTaxa instance ID.
+          description: EcoTaxa instance ID. Required when linking an existing EcoTaxa
+            project or creating a new one.
+        new_ecotaxa_project:
+          type: boolean
+          description: Set to true to create a new EcoTaxa project and link it to this
+            EcoPart project.
+        ecotaxa_account_id:
+          type: integer
+          nullable: true
+          description: EcoTaxa account ID to use for link/create operations. Not required
+            for unlink.
 
     PublicProjectResponse:
       type: object
@@ -395,7 +410,8 @@ components:
                 type: string
     ProjectMetadataPerson:
       type: object
-      description: Person information extracted from import folder metadata, with optional EcoPart user match.
+      description: Person information extracted from import folder metadata, with
+        optional EcoPart user match.
       properties:
         name:
           type: string
@@ -408,7 +424,8 @@ components:
         ecopart_user_id:
           type: integer
           nullable: true
-          description: The EcoPart user ID if a matching account was found by email, null otherwise.
+          description: The EcoPart user ID if a matching account was found by email, null
+            otherwise.
           example: 42
     ProjectMetadata:
       type: object
@@ -429,17 +446,21 @@ components:
         cruise:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 1 (cruise) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`."
+          description: "Source: `meta/*header*.txt` → column 1 (cruise) of the first data
+            row. Fallback: `config/cruise_info.txt` → key `acron`."
           example: "MPS2024"
         ship:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 2 (ship) of the first data row."
+          description: "Source: `meta/*header*.txt` → column 2 (ship) of the first data
+            row."
           example: "R/V Thalassa"
         serial_number:
           type: string
           nullable: true
-          description: "Source: `config/cruise_info.txt` → key `sn`. Fallback: extracted from the header filename pattern `sn<serial_number>_` (e.g. `uvp6_header_sn000241lp_...txt`)."
+          description: "Source: `config/cruise_info.txt` → key `sn`. Fallback: extracted
+            from the header filename pattern `sn<serial_number>_` (e.g.
+            `uvp6_header_sn000241lp_...txt`)."
           example: "002LP"
         instrument_model:
           type: string
@@ -450,19 +471,25 @@ components:
             2. Serial number suffix: LP → UVP6LP, HF → UVP6HF, MHP → UVP6MHP, MHF → UVP6MHF, HD → UVP5HD, SD → UVP5SD, ZD → UVP5Z.
             Returns null if instrument type cannot be determined.
           example: "UVP6LP"
-          enum: [UVP5HD, UVP5SD, UVP5Z, UVP6LP, UVP6HF, UVP6MHP, UVP6MHF]
+          enum: [ UVP5HD, UVP5SD, UVP5Z, UVP6LP, UVP6HF, UVP6MHP, UVP6MHF ]
         data_owner:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
-          description: "Source: `config/cruise_info.txt` → keys `do_name` (name) and `do_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          description: "Source: `config/cruise_info.txt` → keys `do_name` (name) and
+            `do_email` (email). `ecopart_user_id` is resolved by looking up the
+            email in the EcoPart user database."
         operator:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
-          description: "Source: `config/cruise_info.txt` → keys `op_name` (name) and `op_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          description: "Source: `config/cruise_info.txt` → keys `op_name` (name) and
+            `op_email` (email). `ecopart_user_id` is resolved by looking up the
+            email in the EcoPart user database."
         chief_scientist:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
-          description: "Source: `config/cruise_info.txt` → keys `cs_name` (name) and `cs_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+          description: "Source: `config/cruise_info.txt` → keys `cs_name` (name) and
+            `cs_email` (email). `ecopart_user_id` is resolved by looking up the
+            email in the EcoPart user database."

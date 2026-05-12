@@ -484,3 +484,75 @@ test("Cannot find updated privileges", async () => {
         expect(mockPrivilegeRepository.createPrivileges).toHaveBeenCalledTimes(0)
     }
 });
+
+test("Unlink EcoTaxa project with ecotaxa_project_id null", async () => {
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const current_project_with_ecotaxa: ProjectResponseModel = {
+        ...projectResponseModel,
+        ecotaxa_project_id: 777,
+        ecotaxa_project_name: "linked_project",
+        ecotaxa_instance_id: 2,
+    }
+    const project_to_update: PublicProjectUpdateModel = {
+        project_id: 1,
+        ecotaxa_project_id: null,
+    }
+    const OutputData: ProjectResponseModel = {
+        ...projectResponseModel,
+        ecotaxa_project_id: null,
+        ecotaxa_project_name: null,
+        ecotaxa_instance_id: null,
+    }
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(current_project_with_ecotaxa)).mockImplementationOnce(() => Promise.resolve(OutputData))
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => OutputData)
+
+    jest.spyOn(mockEcotaxaAccountRepository, "ensureUserCanUseEcotaxaAccount").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockEcotaxaAccountRepository, "ensureEcotaxaInstanceConsistency").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockEcotaxaAccountRepository, "deleteEcopartUserFromEcotaxaProject").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "ensureEcotaxaProjectNotLinkedToAnotherEcopartProject").mockImplementationOnce(() => Promise.resolve())
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
+    await updateProjectUseCase.execute(current_user, project_to_update);
+
+    expect(mockEcotaxaAccountRepository.ensureUserCanUseEcotaxaAccount).toHaveBeenCalledTimes(0)
+    expect(mockEcotaxaAccountRepository.ensureEcotaxaInstanceConsistency).toHaveBeenCalledTimes(0)
+    expect(mockProjectRepository.ensureEcotaxaProjectNotLinkedToAnotherEcopartProject).toHaveBeenCalledTimes(0)
+    expect(mockEcotaxaAccountRepository.deleteEcopartUserFromEcotaxaProject).toHaveBeenCalledTimes(1)
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
+})
+
+test("Reject incomplete EcoTaxa link payload", async () => {
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const project_to_update: PublicProjectUpdateModel = {
+        project_id: 1,
+        ecotaxa_project_id: 777,
+    }
+    const expected_error = new Error("To update EcoTaxa project you must provide ecotaxa_project_id or set new_ecotaxa_project=true, and also provide ecotaxa_instance_id and ecotaxa_account_id")
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockProjectRepository, "standardUpdateProject")
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, "data_storage/ecopart_data_to_import/")
+
+    try {
+        await updateProjectUseCase.execute(current_user, project_to_update);
+        expect(true).toBe(false)
+    } catch (err) {
+        expect(err).toStrictEqual(expected_error)
+    }
+
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
+})
