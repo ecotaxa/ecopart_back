@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 //SampleRequestModel, SampleUpdateModel, SampleResponseModel 
-import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
+import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -458,6 +458,39 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 }
             });
         })
+    }
+
+    async updateMany(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number> {
+        const { sample_id: _ignored, ...data } = sampleData as Record<string, unknown>;
+        const setParams: unknown[] = [];
+        let setPlaceholders = "";
+        for (const [key, value] of Object.entries(data)) {
+            if (value === undefined) continue;
+            setParams.push(typeof value === "boolean" ? (value ? 1 : 0) : value);
+            setPlaceholders += `${key} = (?),`;
+        }
+        setPlaceholders = setPlaceholders.slice(0, -1);
+
+        const whereParams: unknown[] = [];
+        let wherePlaceholders = "";
+        for (const [key, value] of Object.entries(filter)) {
+            if (value === undefined) continue;
+            whereParams.push(value);
+            wherePlaceholders += `${key} = (?) AND `;
+        }
+        wherePlaceholders = wherePlaceholders.slice(0, -5);
+
+        if (!setPlaceholders) throw new Error("Please provide at least one field to update");
+        if (!wherePlaceholders) throw new Error("Please provide at least one filter");
+
+        const sql = `UPDATE sample SET ${setPlaceholders} WHERE ${wherePlaceholders};`;
+
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, [...setParams, ...whereParams], function (err) {
+                if (err) reject(err);
+                else resolve(this.changes);
+            });
+        });
     }
 
     async getSampleType(sampleType: SampleTypeRequestModel): Promise<SampleTypeModel | null> {

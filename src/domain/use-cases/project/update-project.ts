@@ -8,6 +8,7 @@ import { InstrumentModelRepository } from "../../interfaces/repositories/instrum
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { PrivilegeRequestModel, PublicPrivilege } from "../../entities/privilege";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
+import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 
 export class UpdateProject implements UpdateProjectUseCase {
     userRepository: UserRepository
@@ -15,14 +16,16 @@ export class UpdateProject implements UpdateProjectUseCase {
     instrument_modelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
     ecotaxa_accountRepository: EcotaxaAccountRepository;
+    sampleRepository: SampleRepository;
     DATA_STORAGE_IMPORT: string
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, DATA_STORAGE_IMPORT: string) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, sampleRepository: SampleRepository, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.instrument_modelRepository = instrument_modelRepository
         this.privilegeRepository = privilegeRepository
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
+        this.sampleRepository = sampleRepository
         this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
     }
 
@@ -180,10 +183,23 @@ export class UpdateProject implements UpdateProjectUseCase {
             project.ecotaxa_project_id = ecotaxa_values.ecotaxa_project_id;
             project.ecotaxa_project_name = ecotaxa_values.ecotaxa_project_name;
         } else if (public_project_to_update.ecotaxa_project_id == null) {
-            // simply unlink ecotaxa project
+            // Unlink ecotaxa project and reset all sample import statuses
             project.ecotaxa_project_id = null;
             project.ecotaxa_project_name = "";
             project.ecotaxa_instance_id = null;
+            await this.sampleRepository.standardUpdateManySamples(
+                {
+                    ecotaxa_sample_imported: false,
+                    ecotaxa_import_status_id: null,
+                    ecotaxa_sample_import_date: null,
+                    ecotaxa_sample_id: null,
+                    ecotaxa_sample_tsv_file_name: null,
+                    ecotaxa_sample_local_folder_tsv_path: null,
+                    ecotaxa_sample_nb_images: null,
+                    ecotaxa_sample_task_id: null,
+                },
+                { project_id: public_project_to_update.project_id }
+            );
         }
         // delete ecopart user from previous linked ecotaxa project if one was linked
         await this.ecotaxa_accountRepository.deleteEcopartUserFromEcotaxaProject(current_project, public_project_to_update);

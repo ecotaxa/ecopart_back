@@ -186,8 +186,9 @@ export interface MigrateEcotaxaProjectRequestModel {
 
 export interface MigrateEcotaxaProjectResponseModel {
     project: PublicProjectResponseModel;
-    matched_samples: number;
+    matched_samples: string[];
     unmatched_samples: string[];
+    ecotaxa_only_samples: string[];
 }
 
 // // FOR acess permissions LATER

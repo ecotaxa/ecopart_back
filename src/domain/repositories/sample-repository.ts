@@ -1336,6 +1336,40 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
+    async standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number> {
+        const params_restricted: string[] = [
+            "ecotaxa_sample_imported",
+            "ecotaxa_import_status_id",
+            "ecotaxa_sample_import_date",
+            "ecotaxa_sample_id",
+            "ecotaxa_sample_tsv_file_name",
+            "ecotaxa_sample_local_folder_tsv_path",
+            "ecotaxa_sample_nb_images",
+            "ecotaxa_sample_task_id",
+            "ctd_imported",
+            "ctd_station_id",
+            "ctd_file_extension",
+            "ctd_import_date"
+        ];
+        const unauthorizedParams: string[] = [];
+        const filteredData: Partial<SampleUpdateModel> = {};
+        for (const key of Object.keys(sampleData)) {
+            if (params_restricted.includes(key)) {
+                (filteredData as Record<string, unknown>)[key] = (sampleData as Record<string, unknown>)[key];
+            } else {
+                unauthorizedParams.push(key);
+            }
+        }
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+        if (Object.keys(filteredData).length === 0) {
+            throw new Error('Please provide at least one valid parameter to update');
+        }
+        const result = await this.sampleDataSource.updateMany(filteredData, filter);
+        return result;
+    }
+
     async standardUpdateSample(sample: SampleUpdateModel): Promise<number> {
         const params_restricted: string[] = [
             "sample_id",

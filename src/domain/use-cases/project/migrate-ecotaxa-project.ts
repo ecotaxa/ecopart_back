@@ -82,11 +82,10 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
             ecotaxa_values.ecotaxa_project_id
         );
 
-        // 9. Get all EcoPart samples in the project not yet marked as imported
+        // 9. Get all EcoPart samples in the project
         const search_options: PreparedSearchOptions = {
             filter: [
-                { field: "project_id", operator: "=", value: project_id },
-                { field: "ecotaxa_sample_imported", operator: "=", value: false }
+                { field: "project_id", operator: "=", value: project_id }
             ],
             sort_by: [],
             page: 1,
@@ -98,6 +97,7 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
         const ecotaxa_sample_map = new Map(ecotaxa_samples.map(s => [s.orig_id, s.sampleid]));
         const to_mark_imported: SampleUpdateModel[] = [];
         const unmatched_samples: string[] = [];
+        const matched_samples: string[] = [];
 
         for (const ecopart_sample of ecopart_samples.items) {
             const ecotaxa_sample_id = ecotaxa_sample_map.get(ecopart_sample.sample_name);
@@ -108,6 +108,7 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
                     ecotaxa_sample_import_date: new Date().toISOString(),
                     ecotaxa_sample_id
                 });
+                matched_samples.push(ecopart_sample.sample_name);
             } else {
                 unmatched_samples.push(ecopart_sample.sample_name);
             }
@@ -131,8 +132,11 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
 
         return {
             project: public_project,
-            matched_samples: to_mark_imported.length,
-            unmatched_samples
+            matched_samples,
+            unmatched_samples,
+            ecotaxa_only_samples: ecotaxa_samples
+                .filter(s => !ecopart_samples.items.some(ep => ep.sample_name === s.orig_id))
+                .map(s => s.orig_id)
         };
     }
 }

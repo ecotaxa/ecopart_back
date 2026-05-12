@@ -79,14 +79,14 @@ export interface PublicSampleModel extends PrivateSampleModel {
 export interface SampleUpdateModel {
     [key: string]: any;
     sample_id: number;                         // Sample internal identifier
-    ecotaxa_import_status_id?: number; // EcoTaxa import status
+    ecotaxa_import_status_id?: number | null; // EcoTaxa import status
     ecotaxa_sample_imported?: boolean;                           // EcoTaxa sample imported flag
-    ecotaxa_sample_import_date?: string;                         // EcoTaxa sample import date
-    ecotaxa_sample_id?: number;                                  // EcoTaxa sample identifier
-    ecotaxa_sample_tsv_file_name?: string;                       // EcoTaxa TSV file name
-    ecotaxa_sample_local_folder_tsv_path?: string; // Local path to the TSV file to import
-    ecotaxa_sample_nb_images?: number;                           // EcoTaxa number of images
-    ecotaxa_sample_task_id?: number; // EcoTaxa sample task identifier
+    ecotaxa_sample_import_date?: string | null;                  // EcoTaxa sample import date
+    ecotaxa_sample_id?: number | null;                           // EcoTaxa sample identifier
+    ecotaxa_sample_tsv_file_name?: string | null;                // EcoTaxa TSV file name
+    ecotaxa_sample_local_folder_tsv_path?: string | null; // Local path to the TSV file to import
+    ecotaxa_sample_nb_images?: number | null;                    // EcoTaxa number of images
+    ecotaxa_sample_task_id?: number | null; // EcoTaxa sample task identifier
     ctd_imported?: boolean;                                      // CTD file imported flag
     ctd_station_id?: string | null;                             // CTD station identifier
     ctd_file_extension?: string | null;                         // CTD file extension

@@ -1643,7 +1643,6 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      */
     router.get('/:project_id/ecotaxa_samples/can_be_imported', middlewareAuth.auth, async (req: Request, res: Response) => {
-        console.log("Received request to list importable EcoTaxa samples for project:", req.params.project_id);
         try {
             const tasks = await listImportableEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, req.params.project_id as any);
             res.status(200).send(tasks)
@@ -2153,6 +2152,11 @@ export default function ProjectRouter(
      *                   items:
      *                     type: string
      *                   description: Names of EcoPart samples that had no matching EcoTaxa sample.
+                ecotaxa_only_samples:
+                   type: array
+                   items:
+                     type: string
+                   description: Names of EcoTaxa samples in the EcoTaxa project that have no matching EcoPart sample.
      *       401:
      *         description: Not admin, or EcoTaxa account/instance/project validation failed.
      *         content:

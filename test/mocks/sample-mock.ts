@@ -63,6 +63,9 @@ export class MockSampleRepository implements SampleRepository {
     deleteImportedCTDSamplesFromDb(): Promise<void> {
         throw new Error("Method not implemented for deleteImportedCTDSamplesFromDb");
     }
+    standardUpdateManySamples(): Promise<number> {
+        throw new Error("Method not implemented for standardUpdateManySamples");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase
