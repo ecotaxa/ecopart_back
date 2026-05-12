@@ -836,12 +836,21 @@
           "ecotaxa_project_id": {
             "type": "integer",
             "nullable": true,
-            "description": "Linked EcoTaxa project ID."
+            "description": "Linked EcoTaxa project ID. Set to null to unlink the project from EcoTaxa."
           },
           "ecotaxa_instance_id": {
             "type": "integer",
             "nullable": true,
-            "description": "EcoTaxa instance ID."
+            "description": "EcoTaxa instance ID. Required when linking an existing EcoTaxa project or creating a new one."
+          },
+          "new_ecotaxa_project": {
+            "type": "boolean",
+            "description": "Set to true to create a new EcoTaxa project and link it to this EcoPart project."
+          },
+          "ecotaxa_account_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "EcoTaxa account ID to use for link/create operations. Not required for unlink."
           }
         }
       },
