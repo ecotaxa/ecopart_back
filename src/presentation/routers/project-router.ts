@@ -2152,11 +2152,11 @@ export default function ProjectRouter(
      *                   items:
      *                     type: string
      *                   description: Names of EcoPart samples that had no matching EcoTaxa sample.
-                ecotaxa_only_samples:
-                   type: array
-                   items:
-                     type: string
-                   description: Names of EcoTaxa samples in the EcoTaxa project that have no matching EcoPart sample.
+         *                 ecotaxa_only_samples:
+         *                   type: array
+         *                   items:
+         *                     type: string
+         *                   description: Names of EcoTaxa samples in the EcoTaxa project that have no matching EcoPart sample.
      *       401:
      *         description: Not admin, or EcoTaxa account/instance/project validation failed.
      *         content:
