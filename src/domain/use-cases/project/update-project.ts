@@ -158,6 +158,9 @@ export class UpdateProject implements UpdateProjectUseCase {
         const isEcotaxaUnlinkRequest = public_project_to_update.ecotaxa_project_id === null;
 
         if (!isEcotaxaUnlinkRequest) {
+            if (public_project_to_update.ecotaxa_account_id === undefined || public_project_to_update.ecotaxa_account_id === null) {
+                throw new Error("EcoTaxa account is required to link or create an EcoTaxa project");
+            }
             await this.ecotaxa_accountRepository.ensureUserCanUseEcotaxaAccount(current_user, public_project_to_update.ecotaxa_account_id);
             await this.ecotaxa_accountRepository.ensureEcotaxaInstanceConsistency(public_project_to_update);
         }

@@ -505,6 +505,12 @@ test("Unlink EcoTaxa project with ecotaxa_project_id null", async () => {
         ecotaxa_project_name: null,
         ecotaxa_instance_id: null,
     }
+    const updated_public_project: PublicProjectResponseModel = {
+        ...projectResponseModel,
+        ecotaxa_project_id: null,
+        ecotaxa_project_name: null,
+        ecotaxa_instance_id: null,
+    }
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(current_project_with_ecotaxa)).mockImplementationOnce(() => Promise.resolve(OutputData))
@@ -512,7 +518,7 @@ test("Unlink EcoTaxa project with ecotaxa_project_id null", async () => {
     jest.spyOn(mockUserRepository, "isAdmin")
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(publicPrivileges))
-    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => OutputData)
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
 
     jest.spyOn(mockEcotaxaAccountRepository, "ensureUserCanUseEcotaxaAccount").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockEcotaxaAccountRepository, "ensureEcotaxaInstanceConsistency").mockImplementationOnce(() => Promise.resolve())

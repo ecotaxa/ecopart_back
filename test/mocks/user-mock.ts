@@ -99,6 +99,12 @@ export class MockUserRepository implements UserRepository {
 }
 
 export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    api_ecotaxa_get_samples_in_project(): Promise<Array<{ sampleid: number; orig_id: string; }>> {
+        throw new Error("Method not implemented for api_ecotaxa_get_samples_in_project.");
+    }
+    linkEcotaxaProjectWithTransientCredentials(): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string; }> {
+        throw new Error("Method not implemented for linkEcotaxaProjectWithTransientCredentials.");
+    }
     api_ecotaxa_query_objects_by_sample(): Promise<number[]> {
         throw new Error("Method not implemented for api_ecotaxa_query_objects_by_sample.");
     }
