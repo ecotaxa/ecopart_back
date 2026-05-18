@@ -16,7 +16,7 @@ export class AuthRepositoryImpl implements AuthRepository {
 
     generateAccessToken(user: UserResponseModel): string {
         // creating a JWT token
-        const token = this.jwt.sign(user, this.ACCESS_TOKEN_SECRET, { expiresIn: '1800s' })
+        const token = this.jwt.sign(user, this.ACCESS_TOKEN_SECRET, { expiresIn: '99999991800s' }) // TESTING PURPOSES DO NOT USE IN PRODUCTION
         return token
     }
     generateRefreshToken(user: UserResponseModel): string {

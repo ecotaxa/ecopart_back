@@ -744,16 +744,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
         const meta_header_samples = await this.getSamplesFromHeaders(folderPath);
+        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, meta_header_samples);
 
         if (instrument_model.startsWith('UVP6')) {
             // Read from folderPath/ecodata and return the list of samples
             const samples_ecodata = await this.getSamplesFromEcodata(folderPath);
-            samples = await this.setupSamples(meta_header_samples, samples_ecodata, "ecodata");
+            samples = await this.setupSamples(meta_header_samples, samples_ecodata, "ecodata", sample_images_counts);
 
         } else if (instrument_model.startsWith('UVP5')) {
             // Read from folderPath/work and return the list of samples
             const samples_work = await this.getSamplesFromWork(folderPath);
-            samples = await this.setupSamples(meta_header_samples, samples_work, "work");
+            samples = await this.setupSamples(meta_header_samples, samples_work, "work", sample_images_counts);
         }
 
 
@@ -785,6 +786,46 @@ export class SampleRepositoryImpl implements SampleRepository {
         });
 
         return db_fs_filtered_samples;
+    }
+
+    private async getImportableSamplesImagesCount(folderPath: string, instrument_model: string, samples: HeaderSampleModel[]): Promise<Map<string, number>> {
+        const sample_images_counts = new Map<string, number>();
+
+        for (const sample of samples) {
+            const images_count = await this.getImportableSampleImagesCount(folderPath, instrument_model, sample.profileId);
+            sample_images_counts.set(sample.profileId, images_count);
+        }
+
+        return sample_images_counts;
+    }
+
+    private async getImportableSampleImagesCount(folderPath: string, instrument_model: string, sample_name: string): Promise<number> {
+        const tsv_file_name = `ecotaxa_${sample_name}.tsv`;
+
+        try {
+            if (instrument_model.startsWith('UVP6')) {
+                const images_zip_path = path.join(folderPath, 'ecodata', sample_name, `${sample_name}_Images.zip`);
+                const tsv_content = await this.readFileFromZip(images_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+                return this.extractNumberOfTsvDataLines(tsv_content);
+            }
+
+            if (instrument_model.startsWith('UVP5')) {
+                const work_zip_path = path.join(folderPath, 'work', `${sample_name}.zip`);
+
+                try {
+                    const tsv_content = await this.readFileFromZip(work_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+                    return this.extractNumberOfTsvDataLines(tsv_content);
+                } catch {
+                    const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
+                    const tsv_content = await fsPromises.readFile(tsv_file_path, 'utf8');
+                    return this.extractNumberOfTsvDataLines(tsv_content);
+                }
+            }
+        } catch {
+            return 0;
+        }
+
+        return 0;
     }
 
     private getCTDFolderRelativePath(instrument_model: string): string {
@@ -963,7 +1004,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Function to setup samples
-    async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string): Promise<PublicHeaderSampleResponseModel[]> {
+    async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string, sample_images_counts: Map<string, number>): Promise<PublicHeaderSampleResponseModel[]> {
         // Flag qc samples to flase if not in both lists, and add qc message
         const samples_response: PublicHeaderSampleResponseModel[] = [];
         for (const sample of meta_header_samples) {
@@ -973,6 +1014,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 station_id: sample.stationId,
                 first_image: sample.firstImage,
                 last_image: sample.endImg,
+                images_number: sample_images_counts.get(sample.profileId) ?? 0,
                 comment: sample.comment,
                 qc_lvl1: samples.includes(sample.profileId) ? true : false,
                 qc_lvl1_comment: samples.includes(sample.profileId) ? '' : 'Sample not found in ' + folder + ' folder'
@@ -1592,6 +1634,19 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
 
         return uniqueImages.size;
+    }
+
+    extractNumberOfTsvDataLines(tsvString: string): number {
+        const lines = tsvString
+            .split(/\r\n|\n|\r/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length < 2) {
+            return 0;
+        }
+
+        return lines.length - 1;
     }
 
     // Delete ecotaxa related samples fields from sample in db
