@@ -229,6 +229,7 @@ export interface PublicHeaderSampleResponseModel {
     comment: string,
     qc_lvl1: boolean,
     qc_lvl1_comment: string,
+    images_number: number,
 }
 
 export interface HeaderSampleModel {
