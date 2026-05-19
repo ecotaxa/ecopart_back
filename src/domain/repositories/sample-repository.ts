@@ -1014,7 +1014,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 station_id: sample.stationId,
                 first_image: sample.firstImage,
                 last_image: sample.endImg,
-                images_number: sample_images_counts.get(sample.profileId) ?? 0,
+                vignette_number: sample_images_counts.get(sample.profileId) ?? 0,
                 comment: sample.comment,
                 qc_lvl1: samples.includes(sample.profileId) ? true : false,
                 qc_lvl1_comment: samples.includes(sample.profileId) ? '' : 'Sample not found in ' + folder + ' folder'

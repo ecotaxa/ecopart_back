@@ -157,10 +157,10 @@ export const PublicHeaderSampleResponseModel_1: PublicHeaderSampleResponseModel 
     station_id: "A01",
     first_image: 2790,
     last_image: 15872,
-    images_number: 0,
+    vignette_number: 0,
     comment: "no",
     qc_lvl1: true,
-    qc_lvl1_comment: "no"
+    qc_lvl1_comment: "no",
 }
 
 export const PublicHeaderSampleResponseModel_2: PublicHeaderSampleResponseModel = {
@@ -169,10 +169,10 @@ export const PublicHeaderSampleResponseModel_2: PublicHeaderSampleResponseModel 
     station_id: "0N_23W_830m",
     first_image: 3432,
     last_image: 107843,
-    images_number: 0,
+    vignette_number: 0,
     comment: "0",
     qc_lvl1: true,
-    qc_lvl1_comment: "no"
+    qc_lvl1_comment: "no",
 }
 
 export const listImportableSamplesResult: PublicHeaderSampleResponseModel[] = [
