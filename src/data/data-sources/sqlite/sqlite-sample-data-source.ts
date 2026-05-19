@@ -14,9 +14,9 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     }
 
     async createOne(sample: SampleRequestCreationModel): Promise<number> {
-        const params = [sample.sample_name, sample.comment, sample.instrument_serial_number, sample.optional_structure_id, sample.max_pressure, sample.station_id, sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth, sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio, sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize, sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold, sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp, sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels, sample.instrument_settings_vignettes_minimum_size_pixels, sample.instrument_settings_particle_minimum_size_esd, sample.instrument_settings_vignettes_minimum_size_esd, sample.instrument_settings_acq_shutter, sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure, sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id]
+        const params = [sample.sample_name, sample.comment, sample.instrument_serial_number, sample.optional_structure_id, sample.max_pressure, sample.station_id, sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth, sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio, sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize, sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold, sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp, sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels, sample.instrument_settings_vignettes_minimum_size_pixels, sample.instrument_settings_particle_minimum_size_esd, sample.instrument_settings_vignettes_minimum_size_esd, sample.instrument_settings_acq_shutter, sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure, sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id, sample.nb_vignettes]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO sample (sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, instrument_settings_acq_threshold, instrument_settings_process_datetime, instrument_settings_process_gamma, instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, instrument_settings_vignettes_minimum_size_pixels, instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd, instrument_settings_acq_shutter, instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id
+        const sql = `INSERT INTO sample (sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, instrument_settings_acq_threshold, instrument_settings_process_datetime, instrument_settings_process_gamma, instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, instrument_settings_vignettes_minimum_size_pixels, instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd, instrument_settings_acq_shutter, instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id, nb_vignettes
         ) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
@@ -65,7 +65,8 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             sample.instrument_settings_vignettes_minimum_size_esd,
                             sample.instrument_settings_acq_shutter,
                             sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure,
-                            sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id
+                            sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
+                            sample.nb_vignettes
                         ];
 
                         const placeholders = params.map(() => '?').join(', ');
@@ -82,7 +83,8 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, 
                             instrument_settings_vignettes_minimum_size_pixels, instrument_settings_acq_shutter_speed, 
                             instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd,
-                            instrument_settings_acq_shutter, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id
+                            instrument_settings_acq_shutter, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id,
+                            nb_vignettes
                         ) VALUES (${placeholders})`;
 
                         this.db.run(sql, params, function (err) {
@@ -215,7 +217,8 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             ctd_imported: !!row.ctd_imported,
                             ctd_station_id: row.ctd_station_id ?? null,
                             ctd_file_extension: row.ctd_file_extension ?? null,
-                            ctd_import_date: row.ctd_import_date ?? null
+                            ctd_import_date: row.ctd_import_date ?? null,
+                            nb_vignettes: row.nb_vignettes ?? 0
                         };
                         resolve(result);
                     }
@@ -415,7 +418,8 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                             ctd_imported: !!row.ctd_imported,
                             ctd_station_id: row.ctd_station_id ?? null,
                             ctd_file_extension: row.ctd_file_extension ?? null,
-                            ctd_import_date: row.ctd_import_date ?? null
+                            ctd_import_date: row.ctd_import_date ?? null,
+                            nb_vignettes: row.nb_vignettes ?? 0
                         })),
                         total: rows[0]?.total_count || 0
                     };

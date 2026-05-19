@@ -94,11 +94,12 @@ export class ImportSamples implements ImportSamplesUseCase {
 
     private async startImportTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel) {
         const task_id = task.task_id;
+        let importable_samples: PublicHeaderSampleResponseModel[] = [];
         try {
             await this.taskRepository.startTask({ task_id: task_id });
 
             // 1/4 Do validation before importing
-            const importable_samples = await this.listImportableSamples(project);
+            importable_samples = await this.listImportableSamples(project);
             // Check that asked samples are in the importable list of samples
             await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id);
 
@@ -113,7 +114,8 @@ export class ImportSamples implements ImportSamplesUseCase {
             //TODO LATER but we can already et the qc flag to un validated
 
             // 4/4 Create samples
-            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import);
+            const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
+            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import, vignette_count_map);
 
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -170,7 +172,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.taskRepository.logMessage(task_file_path.task_log_file_path, "Samples import failed, sources files deleted for samples: " + samples_names_to_import.join(", "));
     }
 
-    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[]): Promise<number[]> {
+    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number> = new Map()): Promise<number[]> {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
         // Common sample data
         const base_sample: Partial<SampleRequestCreationModel> = {
@@ -184,6 +186,7 @@ export class ImportSamples implements ImportSamplesUseCase {
                     { ...base_sample, sample_name: sample_name },
                     project.instrument_model
                 );
+                sample.nb_vignettes = vignette_count_map.get(sample_name) ?? 0;
                 return sample;
             })
         );

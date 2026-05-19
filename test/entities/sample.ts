@@ -67,6 +67,7 @@ export const sampleModel_1: PublicSampleModel = {
     ctd_station_id: null,
     ctd_file_extension: null,
     ctd_import_date: null,
+    nb_vignettes: 0,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -135,6 +136,7 @@ export const sampleModel_2: PublicSampleModel =
     ctd_station_id: null,
     ctd_file_extension: null,
     ctd_import_date: null,
+    nb_vignettes: 0,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {
@@ -226,5 +228,6 @@ export const sampleRequestCreationModel_1: SampleRequestCreationModel = {
     instrument_settings_acq_exposure: 0,
     visual_qc_validator_user_id: 1,
     sample_type_id: 1,
-    project_id: 6
+    project_id: 6,
+    nb_vignettes: 0
 }

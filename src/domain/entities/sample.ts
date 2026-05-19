@@ -43,9 +43,11 @@ export interface SampleRequestCreationModel {
     instrument_settings_vignettes_minimum_size_pixels: number | undefined;   // Vignettes minimum size in pixels
     instrument_settings_particle_minimum_size_esd: number | undefined;      // Particle minimum size in esd
     instrument_settings_vignettes_minimum_size_esd: number | undefined;      // Vignettes minimum size in esd
-    instrument_settings_acq_shutter: number | undefined;                     // Acquisition shutter
-    instrument_settings_acq_shutter_speed: number | undefined;               // Acquisition shutter speed (in seconds or relevant unit)
-    instrument_settings_acq_exposure: number | undefined;                    // Acquisition exposure (in seconds or relevant unit)
+    instrument_settings_acq_shutter?: number | undefined;                     // Acquisition shutter
+    instrument_settings_acq_shutter_speed?: number | undefined;               // Acquisition shutter speed (in seconds or relevant unit)
+    instrument_settings_acq_exposure?: number | undefined;                    // Acquisition exposure (in seconds or relevant unit)
+
+    nb_vignettes: number;                                   // Number of vignettes at import time
 
     visual_qc_validator_user_id: number;                    // Quality check validator user identifier
     sample_type_id: number;                                 // Sample type depth or time
@@ -68,6 +70,8 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
     ctd_station_id: string | null;           // CTD station identifier (from sample station_id at import time)
     ctd_file_extension: string | null;       // CTD file extension (e.g. 'ctd')
     ctd_import_date: string | null;          // CTD import date in ISO format
+
+    nb_vignettes: number;                    // Number of vignettes at import time
 
 }
 export interface PublicSampleModel extends PrivateSampleModel {
