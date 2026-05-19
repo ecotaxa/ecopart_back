@@ -1546,7 +1546,8 @@ export class SampleRepositoryImpl implements SampleRepository {
         const options: PreparedSearchOptions = {
             filter: [
                 { field: 'project_id', operator: '=', value: project_id },
-                { field: 'ecotaxa_sample_imported', operator: '=', value: 0 }
+                { field: 'ecotaxa_sample_imported', operator: '=', value: 0 },
+                { field: 'nb_vignettes', operator: '>', value: 0 }
             ],
             sort_by: [
 
