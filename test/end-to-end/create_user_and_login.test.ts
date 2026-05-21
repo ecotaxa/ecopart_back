@@ -230,7 +230,7 @@ describe("End-to-end: Create user, validate, login, link ecotaxa account", () =>
             new ListImportableEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
             new DeleteEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
-            new SearchEcoTaxaSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new SearchEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo),
             new ListImportableCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
             new ImportCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo),
             new ListImportedCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
