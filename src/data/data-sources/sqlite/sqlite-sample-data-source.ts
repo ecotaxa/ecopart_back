@@ -278,12 +278,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         params_filtering.push(...filter.value)
                     }
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += `sample.` + filter.field + ` = 1`;
-                }
-                else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += `sample.` + filter.field + ` = 0`;
+                // If value is a boolean (or its string form), bind as 1/0 — preserves operator
+                else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    const bool_val = (filter.value === true || filter.value === "true") ? 1 : 0;
+                    filtering_sql += `sample.` + filter.field + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push(bool_val);
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
@@ -445,10 +444,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         filtering_sql += `sample.` + filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `;
                         params_filtering.push(...filter.value);
                     }
-                } else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += `sample.` + filter.field + ` = 1`;
-                } else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += `sample.` + filter.field + ` = 0`;
+                } else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    const bool_val = (filter.value === true || filter.value === "true") ? 1 : 0;
+                    filtering_sql += `sample.` + filter.field + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push(bool_val);
                 } else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
                         filtering_sql += `sample.` + filter.field + ` IS NULL`;
