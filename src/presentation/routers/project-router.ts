@@ -8,6 +8,7 @@ import { CreateProjectUseCase } from '../../domain/interfaces/use-cases/project/
 import { DeleteProjectUseCase } from '../../domain/interfaces/use-cases/project/delete-project'
 import { UpdateProjectUseCase } from '../../domain/interfaces/use-cases/project/update-project'
 import { SearchProjectsUseCase } from '../../domain/interfaces/use-cases/project/search-project'
+import { GetProjectUseCase } from '../../domain/interfaces/use-cases/project/get-project'
 import { BackupProjectUseCase } from '../../domain/interfaces/use-cases/project/backup-project'
 import { ExportBackupedProjectUseCase } from '../../domain/interfaces/use-cases/project/export-backuped-project'
 import { ImportSamplesUseCase } from '../../domain/interfaces/use-cases/sample/import-samples'
@@ -38,6 +39,7 @@ export default function ProjectRouter(
     deleteProjectUseCase: DeleteProjectUseCase,
     updateProjectUseCase: UpdateProjectUseCase,
     searchProjectUseCase: SearchProjectsUseCase,
+    getProjectUseCase: GetProjectUseCase,
     backupProjectUseCase: BackupProjectUseCase,
     exportBackupProjectUseCase: ExportBackupedProjectUseCase,
     listImportableSamplesUseCase: ListImportableSamplesUseCase,
@@ -373,6 +375,68 @@ export default function ProjectRouter(
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa generic account not found for instance : ")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create project"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}:
+     *   get:
+     *     summary: Get project by ID
+     *     description: Returns a single project by its ID. The authenticated user must have access to the project.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID to retrieve.
+     *     responses:
+     *       200:
+     *         description: The requested project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicProjectResponse'
+     *       401:
+     *         description: Unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const project = await getProjectUseCase.execute((req as CustomRequest).token, { project_id: Number(req.params.project_id) })
+            res.status(200).send(project)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot get this project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get project"] })
         }
     })
 
@@ -1819,8 +1883,11 @@ export default function ProjectRouter(
      * @openapi
      * /projects/{project_id}/ecotaxa_samples:
      *   get:
-     *     summary: List EcoTaxa samples
-     *     description: Returns a paginated and sorted list of all EcoTaxa samples for the given project.
+     *     summary: List EcoTaxa samples with classification stats
+     *     description: |
+     *       Returns a paginated and sorted list of EcoTaxa-imported samples for the given project,
+     *       enriched with live classification counts fetched from EcoTaxa (`/api/samples/{ids}/stats`).
+     *       The EcoTaxa call is made once per page using the generic EcoPart service account.
      *     tags: [EcoTaxa Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1836,11 +1903,11 @@ export default function ProjectRouter(
      *       - $ref: '#/components/parameters/SortByParam'
      *     responses:
      *       200:
-     *         description: Paginated list of EcoTaxa samples.
+     *         description: Paginated list of EcoTaxa samples with classification counts.
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *               $ref: '#/components/schemas/EcoTaxaSampleListResponse'
      *       401:
      *         description: Invalid parameters or unauthorized.
      *         content:
@@ -1867,10 +1934,10 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      */
     // Pagined and sorted list of all samples for the given project
-    router.get('/:project_id/ecotaxa_samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
+    router.get('/:project_id/ecotaxa_samples', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
-            const project = await searchEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
-            res.status(200).send(project)
+            const result = await searchEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], parseInt(req.params.project_id));
+            res.status(200).send(result)
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
@@ -1882,134 +1949,6 @@ export default function ProjectRouter(
             else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get samples"] })
-        }
-    })
-
-    /**
-     * @openapi
-     * /projects/{project_id}/ecotaxa_samples/searches:
-     *   post:
-     *     summary: Search EcoTaxa samples
-     *     description: |
-     *       Returns a paginated, sorted, and filtered list of EcoTaxa samples for the given project.
-     *
-     *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
-     *
-     *       Supported operators:
-     *       | Operator | Value type | Description |
-     *       |----------|------------|-------------|
-     *       | `=`      | string, number, boolean | Exact match |
-     *       | `<>`     | string, number, boolean | Not equal |
-     *       | `>` `>=` `<` `<=` | number | Numeric comparison |
-     *       | `IN`     | array | Value is one of the given items |
-     *       | `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |
-     *
-     *       Use the string `"null"` as value to match NULL fields (`= "null"` → `IS NULL`, `<> "null"` → `IS NOT NULL`).
-     *
-     *       **Filterable fields:**
-     *       | Field | Type | Note |
-     *       |-------|------|------|
-     *       | `sample_id` | number | |
-     *       | `sample_name` | string | |
-     *       | `comment` | string | |
-     *       | `instrument_serial_number` | string | |
-     *       | `optional_structure_id` | string or null | |
-     *       | `max_pressure` | number | |
-     *       | `station_id` | string | |
-     *       | `sampling_date` | string (ISO date) | |
-     *       | `latitude` | number | |
-     *       | `longitude` | number | |
-     *       | `bottom_depth` | number | |
-     *       | `instrument_operator_email` | string | |
-     *       | `filename` | string | |
-     *       | `sample_creation_date` | string (ISO timestamp) | |
-     *       | `visual_qc_status_id` | number | |
-     *       | `sample_type_id` | number | |
-     *       | `ecotaxa_sample_imported` | boolean | |
-     *       | `ecotaxa_sample_import_date` | string (ISO timestamp) or null | |
-     *       | `ecotaxa_sample_id` | number or null | |
-     *       | `sample_type_label` | string | Computed — resolved to `sample_type_id` |
-     *       | `visual_qc_status_label` | string | Computed — resolved to `visual_qc_status_id` |
-     *
-     *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
-     *
-     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.
-     *     tags: [EcoTaxa Samples]
-     *     security:
-     *       - cookieAccessToken: []
-     *     parameters:
-     *       - name: project_id
-     *         in: path
-     *         required: true
-     *         schema:
-     *           type: integer
-     *         description: The project ID.
-     *       - $ref: '#/components/parameters/PageParam'
-     *       - $ref: '#/components/parameters/LimitParam'
-     *       - $ref: '#/components/parameters/SortByParam'
-     *     requestBody:
-     *       required: true
-     *       content:
-     *         application/json:
-     *           schema:
-     *             type: array
-     *             items:
-     *               $ref: '#/components/schemas/FilterSearchOptions'
-     *           example:
-     *             - field: "sample_name"
-     *               operator: "LIKE"
-     *               value: "UVPCRS002%"
-     *             - field: "sample_type_label"
-     *               operator: "IN"
-     *               value: ["Time", "Depth"]
-     *     responses:
-     *       200:
-     *         description: Paginated filtered list of EcoTaxa samples.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/SampleSearchResponse'
-     *       401:
-     *         description: Invalid parameters/filters or unauthorized.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
-     *       403:
-     *         description: User cannot be used.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
-     *       404:
-     *         description: Sample type or visual QC status not found.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
-     *       500:
-     *         description: Internal server error.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
-     */
-    // Pagined and sorted list of filtered samples for the given project
-    router.post('/:project_id/ecotaxa_samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
-        try {
-            const samples = await searchEcoTaxaSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
-            res.status(200).send(samples)
-        } catch (err) {
-            console.log(new Date().toISOString(), err)
-            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
-            else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Cannot search samples"] })
         }
     })
 

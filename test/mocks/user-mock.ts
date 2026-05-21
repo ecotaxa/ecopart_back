@@ -102,6 +102,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     api_ecotaxa_get_samples_in_project(): Promise<Array<{ sampleid: number; orig_id: string; }>> {
         throw new Error("Method not implemented for api_ecotaxa_get_samples_in_project.");
     }
+    api_ecotaxa_get_sample_stats(): Promise<Array<{ sample_id: number; used_taxa: number[]; nb_unclassified: number; nb_validated: number; nb_dubious: number; nb_predicted: number; projid: number; }>> {
+        throw new Error("Method not implemented for api_ecotaxa_get_sample_stats.");
+    }
     linkEcotaxaProjectWithTransientCredentials(): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string; }> {
         throw new Error("Method not implemented for linkEcotaxaProjectWithTransientCredentials.");
     }

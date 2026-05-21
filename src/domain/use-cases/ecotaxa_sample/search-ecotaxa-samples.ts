@@ -1,109 +1,112 @@
-import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions, SearchResult } from "../../entities/search";
+import { EcoTaxaSampleListItem } from "../../entities/sample";
+import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions } from "../../entities/search";
 import { UserUpdateModel } from "../../entities/user";
-import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { SearchRepository } from "../../interfaces/repositories/search-repository";
-import { SampleRepository } from "../../interfaces/repositories/sample-repository";
-import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
+import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
+import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { SearchRepository } from "../../interfaces/repositories/search-repository";
+import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { SearchEcoTaxaSamplesUseCase } from "../../interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
-import { PublicSampleModel } from "../../entities/sample";
 
 export class SearchEcoTaxaSamples implements SearchEcoTaxaSamplesUseCase {
     userRepository: UserRepository
     sampleRepository: SampleRepository
-    searchRepository: SearchRepository
-    instrumentModelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
+    projectRepository: ProjectRepository
+    searchRepository: SearchRepository
+    ecotaxaAccountRepository: EcotaxaAccountRepository
 
-    constructor(userRepository: UserRepository, sampleRepository: SampleRepository, searchRepository: SearchRepository, instrumentModelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(
+        userRepository: UserRepository,
+        sampleRepository: SampleRepository,
+        privilegeRepository: PrivilegeRepository,
+        projectRepository: ProjectRepository,
+        searchRepository: SearchRepository,
+        ecotaxaAccountRepository: EcotaxaAccountRepository,
+    ) {
         this.userRepository = userRepository
         this.sampleRepository = sampleRepository
-        this.searchRepository = searchRepository
-        this.instrumentModelRepository = instrumentModelRepository
         this.privilegeRepository = privilegeRepository
+        this.projectRepository = projectRepository
+        this.searchRepository = searchRepository
+        this.ecotaxaAccountRepository = ecotaxaAccountRepository
     }
-    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id?: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
-        // not implemented yet
-        throw new Error("Not implemented yet");
-        // Ensure the current user is valid and not deleted
+
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id: number): Promise<{ items: EcoTaxaSampleListItem[], search_info: SearchInfo }> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        // Prepare search options
-        let prepared_options: PreparedSearchOptions = this.prepareSearchOptions(options, filters);
+        const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
+        if (!userIsAdmin) {
+            const userHasPrivilege = await this.privilegeRepository.isGranted({ user_id: current_user.user_id, project_id });
+            if (!userHasPrivilege) {
+                throw new Error("Logged user cannot get EcoTaxa samples for this project");
+            }
+        }
 
-        // Apply additional filters
-        prepared_options = await this.applyAdditionalFilters(current_user, prepared_options, project_id);
+        const project = await this.projectRepository.getProject({ project_id });
+        if (!project) {
+            throw new Error("Cannot find project");
+        }
+        if (project.ecotaxa_instance_id === null || project.ecotaxa_instance_id === undefined) {
+            throw new Error("Project is not linked to an EcoTaxa instance");
+        }
 
-        // Fetch samples based on prepared search options
-        const result: SearchResult<PublicSampleModel> = await this.sampleRepository.standardGetSamples(prepared_options);
-        const samples = result.items;
-
-        // Format search info
+        const prepared_options = this.prepareSearchOptions(options, filters, project_id);
+        const result = await this.sampleRepository.standardGetEcoTaxaSampleSummaries(prepared_options);
         const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, prepared_options);
 
-        return { search_info, samples };
-    }
-
-
-    // Prepares the search options by formatting filters and sort options.
-    private prepareSearchOptions(options: SearchOptions, filters: FilterSearchOptions[]): PreparedSearchOptions {
-        options.filter = filters && filters.length > 0 ? this.searchRepository.formatFilters(filters) : [];
-        if (options.sort_by) options.sort_by = this.searchRepository.formatSortBy(options.sort_by as string);
-        return options as PreparedSearchOptions;
-    }
-
-    // Applies additional filters based on specific conditions.
-    private async applyAdditionalFilters(current_user: UserUpdateModel, options: PreparedSearchOptions, project_id?: number): Promise<PreparedSearchOptions> {
-        if (options.filter.length > 0) {
-            options = await this.applySampleTypeFilter(options);
-            options = await this.applyVisualQCStatusFilter(options);
+        if (result.items.length === 0) {
+            return { items: [], search_info };
         }
-        if (project_id && typeof project_id === "number") {
-            options.filter.push({ field: "project_id", operator: "=", value: project_id });
+
+        const ecotaxa_instance = await this.ecotaxaAccountRepository.getOneEcoTaxaInstance(project.ecotaxa_instance_id);
+        if (!ecotaxa_instance) {
+            throw new Error("Ecotaxa instance not found");
         }
-        return options;
+        const generic_account = await this.ecotaxaAccountRepository.getEcotaxaGenericAccountForInstance(project.ecotaxa_instance_id);
+
+        const ecotaxa_sample_ids = result.items.map(i => i.ecotaxa_sample_id);
+        const stats = await this.ecotaxaAccountRepository.api_ecotaxa_get_sample_stats(
+            ecotaxa_instance.ecotaxa_instance_url,
+            generic_account.ecotaxa_account_token,
+            ecotaxa_sample_ids,
+        );
+        const stats_by_id = new Map(stats.map(s => [s.sample_id, s]));
+
+        const items: EcoTaxaSampleListItem[] = result.items.map(summary => {
+            const s = stats_by_id.get(summary.ecotaxa_sample_id);
+            const nb_unclassified = s?.nb_unclassified ?? 0;
+            const nb_validated = s?.nb_validated ?? 0;
+            const nb_dubious = s?.nb_dubious ?? 0;
+            const nb_predicted = s?.nb_predicted ?? 0;
+            return {
+                sample_id: summary.sample_id,
+                sample_name: summary.sample_name,
+                ecotaxa_sample_id: summary.ecotaxa_sample_id,
+                nb_objects: nb_unclassified + nb_validated + nb_dubious + nb_predicted,
+                nb_unclassified,
+                nb_validated,
+                nb_dubious,
+                nb_predicted,
+            };
+        });
+
+        return { items, search_info };
     }
 
-    // Applies the sample type filter.
-    private async applySampleTypeFilter(options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
-        const sampleTypeModelFilter = options.filter.find(f => f.field === "sample_type_label");
-        if (sampleTypeModelFilter) {
-            // Delete the sample type label filter
-            options.filter = options.filter.filter(f => f.field !== "sample_type_label");
-
-            // If filter sample type label value is a string, replace it with the sample type id
-            if (typeof sampleTypeModelFilter.value == "string") {
-                const sampleTypeModel = await this.sampleRepository.getSampleType({ sample_type_label: sampleTypeModelFilter.value });
-                // If sample type not found, throw an error
-                if (!sampleTypeModel) {
-                    throw new Error("Sample type not found");
-                }
-                // Replace the sample type label filter with the sample type id filter
-                sampleTypeModelFilter.field = "sample_type_id";
-                sampleTypeModelFilter.value = sampleTypeModel.sample_type_id;
-                // Add the new filter to the options
-                options.filter.push(sampleTypeModelFilter);
-            }
-        }
-        return options;
+    private prepareSearchOptions(options: SearchOptions, filters: FilterSearchOptions[], project_id: number): PreparedSearchOptions {
+        const formatted_filters = filters && filters.length > 0 ? this.searchRepository.formatFilters(filters) : [];
+        const sort_by = options.sort_by ? this.searchRepository.formatSortBy(options.sort_by as string) : [];
+        // Drop any caller-supplied project_id / ecotaxa_sample_imported filters: the endpoint always scopes to the path project and to imported samples.
+        const safe_filters = formatted_filters.filter(f => f.field !== "project_id" && f.field !== "ecotaxa_sample_imported");
+        safe_filters.push({ field: "project_id", operator: "=", value: project_id });
+        safe_filters.push({ field: "ecotaxa_sample_imported", operator: "=", value: true });
+        return {
+            page: options.page,
+            limit: options.limit,
+            sort_by,
+            filter: safe_filters,
+        };
     }
-    // Applies the visual QC status filter.
-    private async applyVisualQCStatusFilter(options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
-        const visualQCStatusFilter = options.filter.find(f => f.field === "visual_qc_status_label");
-        if (visualQCStatusFilter) {
-            // If filter visual QC status label value is a string, replace it with the visual QC status id
-            if (typeof visualQCStatusFilter.value == "string") {
-                const visualQCStatusModel = await this.sampleRepository.getVisualQCStatus({ visual_qc_status_label: visualQCStatusFilter.value });
-                if (!visualQCStatusModel) {
-                    throw new Error("Visual QC status not found");
-                }
-                visualQCStatusFilter.field = "visual_qc_status_id";
-                visualQCStatusFilter.value = visualQCStatusModel.visual_qc_status_id;
-                options.filter = options.filter.filter(f => f.field !== "visual_qc_status_label");
-                options.filter.push(visualQCStatusFilter);
-            }
-        }
-        return options;
-    }
-
 }

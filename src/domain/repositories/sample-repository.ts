@@ -6,7 +6,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
@@ -61,6 +61,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                 }
 
                 zipfile.readEntry();
+
+                zipfile.on('error', (err) => reject(err));
 
                 zipfile.on('entry', (entry) => {
                     if ((targetFileName && entry.fileName === targetFileName) || (filePathPattern && filePathPattern.test(entry.fileName))) {
@@ -269,13 +271,16 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async getInstrumentSettingsProcessGamma(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
-        // todo if no vignettes generated return undefined
         if (sample.comment === 'no vignettes generated') {
             return undefined;
         }
-        // else return the gamma
-        const gamma = (await this.readComputeVignettes(file_system_storage_project_folder, sample_name)).gamma;
-        return gamma;
+        try {
+            const gamma = (await this.readComputeVignettes(file_system_storage_project_folder, sample_name)).gamma;
+            return gamma;
+        } catch {
+            // No Images.zip present — treat as no vignettes
+            return undefined;
+        }
     }
 
     parseComputeVignettes(data: string): ComputeVignettesModel {
@@ -1458,6 +1463,42 @@ export class SampleRepositoryImpl implements SampleRepository {
         return updatedSampleCount;
     }
 
+    async standardGetEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {
+        const filter_params_restricted = ["sample_id", "sample_name", "project_id", "ecotaxa_sample_imported", "ecotaxa_sample_id"];
+        const sort_param_restricted = ["sample_id", "sample_name", "ecotaxa_sample_id"];
+
+        const unauthorizedParams: string[] = [];
+        options.sort_by = options.sort_by.filter(sort_by => {
+            let is_valid = true;
+            if (!sort_param_restricted.includes(sort_by.sort_by)) {
+                unauthorizedParams.push(`Unauthorized sort_by: ${sort_by.sort_by}`);
+                is_valid = false;
+            }
+            if (!this.order_by_allow_params.includes(sort_by.order_by)) {
+                unauthorizedParams.push(`Unauthorized order_by: ${sort_by.order_by}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+        options.filter = options.filter.filter(filter => {
+            let is_valid = true;
+            if (!filter_params_restricted.includes(filter.field)) {
+                unauthorizedParams.push(`Filter field: ${filter.field}`);
+                is_valid = false;
+            }
+            if (!this.filter_operator_allow_params.includes(filter.operator)) {
+                unauthorizedParams.push(`Filter operator: ${filter.operator}`);
+                is_valid = false;
+            }
+            return is_valid;
+        });
+        if (unauthorizedParams.length > 0) {
+            throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
+        }
+
+        return await this.sampleDataSource.getEcoTaxaSampleSummaries(options);
+    }
+
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
         const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported"]
@@ -1601,7 +1642,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     console.warn(`Warning: ${tsv_file_name} not found in ${zipPath}. Skipping this sample.`);
                     continue;
                 } else {
-                    new Error(`Error reading files: ${error.message}`);
+                    console.warn(`Warning: Error reading files for sample ${sample}: ${error.message}. Skipping.`);
+                    continue;
                 }
             }
         }
@@ -1646,7 +1688,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     console.warn(`Warning: ${tsv_file_name} not found in ${folderPath}/ecotaxa. Skipping this sample.`);
                     continue;
                 } else {
-                    new Error(`Error reading files: ${error.message}`);
+                    console.warn(`Warning: Error reading files for sample ${sample}: ${error.message}. Skipping.`);
+                    continue;
                 }
             }
         }

@@ -380,6 +380,23 @@ export interface SampleFromInstallConfigModel {
 
 /* Ecotaxa samples */
 
+export interface EcoTaxaSampleListItem {
+    sample_id: number;             // our internal id
+    sample_name: string;
+    ecotaxa_sample_id: number;     // EcoTaxa-side id
+    nb_objects: number;            // sum of the four classification counts
+    nb_unclassified: number;
+    nb_validated: number;
+    nb_dubious: number;
+    nb_predicted: number;
+}
+
+export interface EcoTaxaSampleSummary {
+    sample_id: number;
+    sample_name: string;
+    ecotaxa_sample_id: number;
+}
+
 export interface PublicImportableEcoTaxaSampleResponseModel {
     sample_id: number,
     sample_name: string,

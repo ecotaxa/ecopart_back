@@ -1,4 +1,4 @@
-import { MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
@@ -15,6 +15,7 @@ export interface SampleRepository {
     deleteSample(sample: SampleIdModel): Promise<number>;
     deleteSampleFromStorage(sample_name: string, project_id: number): Promise<number>;
     standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>>;
+    standardGetEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>>;
     getSampleType(sample_type: SampleTypeRequestModel): Promise<SampleTypeModel | null>;
     getVisualQCStatus(visual_qc_status: VisualQualityCheckStatusRequestModel): Promise<VisualQualityCheckStatusModel | null>;
 

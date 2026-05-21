@@ -31,6 +31,7 @@ import { CreateProject } from './domain/use-cases/project/create-project'
 import { DeleteProject } from './domain/use-cases/project/delete-project'
 import { UpdateProject } from './domain/use-cases/project/update-project'
 import { SearchProject } from './domain/use-cases/project/search-projects'
+import { GetProject } from './domain/use-cases/project/get-project'
 import { GetOneInstrumentModel } from './domain/use-cases/instrument_model/get-one-instrument_model'
 import { SearchInstrumentModels } from './domain/use-cases/instrument_model/search-instrument_model'
 import { DeleteTask } from './domain/use-cases/task/delete-task'
@@ -264,6 +265,7 @@ async function getSQLiteDS() {
         new DeleteProject(user_repo, project_repo, privilege_repo, sample_repo, ecotaxa_account_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, sample_repo, config.DATA_STORAGE_IMPORT),
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
+        new GetProject(user_repo, project_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.BASE_URL_PUBLIC),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
@@ -273,7 +275,7 @@ async function getSQLiteDS() {
         new ListImportableEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteEcoTaxaSamples(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
-        new SearchEcoTaxaSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new SearchEcoTaxaSamples(user_repo, sample_repo, privilege_repo, project_repo, search_repo, ecotaxa_account_repo),
         new ListImportableCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new ImportCTDSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo),
         new ListImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),

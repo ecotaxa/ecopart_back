@@ -1,6 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 //SampleRequestModel, SampleUpdateModel, SampleResponseModel 
-import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
+import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -38,7 +38,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             // Begin transaction
             this.db.run('BEGIN TRANSACTION', (beginErr: Error) => {
                 if (beginErr) {
-                    return reject("Failed to begin transaction:" + beginErr);
+                    return reject(new Error("Failed to begin transaction: " + beginErr));
                 }
 
                 const insertPromises = samples.map((sample) => {
@@ -89,7 +89,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
                         this.db.run(sql, params, function (err) {
                             if (err) {
-                                rejectInsert("Failed to insert sample:" + err);
+                                rejectInsert(new Error("Failed to insert sample: " + err));
                             } else {
                                 insertedIds.push(this.lastID);
                                 resolveInsert(this.lastID);
@@ -103,7 +103,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         // Commit transaction if all inserts are successful
                         this.db.run('COMMIT', (commitErr: Error) => {
                             if (commitErr) {
-                                return reject("Failed to commit transaction:" + commitErr);
+                                return reject(new Error("Failed to commit transaction: " + commitErr));
                             }
                             resolve(insertedIds);
                         });
@@ -112,9 +112,9 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         // Rollback transaction if any insert fails
                         this.db.run('ROLLBACK', (rollbackErr: Error) => {
                             if (rollbackErr) {
-                                reject("Failed to rollback transaction:" + rollbackErr);
+                                reject(new Error("Failed to rollback transaction: " + rollbackErr));
                             } else {
-                                reject("Transaction rolled back due to error:" + error);
+                                reject(new Error("Transaction rolled back due to error: " + error));
                             }
 
                         });
@@ -427,6 +427,83 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 }
             });
         })
+    }
+
+    async getEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {
+        // Focused query: only the three columns the EcoTaxa listing endpoint needs.
+        // Builds the same WHERE / ORDER BY / LIMIT-OFFSET as getAll but without joins.
+        let sql = `SELECT sample.sample_id, sample.sample_name, sample.ecotaxa_sample_id, (SELECT COUNT(*) FROM sample`;
+        const params: any[] = [];
+        let filtering_sql = "";
+        const params_filtering: any[] = [];
+
+        if (options.filter.length > 0) {
+            filtering_sql += ` WHERE `;
+            for (const filter of options.filter) {
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
+                        filtering_sql += `sample.` + filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `;
+                        params_filtering.push(...filter.value);
+                    }
+                } else if (filter.value == true || filter.value == "true") {
+                    filtering_sql += `sample.` + filter.field + ` = 1`;
+                } else if (filter.value == false || filter.value == "false") {
+                    filtering_sql += `sample.` + filter.field + ` = 0`;
+                } else if (filter.value === null || filter.value === undefined || filter.value == "null") {
+                    if (filter.operator == "=") {
+                        filtering_sql += `sample.` + filter.field + ` IS NULL`;
+                    } else if (filter.operator == "<>") {
+                        filtering_sql += `sample.` + filter.field + ` IS NOT NULL`;
+                    }
+                } else {
+                    filtering_sql += `sample.` + filter.field + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push(filter.value);
+                }
+                filtering_sql += ` AND `;
+            }
+            filtering_sql = filtering_sql.slice(0, -4);
+        }
+
+        sql += filtering_sql;
+        params.push(...params_filtering);
+
+        sql += `) AS total_count FROM sample`;
+
+        sql += filtering_sql;
+        params.push(...params_filtering);
+
+        if (options.sort_by.length > 0) {
+            sql += ` ORDER BY`;
+            for (const sort of options.sort_by) {
+                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+            }
+            sql = sql.slice(0, -1);
+        }
+
+        const page = options.page;
+        const limit = options.limit;
+        const offset = (page - 1) * limit;
+        sql += ` LIMIT (?) OFFSET (?);`;
+        params.push(limit, offset);
+
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (rows === undefined) return resolve({ items: [], total: 0 });
+                    const result: SearchResult<EcoTaxaSampleSummary> = {
+                        items: rows.map(row => ({
+                            sample_id: row.sample_id,
+                            sample_name: row.sample_name,
+                            ecotaxa_sample_id: row.ecotaxa_sample_id,
+                        })),
+                        total: rows[0]?.total_count || 0,
+                    };
+                    resolve(result);
+                }
+            });
+        });
     }
 
     // Update One Sample

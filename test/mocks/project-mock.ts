@@ -1,5 +1,5 @@
 import { ProjectRequestCreationModel, ProjectResponseModel, PublicProjectResponseModel } from "../../src/domain/entities/project";
-import { PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel } from "../../src/domain/entities/sample";
+import { EcoTaxaSampleListItem, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel } from "../../src/domain/entities/sample";
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { TaskResponseModel } from "../../src/domain/entities/task";
 import { ProjectRepository } from "../../src/domain/interfaces/repositories/project-repository"
@@ -179,7 +179,7 @@ export class MockDeleteEcoTaxaSamplesUseCase implements DeleteEcoTaxaSamplesUseC
 }
 
 export class MockSearchEcoTaxaSamplesUseCase implements SearchEcoTaxaSamplesUseCase {
-    execute(): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
+    execute(): Promise<{ items: EcoTaxaSampleListItem[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for search eco taxa samples");
     }
 }

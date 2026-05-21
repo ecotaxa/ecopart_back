@@ -1,4 +1,4 @@
-import { SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
+import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
 import { SearchResult } from "../../src/domain/entities/search";
 import { SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
 
@@ -38,6 +38,9 @@ export class MockSampleRepository implements SampleRepository {
     }
     standardGetSamples(): Promise<SearchResult<PublicSampleModel>> {
         throw new Error("Method not implemented for standardGetSamples");
+    }
+    standardGetEcoTaxaSampleSummaries(): Promise<SearchResult<EcoTaxaSampleSummary>> {
+        throw new Error("Method not implemented for standardGetEcoTaxaSampleSummaries");
     }
     getSampleType(): Promise<SampleTypeModel | null> {
         throw new Error("Method not implemented for getSampleType");

@@ -884,6 +884,21 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return samples ?? [];
     }
 
+    // Get classification stats for a set of EcoTaxa samples
+    // GET /api/samples/{sample_ids}/stats — returns one entry per sample id, with object counts by classification status
+    async api_ecotaxa_get_sample_stats(baseUrl: string, token: string, ecotaxa_sample_ids: number[]): Promise<Array<{ sample_id: number; used_taxa: number[]; nb_unclassified: number; nb_validated: number; nb_dubious: number; nb_predicted: number; projid: number; }>> {
+        if (ecotaxa_sample_ids.length === 0) return [];
+        const ids = ecotaxa_sample_ids.join(",");
+        const stats = await this.http<Array<{ sample_id: number; used_taxa: number[]; nb_unclassified: number; nb_validated: number; nb_dubious: number; nb_predicted: number; projid: number; }>>(
+            `${baseUrl}api/samples/${ids}/stats`,
+            {
+                method: "GET",
+                headers: this.JSON_HEADERS(token),
+            }
+        );
+        return stats ?? [];
+    }
+
     // Query EcoTaxa objects by sample name in a project
     // GET /api/samples/search to resolve names → numeric IDs
     // POST /api/object_set/{project_id}/query with ProjectFilters.samples
