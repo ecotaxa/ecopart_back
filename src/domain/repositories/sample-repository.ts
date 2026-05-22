@@ -838,7 +838,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             return "ctd_data_cnv";
         }
         if (instrument_model.startsWith("UVP6")) {
-            return "ctd_DATA";
+            return "CTDdata";
         }
         throw new Error(`Unknown instrument model: ${instrument_model}`);
     }
@@ -1272,13 +1272,21 @@ export class SampleRepositoryImpl implements SampleRepository {
             });
         });
 
+        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
+        // when detecting the common prefix and when extracting.
+        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
+            || name.endsWith('/.DS_Store')
+            || name === '.DS_Store'
+            || path.basename(name).startsWith('._');
+        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
+
         // Determine a common top-level directory prefix to strip
         let stripPrefix = '';
-        if (fileEntries.length > 0) {
-            const firstParts = fileEntries[0].name.split('/');
+        if (significantEntries.length > 0) {
+            const firstParts = significantEntries[0].name.split('/');
             if (firstParts.length > 1) {
                 const candidate = firstParts[0] + '/';
-                if (fileEntries.every(e => e.name.startsWith(candidate))) {
+                if (significantEntries.every(e => e.name.startsWith(candidate))) {
                     stripPrefix = candidate;
                 }
             }
@@ -1286,7 +1294,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         // Write files to destFolder with the prefix stripped
         await fsPromises.mkdir(destFolder, { recursive: true });
-        for (const entry of fileEntries) {
+        for (const entry of significantEntries) {
             const normalizedName = entry.name.startsWith(stripPrefix)
                 ? entry.name.slice(stripPrefix.length)
                 : entry.name;

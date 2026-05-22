@@ -1040,7 +1040,7 @@ export default function ProjectRouter(
      *       - One file per sample/profile
      *       - File location:
      *         - UVP5: `ctd_data_cnv` folder of the project
-     *         - UVP6: `ctd_DATA` folder of the project
+     *         - UVP6: `CTDdata` folder of the project
      *       - Filename: `<profileid>.ctd` (same `profileid` as in `*_header_*.txt`)
      *       - Separator: Tab
      *       - File encoding: Latin1
