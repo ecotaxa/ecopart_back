@@ -1,7 +1,6 @@
 import { UserUpdateModel } from "../../../entities/user";
-import { PublicSampleModel } from "../../../entities/sample";
-import { SearchResult } from "../../../entities/search";
+import { ImportedCTDSampleModel } from "../../../entities/sample";
 
 export interface ListImportedCTDSamplesUseCase {
-    execute(current_user: UserUpdateModel, project_id: number): Promise<SearchResult<PublicSampleModel>>;
+    execute(current_user: UserUpdateModel, project_id: number): Promise<ImportedCTDSampleModel[]>;
 }

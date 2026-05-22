@@ -1261,7 +1261,19 @@ export default function ProjectRouter(
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/SampleSearchResponse'
+     *               type: array
+     *               items:
+     *                 type: object
+     *                 properties:
+     *                   sample_name:
+     *                     type: string
+     *                     description: Matching EcoPart sample name.
+     *                   ctd_import_date:
+     *                     type: string
+     *                     description: CTD import date (ISO 8601).
+     *                   file_extension:
+     *                     type: string
+     *                     description: CTD file extension (e.g. "ctd").
      *       401:
      *         description: User is not allowed to list imported CTD samples.
      *         content:

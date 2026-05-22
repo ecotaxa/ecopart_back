@@ -1,6 +1,6 @@
 import { UserUpdateModel } from "../../entities/user";
-import { PublicSampleModel } from "../../entities/sample";
-import { PreparedSearchOptions, SearchResult } from "../../entities/search";
+import { ImportedCTDSampleModel } from "../../entities/sample";
+import { PreparedSearchOptions } from "../../entities/search";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
@@ -20,7 +20,7 @@ export class ListImportedCTDSamples implements ListImportedCTDSamplesUseCase {
         this.projectRepository = projectRepository;
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number): Promise<SearchResult<PublicSampleModel>> {
+    async execute(current_user: UserUpdateModel, project_id: number): Promise<ImportedCTDSampleModel[]> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.ensureUserCanGet(current_user, project_id);
 
@@ -39,7 +39,12 @@ export class ListImportedCTDSamples implements ListImportedCTDSamplesUseCase {
             limit: 10000000,
         };
 
-        return this.sampleRepository.standardGetSamples(options);
+        const result = await this.sampleRepository.standardGetSamples(options);
+        return result.items.map(sample => ({
+            sample_name: sample.sample_name,
+            ctd_import_date: sample.ctd_import_date ?? "",
+            file_extension: sample.ctd_file_extension ?? "",
+        }));
     }
 
     private async ensureUserCanGet(current_user: UserUpdateModel, project_id: number): Promise<void> {

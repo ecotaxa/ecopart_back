@@ -526,12 +526,12 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
             .get(`/projects/${capturedProjectId}/ctd_samples`)
             .set("Cookie", cookieHeader())
         expect(importedRes.status).toBe(200)
-        const importedList = Array.isArray(importedRes.body)
-            ? importedRes.body
-            : (importedRes.body.samples || importedRes.body.items || [])
-        const importedNames: string[] = importedList.map((s: any) => s.sample_name || s)
+        const importedList = importedRes.body as { sample_name: string; ctd_import_date: string; file_extension: string }[]
         for (const name of ALL_SAMPLES) {
-            expect(importedNames).toContain(name)
+            const entry = importedList.find(s => s.sample_name === name)
+            expect(entry).toBeDefined()
+            expect(entry!.file_extension).toBe("ctd")
+            expect(entry!.ctd_import_date).toMatch(/\d{4}-\d{2}-\d{2}T/)
         }
     })
 

@@ -197,7 +197,7 @@ export class MockImportCTDSamplesUseCase implements ImportCTDSamplesUseCase {
 }
 
 export class MockListImportedCTDSamplesUseCase implements ListImportedCTDSamplesUseCase {
-    execute(): Promise<SearchResult<PublicSampleModel>> {
+    execute(): Promise<import("../../src/domain/entities/sample").ImportedCTDSampleModel[]> {
         throw new Error("Method not implemented for list imported CTD samples");
     }
 }
