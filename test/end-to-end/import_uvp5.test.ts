@@ -510,9 +510,11 @@ describe("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without ima
             .set("Cookie", cookieHeader())
 
         expect(listRes.status).toBe(200)
-        const importableCtd = listRes.body as string[]
+        const importableCtd = listRes.body as { sample_name: string; file_extension: string }[]
         for (const name of ALL_SAMPLES) {
-            expect(importableCtd).toContain(name)
+            const entry = importableCtd.find(e => e.sample_name === name)
+            expect(entry).toBeDefined()
+            expect(entry!.file_extension).toBe("ctd")
         }
 
         const importRes = await request(server)

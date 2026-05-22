@@ -1079,13 +1079,20 @@ export default function ProjectRouter(
      *         description: The project ID.
      *     responses:
      *       200:
-     *         description: List of importable CTD sample names.
+     *         description: List of importable CTD samples (one entry per matching .ctd file).
      *         content:
      *           application/json:
      *             schema:
      *               type: array
      *               items:
-     *                 type: string
+     *                 type: object
+     *                 properties:
+     *                   sample_name:
+     *                     type: string
+     *                     description: Matching EcoPart sample name.
+     *                   file_extension:
+     *                     type: string
+     *                     description: CTD file extension (e.g. "ctd").
      *       401:
      *         description: Not authorized for this project.
      *         content:
