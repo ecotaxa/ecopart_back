@@ -161,6 +161,11 @@ export interface SampleRequestModel {
     ctd_import_date?: string | null;                            // CTD import date in ISO format
 }
 
+export interface ImportableCTDSampleModel {
+    sample_name: string;        // Matching EcoPart sample name
+    file_extension: string;     // CTD file extension (e.g. "ctd")
+}
+
 export interface MinimalSampleRequestModel {
     sample_id?: number;                         // Sample internal identifier
     sample_name?: string;                       // Sample name

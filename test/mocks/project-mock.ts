@@ -185,7 +185,7 @@ export class MockSearchEcoTaxaSamplesUseCase implements SearchEcoTaxaSamplesUseC
 }
 
 export class MockListImportableCTDSamplesUseCase implements ListImportableCTDSamplesUseCase {
-    execute(): Promise<string[]> {
+    execute(): Promise<import("../../src/domain/entities/sample").ImportableCTDSampleModel[]> {
         throw new Error("Method not implemented for list importable CTD samples");
     }
 }

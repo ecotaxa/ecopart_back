@@ -6,7 +6,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
@@ -882,7 +882,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return true;
     }
 
-    async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<string[]> {
+    async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
 
@@ -904,14 +904,15 @@ export class SampleRepositoryImpl implements SampleRepository {
         );
 
         const ctd_files = await fsPromises.readdir(ctd_folder_path);
-        const importable_samples: string[] = [];
+        const importable_samples: ImportableCTDSampleModel[] = [];
 
         for (const file_name of ctd_files) {
-            if (path.extname(file_name).toLowerCase() !== ".ctd") {
+            const file_extension = path.extname(file_name).replace(/^\./, "");
+            if (file_extension.toLowerCase() !== "ctd") {
                 continue;
             }
 
-            const sample_name = path.basename(file_name, ".ctd");
+            const sample_name = path.basename(file_name, `.${file_extension}`);
             const sample_info = imported_samples_by_name.get(sample_name);
 
             // Criterion 1: the EcoPart sample with the same name must already be imported.
@@ -928,7 +929,10 @@ export class SampleRepositoryImpl implements SampleRepository {
             const file_path = path.join(ctd_folder_path, file_name);
             const valid_file = await this.isValidCTDFile(file_path, sample_info.sample_type_label);
             if (valid_file) {
-                importable_samples.push(sample_name);
+                importable_samples.push({
+                    sample_name,
+                    file_extension,
+                });
             }
         }
 

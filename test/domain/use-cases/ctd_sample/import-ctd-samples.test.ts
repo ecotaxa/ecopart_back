@@ -167,7 +167,10 @@ describe("Import CTD Samples Use Case", () => {
             jest.spyOn(mockTaskRepository, "createTask").mockResolvedValue(42);
             jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(task);
             jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue(undefined);
-            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue(["sample_a", "sample_b"]);
+            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue([
+                { sample_name: "sample_a", file_extension: "ctd" },
+                { sample_name: "sample_b", file_extension: "ctd" },
+            ]);
             jest.spyOn(mockSampleRepository, "importCTDSamples").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue(undefined);
@@ -194,7 +197,9 @@ describe("Import CTD Samples Use Case", () => {
             jest.spyOn(mockTaskRepository, "createTask").mockResolvedValue(99);
             jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(task);
             jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue(undefined);
-            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue(["sample_a"]);
+            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue([
+                { sample_name: "sample_a", file_extension: "ctd" },
+            ]);
             jest.spyOn(mockSampleRepository, "importCTDSamples").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue(undefined);

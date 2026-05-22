@@ -57,7 +57,7 @@ export class MockSampleRepository implements SampleRepository {
     createManyEcoTaxaSamples(): Promise<number> {
         throw new Error("Method not implemented for createManyEcoTaxaSamples");
     }
-    listImportableCTDSamples(): Promise<string[]> {
+    listImportableCTDSamples(): Promise<import("../../src/domain/entities/sample").ImportableCTDSampleModel[]> {
         throw new Error("Method not implemented for listImportableCTDSamples");
     }
     importCTDSamples(): Promise<void> {

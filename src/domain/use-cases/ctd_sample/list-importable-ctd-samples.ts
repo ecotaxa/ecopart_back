@@ -6,6 +6,7 @@ import { UserRepository } from "../../interfaces/repositories/user-repository";
 
 import { ListImportableCTDSamplesUseCase } from "../../interfaces/use-cases/ctd_sample/list-importable-ctd-samples";
 import { ProjectResponseModel } from "../../entities/project";
+import { ImportableCTDSampleModel } from "../../entities/sample";
 
 export class ListImportableCTDSamples implements ListImportableCTDSamplesUseCase {
     sampleRepository: SampleRepository;
@@ -20,7 +21,7 @@ export class ListImportableCTDSamples implements ListImportableCTDSamplesUseCase
         this.projectRepository = projectRepository;
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number): Promise<string[]> {
+    async execute(current_user: UserUpdateModel, project_id: number): Promise<ImportableCTDSampleModel[]> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.ensureUserCanGet(current_user, project_id);
 

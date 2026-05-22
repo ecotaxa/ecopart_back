@@ -1,4 +1,4 @@
-import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
@@ -28,7 +28,7 @@ export interface SampleRepository {
     createManyEcoTaxaSamples(samples: SampleUpdateModel[]): Promise<number>;
 
     // CTD-specific methods
-    listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<string[]>;
+    listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]>;
     importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void>;
     deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void>;
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;

@@ -117,7 +117,11 @@ describe("List importable CTD samples Use Case", () => {
 
         test("should return list of importable CTD samples — granted member access", async () => {
             const current_user: UserUpdateModel = { user_id: 2 };
-            const ctd_samples = ["sample_a", "sample_b", "sample_c"];
+            const ctd_samples = [
+                { sample_name: "sample_a", file_extension: "ctd" },
+                { sample_name: "sample_b", file_extension: "ctd" },
+                { sample_name: "sample_c", file_extension: "ctd" },
+            ];
 
             jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve());
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false));
