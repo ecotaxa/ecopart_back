@@ -2288,6 +2288,78 @@
         }
       }
     },
+    "/exports/raw": {
+      "post": {
+        "summary": "Export raw data for a list of samples (possibly across multiple projects)",
+        "description": "Creates an asynchronous task that bundles the requested raw artifacts for the given samples into a single ZIP.\nSupported export types (one or more): `metadata` (projects + samples CSV), `lpm` (particle raw files as imported,\ndifferent files for UVP5 vs UVP6), `ctd` (CTD files as imported), `ecotaxa` (EcoTaxa general export TSV via\nEcoTaxa's `/object_set/{id}/export/general` API). When `ecotaxa` is selected, `ecotaxa_exclude_not_living=true`\nrestricts the EcoTaxa export to descendants of the biota taxon (taxo=1, taxochild=Y).\n\nThe endpoint returns the created task immediately; the resulting ZIP is downloadable at\n`/api/tasks/{task_id}/file` once the task reaches the `DONE` status.\n",
+        "tags": [
+          "Exports"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sample_ids",
+                  "export_types"
+                ],
+                "properties": {
+                  "sample_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "export_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "metadata",
+                        "lpm",
+                        "ctd",
+                        "ecotaxa"
+                      ]
+                    }
+                  },
+                  "ecotaxa_exclude_not_living": {
+                    "type": "boolean",
+                    "description": "Required only when \"ecotaxa\" is included in export_types."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task created. Poll the task and download the file once done."
+          },
+          "401": {
+            "description": "User not authorized for one of the projects."
+          },
+          "403": {
+            "description": "User cannot be used."
+          },
+          "404": {
+            "description": "Sample or project not found."
+          },
+          "422": {
+            "description": "Validation error."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
     "/file_system/import_folders": {
       "get": {
         "summary": "List import folders",
