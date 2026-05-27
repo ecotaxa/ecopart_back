@@ -961,7 +961,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         );
     }
 
-    // Export EcoTaxa objects via /object_set/{project_id}/export/general.
+    // Export EcoTaxa objects via /object_set/export/general (project_id goes in the body).
     // When exclude_not_living=true, scope the export to descendants of biota
     // (taxo=ECOTAXA_BIOTA_TAXO_ID + taxochild=Y) so only living organisms are returned.
     // Downloads the produced file (TSV/zip) to dest_file_path.
@@ -994,7 +994,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             throw new Error(`No EcoTaxa samples found in project ${ecotaxa_project_id} matching: ${sample_names.join(", ")}`);
         }
 
-        // Build the filters & request body for /object_set/{project_id}/export/general
+        // Build the filters & request body for /object_set/export/general
         const filters: { [key: string]: string } = { samples: sampleIds.join(",") };
         if (exclude_not_living) {
             filters.taxo = `${ECOTAXA_BIOTA_TAXO_ID}`;
@@ -1004,25 +1004,24 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             filters,
             request: {
                 project_id: ecotaxa_project_id,
-                exp_type: "TSV",
-                use_latin1: false,
-                tsv_entities: "OPASH",
                 split_by: "none",
-                coma_as_separator: false,
-                format_dates_times: false,
-                with_images: false,
+                with_images: "none",
                 with_internal_ids: false,
-                only_first_image: false,
-                sum_subtotal: "none",
+                with_types_row: false,
+                only_annotations: false,
                 out_to_ftp: false,
             }
         };
 
-        const startResp = await this.http<{ job_id: number | string }>(
-            `${baseUrl}api/object_set/${ecotaxa_project_id}/export/general`,
+        const startResp = await this.http<{ job_id: number | string; errors?: string[] }>(
+            `${baseUrl}api/object_set/export/general`,
             { method: "POST", headers: this.JSON_HEADERS(token), body: JSON.stringify(body) }
         );
+        if (startResp.errors && startResp.errors.length > 0) {
+            throw new Error(`EcoTaxa export rejected: ${startResp.errors.join("; ")}`);
+        }
         const job_id = startResp.job_id;
+        if (!job_id) throw new Error("EcoTaxa export did not return a job id");
 
         // Poll until the export job is done
         await this.pollJobUntilDone(baseUrl, token, job_id, { intervalMs: 2500, maxMinutes: 30 });
