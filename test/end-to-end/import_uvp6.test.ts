@@ -17,6 +17,7 @@ import sqlite3 from 'sqlite3'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
+import yauzl from 'yauzl'
 
 import { MiddlewareAuthCookie } from '../../src/presentation/middleware/auth-cookie'
 import { MiddlewareAuthValidation } from '../../src/presentation/middleware/auth-validation'
@@ -27,9 +28,11 @@ import AuthRouter from '../../src/presentation/routers/auth-router'
 import ProjectRouter from '../../src/presentation/routers/project-router'
 import TaskRouter from '../../src/presentation/routers/tasks-router'
 import EcoTaxaInstanceRouter from '../../src/presentation/routers/ecotaxa_instance-router'
+import ExportRouter from '../../src/presentation/routers/export-router'
 import { MiddlewareProjectValidation } from '../../src/presentation/middleware/project-validation'
 import { MiddlewareSampleValidation } from '../../src/presentation/middleware/sample-validation'
 import { MiddlewareTaskValidation } from '../../src/presentation/middleware/task-validation'
+import { MiddlewareExportValidation } from '../../src/presentation/middleware/export-validation'
 
 import { SearchUsers } from '../../src/domain/use-cases/user/search-users'
 import { CreateUser } from '../../src/domain/use-cases/user/create-user'
@@ -53,6 +56,7 @@ import { GetProject } from '../../src/domain/use-cases/project/get-project'
 import { MigrateEcotaxaProject } from '../../src/domain/use-cases/project/migrate-ecotaxa-project'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
+import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
 import { ListImportableSamples } from '../../src/domain/use-cases/sample/list-importable-samples'
 import { ImportSamples } from '../../src/domain/use-cases/sample/import-samples'
 import { DeleteSample } from '../../src/domain/use-cases/sample/delete-sample'
@@ -136,6 +140,23 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
     const testProjectAcronym = `UVP6E2E_${testRunId}`
 
     const cookieHeader = () => loginCookies.map((c: string) => c.split(";")[0]).join("; ")
+
+    // List the entry names (files only) contained in a ZIP file on disk.
+    function listZipEntries(zipPath: string): Promise<string[]> {
+        return new Promise((resolve, reject) => {
+            const entries: string[] = []
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) return reject(err || new Error("Failed to open zip"))
+                zipfile.readEntry()
+                zipfile.on("entry", (entry) => {
+                    if (!/\/$/.test(entry.fileName)) entries.push(entry.fileName)
+                    zipfile.readEntry()
+                })
+                zipfile.on("end", () => resolve(entries))
+                zipfile.on("error", reject)
+            })
+        })
+    }
 
     async function pollTaskUntilDone(taskId: number, intervalMs = 2000, maxMs = 180000): Promise<any> {
         const start = Date.now()
@@ -283,11 +304,18 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
             new CreateEcoTaxaInstance(userRepo, ecotaxaAccountRepo)
         )
 
+        const exportMiddleware = ExportRouter(
+            new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
+            new MiddlewareExportValidation(),
+            new ExportRawData(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo, ecotaxaAccountRepo, relTmpDir, "http://localhost:0"),
+        )
+
         server.use("/users", userMiddleware)
         server.use("/auth", authMiddleware)
         server.use("/projects", projectMiddleware)
         server.use("/tasks", taskMiddleware)
         server.use("/ecotaxa_instances", ecotaxaInstanceMiddleware)
+        server.use("/exports", exportMiddleware)
     })
 
     afterAll(async () => {
@@ -579,5 +607,75 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
             expect(s).toBeDefined()
             expect(s.ecotaxa_sample_imported).toBeTruthy()
         }
+    })
+
+    // ─── Phase 9: Export raw data (metadata + LPM + CTD + EcoTaxa) ───────
+    test("POST /exports/raw should export all types for the imported samples into one ZIP", async () => {
+        // Resolve the sample ids of the just-imported samples.
+        const samplesRes = await request(server)
+            .get(`/projects/${capturedProjectId}/samples/?page=1&limit=20`)
+            .set("Cookie", cookieHeader())
+        expect(samplesRes.status).toBe(200)
+        const sample_ids: number[] = samplesRes.body.samples.map((s: any) => s.sample_id)
+        expect(sample_ids.length).toBe(ALL_SAMPLES.length)
+
+        // Missing ecotaxa_exclude_not_living while requesting ecotaxa must be rejected.
+        const invalidRes = await request(server)
+            .post("/exports/raw")
+            .set("Cookie", cookieHeader())
+            .send({ sample_ids, export_types: ["ecotaxa"] })
+        expect(invalidRes.status).toBe(422)
+
+        // Full export: all four types in a single ZIP, living-only EcoTaxa objects.
+        const exportRes = await request(server)
+            .post("/exports/raw")
+            .set("Cookie", cookieHeader())
+            .send({
+                sample_ids,
+                export_types: ["metadata", "lpm", "ctd", "ecotaxa"],
+                ecotaxa_exclude_not_living: true,
+            })
+        expect(exportRes.status).toBe(200)
+        const exportTaskId = exportRes.body.task_id
+        expect(exportTaskId).toBeDefined()
+
+        const taskResult = await pollTaskUntilDone(exportTaskId, 3000, 360000)
+        expect(taskResult.task_status).toBe("DONE")
+
+        // Download the produced ZIP and inspect its structure.
+        const downloadRes = await request(server)
+            .get(`/tasks/${exportTaskId}/file`)
+            .set("Cookie", cookieHeader())
+            .buffer(true)
+            .parse((res, callback) => {
+                const chunks: Buffer[] = []
+                res.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
+                res.on("end", () => callback(null, Buffer.concat(chunks)))
+            })
+        expect(downloadRes.status).toBe(200)
+
+        const zipPath = path.join(tmpDir, `export_${exportTaskId}.zip`)
+        fs.writeFileSync(zipPath, downloadRes.body as Buffer)
+        const entries = await listZipEntries(zipPath)
+
+        // Metadata: projects.csv + samples.csv
+        expect(entries).toContain("metadata/projects.csv")
+        expect(entries).toContain("metadata/samples.csv")
+
+        // LPM: UVP6 raw Particule zip per sample (Images zip only for sample with images)
+        for (const name of ALL_SAMPLES) {
+            expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Particule.zip`)
+        }
+        for (const name of SAMPLES_WITH_IMAGES) {
+            expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Images.zip`)
+        }
+
+        // CTD: one file per imported sample, as imported (.ctd)
+        for (const name of ALL_SAMPLES) {
+            expect(entries).toContain(`ctd/${capturedProjectId}/${name}.ctd`)
+        }
+
+        // EcoTaxa: one export file for the linked project
+        expect(entries.some(e => e.startsWith(`ecotaxa/${capturedProjectId}/`))).toBe(true)
     })
 })
