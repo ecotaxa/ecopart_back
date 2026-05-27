@@ -171,6 +171,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     createEcoTaxaInstance(): Promise<number> {
         throw new Error("Method not implemented for createEcoTaxaInstance.");
     }
+    exportObjectSetGeneral(): Promise<void> {
+        throw new Error("Method not implemented for exportObjectSetGeneral.");
+    }
 }
 export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     create(): Promise<number> {

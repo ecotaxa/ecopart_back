@@ -6,8 +6,11 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { UserUpdateModel } from "../entities/user";
 
 import path from 'path';
+import * as fsPromises from 'fs/promises';
 import fetch, { FormData, fileFromSync, RequestInfo, RequestInit } from "node-fetch";
 import https from "https";
+
+import { ECOTAXA_BIOTA_TAXO_ID } from "../constants/ecotaxa-living-taxo";
 
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -956,6 +959,86 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
                 headers: this.JSON_HEADERS(token),
             }
         );
+    }
+
+    // Export EcoTaxa objects via /object_set/{project_id}/export/general.
+    // When exclude_not_living=true, scope the export to descendants of biota
+    // (taxo=ECOTAXA_BIOTA_TAXO_ID + taxochild=Y) so only living organisms are returned.
+    // Downloads the produced file (TSV/zip) to dest_file_path.
+    async exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string): Promise<void> {
+        const ecotaxa_instance_id = project.ecotaxa_instance_id as number;
+        const ecotaxa_project_id = project.ecotaxa_project_id as number;
+        if (!ecotaxa_project_id) throw new Error("No linked EcoTaxa project");
+        if (!sample_names || sample_names.length === 0) throw new Error("No sample names provided for EcoTaxa export");
+
+        const ecotaxa_instance = await this.getOneEcoTaxaInstance(ecotaxa_instance_id);
+        if (!ecotaxa_instance) throw new Error("Ecotaxa instance not found");
+        const baseUrl = ecotaxa_instance.ecotaxa_instance_url;
+
+        const ecotaxa_account = await this.getEcotaxaGenericAccountForInstance(ecotaxa_instance_id);
+        if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
+        const token = ecotaxa_account.ecotaxa_account_token;
+
+        // Resolve sample names → EcoTaxa numeric sample ids
+        const sampleIds: number[] = [];
+        for (const name of sample_names) {
+            const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
+                `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
+                { method: "GET", headers: this.JSON_HEADERS(token) }
+            );
+            for (const s of samples) {
+                if (s.orig_id === name) sampleIds.push(s.sampleid);
+            }
+        }
+        if (sampleIds.length === 0) {
+            throw new Error(`No EcoTaxa samples found in project ${ecotaxa_project_id} matching: ${sample_names.join(", ")}`);
+        }
+
+        // Build the filters & request body for /object_set/{project_id}/export/general
+        const filters: { [key: string]: string } = { samples: sampleIds.join(",") };
+        if (exclude_not_living) {
+            filters.taxo = `${ECOTAXA_BIOTA_TAXO_ID}`;
+            filters.taxochild = "Y";
+        }
+        const body = {
+            filters,
+            request: {
+                project_id: ecotaxa_project_id,
+                exp_type: "TSV",
+                use_latin1: false,
+                tsv_entities: "OPASH",
+                split_by: "none",
+                coma_as_separator: false,
+                format_dates_times: false,
+                with_images: false,
+                with_internal_ids: false,
+                only_first_image: false,
+                sum_subtotal: "none",
+                out_to_ftp: false,
+            }
+        };
+
+        const startResp = await this.http<{ job_id: number | string }>(
+            `${baseUrl}api/object_set/${ecotaxa_project_id}/export/general`,
+            { method: "POST", headers: this.JSON_HEADERS(token), body: JSON.stringify(body) }
+        );
+        const job_id = startResp.job_id;
+
+        // Poll until the export job is done
+        await this.pollJobUntilDone(baseUrl, token, job_id, { intervalMs: 2500, maxMinutes: 30 });
+
+        // Download the produced file
+        const fileResp = await this.fetchWithAgent(`${baseUrl}api/jobs/${job_id}/file`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!fileResp.ok) {
+            const txt = await fileResp.text().catch(() => "");
+            throw new Error(`Failed to download EcoTaxa export file for job ${job_id}: HTTP ${fileResp.status} - ${txt}`);
+        }
+        await fsPromises.mkdir(path.dirname(dest_file_path), { recursive: true });
+        const buffer = Buffer.from(await fileResp.arrayBuffer());
+        await fsPromises.writeFile(dest_file_path, buffer);
     }
 
 }

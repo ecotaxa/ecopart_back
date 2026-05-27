@@ -29,4 +29,5 @@ export interface EcotaxaAccountRepository {
     ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void>;
     ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void>;
     getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel>;
+    exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string): Promise<void>;
 }

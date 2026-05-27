@@ -27,6 +27,11 @@ export interface SampleRepository {
     // standardGetEcoTaxaSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>>;
     createManyEcoTaxaSamples(samples: SampleUpdateModel[]): Promise<number>;
 
+    // Raw-data export helpers
+    getSamplesByIds(sample_ids: number[]): Promise<PublicSampleModel[]>;
+    listLpmRawFilesForSample(instrument_model: string, project_id: number, sample_name: string): Promise<string[]>;
+    getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string;
+
     // CTD-specific methods
     listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]>;
     importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void>;

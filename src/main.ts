@@ -8,6 +8,7 @@ import { MiddlewareProjectValidation } from './presentation/middleware/project-v
 import { MiddlewareSampleValidation } from './presentation/middleware/sample-validation'
 import { MiddlewareInstrumentModelValidation } from './presentation/middleware/instrument_model-validation'
 import { MiddlewareTaskValidation } from './presentation/middleware/task-validation'
+import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -16,6 +17,7 @@ import ProjectRouter from './presentation/routers/project-router'
 import TaskRouter from './presentation/routers/tasks-router'
 import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
 import FileSystemRouter from './presentation/routers/file_system-router'
+import ExportRouter from './presentation/routers/export-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -75,6 +77,7 @@ import { SampleRepositoryImpl } from './domain/repositories/sample-repository'
 import { TaskRepositoryImpl } from './domain/repositories/task-repository'
 import { BackupProject } from './domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
+import { ExportRawData } from './domain/use-cases/export/export-raw-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 
 
@@ -308,6 +311,11 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new ListImportFolders(config.DATA_STORAGE_IMPORT),
         new GetImportFolderMetadata(config.DATA_STORAGE_IMPORT, user_repo)
+    ))
+    server.use("/exports", ExportRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareExportValidation(),
+        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FOLDER, config.BASE_URL_PUBLIC),
     ))
 
 

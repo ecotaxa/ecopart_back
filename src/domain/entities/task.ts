@@ -16,6 +16,7 @@ export enum TaskType {
     Export_Backup = "EXPORT_BACKUP",
     Import_CTD = "IMPORT_CTD",
     Import_EcoTaxa = "IMPORT_ECO_TAXA",
+    Export_Raw = "EXPORT_RAW",
 }
 
 export enum TaskAction {

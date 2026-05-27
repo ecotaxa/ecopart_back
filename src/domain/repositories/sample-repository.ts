@@ -1511,6 +1511,47 @@ export class SampleRepositoryImpl implements SampleRepository {
         return await this.sampleDataSource.getEcoTaxaSampleSummaries(options);
     }
 
+    async getSamplesByIds(sample_ids: number[]): Promise<PublicSampleModel[]> {
+        if (!sample_ids || sample_ids.length === 0) return [];
+        const options: PreparedSearchOptions = {
+            filter: [{ field: "sample_id", operator: "IN", value: sample_ids }],
+            sort_by: [],
+            page: 1,
+            limit: sample_ids.length
+        };
+        const result = await this.sampleDataSource.getAll(options);
+        return result.items;
+    }
+
+    // Returns absolute paths of raw LPM artifacts stored per sample after import.
+    // Layout differs between UVP5 (work + meta_conf zips) and UVP6 (Particule [+ Images] zips).
+    async listLpmRawFilesForSample(instrument_model: string, project_id: number, sample_name: string): Promise<string[]> {
+        const sample_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name);
+        let candidates: string[];
+        if (instrument_model.startsWith("UVP5")) {
+            candidates = [`${sample_name}_work.zip`, `${sample_name}_meta_conf.zip`];
+        } else {
+            // UVP6 (LP/HF/MHP/MHF) — Particule is mandatory, Images optional
+            candidates = [`${sample_name}_Particule.zip`, `${sample_name}_Images.zip`];
+        }
+        const present: string[] = [];
+        for (const file_name of candidates) {
+            const abs = path.join(sample_folder, file_name);
+            try {
+                await fsPromises.access(abs);
+                present.push(abs);
+            } catch {
+                // missing file — silently skipped (Images.zip is optional, missing Particule is reported by caller)
+            }
+        }
+        return present;
+    }
+
+    getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string {
+        const extension = ctd_file_extension && ctd_file_extension.length > 0 ? ctd_file_extension : "ctd";
+        return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}.${extension}`);
+    }
+
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
         const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported"]

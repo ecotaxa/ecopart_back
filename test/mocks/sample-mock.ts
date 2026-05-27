@@ -69,6 +69,15 @@ export class MockSampleRepository implements SampleRepository {
     standardUpdateManySamples(): Promise<number> {
         throw new Error("Method not implemented for standardUpdateManySamples");
     }
+    getSamplesByIds(): Promise<PublicSampleModel[]> {
+        throw new Error("Method not implemented for getSamplesByIds");
+    }
+    listLpmRawFilesForSample(): Promise<string[]> {
+        throw new Error("Method not implemented for listLpmRawFilesForSample");
+    }
+    getCTDFileAbsolutePath(): string {
+        throw new Error("Method not implemented for getCTDFileAbsolutePath");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase
