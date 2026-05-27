@@ -351,5 +351,37 @@ describe("Search Task Use Case", () => {
             expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(1)
             expect(mockSearchRepository.formatSearchInfo).toBeCalledTimes(1)
         });
+        test("large limit (front \"All\" option) is passed through unchanged and total is preserved", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            // Front "All": page stays 1, limit is the previously returned search_info.total
+            // (a real integer, not a -1/0 sentinel).
+            const largeLimit = 3742;
+            const options: SearchOptions = {
+                page: 1,
+                limit: largeLimit,
+                sort_by: "asc(sample_id)"
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockSearchRepository, "formatFilters")
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [{ sort_by: "sample_id", order_by: "asc" }])
+            jest.spyOn(mockSampleRepository, "getSampleType")
+            jest.spyOn(mockSampleRepository, "getVisualQCStatus")
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: largeLimit, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: largeLimit, limit: largeLimit, total_on_page: 1, page: 1, pages: 1 }));
+
+            const result = await searchSamplesUseCase.execute(current_user, options, [])
+
+            // Response shape unchanged: { search_info, samples } and total stays correct.
+            expect(result).toEqual({ search_info: { total: largeLimit, limit: largeLimit, total_on_page: 1, page: 1, pages: 1 }, samples: [sampleModel_1] })
+
+            // The large limit is forwarded to the datasource untouched (no silent cap).
+            expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(1)
+            const passedOptions = (mockSampleRepository.standardGetSamples as jest.Mock).mock.calls[0][0]
+            expect(passedOptions.limit).toEqual(largeLimit)
+            expect(passedOptions.page).toEqual(1)
+        });
     });
 });

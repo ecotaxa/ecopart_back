@@ -226,6 +226,21 @@ describe('SQLiteProjectDataSource', () => {
             expect(getAllOutput.total).toEqual(1);
             expect(getAllOutput.items.length).toEqual(1);
         });
+        test('should return every row when limit is very large (front "All" option) and keep total correct', async () => {
+            // Baseline: how many rows actually match (no pagination guess).
+            const baseline = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [] });
+
+            // Mirror the front "All" behaviour: page stays 1 and limit is a large real
+            // integer (the previous search_info.total), never a -1/0 sentinel.
+            const largeLimit = 3742;
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: largeLimit, filter: [], sort_by: [] });
+
+            // total is computed independently of LIMIT, so it is unchanged.
+            expect(getAllOutput.total).toEqual(baseline.total);
+            // All matching rows are returned: not truncated to a default page size,
+            // and not padded up to the (much larger) limit.
+            expect(getAllOutput.items.length).toEqual(getAllOutput.total);
+        });
     });
 
     describe('updateOne', () => {
