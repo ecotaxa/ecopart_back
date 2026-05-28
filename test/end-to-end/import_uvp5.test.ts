@@ -5,10 +5,12 @@
 // Dataset used:
 //   data_storage/ecopart_data_to_import/remote/ftp_plankton/Ecotaxa_Data_to_import/uvp5_endtoend_TEST
 //     work/
-//       omer2_1.zip   -> zipped, NO images (no tsv inside)
-//       omer2_2.zip   -> zipped, WITH images
-//       omer2_3/      -> unzipped, WITH images (has ecotaxa_*.tsv)
-//       omer2_7/      -> unzipped, NO images (no tsv)
+//       omer2_1.zip       -> zipped, NO images (no tsv inside)
+//       omer2_2.zip       -> zipped, WITH images
+//       omer2_3/          -> unzipped, WITH images (has ecotaxa_*.tsv)
+//       omer2_4.tar.zst   -> zstandard-compressed tarball, WITH images
+//       omer2_5.tar.zst   -> zstandard-compressed tarball, NO images
+//       omer2_7/          -> unzipped, NO images (no tsv)
 //     ctd_data_cnv/   -> CTD data for all samples
 //
 // Cleanup is performed in afterAll so it runs whether the assertions pass or not.
@@ -120,6 +122,8 @@ const SAMPLE_WITH_IMAGES_UNZIPPED = "omer2_3"
 const SAMPLE_WITH_IMAGES_ZIPPED = "omer2_2"
 const SAMPLE_NO_IMAGES_UNZIPPED = "omer2_7"
 const SAMPLE_NO_IMAGES_ZIPPED = "omer2_1"
+const SAMPLE_WITH_IMAGES_TARZST = "omer2_4"
+const SAMPLE_NO_IMAGES_TARZST = "omer2_5"
 
 const ALL_SAMPLES = [
     SAMPLE_NO_IMAGES_ZIPPED,
@@ -128,6 +132,7 @@ const ALL_SAMPLES = [
     SAMPLE_NO_IMAGES_UNZIPPED,
 ]
 const SAMPLES_WITH_IMAGES = [SAMPLE_WITH_IMAGES_ZIPPED, SAMPLE_WITH_IMAGES_UNZIPPED]
+const TARZST_SAMPLES = [SAMPLE_WITH_IMAGES_TARZST, SAMPLE_NO_IMAGES_TARZST]
 
 describe("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without images)", () => {
     let db: sqlite3.Database
@@ -682,5 +687,61 @@ describe("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without ima
 
         // EcoTaxa: one export file for the linked project
         expect(entries.some(e => e.startsWith(`ecotaxa/${capturedProjectId}/`))).toBe(true)
+    })
+
+    // ─── Phase 10: Import tar.zst samples (omer2_4 with images, omer2_5 without) ─
+    // Verifies the .tar.zst code path end-to-end: discovery returns the sample name with the
+    // .tar.zst extension stripped, the import decompresses + untars + re-zips into the same
+    // <sample>_work.zip layout as the .zip / folder paths, and vignette counts match the
+    // "with images" / "no images" expectation.
+    test("POST /projects/:id/samples/import should import 2 tar.zst samples (with/without images)", async () => {
+        const listRes = await request(server)
+            .get(`/projects/${capturedProjectId}/samples/can_be_imported`)
+            .set("Cookie", cookieHeader())
+
+        expect(listRes.status).toBe(200)
+        const importableNames = (listRes.body as any[]).map(s => s.sample_name)
+        for (const name of TARZST_SAMPLES) {
+            expect(importableNames).toContain(name)
+        }
+
+        const importRes = await request(server)
+            .post(`/projects/${capturedProjectId}/samples/import`)
+            .set("Cookie", cookieHeader())
+            .send({ samples: TARZST_SAMPLES, backup_project: false })
+
+        expect(importRes.status).toBe(200)
+        expect(importRes.body.success).toBe(true)
+        const taskResult = await pollTaskUntilDone(importRes.body.task_import_samples.task_id, 2000, 300000)
+        expect(taskResult.task_status).toBe("DONE")
+
+        const samplesRes = await request(server)
+            .get(`/projects/${capturedProjectId}/samples/?page=1&limit=20`)
+            .set("Cookie", cookieHeader())
+        expect(samplesRes.status).toBe(200)
+
+        const withImages = samplesRes.body.samples.find((x: any) => x.sample_name === SAMPLE_WITH_IMAGES_TARZST)
+        expect(withImages).toBeDefined()
+        expect(withImages.nb_vignettes).toBeGreaterThan(0)
+
+        const noImages = samplesRes.body.samples.find((x: any) => x.sample_name === SAMPLE_NO_IMAGES_TARZST)
+        expect(noImages).toBeDefined()
+        expect(noImages.nb_vignettes).toBe(0)
+
+        // Verify the produced <sample>_work.zip layout: files must be at the archive root
+        // (any top-level prefix inside the tar.zst must have been stripped), matching the
+        // layout downstream readers depend on.
+        const projectRoot = path.resolve(__dirname, '..', '..')
+        const relTmpDir = path.relative(projectRoot, tmpDir)
+        const fsStorageAbs = path.join(projectRoot, relTmpDir, "fs_storage")
+        for (const name of TARZST_SAMPLES) {
+            const workZipPath = path.join(fsStorageAbs, `${capturedProjectId}`, name, `${name}_work.zip`)
+            expect(fs.existsSync(workZipPath)).toBe(true)
+            const workEntries = await listZipEntries(workZipPath)
+            // Datfile must be at the archive root (no <sample>/ prefix)
+            expect(workEntries).toContain(`${name}_datfile.txt`)
+            // At least one HDR*.txt at the archive root
+            expect(workEntries.some(e => /^HDR.*\.txt$/.test(e))).toBe(true)
+        }
     })
 })

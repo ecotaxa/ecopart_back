@@ -18,6 +18,8 @@ import * as fsPromises from 'fs/promises'; // For promise-based file operations/
 import path from 'path';
 import yauzl from 'yauzl';
 import archiver from 'archiver';
+import * as fzstd from 'fzstd';
+import * as tar from 'tar';
 
 
 
@@ -84,6 +86,40 @@ export class SampleRepositoryImpl implements SampleRepository {
             });
         });
     }
+
+    // Read a single file from a .tar.zst archive (zstd-compressed tarball). Mirrors
+    // readFileFromZip — matches by exact name or by regex against the tar entry path.
+    private async readFileFromTarZst(tarZstPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
+        const compressed = await fsPromises.readFile(tarZstPath);
+        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
+
+        return new Promise((resolve, reject) => {
+            const parser = new tar.Parser();
+            let found = false;
+            parser.on('entry', (entry) => {
+                const name = entry.path;
+                const matches = !found && entry.type === 'File' && (
+                    (targetFileName !== undefined && (name === targetFileName || path.basename(name) === targetFileName))
+                    || (filePathPattern !== undefined && filePathPattern.test(name))
+                );
+                if (matches) {
+                    found = true;
+                    const chunks: Buffer[] = [];
+                    entry.on('data', (chunk: Buffer) => chunks.push(chunk));
+                    entry.on('end', () => resolve(Buffer.concat(chunks).toString()));
+                    entry.on('error', reject);
+                } else {
+                    entry.resume();
+                }
+            });
+            parser.on('end', () => {
+                if (!found) reject(new Error(`${targetFileName} or ${filePathPattern} not found in tar.zst file`));
+            });
+            parser.on('error', reject);
+            parser.end(tarBuffer);
+        });
+    }
+
     // Method to parse and return ComputeVignettes data
     async readComputeVignettes(file_system_storage_project_folder: string, sample_name: string): Promise<ComputeVignettesModel> {
         try {
@@ -816,14 +852,21 @@ export class SampleRepositoryImpl implements SampleRepository {
 
             if (instrument_model.startsWith('UVP5')) {
                 const work_zip_path = path.join(folderPath, 'work', `${sample_name}.zip`);
+                const work_tar_zst_path = path.join(folderPath, 'work', `${sample_name}.tar.zst`);
+                const tsv_pattern = new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 
                 try {
-                    const tsv_content = await this.readFileFromZip(work_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+                    const tsv_content = await this.readFileFromZip(work_zip_path, undefined, tsv_pattern);
                     return this.extractNumberOfTsvDataLines(tsv_content);
                 } catch {
-                    const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
-                    const tsv_content = await fsPromises.readFile(tsv_file_path, 'utf8');
-                    return this.extractNumberOfTsvDataLines(tsv_content);
+                    try {
+                        const tsv_content = await this.readFileFromTarZst(work_tar_zst_path, undefined, tsv_pattern);
+                        return this.extractNumberOfTsvDataLines(tsv_content);
+                    } catch {
+                        const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
+                        const tsv_content = await fsPromises.readFile(tsv_file_path, 'utf8');
+                        return this.extractNumberOfTsvDataLines(tsv_content);
+                    }
                 }
             }
         } catch {
@@ -1111,23 +1154,35 @@ export class SampleRepositoryImpl implements SampleRepository {
     // Function to read and return samples from work folder names
     // Supports both plain directories (work/<sample>/) and zipped subdirectories (work/<sample>.zip)
     async getSamplesFromWork(folderPath: string): Promise<string[]> {
-        const samples: string[] = [];
+        // When a sample is present in multiple forms (tar.zst, zip, folder), keep only one
+        // entry — priority matches UVP5copySamplesToImportFolder: tar.zst > zip > folder.
+        const priorityBySample = new Map<string, number>(); // 3 = tar.zst, 2 = zip, 1 = folder
         try {
             const files = await fsPromises.readdir(path.join(folderPath, 'work'));
 
             for (const file of files) {
-                if (file.endsWith('.zip')) {
-                    // Zipped work subdirectory — strip the .zip extension to get the sample name
-                    samples.push(file.slice(0, -4));
+                let name: string;
+                let priority: number;
+                if (file.endsWith('.tar.zst')) {
+                    name = file.slice(0, -'.tar.zst'.length);
+                    priority = 3;
+                } else if (file.endsWith('.zip')) {
+                    name = file.slice(0, -4);
+                    priority = 2;
                 } else {
-                    samples.push(file);
+                    name = file;
+                    priority = 1;
+                }
+                const existing = priorityBySample.get(name);
+                if (existing === undefined || priority > existing) {
+                    priorityBySample.set(name, priority);
                 }
             }
         } catch (err) {
             throw new Error(`Error reading files: ${err.message}`);
         }
 
-        return samples;
+        return Array.from(priorityBySample.keys());
     }
     async ensureSampleFolderDoNotExists(samples_names_to_import: string[], dest_folder: string): Promise<void> {
         // Ensure that none of the sample folders already exist
@@ -1162,20 +1217,44 @@ export class SampleRepositoryImpl implements SampleRepository {
             // Ensure the destination sample folder exists
             await fsPromises.mkdir(destPath, { recursive: true });
 
-            // ── work: detect whether the source is a directory or a pre-zipped file ──
+            // ── work: detect whether the source is a directory, a pre-zipped file, or a tar.zst ──
             const workDirPath = path.join(sourcePath, 'work', sample);
             const workZipSourcePath = path.join(sourcePath, 'work', sample + '.zip');
+            const workTarZstSourcePath = path.join(sourcePath, 'work', sample + '.tar.zst');
             const workZipFilePath = path.join(destPath, `${sample}_work.zip`);
 
-            let workIsZipped = false;
+            let workIsTarZst = false;
             try {
-                await fsPromises.access(workZipSourcePath);
-                workIsZipped = true;
+                await fsPromises.access(workTarZstSourcePath);
+                workIsTarZst = true;
             } catch {
-                // zip not found — fall back to directory
+                // tar.zst not found — fall back to zip/directory
             }
 
-            if (workIsZipped) {
+            let workIsZipped = false;
+            if (!workIsTarZst) {
+                try {
+                    await fsPromises.access(workZipSourcePath);
+                    workIsZipped = true;
+                } catch {
+                    // zip not found — fall back to directory
+                }
+            }
+
+            if (workIsTarZst) {
+                // The work subdirectory is a zstandard-compressed tarball.
+                // Decompress + untar while stripping any top-level folder prefix, then re-zip —
+                // so the result matches the layout expected by getSampleFromWorkDatfile /
+                // getSampleFromWorkHDR (files at root), identical to the zip/folder paths.
+                const workFolderPath = path.join(destPath, `${sample}_work`);
+                try {
+                    await this.extractTarZstNormalized(workTarZstSourcePath, workFolderPath);
+                    await this.zipFolder(workFolderPath, workZipFilePath);
+                    await fsPromises.rm(workFolderPath, { recursive: true, force: true });
+                } catch (error) {
+                    throw new Error(`Error normalizing work tar.zst for sample ${sample}: ${error.message}`);
+                }
+            } else if (workIsZipped) {
                 // The work subdirectory is a pre-existing zip.
                 // Its internal layout may have a top-level folder prefix (e.g. omer2_1/omer2_1_datfile.txt).
                 // Extract while stripping that prefix, then re-zip — so the result matches
@@ -1274,6 +1353,71 @@ export class SampleRepositoryImpl implements SampleRepository {
                 zipfile.on('end', () => resolve());
                 zipfile.on('error', reject);
             });
+        });
+
+        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
+        // when detecting the common prefix and when extracting.
+        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
+            || name.endsWith('/.DS_Store')
+            || name === '.DS_Store'
+            || path.basename(name).startsWith('._');
+        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
+
+        // Determine a common top-level directory prefix to strip
+        let stripPrefix = '';
+        if (significantEntries.length > 0) {
+            const firstParts = significantEntries[0].name.split('/');
+            if (firstParts.length > 1) {
+                const candidate = firstParts[0] + '/';
+                if (significantEntries.every(e => e.name.startsWith(candidate))) {
+                    stripPrefix = candidate;
+                }
+            }
+        }
+
+        // Write files to destFolder with the prefix stripped
+        await fsPromises.mkdir(destFolder, { recursive: true });
+        for (const entry of significantEntries) {
+            const normalizedName = entry.name.startsWith(stripPrefix)
+                ? entry.name.slice(stripPrefix.length)
+                : entry.name;
+            if (!normalizedName) continue;
+            const destPath = path.join(destFolder, normalizedName);
+            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
+            await fsPromises.writeFile(destPath, entry.content);
+        }
+    }
+
+    /**
+     * Decompress and extract a `.tar.zst` archive to destFolder, stripping a common top-level
+     * directory prefix if present — mirrors extractZipNormalized so the resulting layout is
+     * identical regardless of whether the source was a zip or a tar.zst.
+     */
+    async extractTarZstNormalized(tarZstPath: string, destFolder: string): Promise<void> {
+        // Decompress the zstandard stream to a raw tar buffer, then parse it in memory.
+        const compressed = await fsPromises.readFile(tarZstPath);
+        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
+
+        const fileEntries: { name: string; content: Uint8Array }[] = [];
+
+        await new Promise<void>((resolve, reject) => {
+            const parser = new tar.Parser();
+            parser.on('entry', (entry) => {
+                if (entry.type !== 'File') {
+                    // directory / pax / global header — skip
+                    entry.resume();
+                    return;
+                }
+                const chunks: Buffer[] = [];
+                entry.on('data', (chunk: Buffer) => chunks.push(chunk));
+                entry.on('end', () => {
+                    fileEntries.push({ name: entry.path, content: new Uint8Array(Buffer.concat(chunks)) });
+                });
+                entry.on('error', reject);
+            });
+            parser.on('end', () => resolve());
+            parser.on('error', reject);
+            parser.end(tarBuffer);
         });
 
         // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
