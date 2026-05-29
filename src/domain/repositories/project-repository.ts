@@ -84,17 +84,17 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async standardUpdateProject(project: ProjectUpdateModel): Promise<number> {
-        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_id", "ecotaxa_project_name", "ecotaxa_instance_id"]
+        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_id", "ecotaxa_project_name", "ecotaxa_instance_id"]
         const updated_project_nb = await this.updateProject(project, params_restricted)
         return updated_project_nb
     }
 
     async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
+        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
 
-        // Can be sort_by 
-        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "project_information", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
+        // Can be sort_by
+        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
 
         return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -146,7 +146,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             project_title: public_project.project_title,
             project_acronym: public_project.project_acronym,
             project_description: public_project.project_description,
-            project_information: public_project.project_information,
             cruise: public_project.cruise,
             ship: public_project.ship,
             data_owner_name: public_project.data_owner_name,
@@ -182,7 +181,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             project_title: project.project_title,
             project_acronym: project.project_acronym,
             project_description: project.project_description,
-            project_information: project.project_information,
             cruise: project.cruise,
             ship: project.ship,
             data_owner_name: project.data_owner_name,

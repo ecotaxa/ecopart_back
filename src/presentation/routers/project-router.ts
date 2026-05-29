@@ -182,7 +182,6 @@ export default function ProjectRouter(
      *       | `project_title` | string | |
      *       | `project_acronym` | string | |
      *       | `project_description` | string | |
-     *       | `project_information` | string | |
      *       | `cruise` | string | |
      *       | `ship` | string | |
      *       | `data_owner_name` | string | |
@@ -225,7 +224,7 @@ export default function ProjectRouter(
      *             items:
      *               $ref: '#/components/schemas/FilterSearchOptions'
      *           example:
-     *             - field: "project_information"
+     *             - field: "project_description"
      *               operator: "LIKE"
      *               value: "tes%"
      *             - field: "instrument_model"

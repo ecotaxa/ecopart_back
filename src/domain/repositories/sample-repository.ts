@@ -1696,6 +1696,25 @@ export class SampleRepositoryImpl implements SampleRepository {
         return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}.${extension}`);
     }
 
+    async countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>> {
+        const counts = new Map<number, number>();
+        for (const project_id of project_ids) counts.set(project_id, 0);
+        if (project_ids.length === 0) return counts;
+
+        // standardGetSamples enforces a whitelist of filter fields including project_id, with IN support.
+        // We only need totals so we request page 1 limit 1 and read SearchResult.total.
+        for (const project_id of project_ids) {
+            const result = await this.sampleDataSource.getAll({
+                filter: [{ field: "project_id", operator: "=", value: project_id }],
+                sort_by: [],
+                page: 1,
+                limit: 1,
+            });
+            counts.set(project_id, result.total);
+        }
+        return counts;
+    }
+
     async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Can be filtered by 
         const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported"]

@@ -294,7 +294,6 @@ describe('SQLiteProjectDataSource', () => {
                 expect(project.project_title).toEqual(project_by_id.project_title);
                 expect(project.project_acronym).toEqual(project_by_id.project_acronym);
                 expect(project.project_description).toEqual(project_by_id.project_description);
-                expect(project.project_information).toEqual(project_by_id.project_information);
                 expect(project.cruise).toEqual(project_by_id.cruise);
                 expect(project.ship).toEqual(project_by_id.ship);
                 expect(project.data_owner_name).toEqual(project_by_id.data_owner_name);

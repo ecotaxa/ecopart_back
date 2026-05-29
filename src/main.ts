@@ -315,7 +315,7 @@ async function getSQLiteDS() {
     server.use("/exports", ExportRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExportValidation(),
-        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FOLDER, config.BASE_URL_PUBLIC),
+        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.BASE_URL_PUBLIC),
     ))
 
 

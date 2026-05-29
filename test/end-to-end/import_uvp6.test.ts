@@ -307,7 +307,7 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
         const exportMiddleware = ExportRouter(
             new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
             new MiddlewareExportValidation(),
-            new ExportRawData(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo, ecotaxaAccountRepo, relTmpDir, "http://localhost:0"),
+            new ExportRawData(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo, ecotaxaAccountRepo, instrumentModelRepo, relTmpDir, "http://localhost:0"),
         )
 
         server.use("/users", userMiddleware)
@@ -451,7 +451,6 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
                 project_title: testProjectTitle,
                 project_acronym: testProjectAcronym,
                 project_description: "description",
-                project_information: "test",
                 cruise: "cruise",
                 ship: "boat1,boat2",
                 data_owner_name: "Julie coustenoble",
@@ -658,9 +657,9 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
         fs.writeFileSync(zipPath, downloadRes.body as Buffer)
         const entries = await listZipEntries(zipPath)
 
-        // Metadata: projects.csv + samples.csv
-        expect(entries).toContain("metadata/projects.csv")
-        expect(entries).toContain("metadata/samples.csv")
+        // Metadata: projects.tsv + samples.tsv
+        expect(entries).toContain("metadata/projects.tsv")
+        expect(entries).toContain("metadata/samples.tsv")
 
         // LPM: UVP6 raw Particule zip per sample (Images zip only for sample with images)
         for (const name of ALL_SAMPLES) {

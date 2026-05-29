@@ -6,7 +6,6 @@ export interface ProjectRequestCreationModel {
     project_title: string;
     project_acronym: string;
     project_description: string;
-    project_information?: string;
     cruise: string;
     ship: string;
     data_owner_name: string;
@@ -38,7 +37,6 @@ export interface ProjectResponseModel {
     project_title: string;
     project_acronym: string;
     project_description: string;
-    project_information?: string;
     cruise: string;
     ship: string;
     data_owner_name: string;
@@ -67,7 +65,6 @@ export interface ProjectUpdateModel {
     project_title?: string;
     project_acronym?: string;
     project_description?: string;
-    project_information?: string;
     cruise?: string;
     ship?: string;
     data_owner_name?: string;
@@ -95,7 +92,6 @@ export interface PublicProjectUpdateModel {
     project_title?: string;
     project_acronym?: string;
     project_description?: string;
-    project_information?: string;
     cruise?: string;
     ship?: string;
     data_owner_name?: string;
@@ -125,7 +121,6 @@ export interface PublicProjectRequestCreationModel_base {
     project_title: string;
     project_acronym: string;
     project_description: string;
-    project_information?: string;
     cruise: string;
     ship: string;
     data_owner_name: string;

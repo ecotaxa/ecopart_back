@@ -38,7 +38,6 @@ describe('Migrate EcoTaxa Project Use Case', () => {
             project_title: 'uvp5_sn002zd_omer_2',
             project_acronym: 'omer',
             project_description: 'eee',
-            project_information: '',
             cruise: 'sn002zd_omer_2',
             ship: 'europe',
             data_owner_name: 'lars stemmann',

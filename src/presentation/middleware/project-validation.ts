@@ -25,9 +25,6 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .trim(),
         //.not().isEmpty().withMessage('Project description is required.'),
 
-        // Project information Validation
-        check('project_information').optional()
-            .trim(),
         // Project cruise Validation
         check('cruise')
             .trim()
@@ -196,11 +193,6 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         check('project_description').optional()
             .trim()
             .not().isEmpty().withMessage('Project description cannot be empty.'),
-        // Project information Validation
-        check('project_information').optional()
-            .trim()
-            .not().isEmpty().withMessage('Project information cannot be empty.'),
-
         // Project cruise Validation
         check('cruise').optional()
             .trim()

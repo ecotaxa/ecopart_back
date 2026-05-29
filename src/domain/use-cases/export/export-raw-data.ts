@@ -14,9 +14,74 @@ import { ProjectRepository } from "../../interfaces/repositories/project-reposit
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
+import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportRawDataRequestModel, ExportRawDataUseCase, RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
+import { computeProjectPrivacy } from "./project-privacy";
+import { MinimalUserModel } from "../../entities/user";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "ctd", "ecotaxa"];
+
+const PROJECT_TSV_COLUMNS: string[] = [
+    "ecopart_project_id",
+    "ecopart_project_title",
+    "ecotaxa_instance_url",
+    "ecotaxa_project_id",
+    "ecotaxa_project_title",
+    "project_total_samples",
+    "project_total_samples_exported",
+    "project_acronym",
+    "project_description",
+    "project_cruise_wmo",
+    "project_ship_floatref",
+    "project_data_owner_name",
+    "project_data_owner_email",
+    "project_operator_name",
+    "project_operator_email",
+    "project_chief_scientist_name",
+    "project_chief_scientist_email",
+    "project_instrument",
+    "project_instrument_model_name",
+    "project_instrument_serial_number",
+    "project_override_depth_offset",
+    "project_enable_descent_filter",
+    "project_creation_utc_date_time",
+    "project_export_utc_date_time",
+    "project_privacy",
+    "project_privacy_delay",
+    "project_general_download_delay",
+    "project_ecotaxa_classification_download_delay",
+    "project_managers",
+    "project_members",
+];
+
+// Replace tab/CR/LF in a TSV cell with a single space so the row stays parseable; no quoting.
+function tsvSanitize(value: string): string {
+    return value.replace(/[\t\r\n]+/g, " ");
+}
+
+function serialize(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "boolean") return value ? "true" : "false";
+    return tsvSanitize(String(value));
+}
+
+function serializeUserList(users: MinimalUserModel[]): string {
+    return users.map(u => `${u.user_name} <${u.email}>`).join("; ");
+}
+
+function toIso(date_string: string): string {
+    const d = new Date(date_string);
+    return Number.isNaN(d.getTime()) ? date_string : d.toISOString();
+}
+
+function toTsv(headers: string[], rows: Record<string, string>[]): string {
+    if (headers.length === 0) return "";
+    const lines = [headers.join("\t")];
+    for (const row of rows) {
+        lines.push(headers.map(h => row[h] ?? "").join("\t"));
+    }
+    return lines.join("\n") + "\n";
+}
 
 export class ExportRawData implements ExportRawDataUseCase {
     constructor(
@@ -26,6 +91,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         private sampleRepository: SampleRepository,
         private taskRepository: TaskRepository,
         private ecotaxaAccountRepository: EcotaxaAccountRepository,
+        private instrumentModelRepository: InstrumentModelRepository,
         private DATA_STORAGE_FOLDER: string,
         private base_url_path: string,
     ) { }
@@ -64,7 +130,8 @@ export class ExportRawData implements ExportRawDataUseCase {
         if (!task) throw new Error("Cannot find task");
 
         // Fire-and-forget — the route returns the task immediately and the frontend polls.
-        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living);
+        const export_started_at = new Date();
+        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at);
 
         return task;
     }
@@ -101,6 +168,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         projects_by_id: Map<number, ProjectResponseModel>,
         export_types: RawExportType[],
         ecotaxa_exclude_not_living: boolean,
+        export_started_at: Date,
     ): Promise<void> {
         const task_id = task.task_id;
         try {
@@ -120,7 +188,7 @@ export class ExportRawData implements ExportRawDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
                 if (export_type === "metadata") {
-                    await this.writeMetadata(work_folder, samples, projects_by_id);
+                    await this.writeMetadata(work_folder, samples, projects_by_id, export_started_at);
                 } else if (export_type === "lpm") {
                     await this.writeLpm(task, work_folder, samples, projects_by_id);
                 } else if (export_type === "ctd") {
@@ -150,16 +218,83 @@ export class ExportRawData implements ExportRawDataUseCase {
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
+        export_started_at: Date,
     ): Promise<void> {
         const dir = path.join(work_folder, "metadata");
         await fsPromises.mkdir(dir, { recursive: true });
 
-        const projects = Array.from(projects_by_id.values());
-        const project_csv = this.toCsv(projects);
-        await fsPromises.writeFile(path.join(dir, "projects.csv"), project_csv);
+        const project_ids = Array.from(projects_by_id.keys());
+        const samples_per_project_total = await this.sampleRepository.countSamplesPerProject(project_ids);
+        const exported_per_project = new Map<number, number>();
+        for (const project_id of project_ids) exported_per_project.set(project_id, 0);
+        for (const sample of samples) {
+            exported_per_project.set(sample.project_id, (exported_per_project.get(sample.project_id) ?? 0) + 1);
+        }
 
-        const sample_csv = this.toCsv(samples);
-        await fsPromises.writeFile(path.join(dir, "samples.csv"), sample_csv);
+        const project_rows: Record<string, string>[] = [];
+        for (const project of projects_by_id.values()) {
+            const ecotaxa_instance_url = await this.resolveEcotaxaInstanceUrl(project.ecotaxa_instance_id);
+            const bodc = await this.resolveInstrumentBodc(project.instrument_model);
+            const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: project.project_id });
+            const managers = privileges?.managers ?? [];
+            const members = privileges?.members ?? [];
+            project_rows.push({
+                ecopart_project_id: serialize(project.project_id),
+                ecopart_project_title: serialize(project.project_title),
+                ecotaxa_instance_url: serialize(ecotaxa_instance_url),
+                ecotaxa_project_id: serialize(project.ecotaxa_project_id),
+                ecotaxa_project_title: serialize(project.ecotaxa_project_name),
+                project_total_samples: serialize(samples_per_project_total.get(project.project_id) ?? 0),
+                project_total_samples_exported: serialize(exported_per_project.get(project.project_id) ?? 0),
+                project_acronym: serialize(project.project_acronym),
+                project_description: serialize(project.project_description),
+                project_cruise_wmo: serialize(project.cruise),
+                project_ship_floatref: serialize(project.ship),
+                project_data_owner_name: serialize(project.data_owner_name),
+                project_data_owner_email: serialize(project.data_owner_email),
+                project_operator_name: serialize(project.operator_name),
+                project_operator_email: serialize(project.operator_email),
+                project_chief_scientist_name: serialize(project.chief_scientist_name),
+                project_chief_scientist_email: serialize(project.chief_scientist_email),
+                project_instrument: serialize(bodc),
+                project_instrument_model_name: serialize(project.instrument_model),
+                project_instrument_serial_number: serialize(project.serial_number),
+                project_override_depth_offset: serialize(project.override_depth_offset),
+                project_enable_descent_filter: serialize(project.enable_descent_filter),
+                project_creation_utc_date_time: serialize(toIso(project.project_creation_date)),
+                project_export_utc_date_time: export_started_at.toISOString(),
+                project_privacy: computeProjectPrivacy(
+                    project.project_creation_date,
+                    project.privacy_duration,
+                    project.visible_duration,
+                    project.public_duration,
+                    export_started_at,
+                ),
+                project_privacy_delay: serialize(project.privacy_duration),
+                project_general_download_delay: serialize(project.visible_duration),
+                project_ecotaxa_classification_download_delay: serialize(project.public_duration),
+                project_managers: serializeUserList(managers),
+                project_members: serializeUserList(members),
+            });
+        }
+
+        await fsPromises.writeFile(path.join(dir, "projects.tsv"), toTsv(PROJECT_TSV_COLUMNS, project_rows));
+
+        const sample_rows = samples.map(s => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, serialize(v)])));
+        const sample_headers = sample_rows.length > 0 ? Object.keys(sample_rows[0]) : [];
+        await fsPromises.writeFile(path.join(dir, "samples.tsv"), toTsv(sample_headers, sample_rows));
+    }
+
+    private async resolveEcotaxaInstanceUrl(ecotaxa_instance_id: number | null): Promise<string | null> {
+        if (!ecotaxa_instance_id) return null;
+        const instance = await this.ecotaxaAccountRepository.getOneEcoTaxaInstance(ecotaxa_instance_id);
+        return instance?.ecotaxa_instance_url ?? null;
+    }
+
+    private async resolveInstrumentBodc(instrument_model_name: string): Promise<string | null> {
+        if (!instrument_model_name) return null;
+        const instrument = await this.instrumentModelRepository.getOneInstrumentModel({ instrument_model_name });
+        return instrument?.bodc_url ?? null;
     }
 
     private async writeLpm(
@@ -243,25 +378,6 @@ export class ExportRawData implements ExportRawDataUseCase {
                 throw err;
             }
         }
-    }
-
-    private toCsv(rows: { [key: string]: any }[]): string {
-        if (rows.length === 0) return "";
-        const headers = Array.from(rows.reduce<Set<string>>((acc, row) => {
-            Object.keys(row).forEach(k => acc.add(k));
-            return acc;
-        }, new Set()));
-        const escape = (v: any): string => {
-            if (v === null || v === undefined) return "";
-            const s = typeof v === "string" ? v : JSON.stringify(v);
-            if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-            return s;
-        };
-        const lines = [headers.join(",")];
-        for (const row of rows) {
-            lines.push(headers.map(h => escape(row[h])).join(","));
-        }
-        return lines.join("\n") + "\n";
     }
 
     private zipFolder(folder_path: string, zip_file_path: string): Promise<void> {

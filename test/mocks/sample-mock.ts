@@ -78,6 +78,9 @@ export class MockSampleRepository implements SampleRepository {
     getCTDFileAbsolutePath(): string {
         throw new Error("Method not implemented for getCTDFileAbsolutePath");
     }
+    countSamplesPerProject(): Promise<Map<number, number>> {
+        throw new Error("Method not implemented for countSamplesPerProject");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase

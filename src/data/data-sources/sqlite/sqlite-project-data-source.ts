@@ -4,6 +4,15 @@ import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, P
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
+// Map domain-level field names to the physical SQLite column names where they differ.
+// The domain/API contract keeps using `cruise` / `ship`; the DB columns are `cruise_wmo` / `ship_floatref`.
+const DOMAIN_TO_PHYSICAL_COLUMN: Record<string, string> = {
+    cruise: "cruise_wmo",
+    ship: "ship_floatref",
+};
+const toPhysicalColumn = (domainKey: string): string =>
+    DOMAIN_TO_PHYSICAL_COLUMN[domainKey] ?? domainKey;
+
 // const DB_TABLE = "project"
 export class SQLiteProjectDataSource implements ProjectDataSource {
 
@@ -13,9 +22,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
     async create(project: ProjectRequestCreationModel): Promise<number> {
-        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.project_information, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number, project.ecotaxa_project_id, project.ecotaxa_project_name, project.ecotaxa_instance_id]
+        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number, project.ecotaxa_project_id, project.ecotaxa_project_name, project.ecotaxa_instance_id]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, project_information, cruise, ship, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number, ecotaxa_project_id, ecotaxa_project_name, ecotaxa_instance_id) VALUES  (` + placeholders + `);`;
+        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, cruise_wmo, ship_floatref, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number, ecotaxa_project_id, ecotaxa_project_name, ecotaxa_instance_id) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -66,9 +75,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             project_title: row.project_title,
                             project_acronym: row.project_acronym,
                             project_description: row.project_description,
-                            project_information: row.project_information,
-                            cruise: row.cruise,
-                            ship: row.ship,
+                            cruise: row.cruise_wmo,
+                            ship: row.ship_floatref,
                             data_owner_name: row.data_owner_name,
                             data_owner_email: row.data_owner_email,
                             operator_name: row.operator_name,
@@ -123,7 +131,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             } else {
                 params.push(value)
             }
-            placeholders = placeholders + key + "=(?),"
+            placeholders = placeholders + toPhysicalColumn(key) + "=(?),"
         }
         placeholders = placeholders.slice(0, -1);
         params.push(project_id)
@@ -152,32 +160,33 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
+                const physicalField = toPhysicalColumn(filter.field);
                 if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
-                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        filtering_sql += physicalField + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
                         params_filtering.push(...filter.value)
                     }
                 }
                 // If value is true or false, set to 1 or 0
                 else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += filter.field + ` = 1`;
+                    filtering_sql += physicalField + ` = 1`;
                 }
                 else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += filter.field + ` = 0`;
+                    filtering_sql += physicalField + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
-                        filtering_sql += filter.field + ` IS NULL`;
+                        filtering_sql += physicalField + ` IS NULL`;
                     } else if (filter.operator == "<>") {
-                        filtering_sql += filter.field + ` IS NOT NULL`;
+                        filtering_sql += physicalField + ` IS NOT NULL`;
                     }
                 }
 
                 else {
-                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`
+                    filtering_sql += physicalField + ` ` + filter.operator + ` (?)`
                     params_filtering.push(filter.value)
                 }
                 filtering_sql += ` AND `;
@@ -202,7 +211,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         if (options.sort_by.length > 0) {
             sql += ` ORDER BY`;
             for (const sort of options.sort_by) {
-                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+                sql += ` ` + toPhysicalColumn(sort.sort_by) + ` ` + sort.order_by + `,`;
             }
             // remove last ,
             sql = sql.slice(0, -1);
@@ -231,9 +240,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             project_title: row.project_title,
                             project_acronym: row.project_acronym,
                             project_description: row.project_description,
-                            project_information: row.project_information,
-                            cruise: row.cruise,
-                            ship: row.ship,
+                            cruise: row.cruise_wmo,
+                            ship: row.ship_floatref,
                             data_owner_name: row.data_owner_name,
                             data_owner_email: row.data_owner_email,
                             operator_name: row.operator_name,
@@ -262,13 +270,13 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
     async getDistinctShips(): Promise<string[]> {
-        const sql = `SELECT DISTINCT ship FROM project ORDER BY ship ASC;`;
+        const sql = `SELECT DISTINCT ship_floatref FROM project ORDER BY ship_floatref ASC;`;
         return await new Promise((resolve, reject) => {
             this.db.all(sql, [], (err, rows) => {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve(rows.map((row: any) => row.ship));
+                    resolve(rows.map((row: any) => row.ship_floatref));
                 }
             });
         })
