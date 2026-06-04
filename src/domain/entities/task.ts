@@ -55,9 +55,9 @@ export interface TaskStatusResponseModel {
 }
 export interface PrivateTaskResponseModel extends PrivateTaskRequestCreationModel {
     task_id: number;
-    task_creation_date: string;
-    task_start_date?: string;
-    task_end_date?: string;
+    task_creation_utc_date_time: string;
+    task_start_utc_date_time?: string;
+    task_end_utc_date_time?: string;
 
     task_progress_pct: number;
     task_progress_msg?: string;
@@ -78,9 +78,9 @@ export interface TaskResponseModel {
     task_owner: string;
     task_project_id?: number;
     task_params?: object;
-    task_creation_date: string;
-    task_start_date?: string;
-    task_end_date?: string;
+    task_creation_utc_date_time: string;
+    task_start_utc_date_time?: string;
+    task_end_utc_date_time?: string;
     task_log_file_path?: string;
 
     task_progress_pct: number;
@@ -108,9 +108,9 @@ export interface PrivateTaskRequestModel {
     task_project_id?: number;
     task_params?: object;
     task_log_file_path?: string;
-    task_creation_date?: string;
-    task_start_date?: string;
-    task_end_date?: string;
+    task_creation_utc_date_time?: string;
+    task_start_utc_date_time?: string;
+    task_end_utc_date_time?: string;
 }
 
 export interface PublicTaskRequestModel extends PrivateTaskRequestModel {
@@ -130,9 +130,9 @@ export interface PrivateTaskUpdateModel {
     task_owner?: string;
     task_project_id?: number;
     task_params?: object;
-    task_creation_date?: string;
-    task_start_date?: string;
-    task_end_date?: string;
+    task_creation_utc_date_time?: string;
+    task_start_utc_date_time?: string;
+    task_end_utc_date_time?: string;
     task_log_file_path?: string;
 
     task_progress_pct?: number;

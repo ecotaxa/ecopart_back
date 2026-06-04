@@ -76,7 +76,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         }
         const ecotaxa_account_data = ecotaxa_account.items[0]
         // // if generic instance token is expired, throw an error
-        // if (new Date(ecotaxa_account_data.ecotaxa_account_expiration_date) < new Date()) {
+        // if (new Date(ecotaxa_account_data.ecotaxa_account_expiration_utc_date_time) < new Date()) {
         //     throw new Error("Ecotaxa generic account token is expired for instance : " + ecotaxa_instance_id);
         // }
         return ecotaxa_account_data
@@ -396,7 +396,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             ecotaxa_account_ecotaxa_id: ecotaxa_account.ecotaxa_account_ecotaxa_id,
             ecotaxa_user_name: ecotaxa_account.ecotaxa_account_user_name,
             ecotaxa_user_email: ecotaxa_account.ecotaxa_account_user_email,
-            ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_date,
+            ecotaxa_expiration_date: ecotaxa_account.ecotaxa_account_expiration_utc_date_time,
             ecotaxa_account_instance_id: ecotaxa_account.ecotaxa_account_instance_id,
             ecotaxa_account_instance_name: ecotaxa_account.ecotaxa_account_instance_name
         }
@@ -450,7 +450,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const filter_params_restricted: string[] = ["ecotaxa_account_ecopart_user_id"]
 
         // Can be sort_by 
-        const sort_param_restricted: string[] = ["ecotaxa_account_expiration_date"]
+        const sort_param_restricted: string[] = ["ecotaxa_account_expiration_utc_date_time"]
 
         return await this.getEcotaxaAccountModels(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -460,7 +460,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const filter_params_restricted: string[] = ["ecotaxa_account_ecopart_user_id", "ecotaxa_account_instance_id", "ecotaxa_account_user_email"]
 
         // Can be sort_by 
-        const sort_param_restricted: string[] = ["ecotaxa_account_expiration_date"]
+        const sort_param_restricted: string[] = ["ecotaxa_account_expiration_utc_date_time"]
 
         return await this.getEcotaxaAccountModels(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }

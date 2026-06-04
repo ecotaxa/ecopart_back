@@ -157,7 +157,7 @@ export default function UsersRouter(
      *       | `organisation` | string |
      *       | `country` | string |
      *       | `user_planned_usage` | string |
-     *       | `user_creation_date` | string (ISO timestamp) |
+     *       | `user_creation_utc_date_time` | string (ISO timestamp) |
      *       | `confirmation_code` | string or null |
      *       | `reset_password_code` | string or null |
      *       | `deleted` | string (ISO timestamp) or null |
@@ -678,9 +678,9 @@ export default function UsersRouter(
      *         in: query
      *         schema:
      *           type: string
-     *           default: "asc(ecotaxa_account_expiration_date)"
-     *         description: "Sorting statement. Allowed fields: ecotaxa_account_expiration_date. Format: asc(field) or desc(field)."
-     *         example: "asc(ecotaxa_account_expiration_date)"
+     *           default: "asc(ecotaxa_account_expiration_utc_date_time)"
+     *         description: "Sorting statement. Allowed fields: ecotaxa_account_expiration_utc_date_time. Format: asc(field) or desc(field)."
+     *         example: "asc(ecotaxa_account_expiration_utc_date_time)"
      *     responses:
      *       200:
      *         description: Paginated list of EcoTaxa accounts.

@@ -110,7 +110,7 @@ describe("Authorization middleware", () => {
                 "organisation": "LOV",
                 "country": "France",
                 "user_planned_usage": "Mon usage",
-                "user_creation_date": "2023-07-31 17:18:47",
+                "user_creation_utc_date_time": "2023-07-31 17:18:47",
                 "iat": 1692612422,
                 "exp": 1692614222
             }
@@ -210,7 +210,7 @@ describe("Authorization middleware", () => {
                 organisation: 'LOV',
                 country: 'France',
                 user_planned_usage: 'Mon usage',
-                user_creation_date: '2023-07-31 17:18:47',
+                user_creation_utc_date_time: '2023-07-31 17:18:47',
                 iat: 1692612422,
                 exp: 1692614222
             }

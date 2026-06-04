@@ -12,9 +12,10 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
     }
 
     async create(ecotaxa_account: EcotaxaAccountRequestCreationModel): Promise<number> {
-        const params = [ecotaxa_account.ecotaxa_account_ecotaxa_id, ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_date, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id]
+        // Explicit ISO 8601 UTC timestamp for the creation date (see sqlite-task-data-source).
+        const params = [ecotaxa_account.ecotaxa_account_ecotaxa_id, ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_utc_date_time, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id, new Date().toISOString()]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_date, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_utc_date_time, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id, ecotaxa_account_creation_utc_date_time) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -43,13 +44,13 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                     const result: EcotaxaAccountResponseModel = {
                         ecotaxa_account_id: row.ecotaxa_account_id,
                         ecotaxa_account_ecotaxa_id: row.ecotaxa_account_ecotaxa_id,
-                        ecotaxa_account_creation_date: row.ecotaxa_account_creation_date,
+                        ecotaxa_account_creation_utc_date_time: row.ecotaxa_account_creation_utc_date_time,
                         ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                         ecotaxa_account_token: row.ecotaxa_account_token,
                         ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                         ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                         ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
-                        ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date,
+                        ecotaxa_account_expiration_utc_date_time: row.ecotaxa_account_expiration_utc_date_time,
                         ecotaxa_account_instance_name: row.ecotaxa_instance_name
                     };
                     resolve(result);
@@ -144,13 +145,13 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         items: rows.map(row => ({
                             ecotaxa_account_id: row.ecotaxa_account_id,
                             ecotaxa_account_ecotaxa_id: row.ecotaxa_account_ecotaxa_id,
-                            ecotaxa_account_creation_date: row.ecotaxa_account_creation_date,
+                            ecotaxa_account_creation_utc_date_time: row.ecotaxa_account_creation_utc_date_time,
                             ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                             ecotaxa_account_token: row.ecotaxa_account_token,
                             ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                             ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                             ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
-                            ecotaxa_account_expiration_date: row.ecotaxa_account_expiration_date,
+                            ecotaxa_account_expiration_utc_date_time: row.ecotaxa_account_expiration_utc_date_time,
                             ecotaxa_account_instance_name: row.ecotaxa_instance_name
                         })),
                         total: rows[0]?.total_count || 0
@@ -193,7 +194,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         ecotaxa_instance_id: row.ecotaxa_instance_id,
                         ecotaxa_instance_name: row.ecotaxa_instance_name,
                         ecotaxa_instance_description: row.ecotaxa_instance_description,
-                        ecotaxa_instance_creation_date: row.ecotaxa_instance_creation_date,
+                        ecotaxa_instance_creation_utc_date_time: row.ecotaxa_instance_creation_utc_date_time,
                         ecotaxa_instance_url: row.ecotaxa_instance_url
                     };
                     resolve(result)
@@ -217,7 +218,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         ecotaxa_instance_id: row.ecotaxa_instance_id,
                         ecotaxa_instance_name: row.ecotaxa_instance_name,
                         ecotaxa_instance_description: row.ecotaxa_instance_description,
-                        ecotaxa_instance_creation_date: row.ecotaxa_instance_creation_date,
+                        ecotaxa_instance_creation_utc_date_time: row.ecotaxa_instance_creation_utc_date_time,
                         ecotaxa_instance_url: row.ecotaxa_instance_url
                     }));
                     resolve(result)
@@ -227,8 +228,9 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
     }
 
     async createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number> {
-        const sql = "INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url) VALUES ((?), (?), (?))";
-        const params = [instance.ecotaxa_instance_name, instance.ecotaxa_instance_description, instance.ecotaxa_instance_url];
+        // Explicit ISO 8601 UTC timestamp (see sqlite-task-data-source).
+        const sql = "INSERT INTO ecotaxa_instance (ecotaxa_instance_name, ecotaxa_instance_description, ecotaxa_instance_url, ecotaxa_instance_creation_utc_date_time) VALUES ((?), (?), (?), (?))";
+        const params = [instance.ecotaxa_instance_name, instance.ecotaxa_instance_description, instance.ecotaxa_instance_url, new Date().toISOString()];
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
                 if (err) {

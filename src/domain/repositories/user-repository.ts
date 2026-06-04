@@ -107,18 +107,18 @@ export class UserRepositoryImpl implements UserRepository {
 
     async adminGetUsers(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>> {
         // Can be filtered by 
-        const filter_params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        const filter_params_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_utc_date_time", "deleted"]
         // Can be sort_by
-        const sort_param_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "deleted"]
+        const sort_param_admin = ["user_id", "first_name", "last_name", "email", "valid_email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_utc_date_time", "deleted"]
         // Const prepared_options = this.prepare_options(options)
         return await this.getUsers(options, filter_params_admin, sort_param_admin, this.order_by_allow_params, this.filter_operator_allow_params)
     }
 
     async standardGetUsers(options: PreparedSearchOptions): Promise<SearchResult<UserResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date", "valid_email", "deleted"] // Add valid_email and deleted to force default filter
+        const filter_params_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_utc_date_time", "valid_email", "deleted"] // Add valid_email and deleted to force default filter
         // Can be sort_by 
-        const sort_param_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_date"]
+        const sort_param_restricted = ["user_id", "first_name", "last_name", "email", "is_admin", "organisation", "country", "user_planned_usage", "user_creation_utc_date_time"]
 
         // If valid_email or deleted throw errors
         if (options.filter.find(filter => filter.field === "valid_email")) {
@@ -238,7 +238,7 @@ export class UserRepositoryImpl implements UserRepository {
             organisation: createdUser.organisation,
             country: createdUser.country,
             user_planned_usage: createdUser.user_planned_usage,
-            user_creation_date: createdUser.user_creation_date
+            user_creation_utc_date_time: createdUser.user_creation_utc_date_time
         }
 
         return publicUser

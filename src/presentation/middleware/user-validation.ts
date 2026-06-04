@@ -126,7 +126,7 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
         check('confirmation_code')
             .isEmpty().withMessage('Confirmation code cannot be set manually.'),
         // User Creation Date Validation
-        check('user_creation_date')
+        check('user_creation_utc_date_time')
             .isEmpty().withMessage('User creation date cannot be set manually.'),
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
@@ -162,7 +162,7 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
             .isInt({ min: 1 }).withMessage('Page must be a number and must be greater than 0.'),
         query('limit').default(10)
             .isInt({ min: 1 }).withMessage('Limit must be a number and must be greater than 0.'),
-        query('sort_by').default("asc(ecotaxa_account_expiration_date)"),
+        query('sort_by').default("asc(ecotaxa_account_expiration_utc_date_time)"),
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);

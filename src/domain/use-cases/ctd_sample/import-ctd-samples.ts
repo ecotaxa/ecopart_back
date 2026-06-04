@@ -38,7 +38,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
             throw new Error("Cannot find task");
         }
 
-        this.startImportCTDSamplesTask(task, samples_names_to_import, project);
+        this.startImportCTDSamplesTask(task, samples_names_to_import, project, current_user);
 
         return task;
     }
@@ -74,7 +74,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
         }
     }
 
-    private async startImportCTDSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], project: ProjectResponseModel) {
+    private async startImportCTDSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], project: ProjectResponseModel, current_user: UserUpdateModel) {
         const task_id = task.task_id;
         try {
             await this.taskRepository.startTask({ task_id: task_id });
@@ -84,7 +84,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
             this.ensureCTDSamplesAreImportables(importable_samples.map(s => s.sample_name), samples_names_to_import);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/3 CTD sample copy: start");
-            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import);
+            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 3/3 CTD sample import: done");
             await this.taskRepository.finishTask({ task_id: task_id });

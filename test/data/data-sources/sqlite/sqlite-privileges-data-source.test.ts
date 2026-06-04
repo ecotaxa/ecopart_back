@@ -294,7 +294,7 @@ describe('SQLitePrivilegeDataSource', () => {
 
         test('should return all privileges with sorting filtering and pagination', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource_Privilege.getAll({ page: 1, limit: 2, filter: [{ field: 'privilege_name', operator: 'LIKE', value: 'm%' }], sort_by: [{ sort_by: 'privilege_creation_date', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource_Privilege.getAll({ page: 1, limit: 2, filter: [{ field: 'privilege_name', operator: 'LIKE', value: 'm%' }], sort_by: [{ sort_by: 'privilege_creation_utc_date_time', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(2);
@@ -331,7 +331,7 @@ describe('SQLitePrivilegeDataSource', () => {
             // not null
             expect(privilege).not.toBeNull();
             if (privilege) {
-                // Compare each property individually, excluding the privilege_creation_date
+                // Compare each property individually, excluding the privilege_creation_utc_date_time
                 expect(privilege.privilege_id).toEqual(privilege_id);
                 expect(privilege.privilege_name).toEqual('manager');
                 expect(privilege.contact).toEqual(true);

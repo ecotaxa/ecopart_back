@@ -221,7 +221,7 @@ describe("EcotaxaAccount Repository", () => {
                 limit: 10,
                 page: 1,
                 sort_by: [{
-                    sort_by: "ecotaxa_account_expiration_date",
+                    sort_by: "ecotaxa_account_expiration_utc_date_time",
                     order_by: "asc"
                 }]
             }
@@ -236,7 +236,7 @@ describe("EcotaxaAccount Repository", () => {
         test("Should throw an error if unauthorized params", async () => {
             const options: PreparedSearchOptions = {
                 filter: [{
-                    field: "ecotaxa_account_expiration_date",
+                    field: "ecotaxa_account_expiration_utc_date_time",
                     operator: "-",
                     value: 1
                 }],
@@ -251,7 +251,7 @@ describe("EcotaxaAccount Repository", () => {
             try { await ecotaxa_accountRepository.standardGetEcotaxaAccountsModels(options) }
             catch (e) {
                 expect(e).toBeInstanceOf(Error)
-                expect(e.message).toBe("Unauthorized or unexisting parameters : Unauthorized sort_by: ecotaxa_account_ecopart_user_id, Unauthorized order_by: toto, Filter field: ecotaxa_account_expiration_date, Filter operator: -")
+                expect(e.message).toBe("Unauthorized or unexisting parameters : Unauthorized sort_by: ecotaxa_account_ecopart_user_id, Unauthorized order_by: toto, Filter field: ecotaxa_account_expiration_utc_date_time, Filter operator: -")
             }
         });
     });

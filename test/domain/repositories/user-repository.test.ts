@@ -89,7 +89,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -114,7 +114,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -147,7 +147,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -173,7 +173,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -206,7 +206,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -239,7 +239,7 @@ describe("User Repository", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 total: 1
             }
@@ -295,7 +295,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(expectedData))
             const result = await userRepository.getUser(inputData);
@@ -644,7 +644,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(adminUser))
 
@@ -662,7 +662,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonAdminUser))
 
@@ -689,7 +689,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
             jest.spyOn(jwtAdapter, "sign").mockImplementation(() => { return "validation_token" })
@@ -787,7 +787,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
                 password_hash: "code",
                 confirmation_code: "code",
                 reset_password_code: "code"
@@ -802,7 +802,7 @@ describe("User Repository", () => {
                 organisation: 'LOV',
                 country: 'France',
                 user_planned_usage: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const result: PublicUserModel = userRepository.toPublicUser(inputData);
             expect(result).toStrictEqual(expectedData)
@@ -820,7 +820,7 @@ describe("User Repository", () => {
                 organisation: "anonymized",
                 country: "anonymized",
                 user_planned_usage: "anonymized",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
                 deleted: '2023-08-01 10:30:00',
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(deletedUser))
@@ -839,7 +839,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonDeletedUser))
 
@@ -857,7 +857,7 @@ describe("User Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUserDataSource, "getOne").mockImplementation(() => Promise.resolve(nonDeletedUser))
 

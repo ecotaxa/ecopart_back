@@ -197,7 +197,7 @@ export default function ProjectRouter(
      *       | `public_duration` | number | |
      *       | `serial_number` | string | |
      *       | `root_folder_path` | string | |
-     *       | `project_creation_date` | string (ISO timestamp) | |
+     *       | `project_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `instrument_model` | string | Computed — resolved to instrument model IDs |
      *       | `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |
      *       | `contact` | string or number | Computed — resolved to project IDs via privilege system |
@@ -681,7 +681,7 @@ export default function ProjectRouter(
      *             schema:
      *               type: object
      *               properties:
-     *                 last_backup_date:
+     *                 last_backup_utc_date_time:
      *                   type: string
      *                   format: date-time
      *                   nullable: true
@@ -713,8 +713,8 @@ export default function ProjectRouter(
     // Get last backup date for a project
     router.get('/:project_id/backup/last-date', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            const last_backup_date = await backupProjectUseCase.getLastBackupDate((req as CustomRequest).token, req.params.project_id as any);
-            res.status(200).send({ last_backup_date })
+            const last_backup_utc_date_time = await backupProjectUseCase.getLastBackupDate((req as CustomRequest).token, req.params.project_id as any);
+            res.status(200).send({ last_backup_utc_date_time })
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
@@ -1267,7 +1267,7 @@ export default function ProjectRouter(
      *                   sample_name:
      *                     type: string
      *                     description: Matching EcoPart sample name.
-     *                   ctd_import_date:
+     *                   ctd_import_utc_date_time:
      *                     type: string
      *                     description: CTD import date (ISO 8601).
      *                   file_extension:
@@ -1494,10 +1494,9 @@ export default function ProjectRouter(
      *       | `sample_name` | string | |
      *       | `comment` | string | |
      *       | `instrument_serial_number` | string | |
-     *       | `optional_structure_id` | string or null | |
      *       | `max_pressure` | number | |
      *       | `station_id` | string | |
-     *       | `sampling_date` | string (ISO date) | |
+     *       | `sampling_utc_date_time` | string (ISO date) | |
      *       | `latitude` | number | |
      *       | `longitude` | number | |
      *       | `wind_direction` | number | |
@@ -1507,7 +1506,7 @@ export default function ProjectRouter(
      *       | `bottom_depth` | number | |
      *       | `instrument_operator_email` | string | |
      *       | `filename` | string | |
-     *       | `sample_creation_date` | string (ISO timestamp) | |
+     *       | `sample_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `filter_first_image` | string | |
      *       | `filter_last_image` | string | |
      *       | `visual_qc_status_id` | number | |
@@ -1517,7 +1516,7 @@ export default function ProjectRouter(
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
-     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_date),asc(sample_id)`.
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_utc_date_time),asc(sample_id)`.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []

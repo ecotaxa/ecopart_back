@@ -330,7 +330,7 @@ describe('SQLiteUserDataSource', () => {
                 last_name: "EDITED",
                 organisation: "Organization",
                 reset_password_code: null,
-                user_creation_date: "2024-03-04 17:02:02",
+                user_creation_utc_date_time: "2024-03-04 17:02:02",
                 user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
@@ -341,7 +341,7 @@ describe('SQLiteUserDataSource', () => {
             // not null
             expect(user).not.toBeNull();
             if (user) {
-                // Compare each property individually, excluding the user_creation_date
+                // Compare each property individually, excluding the user_creation_utc_date_time
                 expect(user.confirmation_code).toEqual(user_by_id.confirmation_code);
                 expect(user.country).toEqual(user_by_id.country);
                 expect(user.deleted).toEqual(user_by_id.deleted);
@@ -373,7 +373,7 @@ describe('SQLiteUserDataSource', () => {
                 last_name: "EDITED",
                 organisation: "Organization",
                 reset_password_code: null,
-                user_creation_date: "2024-03-04 17:02:02",
+                user_creation_utc_date_time: "2024-03-04 17:02:02",
                 user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
@@ -384,7 +384,7 @@ describe('SQLiteUserDataSource', () => {
             // not null
             expect(user).not.toBeNull();
             if (user) {
-                // Compare each property individually, excluding the user_creation_date
+                // Compare each property individually, excluding the user_creation_utc_date_time
                 expect(user.confirmation_code).toEqual(user_by_id.confirmation_code);
                 expect(user.country).toEqual(user_by_id.country);
                 expect(user.deleted).toEqual(user_by_id.deleted);

@@ -63,7 +63,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(null)).mockImplementationOnce(() => Promise.resolve(created_user))
@@ -108,7 +108,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: '2023-08-01 10:30:00'
         }
         const updated_user: UserResponseModel = {
@@ -122,7 +122,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
@@ -170,7 +170,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
         const updated_user: UserResponseModel = {
             user_id: 1,
@@ -183,7 +183,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "getUser").mockImplementationOnce(() => Promise.resolve(preexistant_user)).mockImplementationOnce(() => Promise.resolve(updated_user))
@@ -227,7 +227,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const expectedResponse = new Error("Valid user already exists");
@@ -311,7 +311,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const expectedResponse = new Error("Cannot update preexistent user");
@@ -359,7 +359,7 @@ describe("Create User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const expectedResponse = new Error("Cannot find updated preexistent user");

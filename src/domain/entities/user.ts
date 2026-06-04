@@ -35,7 +35,7 @@ export interface UserRequestModel {
     organisation?: string;
     country?: string;
     user_planned_usage?: string;
-    user_creation_date?: string;
+    user_creation_utc_date_time?: string;
     deleted?: string;
 }
 export interface UserUpdateModel {
@@ -52,7 +52,7 @@ export interface UserUpdateModel {
     organisation?: string;
     country?: string;
     user_planned_usage?: string;
-    user_creation_date?: string;
+    user_creation_utc_date_time?: string;
     deleted?: string;
 }
 
@@ -72,7 +72,7 @@ export interface PublicUserModel {
     organisation: string;
     country: string;
     user_planned_usage: string;
-    user_creation_date: string;
+    user_creation_utc_date_time: string;
 }
 export interface PrivateUserModel extends PublicUserModel, UserResponseModel {
     password_hash?: string;

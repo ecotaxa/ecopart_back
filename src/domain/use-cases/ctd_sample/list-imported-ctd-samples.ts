@@ -42,7 +42,7 @@ export class ListImportedCTDSamples implements ListImportedCTDSamplesUseCase {
         const result = await this.sampleRepository.standardGetSamples(options);
         return result.items.map(sample => ({
             sample_name: sample.sample_name,
-            ctd_import_date: sample.ctd_import_date ?? "",
+            ctd_import_utc_date_time: sample.ctd_import_utc_date_time ?? "",
             file_extension: sample.ctd_file_extension ?? "",
         }));
     }

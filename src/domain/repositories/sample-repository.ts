@@ -147,14 +147,14 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         else if (instrument_model.startsWith('UVP5')) {
             // read from file_system_storage_project_folder/work and return the list of samples
-            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string);
+            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string, instrument_model);
         }
         const sample = this.constructSampleFromBaseAndFsStorage(sample_fss, base_sample);
 
         return sample;
     }
 
-    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string): Promise<Partial<SampleRequestCreationModel>> {
+    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string, instrument_model: string): Promise<Partial<SampleRequestCreationModel>> {
         // Complete the sample object
         // Get sample info from meta/uvp5_header_sn
         const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
@@ -183,6 +183,18 @@ export class SampleRepositoryImpl implements SampleRepository {
         delete (sample_header as any).latitude_raw;
         delete (sample_header as any).longitude_raw;
 
+        // Per Marc's spec: resize factor is a constant per UVP5 sub-model
+        // (UVP5SD = 2, UVP5HD = 1). Not in the install_config file itself.
+        const instrument_settings_process_vignette_resize_factor =
+            instrument_model === 'UVP5SD' ? 2
+                : instrument_model === 'UVP5HD' ? 1
+                    : undefined;
+
+        // TODO(marc): UVP5 pressure_gain constant — Marc said "0.1 or 10". Lock the value
+        // and set it here (e.g. 0.1) once confirmed. Left undefined for now so the column
+        // is empty on UVP5 rows rather than wrong.
+        const instrument_settings_acq_pressure_gain: number | undefined = undefined;
+
         // Construct the sample object
         const sample_to_return: Partial<SampleRequestCreationModel> = {
             ...sample_header,
@@ -193,6 +205,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             ...sample_install_config,
             sample_type_id,
             instrument_settings_images_post_process,
+            instrument_settings_process_vignette_resize_factor,
+            instrument_settings_acq_pressure_gain,
             latitude: coords.latitude,
             longitude: coords.longitude
         };
@@ -498,10 +512,10 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         });
 
-        // Prepare the output object
+        // Prepare the output object. The resize-factor depends on the UVP5 sub-model and is set
+        // by the caller (UVP5SD = 2, UVP5HD = 1) — not present in install_config.
         const sample: SampleFromInstallConfigModel = {
             instrument_settings_process_gamma: install_config_content['gamma'],
-            instrument_settings_vignettes_minimum_size_esd: install_config_content['esdmin']
         };
         return sample;
     }
@@ -523,8 +537,8 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         // Create the model with the parsed data
         const sample: SampleFromConfigurationDataModel = {
-            instrument_settings_acq_xsize: configuration_data_content['xsize'],           // xsize
-            instrument_settings_acq_ysize: configuration_data_content['ysize'],           // ysize
+            instrument_settings_acq_x_size: configuration_data_content['xsize'],           // xsize
+            instrument_settings_acq_y_size: configuration_data_content['ysize'],           // ysize
             instrument_settings_pixel_size_mm: configuration_data_content['pixel']        // Pixel_Size
         };
 
@@ -560,20 +574,27 @@ export class SampleRepositoryImpl implements SampleRepository {
                 work_hdr_content[key.trim()] = value.trim();
             }
         });
-        // Create the sample object
+        // Create the sample object.
+        // SMbase / SMzoo are minimum AREAS in pixels² (renamed columns).
+        // Ratio is the ROI-enlargement ratio (cropping window wider than the ROI). See plan
+        // section "Vignette ratio fields — disambiguation and rename".
         const sample: SampleFromWorkHDRModel = {
-            instrument_settings_acq_gain: parseInt(work_hdr_content['Gain']),                                 // Gain
-            instrument_settings_acq_description: lines[1].replace(';', '').trim(),                            // 2nd line description
-            instrument_settings_acq_task_type: parseInt(work_hdr_content['TaskType']),                        // TaskType
-            instrument_settings_acq_choice: parseInt(work_hdr_content['Choice']),                             // Choice
-            instrument_settings_acq_disk_type: parseInt(work_hdr_content['DiskType']),                        // DiskType
-            instrument_settings_acq_appendices_ratio: parseInt(work_hdr_content['Ratio']),                    // Ratio
-            instrument_settings_acq_erase_border: parseInt(work_hdr_content['EraseBorderBlobs']),             // EraseBorderBlobs
-            instrument_settings_acq_threshold: parseInt(work_hdr_content['Thresh']),                          // Thresh
-            instrument_settings_particle_minimum_size_pixels: parseInt(work_hdr_content['SMbase']),           // SMbase
-            instrument_settings_vignettes_minimum_size_pixels: parseInt(work_hdr_content['SMzoo']),           // SMzoo
-            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['Exposure']) || undefined,       // Exposure UVP5HD
-            instrument_settings_acq_exposure: parseInt(work_hdr_content['ShutterSpeed']) || undefined         // ShutterSpeed UVP5SD (default to 0 if missing)
+            instrument_settings_acq_gain: parseInt(work_hdr_content['Gain']),
+            instrument_settings_acq_description: lines[1].replace(';', '').trim(),
+            instrument_settings_acq_task_type: parseInt(work_hdr_content['TaskType']),
+            instrument_settings_acq_choice: parseInt(work_hdr_content['Choice']),
+            instrument_settings_acq_disk_type: parseInt(work_hdr_content['DiskType']),
+            instrument_settings_acq_vignette_roi_enlargement_ratio: parseInt(work_hdr_content['Ratio']),
+            instrument_settings_acq_erase_border: parseInt(work_hdr_content['EraseBorderBlobs']),
+            instrument_settings_acq_threshold: parseInt(work_hdr_content['Thresh']),
+            instrument_settings_particule_minimum_area_pixels: parseInt(work_hdr_content['SMbase']),
+            instrument_settings_vignette_minimum_area_pixels: parseInt(work_hdr_content['SMzoo']),
+            // Marc's spec says these two are likely swapped relative to the HDR fields they
+            // currently read from (acq_shutter_speed should be the UVP5SD code, acq_exposure
+            // should be the UVP5HD/UVP6 shutter in µs). See follow-up #8 in the plan — fixing
+            // the swap requires a backfill and is tracked separately.
+            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['Exposure']) || undefined,
+            instrument_settings_acq_exposure: parseInt(work_hdr_content['ShutterSpeed']) || undefined
         };
         return sample;
     }
@@ -607,6 +628,31 @@ export class SampleRepositoryImpl implements SampleRepository {
             max_pressure: work_datfile_content.sample_metadata.max_pressure,
         };
         return sample;
+    }
+
+    // UVP timestamps come in proprietary formats — typically "YYYYMMDDhhmmss" (UVP5
+    // meta_header filename) or "YYYYMMDD-HHMMSS" (UVP5 filename variant) or whatever
+    // UVPapp writes into metadata.ini's sample_metadata.sampledatetime. UVP convention
+    // is UTC. Convert to ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`) so the value stored in
+    // sample.sampling_utc_date_time is a real ISO datetime. Returns the input unchanged
+    // when no known pattern matches (best effort — beats silently dropping the value).
+    private parseUvpDateToIso(raw: string | null | undefined): string {
+        if (raw === null || raw === undefined) return "";
+        const s = String(raw).trim();
+        if (s.length === 0) return s;
+        // Already ISO 8601 (YYYY-MM-DDTHH:MM:SS...) — return as-is.
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return s;
+        // UVP variants: digits with optional `-` between date and time, and optional `_suffix`.
+        // Captures Y/M/D/h/m/s. Examples that match:
+        //   20200313004656            → "2020-03-13T00:46:56Z"
+        //   20200313-004656           → same
+        //   20200313004656_Merged-020 → same (suffix dropped)
+        const m = s.match(/^(\d{4})(\d{2})(\d{2})[-_]?(\d{2})(\d{2})(\d{2})/);
+        if (m) {
+            const [, y, mo, d, h, mi, se] = m;
+            return `${y}-${mo}-${d}T${h}:${mi}:${se}Z`;
+        }
+        return s;
     }
 
     parseMetaHeader(
@@ -653,7 +699,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             comment: row.comment,
             instrument_serial_number: instrumentSerialNumber,
             station_id: row.stationid,
-            sampling_date: row.filename,
+            sampling_utc_date_time: this.parseUvpDateToIso(row.filename),
             latitude_raw: row.latitude,
             longitude_raw: row.longitude,
             wind_direction: row.winddir,
@@ -707,9 +753,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             sample_name: ini_content.sample_metadata['profileid'] as string,
             comment: ini_content.sample_metadata['comment'] as string,
             instrument_serial_number: ini_content.HW_CONF['Camera_ref'] as string,
-            optional_structure_id: ini_content.sample_metadata['argoid'] as string,
             station_id: ini_content.sample_metadata['stationid'] as string,
-            sampling_date: ini_content.sample_metadata['sampledatetime'] as string,
+            sampling_utc_date_time: this.parseUvpDateToIso(ini_content.sample_metadata['sampledatetime'] as string),
             wind_direction: ini_content.sample_metadata['winddir'] as number,
             wind_speed: ini_content.sample_metadata['windspeed'] as number,
             sea_state: ini_content.sample_metadata['seastate'] as string,
@@ -724,25 +769,34 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_acq_task_type: undefined,
             instrument_settings_acq_choice: undefined,
             instrument_settings_acq_disk_type: undefined,
-            instrument_settings_acq_appendices_ratio: ini_content.ACQ_CONF['Appendices_ratio'] as number,
-            instrument_settings_acq_xsize: undefined,
-            instrument_settings_acq_ysize: undefined,
+            instrument_settings_acq_vignette_roi_enlargement_ratio: ini_content.ACQ_CONF['Appendices_ratio'] as number,
+            instrument_settings_acq_x_size: undefined,
+            instrument_settings_acq_y_size: undefined,
             instrument_settings_acq_erase_border: undefined,
             instrument_settings_acq_threshold: ini_content.HW_CONF['Threshold'] as number,
+            // UVP6 pressure raw data is in decibar; gain to convert to decibar is 1 (per Marc's spec).
+            instrument_settings_acq_pressure_gain: 1,
             instrument_settings_process_datetime: undefined,
+            // TODO(marc): pull the scale factor from compute_vignettes.txt — file is parsed
+            // separately for `gamma`; extend that parser to also return the scale value and
+            // wire it here. Plan section "Vignette ratio fields — disambiguation and rename".
+            instrument_settings_process_vignette_resize_factor: undefined,
             instrument_settings_images_post_process: "uvpapp",
             instrument_settings_aa: ini_content.HW_CONF['Aa'] as number,
             instrument_settings_exp: ini_content.HW_CONF['Exp'] as number,
             instrument_settings_image_volume_l: ini_content.HW_CONF['Image_volume'] as number,
             instrument_settings_pixel_size_mm: ini_content.HW_CONF['Pixel_Size'] as number,
             instrument_settings_depth_offset_m: ini_content.HW_CONF['Pressure_offset'] as number,
-            instrument_settings_particle_minimum_size_pixels: undefined,
-            instrument_settings_vignettes_minimum_size_pixels: undefined,
-            instrument_settings_particle_minimum_size_esd: ini_content.ACQ_CONF['Limit_lpm_detection_size'] as number,
-            instrument_settings_vignettes_minimum_size_esd: ini_content.ACQ_CONF['Vignetting_lower_limit_size'] as number,
+            // TODO(marc): parse particule/vignette min ESD from the ACQ_CONF line in data.txt,
+            // convert via Marc's area_px = floor((π × (ESD_mm/2)²) / Aa)^(1/Exp). ACQ_CONF
+            // position indices need confirmation. Plan section "UVP6 data.txt parsing for
+            // area-in-pixels fields".
+            instrument_settings_particule_minimum_area_pixels: undefined,
+            instrument_settings_vignette_minimum_area_pixels: undefined,
             instrument_settings_acq_shutter_speed: undefined,
             instrument_settings_acq_exposure: undefined,
-            instrument_settings_acq_shutter: undefined,
+            // UVP6 integration_time may or may not exist in metadata.ini — pending Marc's confirmation.
+            instrument_settings_integration_time: undefined,
 
             // these will be reprocessed
             latitude_raw: ini_content.sample_metadata['latitude'],
@@ -982,7 +1036,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return importable_samples;
     }
 
-    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void> {
+    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
         const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
@@ -1004,10 +1058,12 @@ export class SampleRepositoryImpl implements SampleRepository {
         );
 
         for (const sample_name of samples_names_to_import) {
-            const source_file_path = path.join(ctd_folder_path, `${sample_name}.ctd`);
+            const ctd_original_file_name = `${sample_name}.ctd`;
+            const ctd_imported_file_name = `${sample_name}.ctd`;
+            const source_file_path = path.join(ctd_folder_path, ctd_original_file_name);
             const ctd_file_extension = path.extname(source_file_path).replace(/^\./, ""); // e.g. "ctd"
             const sample_storage_folder = path.join(project_storage_path, sample_name);
-            const dest_file_path = path.join(sample_storage_folder, `${sample_name}.ctd`);
+            const dest_file_path = path.join(sample_storage_folder, ctd_imported_file_name);
 
             try {
                 await fsPromises.access(source_file_path);
@@ -1034,7 +1090,11 @@ export class SampleRepositoryImpl implements SampleRepository {
                     ctd_imported: true,
                     ctd_station_id: sample_info.station_id ?? null,
                     ctd_file_extension: ctd_file_extension,
-                    ctd_import_date: new Date().toISOString(),
+                    ctd_import_utc_date_time: new Date().toISOString(),
+                    ctd_original_file_name,
+                    ctd_imported_file_name,
+                    ctd_importator_user_id: importator_user_id,
+                    // ctd_latitude / ctd_longitude stay null until the CTD-file parser is wired (plan follow-up).
                 } as any);
             }
         }
@@ -1543,7 +1603,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const params_restricted: string[] = [
             "ecotaxa_sample_imported",
             "ecotaxa_import_status_id",
-            "ecotaxa_sample_import_date",
+            "ecotaxa_sample_import_utc_date_time",
             "ecotaxa_sample_id",
             "ecotaxa_sample_tsv_file_name",
             "ecotaxa_sample_local_folder_tsv_path",
@@ -1552,7 +1612,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_date"
+            "ctd_import_utc_date_time"
         ];
         const unauthorizedParams: string[] = [];
         const filteredData: Partial<SampleUpdateModel> = {};
@@ -1578,7 +1638,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             "sample_id",
             "ecotaxa_sample_imported",
             "ecotaxa_import_status_id",
-            "ecotaxa_sample_import_date",
+            "ecotaxa_sample_import_utc_date_time",
             "ecotaxa_sample_id",
             "ecotaxa_sample_tsv_file_name",
             "ecotaxa_sample_local_folder_tsv_path",
@@ -1587,7 +1647,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_date"
+            "ctd_import_utc_date_time"
         ];
         const updated_sample_nb = await this.updateSample(sample, params_restricted)
         return updated_sample_nb
@@ -1715,12 +1775,34 @@ export class SampleRepositoryImpl implements SampleRepository {
         return counts;
     }
 
-    async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
-        // Can be filtered by 
-        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported"]
+    async countEcotaxaSamplesPerProject(project_ids: number[]): Promise<Map<number, number>> {
+        const counts = new Map<number, number>();
+        for (const project_id of project_ids) counts.set(project_id, 0);
+        if (project_ids.length === 0) return counts;
 
-        // Can be sort_by 
-        const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "optional_structure_id", "max_pressure", "station_id", "sampling_date", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_appendices_ratio", "instrument_settings_acq_xsize", "instrument_settings_acq_ysize", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particle_minimum_size_pixels", "instrument_settings_vignettes_minimum_size_pixels", "instrument_settings_particle_minimum_size_esd", "instrument_settings_vignettes_minimum_size_esd", "instrument_settings_acq_shutter", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id"]
+        // Same totals-only trick as countSamplesPerProject, with an extra
+        // ecotaxa_sample_imported=true filter.
+        for (const project_id of project_ids) {
+            const result = await this.sampleDataSource.getAll({
+                filter: [
+                    { field: "project_id", operator: "=", value: project_id },
+                    { field: "ecotaxa_sample_imported", operator: "=", value: true },
+                ],
+                sort_by: [],
+                page: 1,
+                limit: 1,
+            });
+            counts.set(project_id, result.total);
+        }
+        return counts;
+    }
+
+    async standardGetSamples(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
+        // Can be filtered by
+        const filter_params_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "max_pressure", "station_id", "sampling_utc_date_time", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_vignette_roi_enlargement_ratio", "instrument_settings_acq_x_size", "instrument_settings_acq_y_size", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_acq_pressure_gain", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_process_vignette_resize_factor", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particule_minimum_area_pixels", "instrument_settings_vignette_minimum_area_pixels", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "instrument_settings_integration_time", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "ecotaxa_sample_imported", "ctd_imported", "nb_black"]
+
+        // Can be sort_by
+        const sort_param_restricted = ["sample_id", "sample_name", "comment", "instrument_serial_number", "max_pressure", "station_id", "sampling_utc_date_time", "latitude", "longitude", "wind_direction", "wind_speed", "sea_state", "nebulousness", "bottom_depth", "operator_email", "filename", "filter_first_image", "filter_last_image", "instrument_settings_acq_gain", "instrument_settings_acq_description", "instrument_settings_acq_task_type", "instrument_settings_acq_choice", "instrument_settings_acq_disk_type", "instrument_settings_acq_vignette_roi_enlargement_ratio", "instrument_settings_acq_x_size", "instrument_settings_acq_y_size", "instrument_settings_acq_erase_border", "instrument_settings_acq_threshold", "instrument_settings_acq_pressure_gain", "instrument_settings_process_datetime", "instrument_settings_process_gamma", "instrument_settings_process_vignette_resize_factor", "instrument_settings_images_post_process", "instrument_settings_aa", "instrument_settings_exp", "instrument_settings_image_volume_l", "instrument_settings_pixel_size_mm", "instrument_settings_depth_offset_m", "instrument_settings_particule_minimum_area_pixels", "instrument_settings_vignette_minimum_area_pixels", "instrument_settings_acq_shutter_speed", "instrument_settings_acq_exposure", "instrument_settings_integration_time", "visual_qc_validator_user_id", "sample_type_id", "project_id", "visual_qc_status_id", "nb_black"]
 
         return await this.getSamples(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -1951,7 +2033,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 sample_id: sample.sample_id,
                 ecotaxa_sample_imported: false,
                 ecotaxa_import_status_id: undefined,
-                ecotaxa_sample_import_date: undefined,
+                ecotaxa_sample_import_utc_date_time: undefined,
                 ecotaxa_sample_id: undefined,
                 ecotaxa_sample_tsv_file_name: undefined,
                 ecotaxa_sample_local_folder_tsv_path: undefined,
@@ -1995,7 +2077,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 ctd_imported: false,
                 ctd_station_id: undefined,
                 ctd_file_extension: undefined,
-                ctd_import_date: undefined,
+                ctd_import_utc_date_time: undefined,
             };
             await this.standardUpdateSample(sample_update);
         }

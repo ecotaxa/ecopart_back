@@ -91,10 +91,10 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
     async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
+        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
 
         // Can be sort_by
-        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_date"]
+        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
 
         return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -199,11 +199,11 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             members: privileges.members,
             managers: privileges.managers,
             contact: privileges.contact,
-            project_creation_date: project.project_creation_date,
+            project_creation_utc_date_time: project.project_creation_utc_date_time,
             ecotaxa_project_id: project.ecotaxa_project_id,
             ecotaxa_project_name: project.ecotaxa_project_name,
             ecotaxa_instance_id: project.ecotaxa_instance_id,
-            last_backup_date: project.last_backup_date ?? null
+            last_backup_utc_date_time: project.last_backup_utc_date_time ?? null
         };
 
         return publicProject;

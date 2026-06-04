@@ -209,7 +209,7 @@ describe("User Router", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/users/1").send(user_to_update)
@@ -239,7 +239,7 @@ describe("User Router", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/users/1").send(user_to_update)
@@ -285,7 +285,7 @@ describe("User Router", () => {
                         organisation: "LOV",
                         country: "France",
                         user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                        user_creation_date: '2023-08-01 10:30:00'
+                        user_creation_utc_date_time: '2023-08-01 10:30:00'
                     }],
                 search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
 
@@ -366,7 +366,7 @@ describe("User Router", () => {
                         organisation: "LOV",
                         country: "France",
                         user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                        user_creation_date: '2023-08-01 10:30:00'
+                        user_creation_utc_date_time: '2023-08-01 10:30:00'
                     }],
                 search_info: { limit: 10, page: 1, pages: 1, total: 1, total_on_page: 1 }
 

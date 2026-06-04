@@ -36,7 +36,7 @@ class MockMiddlewareAuth implements MiddlewareAuth {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
 
             iat: 1693237789,
             exp: 1724795389

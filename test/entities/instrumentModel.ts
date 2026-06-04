@@ -6,13 +6,13 @@ import { SearchInfo } from "../../src/domain/entities/search"
 
 export const instrument_model_response: InstrumentModelResponseModel = {
     instrument_model_id: 1,
-    instrument_model_creation_date: '2023-08-01 10:30:00',
+    instrument_model_creation_utc_date_time: '2023-08-01 10:30:00',
     instrument_model_name: "UVP5HD",
     bodc_url: "http://uvp5hd.com",
 }
 export const instrument_model_response_UVP6: InstrumentModelResponseModel = {
     instrument_model_id: 2,
-    instrument_model_creation_date: '2024-08-01 10:30:00',
+    instrument_model_creation_utc_date_time: '2024-08-01 10:30:00',
     instrument_model_name: "UVP6HF",
     bodc_url: "http://uvp6hf.com",
 }

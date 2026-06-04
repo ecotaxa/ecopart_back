@@ -5,6 +5,96 @@ import { SampleDataSource } from "../../interfaces/data-sources/sample-data-sour
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
+// Shared row → PublicSampleModel mapper. Used by getOne() and getAll().
+// Expects the JOINs to alias `user u_qc ...` and `user u_ctd ...` so QC validator and
+// CTD importator columns don't collide.
+function mapRowToPublicSample(row: any): PublicSampleModel {
+    const qc_first = row.qc_first_name;
+    const qc_last = row.qc_last_name;
+    const qc_email = row.qc_email;
+    const ctd_first = row.ctd_first_name;
+    const ctd_last = row.ctd_last_name;
+    const ctd_email = row.ctd_email;
+    const ctd_importator_name = (ctd_first || ctd_last) ? `${ctd_first ?? ""} ${ctd_last ?? ""}`.trim() : null;
+
+    return {
+        sample_id: row.sample_id,
+        sample_name: row.sample_name,
+        comment: row.comment,
+        instrument_serial_number: row.instrument_serial_number,
+        max_pressure: row.max_pressure,
+        station_id: row.station_id,
+        sampling_utc_date_time: row.sampling_utc_date_time,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        wind_direction: row.wind_direction,
+        wind_speed: row.wind_speed,
+        sea_state: row.sea_state,
+        nebulousness: row.nebulousness,
+        bottom_depth: row.bottom_depth,
+        instrument_operator_email: row.instrument_operator_email,
+        filename: row.filename,
+        sample_creation_utc_date_time: row.sample_creation_utc_date_time,
+        filter_first_image: row.filter_first_image,
+        filter_last_image: row.filter_last_image,
+        instrument_settings_acq_gain: row.instrument_settings_acq_gain,
+        instrument_settings_acq_description: row.instrument_settings_acq_description,
+        instrument_settings_acq_task_type: row.instrument_settings_acq_task_type,
+        instrument_settings_acq_choice: row.instrument_settings_acq_choice,
+        instrument_settings_acq_disk_type: row.instrument_settings_acq_disk_type,
+        instrument_settings_acq_vignette_roi_enlargement_ratio: row.instrument_settings_acq_vignette_roi_enlargement_ratio,
+        instrument_settings_acq_x_size: row.instrument_settings_acq_x_size,
+        instrument_settings_acq_y_size: row.instrument_settings_acq_y_size,
+        instrument_settings_acq_erase_border: row.instrument_settings_acq_erase_border,
+        instrument_settings_acq_threshold: row.instrument_settings_acq_threshold,
+        instrument_settings_acq_pressure_gain: row.instrument_settings_acq_pressure_gain ?? undefined,
+        instrument_settings_process_datetime: row.instrument_settings_process_datetime,
+        instrument_settings_process_gamma: row.instrument_settings_process_gamma,
+        instrument_settings_process_vignette_resize_factor: row.instrument_settings_process_vignette_resize_factor ?? undefined,
+        instrument_settings_images_post_process: row.instrument_settings_images_post_process,
+        instrument_settings_aa: row.instrument_settings_aa,
+        instrument_settings_exp: row.instrument_settings_exp,
+        instrument_settings_image_volume_l: row.instrument_settings_image_volume_l,
+        instrument_settings_pixel_size_mm: row.instrument_settings_pixel_size_mm,
+        instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m,
+        instrument_settings_particule_minimum_area_pixels: row.instrument_settings_particule_minimum_area_pixels,
+        instrument_settings_vignette_minimum_area_pixels: row.instrument_settings_vignette_minimum_area_pixels,
+        instrument_settings_acq_shutter_speed: row.instrument_settings_acq_shutter_speed,
+        instrument_settings_acq_exposure: row.instrument_settings_acq_exposure,
+        instrument_settings_integration_time: row.instrument_settings_integration_time ?? undefined,
+        visual_qc_validator_user_id: row.visual_qc_validator_user_id,
+        visual_qc_validator_user: `${qc_first ?? ""} ${qc_last ?? ""} (${qc_email ?? ""})`.trim(),
+        visual_qc_validator_email: qc_email ?? "",
+        visual_qc_status_id: row.visual_qc_status_id,
+        visual_qc_status_label: row.visual_qc_status_label,
+        sample_type_id: row.sample_type_id,
+        sample_type_label: row.sample_type_label,
+        project_id: row.project_id,
+        ecotaxa_sample_imported: row.ecotaxa_sample_imported,
+        ecotaxa_sample_import_utc_date_time: row.ecotaxa_sample_import_utc_date_time,
+        ecotaxa_sample_id: row.ecotaxa_sample_id,
+        ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
+        ecotaxa_sample_local_folder_tsv_path: row.ecotaxa_sample_local_folder_tsv_path,
+        ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
+        ecotaxa_import_status_id: row.ecotaxa_import_status_id,
+        ecotaxa_import_status_label: row.ecotaxa_import_status_label,
+        ecotaxa_sample_task_id: row.ecotaxa_sample_task_id,
+        ctd_imported: !!row.ctd_imported,
+        ctd_station_id: row.ctd_station_id ?? null,
+        ctd_file_extension: row.ctd_file_extension ?? null,
+        ctd_import_utc_date_time: row.ctd_import_utc_date_time ?? null,
+        ctd_original_file_name: row.ctd_original_file_name ?? null,
+        ctd_imported_file_name: row.ctd_imported_file_name ?? null,
+        ctd_importator_user_id: row.ctd_importator_user_id ?? null,
+        ctd_latitude: row.ctd_latitude ?? null,
+        ctd_longitude: row.ctd_longitude ?? null,
+        ctd_importator_name,
+        ctd_importator_email: ctd_email ?? null,
+        nb_vignettes: row.nb_vignettes ?? 0,
+        nb_black: row.nb_black ?? 0,
+    };
+}
+
 // const DB_TABLE = "sample"
 export class SQLiteSampleDataSource implements SampleDataSource {
 
@@ -14,9 +104,50 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     }
 
     async createOne(sample: SampleRequestCreationModel): Promise<number> {
-        const params = [sample.sample_name, sample.comment, sample.instrument_serial_number, sample.optional_structure_id, sample.max_pressure, sample.station_id, sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth, sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio, sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize, sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold, sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp, sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels, sample.instrument_settings_vignettes_minimum_size_pixels, sample.instrument_settings_particle_minimum_size_esd, sample.instrument_settings_vignettes_minimum_size_esd, sample.instrument_settings_acq_shutter, sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure, sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id, sample.nb_vignettes]
+        const params = [
+            sample.sample_name, sample.comment, sample.instrument_serial_number,
+            sample.max_pressure, sample.station_id, sample.sampling_utc_date_time, sample.latitude, sample.longitude,
+            sample.wind_direction, sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth,
+            sample.instrument_operator_email, sample.filename, sample.filter_first_image, sample.filter_last_image,
+            sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description, sample.instrument_settings_acq_task_type,
+            sample.instrument_settings_acq_choice, sample.instrument_settings_acq_disk_type,
+            sample.instrument_settings_acq_vignette_roi_enlargement_ratio,
+            sample.instrument_settings_acq_x_size, sample.instrument_settings_acq_y_size, sample.instrument_settings_acq_erase_border,
+            sample.instrument_settings_acq_threshold, sample.instrument_settings_acq_pressure_gain,
+            sample.instrument_settings_process_datetime, sample.instrument_settings_process_gamma,
+            sample.instrument_settings_process_vignette_resize_factor,
+            sample.instrument_settings_images_post_process, sample.instrument_settings_aa, sample.instrument_settings_exp,
+            sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_depth_offset_m,
+            sample.instrument_settings_particule_minimum_area_pixels, sample.instrument_settings_vignette_minimum_area_pixels,
+            sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure,
+            sample.instrument_settings_integration_time,
+            sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
+            sample.nb_vignettes, sample.nb_black,
+            // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time
+            // (see sqlite-task-data-source about why we no longer rely on DEFAULT CURRENT_TIMESTAMP).
+            new Date().toISOString(),
+        ]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO sample (sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, instrument_settings_acq_threshold, instrument_settings_process_datetime, instrument_settings_process_gamma, instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, instrument_settings_vignettes_minimum_size_pixels, instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd, instrument_settings_acq_shutter, instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id, nb_vignettes
+        const sql = `INSERT INTO sample (
+            sample_name, comment, instrument_serial_number,
+            max_pressure, station_id, sampling_utc_date_time, latitude, longitude,
+            wind_direction, wind_speed, sea_state, nebulousness, bottom_depth,
+            instrument_operator_email, filename, filter_first_image, filter_last_image,
+            instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type,
+            instrument_settings_acq_choice, instrument_settings_acq_disk_type,
+            instrument_settings_acq_vignette_roi_enlargement_ratio,
+            instrument_settings_acq_x_size, instrument_settings_acq_y_size, instrument_settings_acq_erase_border,
+            instrument_settings_acq_threshold, instrument_settings_acq_pressure_gain,
+            instrument_settings_process_datetime, instrument_settings_process_gamma,
+            instrument_settings_process_vignette_resize_factor,
+            instrument_settings_images_post_process, instrument_settings_aa, instrument_settings_exp,
+            instrument_settings_image_volume_l, instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m,
+            instrument_settings_particule_minimum_area_pixels, instrument_settings_vignette_minimum_area_pixels,
+            instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure,
+            instrument_settings_integration_time,
+            visual_qc_validator_user_id, sample_type_id, project_id,
+            nb_vignettes, nb_black,
+            sample_creation_utc_date_time
         ) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
@@ -45,46 +176,57 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                     return new Promise<number>((resolveInsert, rejectInsert) => {
                         const params = [
                             sample.sample_name, sample.comment, sample.instrument_serial_number,
-                            sample.optional_structure_id, sample.max_pressure, sample.station_id,
-                            sample.sampling_date, sample.latitude, sample.longitude, sample.wind_direction,
+                            sample.max_pressure, sample.station_id,
+                            sample.sampling_utc_date_time, sample.latitude, sample.longitude, sample.wind_direction,
                             sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth,
                             sample.instrument_operator_email, sample.filename, sample.filter_first_image,
                             sample.filter_last_image,
                             sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description,
                             sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice,
-                            sample.instrument_settings_acq_disk_type, sample.instrument_settings_acq_appendices_ratio,
-                            sample.instrument_settings_acq_xsize, sample.instrument_settings_acq_ysize,
+                            sample.instrument_settings_acq_disk_type,
+                            sample.instrument_settings_acq_vignette_roi_enlargement_ratio,
+                            sample.instrument_settings_acq_x_size, sample.instrument_settings_acq_y_size,
                             sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold,
+                            sample.instrument_settings_acq_pressure_gain,
                             sample.instrument_settings_process_datetime,
-                            sample.instrument_settings_process_gamma, sample.instrument_settings_images_post_process,
+                            sample.instrument_settings_process_gamma,
+                            sample.instrument_settings_process_vignette_resize_factor,
+                            sample.instrument_settings_images_post_process,
                             sample.instrument_settings_aa, sample.instrument_settings_exp,
                             sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm,
-                            sample.instrument_settings_depth_offset_m, sample.instrument_settings_particle_minimum_size_pixels,
-                            sample.instrument_settings_vignettes_minimum_size_pixels,
-                            sample.instrument_settings_particle_minimum_size_esd,
-                            sample.instrument_settings_vignettes_minimum_size_esd,
-                            sample.instrument_settings_acq_shutter,
+                            sample.instrument_settings_depth_offset_m,
+                            sample.instrument_settings_particule_minimum_area_pixels,
+                            sample.instrument_settings_vignette_minimum_area_pixels,
                             sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure,
+                            sample.instrument_settings_integration_time,
                             sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
-                            sample.nb_vignettes
+                            sample.nb_vignettes, sample.nb_black,
+                            // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time.
+                            new Date().toISOString(),
                         ];
 
                         const placeholders = params.map(() => '?').join(', ');
                         const sql = `INSERT INTO sample (
-                            sample_name, comment, instrument_serial_number, optional_structure_id, max_pressure, 
-                            station_id, sampling_date, latitude, longitude, wind_direction, wind_speed, sea_state, 
-                            nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image, 
-                            instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type, 
-                            instrument_settings_acq_choice, instrument_settings_acq_disk_type, instrument_settings_acq_appendices_ratio, 
-                            instrument_settings_acq_xsize, instrument_settings_acq_ysize, instrument_settings_acq_erase_border, 
-                            instrument_settings_acq_threshold, instrument_settings_process_datetime, 
-                            instrument_settings_process_gamma, instrument_settings_images_post_process, 
-                            instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l, 
-                            instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m, instrument_settings_particle_minimum_size_pixels, 
-                            instrument_settings_vignettes_minimum_size_pixels, instrument_settings_acq_shutter_speed, 
-                            instrument_settings_particle_minimum_size_esd, instrument_settings_vignettes_minimum_size_esd,
-                            instrument_settings_acq_shutter, instrument_settings_acq_exposure, visual_qc_validator_user_id, sample_type_id, project_id,
-                            nb_vignettes
+                            sample_name, comment, instrument_serial_number,
+                            max_pressure, station_id, sampling_utc_date_time, latitude, longitude, wind_direction, wind_speed, sea_state,
+                            nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image,
+                            instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type,
+                            instrument_settings_acq_choice, instrument_settings_acq_disk_type,
+                            instrument_settings_acq_vignette_roi_enlargement_ratio,
+                            instrument_settings_acq_x_size, instrument_settings_acq_y_size, instrument_settings_acq_erase_border,
+                            instrument_settings_acq_threshold, instrument_settings_acq_pressure_gain,
+                            instrument_settings_process_datetime, instrument_settings_process_gamma,
+                            instrument_settings_process_vignette_resize_factor,
+                            instrument_settings_images_post_process,
+                            instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l,
+                            instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m,
+                            instrument_settings_particule_minimum_area_pixels,
+                            instrument_settings_vignette_minimum_area_pixels,
+                            instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure,
+                            instrument_settings_integration_time,
+                            visual_qc_validator_user_id, sample_type_id, project_id,
+                            nb_vignettes, nb_black,
+                            sample_creation_utc_date_time
                         ) VALUES (${placeholders})`;
 
                         this.db.run(sql, params, function (err) {
@@ -140,8 +282,20 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             return null
         }
 
-        // form final sql
-        const sql = `SELECT sample.*, user.first_name, user.last_name, user.email, sample_type.sample_type_label, ecotaxa_import_status.ecotaxa_import_status_label, visual_quality_check_status.visual_qc_status_label FROM sample LEFT JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id LEFT JOIN visual_quality_check_status on sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id LEFT JOIN user on sample.visual_qc_validator_user_id=user.user_id LEFT JOIN ecotaxa_import_status ON sample.ecotaxa_import_status_id = ecotaxa_import_status.ecotaxa_import_status_id WHERE ` + placeholders + `LIMIT 1;`;
+        // form final sql — two user joins (qc validator + ctd importator), aliased so the row mapper can read both
+        const sql = `SELECT sample.*,
+                u_qc.first_name AS qc_first_name, u_qc.last_name AS qc_last_name, u_qc.email AS qc_email,
+                u_ctd.first_name AS ctd_first_name, u_ctd.last_name AS ctd_last_name, u_ctd.email AS ctd_email,
+                sample_type.sample_type_label,
+                ecotaxa_import_status.ecotaxa_import_status_label,
+                visual_quality_check_status.visual_qc_status_label
+            FROM sample
+            LEFT JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
+            LEFT JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
+            LEFT JOIN user u_qc ON sample.visual_qc_validator_user_id = u_qc.user_id
+            LEFT JOIN user u_ctd ON sample.ctd_importator_user_id = u_ctd.user_id
+            LEFT JOIN ecotaxa_import_status ON sample.ecotaxa_import_status_id = ecotaxa_import_status.ecotaxa_import_status_id
+            WHERE ` + placeholders + `LIMIT 1;`;
         return await new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -152,74 +306,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                         return;
                     }
                     else {
-                        const result = {
-                            sample_id: row.sample_id,
-                            sample_name: row.sample_name,
-                            comment: row.comment,
-                            instrument_serial_number: row.instrument_serial_number,
-                            optional_structure_id: row.optional_structure_id,
-                            max_pressure: row.max_pressure,
-                            station_id: row.station_id,
-                            sampling_date: row.sampling_date,
-                            latitude: row.latitude,
-                            longitude: row.longitude,
-                            wind_direction: row.wind_direction,
-                            wind_speed: row.wind_speed,
-                            sea_state: row.sea_state,
-                            nebulousness: row.nebulousness,
-                            bottom_depth: row.bottom_depth,
-                            instrument_operator_email: row.instrument_operator_email,
-                            filename: row.filename,
-                            sample_creation_date: row.sample_creation_date,
-                            filter_first_image: row.filter_first_image,
-                            filter_last_image: row.filter_last_image,
-                            instrument_settings_acq_gain: row.instrument_settings_acq_gain,
-                            instrument_settings_acq_description: row.instrument_settings_acq_description,
-                            instrument_settings_acq_task_type: row.instrument_settings_acq_task_type,
-                            instrument_settings_acq_choice: row.instrument_settings_acq_choice,
-                            instrument_settings_acq_disk_type: row.instrument_settings_acq_disk_type,
-                            instrument_settings_acq_appendices_ratio: row.instrument_settings_acq_appendices_ratio,
-                            instrument_settings_acq_xsize: row.instrument_settings_acq_xsize,
-                            instrument_settings_acq_ysize: row.instrument_settings_acq_ysize,
-                            instrument_settings_acq_erase_border: row.instrument_settings_acq_erase_border,
-                            instrument_settings_acq_threshold: row.instrument_settings_acq_threshold,
-                            instrument_settings_process_datetime: row.instrument_settings_process_datetime,
-                            instrument_settings_process_gamma: row.instrument_settings_process_gamma,
-                            instrument_settings_images_post_process: row.instrument_settings_images_post_process,
-                            instrument_settings_aa: row.instrument_settings_aa,
-                            instrument_settings_exp: row.instrument_settings_exp,
-                            instrument_settings_image_volume_l: row.instrument_settings_image_volume_l,
-                            instrument_settings_pixel_size_mm: row.instrument_settings_pixel_size_mm,
-                            instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m,
-                            instrument_settings_particle_minimum_size_pixels: row.instrument_settings_particle_minimum_size_pixels,
-                            instrument_settings_vignettes_minimum_size_pixels: row.instrument_settings_vignettes_minimum_size_pixels,
-                            instrument_settings_particle_minimum_size_esd: row.instrument_settings_particle_minimum_size_esd,
-                            instrument_settings_vignettes_minimum_size_esd: row.instrument_settings_vignettes_minimum_size_esd,
-                            instrument_settings_acq_shutter: row.instrument_settings_acq_shutter_speed,
-                            instrument_settings_acq_shutter_speed: row.instrument_settings_acq_shutter_speed,
-                            instrument_settings_acq_exposure: row.instrument_settings_acq_exposure,
-                            visual_qc_validator_user_id: row.visual_qc_validator_user_id,
-                            visual_qc_validator_user: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
-                            visual_qc_status_id: row.visual_qc_status_id,
-                            visual_qc_status_label: row.visual_qc_status_label,
-                            sample_type_id: row.sample_type_id,
-                            sample_type_label: row.sample_type_label,
-                            project_id: row.project_id,
-                            ecotaxa_sample_imported: row.ecotaxa_sample_imported,
-                            ecotaxa_sample_import_date: row.ecotaxa_sample_import_date,
-                            ecotaxa_sample_id: row.ecotaxa_sample_id,
-                            ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
-                            ecotaxa_sample_local_folder_tsv_path: row.ecotaxa_sample_local_folder_tsv_path,
-                            ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
-                            ecotaxa_import_status_id: row.ecotaxa_import_status_id,
-                            ecotaxa_import_status_label: row.ecotaxa_import_status_label,
-                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id,
-                            ctd_imported: !!row.ctd_imported,
-                            ctd_station_id: row.ctd_station_id ?? null,
-                            ctd_file_extension: row.ctd_file_extension ?? null,
-                            ctd_import_date: row.ctd_import_date ?? null,
-                            nb_vignettes: row.nb_vignettes ?? 0
-                        };
+                        const result = mapRowToPublicSample(row);
                         resolve(result);
                     }
                 }
@@ -245,7 +332,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     async deleteOneEcoTaxaSample(sample: SampleIdModel): Promise<number> {
         // reset to null and 0 ecotaxa fields based on sample_id
-        const sql = `UPDATE sample SET ecotaxa_sample_imported = 0, ecotaxa_sample_import_date = NULL, ecotaxa_sample_id = NULL, ecotaxa_sample_tsv_file_name = NULL, ecotaxa_sample_local_folder_tsv_path = NULL, ecotaxa_sample_nb_images = NULL, ecotaxa_import_status_id = NULL, ecotaxa_sample_task_id = NULL WHERE sample_id = (?)`;
+        const sql = `UPDATE sample SET ecotaxa_sample_imported = 0, ecotaxa_sample_import_utc_date_time = NULL, ecotaxa_sample_id = NULL, ecotaxa_sample_tsv_file_name = NULL, ecotaxa_sample_local_folder_tsv_path = NULL, ecotaxa_sample_nb_images = NULL, ecotaxa_import_status_id = NULL, ecotaxa_sample_task_id = NULL WHERE sample_id = (?)`;
         return await new Promise((resolve, reject) => {
             this.db.run(sql, [sample.sample_id], function (err) {
                 if (err) {
@@ -261,7 +348,13 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<PublicSampleModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT sample.*, user.first_name, user.last_name, user.email, sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label, (SELECT COUNT(*) FROM sample`
+        let sql = `SELECT sample.*,
+                u_qc.first_name AS qc_first_name, u_qc.last_name AS qc_last_name, u_qc.email AS qc_email,
+                u_ctd.first_name AS ctd_first_name, u_ctd.last_name AS ctd_last_name, u_ctd.email AS ctd_email,
+                sample_type.sample_type_label,
+                visual_quality_check_status.visual_qc_status_label,
+                ecotaxa_import_status.ecotaxa_import_status_label,
+                (SELECT COUNT(*) FROM sample`
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -314,8 +407,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             ON sample.sample_type_id = sample_type.sample_type_id
         LEFT JOIN visual_quality_check_status
             ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
-        LEFT JOIN user
-            ON sample.visual_qc_validator_user_id = user.user_id
+        LEFT JOIN user u_qc
+            ON sample.visual_qc_validator_user_id = u_qc.user_id
+        LEFT JOIN user u_ctd
+            ON sample.ctd_importator_user_id = u_ctd.user_id
         LEFT JOIN ecotaxa_import_status
             ON sample.ecotaxa_import_status_id = ecotaxa_import_status.ecotaxa_import_status_id
         `;
@@ -352,74 +447,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 } else {
                     if (rows === undefined) resolve({ items: [], total: 0 });
                     const result: SearchResult<PublicSampleModel> = {
-                        items: rows.map(row => ({
-                            sample_id: row.sample_id,
-                            sample_name: row.sample_name,
-                            comment: row.comment,
-                            instrument_serial_number: row.instrument_serial_number,
-                            optional_structure_id: row.optional_structure_id,
-                            max_pressure: row.max_pressure,
-                            station_id: row.station_id,
-                            sampling_date: row.sampling_date,
-                            latitude: row.latitude,
-                            longitude: row.longitude,
-                            wind_direction: row.wind_direction,
-                            wind_speed: row.wind_speed,
-                            sea_state: row.sea_state,
-                            nebulousness: row.nebulousness,
-                            bottom_depth: row.bottom_depth,
-                            instrument_operator_email: row.instrument_operator_email,
-                            filename: row.filename,
-                            sample_creation_date: row.sample_creation_date,
-                            filter_first_image: row.filter_first_image,
-                            filter_last_image: row.filter_last_image,
-                            instrument_settings_acq_gain: row.instrument_settings_acq_gain,
-                            instrument_settings_acq_description: row.instrument_settings_acq_description,
-                            instrument_settings_acq_task_type: row.instrument_settings_acq_task_type,
-                            instrument_settings_acq_choice: row.instrument_settings_acq_choice,
-                            instrument_settings_acq_disk_type: row.instrument_settings_acq_disk_type,
-                            instrument_settings_acq_appendices_ratio: row.instrument_settings_acq_appendices_ratio,
-                            instrument_settings_acq_xsize: row.instrument_settings_acq_xsize,
-                            instrument_settings_acq_ysize: row.instrument_settings_acq_ysize,
-                            instrument_settings_acq_erase_border: row.instrument_settings_acq_erase_border,
-                            instrument_settings_acq_threshold: row.instrument_settings_acq_threshold,
-                            instrument_settings_process_datetime: row.instrument_settings_process_datetime,
-                            instrument_settings_process_gamma: row.instrument_settings_process_gamma,
-                            instrument_settings_images_post_process: row.instrument_settings_images_post_process,
-                            instrument_settings_aa: row.instrument_settings_aa,
-                            instrument_settings_exp: row.instrument_settings_exp,
-                            instrument_settings_image_volume_l: row.instrument_settings_image_volume_l,
-                            instrument_settings_pixel_size_mm: row.instrument_settings_pixel_size_mm,
-                            instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m,
-                            instrument_settings_particle_minimum_size_pixels: row.instrument_settings_particle_minimum_size_pixels,
-                            instrument_settings_vignettes_minimum_size_pixels: row.instrument_settings_vignettes_minimum_size_pixels,
-                            instrument_settings_particle_minimum_size_esd: row.instrument_settings_particle_minimum_size_esd,
-                            instrument_settings_vignettes_minimum_size_esd: row.instrument_settings_vignettes_minimum_size_esd,
-                            instrument_settings_acq_shutter: row.instrument_settings_acq_shutter_speed,
-                            instrument_settings_acq_shutter_speed: row.instrument_settings_acq_shutter_speed,
-                            instrument_settings_acq_exposure: row.instrument_settings_acq_exposure,
-                            visual_qc_validator_user_id: row.visual_qc_validator_user_id,
-                            visual_qc_validator_user: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
-                            visual_qc_status_id: row.visual_qc_status_id,
-                            visual_qc_status_label: row.visual_qc_status_label,
-                            sample_type_id: row.sample_type_id,
-                            sample_type_label: row.sample_type_label,
-                            project_id: row.project_id,
-                            ecotaxa_sample_imported: row.ecotaxa_sample_imported,
-                            ecotaxa_sample_import_date: row.ecotaxa_sample_import_date,
-                            ecotaxa_sample_id: row.ecotaxa_sample_id,
-                            ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
-                            ecotaxa_sample_local_folder_tsv_path: row.ecotaxa_sample_local_folder_tsv_path,
-                            ecotaxa_sample_nb_images: row.ecotaxa_sample_nb_images,
-                            ecotaxa_import_status_id: row.ecotaxa_import_status_id,
-                            ecotaxa_import_status_label: row.ecotaxa_import_status_label,
-                            ecotaxa_sample_task_id: row.ecotaxa_sample_task_id,
-                            ctd_imported: !!row.ctd_imported,
-                            ctd_station_id: row.ctd_station_id ?? null,
-                            ctd_file_extension: row.ctd_file_extension ?? null,
-                            ctd_import_date: row.ctd_import_date ?? null,
-                            nb_vignettes: row.nb_vignettes ?? 0
-                        })),
+                        items: rows.map(row => mapRowToPublicSample(row)),
                         total: rows[0]?.total_count || 0
                     };
                     resolve(result);

@@ -12,9 +12,12 @@ export class SQLiteTaskDataSource implements TaskDataSource {
     }
 
     async create(task: PrivateTaskRequestCreationModel): Promise<number> {
-        const params = [task.task_type_id, task.task_status_id, task.task_owner_id, task.task_project_id, task.task_log_file_path, task.task_params];
+        // Write task_creation_utc_date_time as proper ISO 8601 UTC (with `T` and trailing `Z`)
+        // rather than relying on SQLite's `DEFAULT CURRENT_TIMESTAMP` which emits the SQLite
+        // local-looking "YYYY-MM-DD HH:MM:SS" form (UTC value, ambiguous format).
+        const params = [task.task_type_id, task.task_status_id, task.task_owner_id, task.task_project_id, task.task_log_file_path, task.task_params, new Date().toISOString()];
         const placeholders = params.map(() => '(?)').join(',');
-        const sql = `INSERT INTO task (task_type_id, task_status_id, task_owner_id, task_project_id, task_log_file_path, task_params) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO task (task_type_id, task_status_id, task_owner_id, task_project_id, task_log_file_path, task_params, task_creation_utc_date_time) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -164,9 +167,9 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                     const result: SearchResult<TaskResponseModel> = {
                         items: rows.map(row => ({
                             task_id: row.task_id,
-                            task_creation_date: row.task_creation_date,
-                            task_start_date: row.task_start_date,
-                            task_end_date: row.task_end_date,
+                            task_creation_utc_date_time: row.task_creation_utc_date_time,
+                            task_start_utc_date_time: row.task_start_utc_date_time,
+                            task_end_utc_date_time: row.task_end_utc_date_time,
                             task_type_id: row.task_type_id,
                             task_type: row.task_type_label,
                             task_status_id: row.task_status_id,
@@ -231,9 +234,9 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                     else {
                         const result = {
                             task_id: row.task_id,
-                            task_creation_date: row.task_creation_date,
-                            task_start_date: row.task_start_date,
-                            task_end_date: row.task_end_date,
+                            task_creation_utc_date_time: row.task_creation_utc_date_time,
+                            task_start_utc_date_time: row.task_start_utc_date_time,
+                            task_end_utc_date_time: row.task_end_utc_date_time,
                             task_type_id: row.task_type_id,
                             task_type: row.task_type_label,
                             task_status_id: row.task_status_id,

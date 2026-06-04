@@ -50,43 +50,43 @@ describe('InstrumentModelsRouter', () => {
                         "instrument_model_id": 1,
                         "instrument_model_name": "UVP5HD",
                         "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 2,
                         "instrument_model_name": "UVP5SD",
                         "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 3,
                         "instrument_model_name": "UVP5Z",
                         "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 5,
                         "instrument_model_name": "UVP6HF",
                         "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 4,
                         "instrument_model_name": "UVP6LP",
                         "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1578/",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 7,
                         "instrument_model_name": "UVP6MHF",
                         "bodc_url": "Not registred in BODC for now",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     },
                     {
                         "instrument_model_id": 6,
                         "instrument_model_name": "UVP6MHP",
                         "bodc_url": "Not registred in BODC for now",
-                        "instrument_model_creation_date": "2024-11-20 16:34:16"
+                        "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
                     }
                 ]
             }
@@ -144,7 +144,7 @@ describe('InstrumentModelsRouter', () => {
                 "instrument_model_id": 1,
                 "instrument_model_name": "UVP5HD",
                 "bodc_url": "https://vocab.nerc.ac.uk/collection/L22/current/TOOL1577/",
-                "instrument_model_creation_date": "2024-11-20 16:34:16"
+                "instrument_model_creation_utc_date_time": "2024-11-20 16:34:16"
             }
 
             jest.spyOn(getOneInstrumentModelsUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))

@@ -101,7 +101,7 @@ export class BackupProject implements BackupProjectUseCase {
             await this.copySourcesToBackupProjectFolder(task_id, project, skip_already_imported);
 
             // Record the backup date on the project
-            await this.projectRepository.standardUpdateProject({ project_id: project.project_id, last_backup_date: new Date().toISOString() });
+            await this.projectRepository.standardUpdateProject({ project_id: project.project_id, last_backup_utc_date_time: new Date().toISOString() });
 
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -165,7 +165,7 @@ export class BackupProject implements BackupProjectUseCase {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.ensureUserCanGet(current_user, project_id);
         const project = await this.getProjectIfExist(project_id);
-        return project.last_backup_date ?? null;
+        return project.last_backup_utc_date_time ?? null;
     }
 
 }

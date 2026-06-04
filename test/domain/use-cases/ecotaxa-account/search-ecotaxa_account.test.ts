@@ -36,7 +36,7 @@ describe("Domain - Use Cases - Search ecotaxa account", () => {
             jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed').mockResolvedValueOnce();
             jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed').mockResolvedValueOnce();
             jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_name", order_by: "asc" }])
-            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_date", order_by: "asc" }])
+            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_utc_date_time", order_by: "asc" }])
             jest.spyOn(mockEcotaxaAccountRepository, 'standardGetEcotaxaAccountsModels').mockResolvedValueOnce(ecotaxa_accounts_response);
             jest.spyOn(mockEcotaxaAccountRepository, 'formatEcotaxaAccountResponse').mockReturnValueOnce(public_ecotaxa_account_response_model_2);
             jest.spyOn(mockSearchRepository, 'formatSearchInfo').mockReturnValueOnce(search_info_response);
@@ -50,7 +50,7 @@ describe("Domain - Use Cases - Search ecotaxa account", () => {
             expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenNthCalledWith(1, 1);
             expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenNthCalledWith(2, 1);
             expect(mockSearchRepository.formatSortBy).toHaveBeenCalledTimes(1);
-            expect(mockSearchRepository.formatSortBy).toHaveBeenNthCalledWith(1, "asc(ecotaxa_account_expiration_date)");
+            expect(mockSearchRepository.formatSortBy).toHaveBeenNthCalledWith(1, "asc(ecotaxa_account_expiration_utc_date_time)");
             expect(mockEcotaxaAccountRepository.standardGetEcotaxaAccountsModels).toHaveBeenCalledWith(options as PreparedSearchOptions);
             expect(mockEcotaxaAccountRepository.formatEcotaxaAccountResponse).toHaveBeenCalledWith(ecotaxaAccountResponseModel);
             expect(mockSearchRepository.formatSearchInfo).toHaveBeenCalledWith(ecotaxa_accounts_response, options);
@@ -99,7 +99,7 @@ describe("Domain - Use Cases - Search ecotaxa account", () => {
             jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed').mockResolvedValueOnce();
             jest.spyOn(mockUserRepository, 'isAdmin').mockResolvedValueOnce(true);
             jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_name", order_by: "asc" }])
-            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_date", order_by: "asc" }])
+            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_utc_date_time", order_by: "asc" }])
             jest.spyOn(mockEcotaxaAccountRepository, 'standardGetEcotaxaAccountsModels').mockResolvedValueOnce(ecotaxa_accounts_response);
             jest.spyOn(mockEcotaxaAccountRepository, 'formatEcotaxaAccountResponse').mockReturnValueOnce(public_ecotaxa_account_response_model_2);
             jest.spyOn(mockSearchRepository, 'formatSearchInfo').mockReturnValueOnce(search_info_response);
@@ -114,7 +114,7 @@ describe("Domain - Use Cases - Search ecotaxa account", () => {
             expect(mockUserRepository.isAdmin).toHaveBeenCalledWith(2);
             expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenNthCalledWith(2, 1);
             expect(mockSearchRepository.formatSortBy).toHaveBeenCalledTimes(1);
-            expect(mockSearchRepository.formatSortBy).toHaveBeenNthCalledWith(1, "asc(ecotaxa_account_expiration_date)");
+            expect(mockSearchRepository.formatSortBy).toHaveBeenNthCalledWith(1, "asc(ecotaxa_account_expiration_utc_date_time)");
             expect(mockEcotaxaAccountRepository.standardGetEcotaxaAccountsModels).toHaveBeenCalledWith(options as PreparedSearchOptions);
             expect(mockEcotaxaAccountRepository.formatEcotaxaAccountResponse).toHaveBeenCalledWith(ecotaxaAccountResponseModel);
             expect(mockSearchRepository.formatSearchInfo).toHaveBeenCalledWith(ecotaxa_accounts_response, options);
@@ -134,7 +134,7 @@ describe("Domain - Use Cases - Search ecotaxa account", () => {
             jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed').mockResolvedValueOnce();
             jest.spyOn(mockUserRepository, 'isAdmin').mockResolvedValueOnce(false);
             jest.spyOn(mockSearchRepository, 'formatSortBy')
-            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_date", order_by: "asc" }])
+            // default jest.spyOn(mockSearchRepository, 'formatSortBy').mockImplementation(() => [{ sort_by: "ecotaxa_account_expiration_utc_date_time", order_by: "asc" }])
             jest.spyOn(mockEcotaxaAccountRepository, 'standardGetEcotaxaAccountsModels')
             jest.spyOn(mockEcotaxaAccountRepository, 'formatEcotaxaAccountResponse')
             jest.spyOn(mockSearchRepository, 'formatSearchInfo')

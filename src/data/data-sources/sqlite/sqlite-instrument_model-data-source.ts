@@ -12,9 +12,10 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
     }
 
     async create(instrument_model: InstrumentModelRequestCreationModel): Promise<number> {
-        const params = [instrument_model.instrument_model_name, instrument_model.bodc_url];
+        // Explicit ISO 8601 UTC timestamp (see sqlite-task-data-source).
+        const params = [instrument_model.instrument_model_name, instrument_model.bodc_url, new Date().toISOString()];
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO instrument_model (instrument_model_name, bodc_url) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO instrument_model (instrument_model_name, bodc_url, instrument_model_creation_utc_date_time) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -116,7 +117,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                             instrument_model_id: row.instrument_model_id,
                             instrument_model_name: row.instrument_model_name,
                             bodc_url: row.bodc_url,
-                            instrument_model_creation_date: row.instrument_model_creation_date
+                            instrument_model_creation_utc_date_time: row.instrument_model_creation_utc_date_time
                         })),
                         total: rows[0]?.total_count || 0
                     };
@@ -181,7 +182,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
                             instrument_model_id: row.instrument_model_id,
                             instrument_model_name: row.instrument_model_name,
                             bodc_url: row.bodc_url,
-                            instrument_model_creation_date: row.instrument_model_creation_date
+                            instrument_model_creation_utc_date_time: row.instrument_model_creation_utc_date_time
                         };
                         resolve(result);
                     }

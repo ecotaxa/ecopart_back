@@ -42,7 +42,7 @@ class MockMiddlewareAuth implements MiddlewareAuth {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
 
             iat: 1693237789,
             exp: 1724795389
@@ -117,7 +117,7 @@ describe("User Router", () => {
                         organisation: "LOV",
                         country: "France",
                         user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                        user_creation_date: '2023-08-01 10:30:00'
+                        user_creation_utc_date_time: '2023-08-01 10:30:00'
                     }, {
                         user_id: 2,
                         last_name: "Smith",
@@ -128,7 +128,7 @@ describe("User Router", () => {
                         organisation: "LOV",
                         country: "France",
                         user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                        user_creation_date: '2023-08-01 10:30:00'
+                        user_creation_utc_date_time: '2023-08-01 10:30:00'
                     }],
                 search_info: {
                     total: 2,
@@ -202,7 +202,7 @@ describe("User Router", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }, {
                     user_id: 2,
                     last_name: "Smith",
@@ -213,7 +213,7 @@ describe("User Router", () => {
                     organisation: "LOV",
                     country: "France",
                     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                    user_creation_date: '2023-08-01 10:30:00'
+                    user_creation_utc_date_time: '2023-08-01 10:30:00'
                 }],
                 search_info: {
                     total: 2,
@@ -456,7 +456,7 @@ describe("User Router", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
             const response = await request(server).patch("/users/1").send(user_to_update)

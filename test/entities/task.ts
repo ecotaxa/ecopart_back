@@ -19,9 +19,9 @@ export const TaskResponseModel_1: TaskResponseModel = {
     task_reply: "",
     task_step: "0",
     task_id: 1,
-    task_creation_date: "2024-11-20 16:35:09",
-    task_start_date: "",
-    task_end_date: ""
+    task_creation_utc_date_time: "2024-11-20 16:35:09",
+    task_start_utc_date_time: "",
+    task_end_utc_date_time: ""
 }
 export const TaskResponseModel_2: TaskResponseModel = {
     task_type_id: 4,
@@ -41,9 +41,9 @@ export const TaskResponseModel_2: TaskResponseModel = {
     task_reply: "",
     task_step: "0",
     task_id: 2,
-    task_creation_date: "2024-11-20 16:40:30",
-    task_start_date: "",
-    task_end_date: ""
+    task_creation_utc_date_time: "2024-11-20 16:40:30",
+    task_start_utc_date_time: "",
+    task_end_utc_date_time: ""
 }
 
 export const TaskResponseModel_3: TaskResponseModel = {
@@ -64,9 +64,9 @@ export const TaskResponseModel_3: TaskResponseModel = {
     task_reply: "",
     task_step: "0",
     task_id: 3,
-    task_creation_date: "2024-11-20 16:40:37",
-    task_start_date: "",
-    task_end_date: ""
+    task_creation_utc_date_time: "2024-11-20 16:40:37",
+    task_start_utc_date_time: "",
+    task_end_utc_date_time: ""
 }
 export const SearchTasksResult: {
     tasks: TaskResponseModel[];

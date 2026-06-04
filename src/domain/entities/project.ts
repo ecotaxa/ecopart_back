@@ -31,7 +31,7 @@ export interface ProjectResponseModel {
     ecotaxa_instance_id: number | null;
 
     project_id: number;
-    project_creation_date: string;
+    project_creation_utc_date_time: string;
 
     root_folder_path: string;
     project_title: string;
@@ -52,7 +52,7 @@ export interface ProjectResponseModel {
     public_duration: number;
     instrument_model: string;
     serial_number: string;
-    last_backup_date?: string | null;
+    last_backup_utc_date_time?: string | null;
 }
 export interface ProjectRequestModel {
     project_id: number;
@@ -150,8 +150,8 @@ export interface PublicProjectRequestCreationModel extends PublicProjectRequestC
 
 export interface PublicProjectResponseModel extends PublicProjectRequestCreationModel_base {
     project_id: number;
-    project_creation_date: string;
-    last_backup_date?: string | null;
+    project_creation_utc_date_time: string;
+    last_backup_utc_date_time?: string | null;
 }
 
 export interface ProjectMetadataPersonModel {

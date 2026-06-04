@@ -24,9 +24,11 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     async create(user: UserRequestCreationModel): Promise<number> {
-        const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage]
+        // Explicit ISO 8601 UTC timestamp — see note in sqlite-task-data-source about why
+        // we no longer rely on `DEFAULT CURRENT_TIMESTAMP`.
+        const params = [user.first_name, user.last_name, user.email, user.confirmation_code, user.password, user.organisation, user.country, user.user_planned_usage, new Date().toISOString()]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO user (first_name, last_name, email, confirmation_code, password_hash, organisation, country, user_planned_usage, user_creation_utc_date_time) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -135,7 +137,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                             organisation: row.organisation,
                             country: row.country,
                             user_planned_usage: row.user_planned_usage,
-                            user_creation_date: row.user_creation_date,
+                            user_creation_utc_date_time: row.user_creation_utc_date_time,
                             deleted: row.deleted
                         })),
                         total: rows[0]?.total_count || 0
@@ -211,7 +213,7 @@ export class SQLiteUserDataSource implements UserDataSource {
                             organisation: row.organisation,
                             country: row.country,
                             user_planned_usage: row.user_planned_usage,
-                            user_creation_date: row.user_creation_date,
+                            user_creation_utc_date_time: row.user_creation_utc_date_time,
                             deleted: row.deleted
                         };
                         resolve(result);

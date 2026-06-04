@@ -191,7 +191,7 @@ export class UpdateProject implements UpdateProjectUseCase {
                 {
                     ecotaxa_sample_imported: false,
                     ecotaxa_import_status_id: null,
-                    ecotaxa_sample_import_date: null,
+                    ecotaxa_sample_import_utc_date_time: null,
                     ecotaxa_sample_id: null,
                     ecotaxa_sample_tsv_file_name: null,
                     ecotaxa_sample_local_folder_tsv_path: null,

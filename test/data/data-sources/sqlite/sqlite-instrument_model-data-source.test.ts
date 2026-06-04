@@ -179,7 +179,7 @@ describe('SQLiteInstrumentModelDataSource', () => {
 
         test('should return all instrument_models with sorting filtering and pagination', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: 'LIKE', value: 'UVP5%' }], sort_by: [{ sort_by: 'instrument_model_creation_date', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: 'LIKE', value: 'UVP5%' }], sort_by: [{ sort_by: 'instrument_model_creation_utc_date_time', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(3);
@@ -189,7 +189,7 @@ describe('SQLiteInstrumentModelDataSource', () => {
         });
         test('should return all instrument_models with sorting filtering and pagination', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: '=', value: 'UVP5HD' }], sort_by: [{ sort_by: 'instrument_model_creation_date', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: '=', value: 'UVP5HD' }], sort_by: [{ sort_by: 'instrument_model_creation_utc_date_time', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(1);
@@ -198,7 +198,7 @@ describe('SQLiteInstrumentModelDataSource', () => {
         });
         test('should return all instrument_models with sorting filtering and pagination', async () => {
             // Call the getAll method
-            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: 'IN', value: ['UVP5HD', 'UVP5SD'] }], sort_by: [{ sort_by: 'instrument_model_creation_date', order_by: 'ASC' }] });
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 2, filter: [{ field: 'instrument_model_name', operator: 'IN', value: ['UVP5HD', 'UVP5SD'] }], sort_by: [{ sort_by: 'instrument_model_creation_utc_date_time', order_by: 'ASC' }] });
             expect(getAllOutput.items).toBeDefined();
             expect(getAllOutput.total).toBeDefined();
             expect(getAllOutput.total).toEqual(2);
@@ -256,7 +256,7 @@ describe('SQLiteInstrumentModelDataSource', () => {
             // not null
             expect(instrument_model).not.toBeNull();
             if (instrument_model) {
-                // Compare each property individually, excluding the instrument_model_creation_date
+                // Compare each property individually, excluding the instrument_model_creation_utc_date_time
                 expect(instrument_model.instrument_model_id).toEqual(8);
                 expect(instrument_model.instrument_model_name).toEqual('UVP8');
                 expect(instrument_model.bodc_url).toEqual('http://uvp8.com');

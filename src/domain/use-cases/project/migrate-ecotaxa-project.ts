@@ -105,7 +105,7 @@ export class MigrateEcotaxaProject implements MigrateEcotaxaProjectUseCase {
                 to_mark_imported.push({
                     sample_id: ecopart_sample.sample_id,
                     ecotaxa_sample_imported: true,
-                    ecotaxa_sample_import_date: new Date().toISOString(),
+                    ecotaxa_sample_import_utc_date_time: new Date().toISOString(),
                     ecotaxa_sample_id
                 });
                 matched_samples.push(ecopart_sample.sample_name);

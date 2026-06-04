@@ -37,7 +37,7 @@ describe("Create User Use Case", () => {
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
-            user_creation_date: '2023-07-31 17:18:47',
+            user_creation_utc_date_time: '2023-07-31 17:18:47',
 
             iat: 1693237789,
             exp: 1724795389
@@ -52,7 +52,7 @@ describe("Create User Use Case", () => {
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
-            user_creation_date: '2023-07-31 17:18:47',
+            user_creation_utc_date_time: '2023-07-31 17:18:47',
         }
         const OutputAuthData: AuthJwtRefreshedResponseModel = {
             jwt: "refreshed_token",
@@ -78,7 +78,7 @@ describe("Create User Use Case", () => {
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
-            user_creation_date: '2023-07-31 17:18:47',
+            user_creation_utc_date_time: '2023-07-31 17:18:47',
 
             iat: 1693237789,
             exp: 1724795389
@@ -107,7 +107,7 @@ describe("Create User Use Case", () => {
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
-            user_creation_date: '2023-07-31 17:18:47',
+            user_creation_utc_date_time: '2023-07-31 17:18:47',
 
             iat: 1693237789,
             exp: 1724795389
@@ -123,7 +123,7 @@ describe("Create User Use Case", () => {
             organisation: 'LOV',
             country: 'France',
             user_planned_usage: 'Mon usage',
-            user_creation_date: '2023-07-31 17:18:47',
+            user_creation_utc_date_time: '2023-07-31 17:18:47',
         }
 
         jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "refreshed_token" })

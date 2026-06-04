@@ -17,7 +17,7 @@ export interface PrivilegeResponseModel extends PrivilegeRequestCreationModel {
     privilege_id: number;
     user_name: string;
     email: string;
-    privilege_creation_date: string;
+    privilege_creation_utc_date_time: string;
 }
 
 export interface PublicPrivilege {

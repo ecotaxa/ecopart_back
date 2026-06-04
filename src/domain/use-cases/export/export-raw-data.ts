@@ -17,6 +17,7 @@ import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportRawDataRequestModel, ExportRawDataUseCase, RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
 import { computeProjectPrivacy } from "./project-privacy";
+import { renderReadme } from "./readme";
 import { MinimalUserModel } from "../../entities/user";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "ctd", "ecotaxa"];
@@ -24,11 +25,13 @@ const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "ctd", "ecotaxa"];
 const PROJECT_TSV_COLUMNS: string[] = [
     "ecopart_project_id",
     "ecopart_project_title",
+    "project_total_samples",
+    "project_total_samples_exported",
     "ecotaxa_instance_url",
     "ecotaxa_project_id",
     "ecotaxa_project_title",
-    "project_total_samples",
-    "project_total_samples_exported",
+    "project_total_ecotaxa_samples",
+    "project_total_ecotaxa_samples_exported",
     "project_acronym",
     "project_description",
     "project_cruise_wmo",
@@ -52,6 +55,73 @@ const PROJECT_TSV_COLUMNS: string[] = [
     "project_ecotaxa_classification_download_delay",
     "project_managers",
     "project_members",
+];
+
+const SAMPLE_TSV_COLUMNS: string[] = [
+    "ecopart_project_id",
+    "ecopart_sample_id",
+    "sample_name",
+    "sample_comment",
+    "sample_type",
+    "sampling_utc_date_time",
+    "sample_import_utc_date_time",
+    "sample_max_pressure",
+    "station_id",
+    "sample_latitude",
+    "sample_longitude",
+    "environment_wind_direction",
+    "environment_sea_state",
+    "environment_bottom_depth",
+    "environment_wind_speed",
+    "environment_nebulousness",
+    "instrument_operator_email",
+    "ecotaxa_sample_imported",
+    "ecotaxa_sample_import_utc_date_time",
+    "ecotaxa_sample_id",
+    "ecotaxa_sample_tsv_file_name",
+    "ecotaxa_sample_nb_images",
+    "ecotaxa_import_status_id",
+    "ecotaxa_import_status_label",
+    "ecotaxa_sample_task_id",
+    "instrument_settings_serial_number",
+    "instrument_settings_aa",
+    "instrument_settings_exp",
+    "instrument_settings_image_volume_l",
+    "instrument_settings_pixel_size_mm",
+    "instrument_settings_depth_offset_m",
+    "instrument_settings_acq_pressure_gain",
+    "instrument_settings_particule_minimum_area_pixels",
+    "instrument_settings_vignette_minimum_area_pixels",
+    "instrument_settings_acq_shutter_speed",
+    "instrument_settings_acq_gain",
+    "instrument_settings_acq_x_size",
+    "instrument_settings_acq_y_size",
+    "instrument_settings_acq_description",
+    "instrument_settings_acq_choice",
+    "instrument_settings_acq_disk_type",
+    "instrument_settings_acq_threshold",
+    "instrument_settings_acq_exposure",
+    "instrument_settings_acq_erase_border",
+    "instrument_settings_acq_task_type",
+    "instrument_settings_acq_vignette_roi_enlargement_ratio",
+    "instrument_settings_process_gamma",
+    "instrument_settings_process_vignette_resize_factor",
+    "instrument_settings_process_datetime",
+    "instrument_settings_images_post_process",
+    "sample_integration_time",
+    "filename",
+    "filter_first_image",
+    "filter_last_image",
+    "ctd_original_file_name",
+    "ctd_imported_file_name",
+    "ctd_importator_name",
+    "ctd_importator_email",
+    "ctd_import_utc_date_time",
+    "ctd_latitude",
+    "ctd_longitude",
+    "visual_qc_status",
+    "visual_qc_validator_email",
+    "number_of_black",
 ];
 
 // Replace tab/CR/LF in a TSV cell with a single space so the row stays parseable; no quoting.
@@ -188,7 +258,7 @@ export class ExportRawData implements ExportRawDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
                 if (export_type === "metadata") {
-                    await this.writeMetadata(work_folder, samples, projects_by_id, export_started_at);
+                    await this.writeMetadata(work_folder, samples, projects_by_id, export_started_at, export_types);
                 } else if (export_type === "lpm") {
                     await this.writeLpm(task, work_folder, samples, projects_by_id);
                 } else if (export_type === "ctd") {
@@ -199,6 +269,10 @@ export class ExportRawData implements ExportRawDataUseCase {
 
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index), `Step ${step_index}/${step_count} ${export_type}: done`);
             }
+
+            // Consumer-facing documentation, generated from the same column constants the
+            // emitters use — so the README can't drift from the actual file contents.
+            await fsPromises.writeFile(path.join(work_folder, "README.md"), renderReadme(export_types));
 
             const zip_file_name = `ecopart_export_raw_${task_id}.zip`;
             const zip_path = path.join(task_folder, zip_file_name);
@@ -219,16 +293,31 @@ export class ExportRawData implements ExportRawDataUseCase {
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
         export_started_at: Date,
+        export_types: RawExportType[],
     ): Promise<void> {
         const dir = path.join(work_folder, "metadata");
         await fsPromises.mkdir(dir, { recursive: true });
 
         const project_ids = Array.from(projects_by_id.keys());
         const samples_per_project_total = await this.sampleRepository.countSamplesPerProject(project_ids);
+        const ecotaxa_samples_per_project_total = await this.sampleRepository.countEcotaxaSamplesPerProject(project_ids);
         const exported_per_project = new Map<number, number>();
-        for (const project_id of project_ids) exported_per_project.set(project_id, 0);
+        // `project_total_ecotaxa_samples_exported` reflects what was truly added to the EcoTaxa
+        // section of this export. It stays 0 when ecotaxa isn't in `export_types`, and
+        // otherwise uses the same per-sample predicate as `writeEcotaxa` (sample is in basket,
+        // its project has a linked EcoTaxa project, and the sample is flagged
+        // `ecotaxa_sample_imported`). Keep this filter in sync with `writeEcotaxa`.
+        const ecotaxa_exported_per_project = new Map<number, number>();
+        for (const project_id of project_ids) {
+            exported_per_project.set(project_id, 0);
+            ecotaxa_exported_per_project.set(project_id, 0);
+        }
+        const ecotaxa_in_export = export_types.includes("ecotaxa");
         for (const sample of samples) {
             exported_per_project.set(sample.project_id, (exported_per_project.get(sample.project_id) ?? 0) + 1);
+            if (ecotaxa_in_export && sample.ecotaxa_sample_imported && projects_by_id.get(sample.project_id)?.ecotaxa_project_id) {
+                ecotaxa_exported_per_project.set(sample.project_id, (ecotaxa_exported_per_project.get(sample.project_id) ?? 0) + 1);
+            }
         }
 
         const project_rows: Record<string, string>[] = [];
@@ -246,6 +335,8 @@ export class ExportRawData implements ExportRawDataUseCase {
                 ecotaxa_project_title: serialize(project.ecotaxa_project_name),
                 project_total_samples: serialize(samples_per_project_total.get(project.project_id) ?? 0),
                 project_total_samples_exported: serialize(exported_per_project.get(project.project_id) ?? 0),
+                project_total_ecotaxa_samples: serialize(ecotaxa_samples_per_project_total.get(project.project_id) ?? 0),
+                project_total_ecotaxa_samples_exported: serialize(ecotaxa_exported_per_project.get(project.project_id) ?? 0),
                 project_acronym: serialize(project.project_acronym),
                 project_description: serialize(project.project_description),
                 project_cruise_wmo: serialize(project.cruise),
@@ -261,10 +352,10 @@ export class ExportRawData implements ExportRawDataUseCase {
                 project_instrument_serial_number: serialize(project.serial_number),
                 project_override_depth_offset: serialize(project.override_depth_offset),
                 project_enable_descent_filter: serialize(project.enable_descent_filter),
-                project_creation_utc_date_time: serialize(toIso(project.project_creation_date)),
+                project_creation_utc_date_time: serialize(toIso(project.project_creation_utc_date_time)),
                 project_export_utc_date_time: export_started_at.toISOString(),
                 project_privacy: computeProjectPrivacy(
-                    project.project_creation_date,
+                    project.project_creation_utc_date_time,
                     project.privacy_duration,
                     project.visible_duration,
                     project.public_duration,
@@ -280,9 +371,78 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         await fsPromises.writeFile(path.join(dir, "projects.tsv"), toTsv(PROJECT_TSV_COLUMNS, project_rows));
 
-        const sample_rows = samples.map(s => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, serialize(v)])));
-        const sample_headers = sample_rows.length > 0 ? Object.keys(sample_rows[0]) : [];
-        await fsPromises.writeFile(path.join(dir, "samples.tsv"), toTsv(sample_headers, sample_rows));
+        // Stable, reproducible row order: by (ecopart_project_id, ecopart_sample_id).
+        const ordered_samples = [...samples].sort((a, b) =>
+            a.project_id - b.project_id || a.sample_id - b.sample_id);
+
+        const sample_rows: Record<string, string>[] = ordered_samples.map(sample => ({
+            ecopart_project_id: serialize(sample.project_id),
+            ecopart_sample_id: serialize(sample.sample_id),
+            sample_name: serialize(sample.sample_name),
+            sample_comment: serialize(sample.comment),
+            sample_type: serialize(sample.sample_type_label),
+            sampling_utc_date_time: serialize(toIso(sample.sampling_utc_date_time)),
+            sample_import_utc_date_time: serialize(toIso(sample.sample_creation_utc_date_time)),
+            sample_max_pressure: serialize(sample.max_pressure),
+            station_id: serialize(sample.station_id),
+            sample_latitude: serialize(sample.latitude),
+            sample_longitude: serialize(sample.longitude),
+            environment_wind_direction: serialize(sample.wind_direction),
+            environment_sea_state: serialize(sample.sea_state),
+            environment_bottom_depth: serialize(sample.bottom_depth),
+            environment_wind_speed: serialize(sample.wind_speed),
+            environment_nebulousness: serialize(sample.nebulousness),
+            instrument_operator_email: serialize(sample.instrument_operator_email),
+            ecotaxa_sample_imported: serialize(sample.ecotaxa_sample_imported),
+            ecotaxa_sample_import_utc_date_time: serialize(sample.ecotaxa_sample_import_utc_date_time ? toIso(sample.ecotaxa_sample_import_utc_date_time) : null),
+            ecotaxa_sample_id: serialize(sample.ecotaxa_sample_id),
+            ecotaxa_sample_tsv_file_name: serialize(sample.ecotaxa_sample_tsv_file_name),
+            ecotaxa_sample_nb_images: serialize(sample.ecotaxa_sample_nb_images),
+            ecotaxa_import_status_id: serialize(sample.ecotaxa_import_status_id),
+            ecotaxa_import_status_label: serialize(sample.ecotaxa_import_status_label),
+            ecotaxa_sample_task_id: serialize(sample.ecotaxa_sample_task_id),
+            instrument_settings_serial_number: serialize(sample.instrument_serial_number),
+            instrument_settings_aa: serialize(sample.instrument_settings_aa),
+            instrument_settings_exp: serialize(sample.instrument_settings_exp),
+            instrument_settings_image_volume_l: serialize(sample.instrument_settings_image_volume_l),
+            instrument_settings_pixel_size_mm: serialize(sample.instrument_settings_pixel_size_mm),
+            instrument_settings_depth_offset_m: serialize(sample.instrument_settings_depth_offset_m),
+            instrument_settings_acq_pressure_gain: serialize(sample.instrument_settings_acq_pressure_gain),
+            instrument_settings_particule_minimum_area_pixels: serialize(sample.instrument_settings_particule_minimum_area_pixels),
+            instrument_settings_vignette_minimum_area_pixels: serialize(sample.instrument_settings_vignette_minimum_area_pixels),
+            instrument_settings_acq_shutter_speed: serialize(sample.instrument_settings_acq_shutter_speed),
+            instrument_settings_acq_gain: serialize(sample.instrument_settings_acq_gain),
+            instrument_settings_acq_x_size: serialize(sample.instrument_settings_acq_x_size),
+            instrument_settings_acq_y_size: serialize(sample.instrument_settings_acq_y_size),
+            instrument_settings_acq_description: serialize(sample.instrument_settings_acq_description),
+            instrument_settings_acq_choice: serialize(sample.instrument_settings_acq_choice),
+            instrument_settings_acq_disk_type: serialize(sample.instrument_settings_acq_disk_type),
+            instrument_settings_acq_threshold: serialize(sample.instrument_settings_acq_threshold),
+            instrument_settings_acq_exposure: serialize(sample.instrument_settings_acq_exposure),
+            instrument_settings_acq_erase_border: serialize(sample.instrument_settings_acq_erase_border),
+            instrument_settings_acq_task_type: serialize(sample.instrument_settings_acq_task_type),
+            instrument_settings_acq_vignette_roi_enlargement_ratio: serialize(sample.instrument_settings_acq_vignette_roi_enlargement_ratio),
+            instrument_settings_process_gamma: serialize(sample.instrument_settings_process_gamma),
+            instrument_settings_process_vignette_resize_factor: serialize(sample.instrument_settings_process_vignette_resize_factor),
+            instrument_settings_process_datetime: serialize(sample.instrument_settings_process_datetime),
+            instrument_settings_images_post_process: serialize(sample.instrument_settings_images_post_process),
+            sample_integration_time: serialize(sample.instrument_settings_integration_time),
+            filename: serialize(sample.filename),
+            filter_first_image: serialize(sample.filter_first_image),
+            filter_last_image: serialize(sample.filter_last_image),
+            ctd_original_file_name: serialize(sample.ctd_original_file_name),
+            ctd_imported_file_name: serialize(sample.ctd_imported_file_name),
+            ctd_importator_name: serialize(sample.ctd_importator_name),
+            ctd_importator_email: serialize(sample.ctd_importator_email),
+            ctd_import_utc_date_time: serialize(sample.ctd_import_utc_date_time ? toIso(sample.ctd_import_utc_date_time) : null),
+            ctd_latitude: serialize(sample.ctd_latitude),
+            ctd_longitude: serialize(sample.ctd_longitude),
+            visual_qc_status: serialize(sample.visual_qc_status_label),
+            visual_qc_validator_email: serialize(sample.visual_qc_validator_email),
+            number_of_black: serialize(sample.nb_black),
+        }));
+
+        await fsPromises.writeFile(path.join(dir, "samples.tsv"), toTsv(SAMPLE_TSV_COLUMNS, sample_rows));
     }
 
     private async resolveEcotaxaInstanceUrl(ecotaxa_instance_id: number | null): Promise<string | null> {
@@ -354,12 +514,18 @@ export class ExportRawData implements ExportRawDataUseCase {
         exclude_not_living: boolean,
     ): Promise<void> {
         // Group sample names by EcoTaxa-linked project, then run one export per project.
+        // The per-sample predicate here is the source of truth for what gets counted in
+        // `project_total_ecotaxa_samples_exported` — keep `writeMetadata` in sync.
         const by_project = new Map<number, { project: ProjectResponseModel; sample_names: string[] }>();
         for (const sample of samples) {
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;
             if (!project.ecotaxa_project_id) {
                 await this.taskRepository.logMessage(task.task_log_file_path, `EcoTaxa: skipping sample '${sample.sample_name}' (project ${project.project_id} has no linked EcoTaxa project)`);
+                continue;
+            }
+            if (!sample.ecotaxa_sample_imported) {
+                await this.taskRepository.logMessage(task.task_log_file_path, `EcoTaxa: skipping sample '${sample.sample_name}' (not imported into EcoTaxa)`);
                 continue;
             }
             const entry = by_project.get(project.project_id) ?? { project, sample_names: [] };

@@ -188,10 +188,10 @@ export class TaskRepositoryImpl implements TaskRepository {
 
     async standardGetTasks(options: PreparedSearchOptions): Promise<SearchResult<TaskResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_date", "task_start_date", "task_end_date"]
+        const filter_params_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_utc_date_time", "task_start_utc_date_time", "task_end_utc_date_time"]
 
         // Can be sort_by 
-        const sort_param_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_date", "task_start_date", "task_end_date"]
+        const sort_param_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_utc_date_time", "task_start_utc_date_time", "task_end_utc_date_time"]
 
         return await this.getTasks(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -444,8 +444,16 @@ export class TaskRepositoryImpl implements TaskRepository {
             return result.items[0].task_status_id
         });
 
-        // Update the task status if valid
-        await this.taskDataSource.updateOne({ task_id: task_to_update.task_id, task_status_id: transition_status_id });
+        // Update the task status if valid, stamping start/end timestamps as ISO 8601 UTC
+        // when entering Running / Done / Error so consumers see when the task ran.
+        const update: { task_id: number; task_status_id: number; task_start_utc_date_time?: string; task_end_utc_date_time?: string } = {
+            task_id: task_to_update.task_id,
+            task_status_id: transition_status_id,
+        };
+        const now_iso = new Date().toISOString();
+        if (status === TasksStatus.Running) update.task_start_utc_date_time = now_iso;
+        if (status === TasksStatus.Done || status === TasksStatus.Error) update.task_end_utc_date_time = now_iso;
+        await this.taskDataSource.updateOne(update);
 
 
         // Logging task status update in the log file

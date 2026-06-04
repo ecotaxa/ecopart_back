@@ -434,7 +434,7 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
         futureDate.setDate(futureDate.getDate() + 30)
         await new Promise<void>((resolve, reject) => {
             db.run(
-                `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_date, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_utc_date_time, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [capturedEcotaxaEcotaxaId, realEcotaxaToken, "Generic Test", GENERIC_ECOTAXA_ACCOUNT_EMAIL, futureDate.toISOString(), 2, testInstanceId],
                 function (err) {
                     if (err) reject(err)
@@ -553,12 +553,12 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
             .get(`/projects/${capturedProjectId}/ctd_samples`)
             .set("Cookie", cookieHeader())
         expect(importedRes.status).toBe(200)
-        const importedList = importedRes.body as { sample_name: string; ctd_import_date: string; file_extension: string }[]
+        const importedList = importedRes.body as { sample_name: string; ctd_import_utc_date_time: string; file_extension: string }[]
         for (const name of ALL_SAMPLES) {
             const entry = importedList.find(s => s.sample_name === name)
             expect(entry).toBeDefined()
             expect(entry!.file_extension).toBe("ctd")
-            expect(entry!.ctd_import_date).toMatch(/\d{4}-\d{2}-\d{2}T/)
+            expect(entry!.ctd_import_utc_date_time).toMatch(/\d{4}-\d{2}-\d{2}T/)
         }
     })
 
@@ -657,7 +657,8 @@ describe("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without ima
         fs.writeFileSync(zipPath, downloadRes.body as Buffer)
         const entries = await listZipEntries(zipPath)
 
-        // Metadata: projects.tsv + samples.tsv
+        // Metadata: projects.tsv + samples.tsv + the consumer-facing README at the root
+        expect(entries).toContain("README.md")
         expect(entries).toContain("metadata/projects.tsv")
         expect(entries).toContain("metadata/samples.tsv")
 

@@ -29,7 +29,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -45,7 +45,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: 1,
@@ -58,7 +58,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -99,7 +99,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: user_id,
@@ -112,7 +112,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -149,7 +149,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -165,7 +165,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: user_id,
@@ -178,7 +178,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -213,7 +213,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -229,7 +229,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
                 deleted: '2023-08-01 10:31:00'
             }
             const updated_user: UserResponseModel = {
@@ -243,7 +243,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -280,7 +280,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -297,7 +297,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -335,7 +335,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -351,7 +351,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: user_id,
@@ -364,7 +364,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
 
@@ -403,7 +403,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -419,7 +419,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user = null
 
@@ -457,7 +457,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00',
+                user_creation_utc_date_time: '2023-08-01 10:30:00',
 
                 iat: 1693237789,
                 exp: 1724795389
@@ -473,7 +473,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const updated_user: UserResponseModel = {
                 user_id: user_id,
@@ -486,7 +486,7 @@ describe("Valid Users Use Case", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
 
             jest.spyOn(mockUserRepository, "verifyValidationToken").mockImplementation(() => { return decoded_token })

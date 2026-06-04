@@ -44,7 +44,7 @@ export const privilegesResponse_WithMemberAndManager: PrivilegeResponseModel[] =
         contact: true,
         user_name: "user1",
         email: "test",
-        privilege_creation_date: "2021-01-01"
+        privilege_creation_utc_date_time: "2021-01-01"
     },
     {
         privilege_id: 2,
@@ -54,7 +54,7 @@ export const privilegesResponse_WithMemberAndManager: PrivilegeResponseModel[] =
         contact: false,
         user_name: "user2",
         email: "test",
-        privilege_creation_date: "2021-01-01"
+        privilege_creation_utc_date_time: "2021-01-01"
     }]
 export const privilegesRequestCreation_WithMemberAndManager: PrivilegeRequestCreationModel[] = [
     {

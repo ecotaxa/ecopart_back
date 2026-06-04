@@ -31,7 +31,7 @@ export const validUser: UserResponseModel = {
     organisation: "LOV",
     country: "France",
     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    user_creation_date: '2023-08-01 10:30:00'
+    user_creation_utc_date_time: '2023-08-01 10:30:00'
 }
 export const deletedUser: UserResponseModel = {
     user_id: 1,
@@ -46,7 +46,7 @@ export const deletedUser: UserResponseModel = {
     user_planned_usage: "anonymized",
     reset_password_code: null,
     deleted: "2021-08-10T00:00:00.000Z",
-    user_creation_date: "121212"
+    user_creation_utc_date_time: "121212"
 }
 export const unvalidUser: UserResponseModel = {
     user_id: 1,
@@ -58,7 +58,7 @@ export const unvalidUser: UserResponseModel = {
     organisation: "LOV",
     country: "France",
     user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    user_creation_date: '2023-08-01 10:30:00'
+    user_creation_utc_date_time: '2023-08-01 10:30:00'
 }
 
 
@@ -90,7 +90,7 @@ export const ecotaxaAccountRequestCreationModel: EcotaxaAccountRequestCreationMo
     ecotaxa_account_user_name: "ecotaxa_user_name",
     ecotaxa_account_user_email: "lena@gmail.com",
     ecotaxa_account_instance_id: 1,
-    ecotaxa_account_expiration_date: "2025-03-19T16:49:24.892Z"
+    ecotaxa_account_expiration_utc_date_time: "2025-03-19T16:49:24.892Z"
 }
 export const ecotaxaAccountRequestCreationModel_unexistingUser: EcotaxaAccountRequestCreationModel = {
     ecotaxa_account_ecotaxa_id: 1,
@@ -99,7 +99,7 @@ export const ecotaxaAccountRequestCreationModel_unexistingUser: EcotaxaAccountRe
     ecotaxa_account_user_name: "ecotaxa_user_name",
     ecotaxa_account_user_email: "lena@gmail.com",
     ecotaxa_account_instance_id: 1,
-    ecotaxa_account_expiration_date: "2025-03-19T16:49:24.892Z"
+    ecotaxa_account_expiration_utc_date_time: "2025-03-19T16:49:24.892Z"
 }
 
 export const public_ecotaxa_account_response_model: PublicEcotaxaAccountResponseModel =
@@ -126,33 +126,33 @@ export const public_ecotaxa_account_response_model_2: PublicEcotaxaAccountRespon
 export const ecotaxaAccountResponseModel: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
     "ecotaxa_account_ecotaxa_id": 1,
-    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_expiration_utc_date_time": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
     "ecotaxa_account_ecopart_user_id": 1,
     "ecotaxa_account_token": "ecotaxa_account_token",
     "ecotaxa_account_user_name": "ecotaxa_account_user_name",
-    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_creation_utc_date_time": "025-03-19T16:49:24.892Z",
     "ecotaxa_account_user_email": "ecotaxa_account_user_email",
 }
 export const ecotaxaAccountResponseModel_2: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 4,
     "ecotaxa_account_ecotaxa_id": 2,
-    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_expiration_utc_date_time": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
     "ecotaxa_account_ecopart_user_id": 2,
     "ecotaxa_account_token": "ecotaxa_account_token",
     "ecotaxa_account_user_name": "ecotaxa_account_user_name",
-    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_creation_utc_date_time": "025-03-19T16:49:24.892Z",
     "ecotaxa_account_user_email": "ecotaxa_account_user_email",
 }
 
 export const ecotaxaAccountResponseModel_lena: EcotaxaAccountResponseModel = {
-    "ecotaxa_account_creation_date": "2025-02-26 13:50:00",
+    "ecotaxa_account_creation_utc_date_time": "2025-02-26 13:50:00",
     "ecotaxa_account_ecotaxa_id": 1,
     "ecotaxa_account_ecopart_user_id": 1,
-    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_expiration_utc_date_time": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_id": 1,
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
@@ -166,14 +166,14 @@ export const ecotaxa_instance_1: EcotaxaInstanceModel = {
     ecotaxa_instance_id: 1,
     ecotaxa_instance_name: "FR",
     ecotaxa_instance_description: "FR instance",
-    ecotaxa_instance_creation_date: "2025-03-19T16:49:24.892Z",
+    ecotaxa_instance_creation_utc_date_time: "2025-03-19T16:49:24.892Z",
     ecotaxa_instance_url: "http://localhost:8080/"
 }
 export const ecotaxa_instance_test_ecotaxa: EcotaxaInstanceModel = {
     ecotaxa_instance_id: 1,
     ecotaxa_instance_name: "FR",
     ecotaxa_instance_description: "FR instance",
-    ecotaxa_instance_creation_date: "2025-03-19T16:49:24.892Z",
+    ecotaxa_instance_creation_utc_date_time: "2025-03-19T16:49:24.892Z",
     ecotaxa_instance_url: "https://ecotaxa.obs-vlfr.fr/"
 }
 
@@ -187,13 +187,13 @@ export const ecotaxa_account_1: EcotaxaAccountModel = {
 export const ecotaxaAccountResponseModel_1: EcotaxaAccountResponseModel = {
     "ecotaxa_account_id": 3,
     "ecotaxa_account_ecotaxa_id": 1,
-    "ecotaxa_account_expiration_date": "2025-03-19T16:49:24.892Z",
+    "ecotaxa_account_expiration_utc_date_time": "2025-03-19T16:49:24.892Z",
     "ecotaxa_account_instance_id": 1,
     "ecotaxa_account_instance_name": "FR",
     "ecotaxa_account_ecopart_user_id": 1,
     "ecotaxa_account_token": "ecotaxa_account_token",
     "ecotaxa_account_user_name": "ecotaxa_account_user_name",
-    "ecotaxa_account_creation_date": "025-03-19T16:49:24.892Z",
+    "ecotaxa_account_creation_utc_date_time": "025-03-19T16:49:24.892Z",
     "ecotaxa_account_user_email": "ecotaxa_account_user_email",
 }
 

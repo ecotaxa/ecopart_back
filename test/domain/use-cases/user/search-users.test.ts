@@ -67,7 +67,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
         const private_user = {
             user_id: 1,
@@ -79,7 +79,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: undefined,
             confirmation_code: undefined,
             reset_password_code: undefined
@@ -128,7 +128,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: undefined,
             confirmation_code: undefined,
             reset_password_code: undefined
@@ -143,7 +143,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: undefined,
             confirmation_code: undefined,
             reset_password_code: undefined
@@ -189,7 +189,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
         const private_user = {
             user_id: 1,
@@ -201,7 +201,7 @@ describe("Get All Users Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: undefined,
             confirmation_code: undefined,
             reset_password_code: undefined

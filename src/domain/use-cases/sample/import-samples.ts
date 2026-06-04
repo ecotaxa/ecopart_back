@@ -199,6 +199,9 @@ export class ImportSamples implements ImportSamplesUseCase {
                     project.instrument_model
                 );
                 sample.nb_vignettes = vignette_count_map.get(sample_name) ?? 0;
+                // TODO(marc): compute number-of-black at import. Until then default to 0 so the
+                // column ships with a safe value (matches DEFAULT 0 on the DB column).
+                sample.nb_black = 0;
                 return sample;
             })
         );

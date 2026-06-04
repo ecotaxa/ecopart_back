@@ -110,7 +110,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             // to be equal exept creation date
             expect(ecotaxa_account).toMatchObject({
                 ...ecotaxaAccountResponseModel_lena,
-                ecotaxa_account_creation_date: expect.any(String)
+                ecotaxa_account_creation_utc_date_time: expect.any(String)
             });
         });
         test('should not get the ecotaxa_account if it does not exist', async () => {
@@ -134,7 +134,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             // to be equal exept creation date
             expect(ecotaxa_accounts.items[0]).toMatchObject({
                 ...ecotaxaAccountResponseModel_lena,
-                ecotaxa_account_creation_date: expect.any(String)
+                ecotaxa_account_creation_utc_date_time: expect.any(String)
             });
             expect(ecotaxa_accounts.total).toEqual(1);
 
@@ -147,7 +147,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
                     value: 1
                 }],
                 sort_by: [{
-                    sort_by: "ecotaxa_account_expiration_date",
+                    sort_by: "ecotaxa_account_expiration_utc_date_time",
                     order_by: "asc"
                 }],
                 limit: 10,
@@ -160,7 +160,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
             // to be equal exept creation date
             expect(ecotaxa_accounts.items[0]).toMatchObject({
                 ...ecotaxaAccountResponseModel_lena,
-                ecotaxa_account_creation_date: expect.any(String)
+                ecotaxa_account_creation_utc_date_time: expect.any(String)
             });
             expect(ecotaxa_accounts.total).toEqual(1);
         });
@@ -172,7 +172,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
                     value: 100
                 }],
                 sort_by: [{
-                    sort_by: "ecotaxa_account_expiration_date",
+                    sort_by: "ecotaxa_account_expiration_utc_date_time",
                     order_by: "asc"
                 }],
                 limit: 10,
@@ -226,7 +226,7 @@ describe('SQLiteEcotaxaAccountDataSource', () => {
                 ecotaxa_instance_name: "FR",
                 ecotaxa_instance_description: "French ecotaxa instance",
                 ecotaxa_instance_url: "https://ecotaxa.obs-vlfr.fr/",
-                ecotaxa_instance_creation_date: expect.any(String)
+                ecotaxa_instance_creation_utc_date_time: expect.any(String)
             });
         });
         test('should not get the ecotaxa_instance if it does not exist', async () => {

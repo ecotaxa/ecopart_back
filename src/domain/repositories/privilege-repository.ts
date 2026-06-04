@@ -91,7 +91,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
     async getPrivilegesByFilter(filters: FilterSearchOptions[]): Promise<SearchResult<PrivilegeResponseModel>> {
         const prepare_options: PreparedSearchOptions = {
             filter: filters,
-            sort_by: [{ sort_by: "privilege_creation_date", order_by: "desc" }],
+            sort_by: [{ sort_by: "privilege_creation_utc_date_time", order_by: "desc" }],
             limit: 1000,
             page: 1
         };
@@ -187,7 +187,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
                     value: privilege.project_id
                 }
             ],
-            sort_by: [{ sort_by: "privilege_creation_date", order_by: "desc" }],
+            sort_by: [{ sort_by: "privilege_creation_utc_date_time", order_by: "desc" }],
             limit: 1,
             page: 1
 
@@ -235,7 +235,7 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
                     value: true
                 }
             ],
-            sort_by: [{ sort_by: "privilege_creation_date", order_by: "desc" }],
+            sort_by: [{ sort_by: "privilege_creation_utc_date_time", order_by: "desc" }],
             limit: 1,
             page: 1
 

@@ -288,7 +288,7 @@ describe('SQLiteProjectDataSource', () => {
             // not null
             expect(project).not.toBeNull();
             if (project) {
-                // Compare each property individually, excluding the project_creation_date
+                // Compare each property individually, excluding the project_creation_utc_date_time
 
                 expect(project.project_id).toEqual(project_by_id.project_id);
                 expect(project.project_title).toEqual(project_by_id.project_title);

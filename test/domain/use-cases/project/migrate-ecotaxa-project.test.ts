@@ -33,7 +33,7 @@ describe('Migrate EcoTaxa Project Use Case', () => {
         const current_user: UserUpdateModel = { user_id: 1 };
         const project = {
             project_id: 10,
-            project_creation_date: '2026-05-12 12:43:47',
+            project_creation_utc_date_time: '2026-05-12 12:43:47',
             root_folder_path: 'remote/ftp_plankton/Ecotaxa_Data_to_import/uvp5_sn002zd_omer_2',
             project_title: 'uvp5_sn002zd_omer_2',
             project_acronym: 'omer',
@@ -56,7 +56,7 @@ describe('Migrate EcoTaxa Project Use Case', () => {
             ecotaxa_project_id: 18890,
             ecotaxa_project_name: 'uvp5_sn002zd_omer_2',
             ecotaxa_instance_id: 3,
-            last_backup_date: null,
+            last_backup_utc_date_time: null,
         } as PublicProjectResponseModel;
 
         const ecotaxaSamples = [

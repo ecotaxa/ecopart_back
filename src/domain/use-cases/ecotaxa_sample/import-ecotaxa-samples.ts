@@ -195,7 +195,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
                     sample_id: sample.sample_id,
 
                     ecotaxa_sample_imported: true,
-                    ecotaxa_sample_import_date: new Date().toISOString(),
+                    ecotaxa_sample_import_utc_date_time: new Date().toISOString(),
 
                     ecotaxa_sample_nb_images: sample.images,
                     ecotaxa_sample_tsv_file_name: sample.tsv_file_name,

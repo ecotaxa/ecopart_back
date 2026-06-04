@@ -39,7 +39,7 @@ describe("Auth Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const expectedData = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiU21pdGgiLCJlbWFpbCI6ImpvaG5AZ21haWwuY29tIiwic3RhdHVzIjoiUGVuZGluZyIsIm9yZ2FuaXNhdGlvbiI6IkxPViIsImNvdW50cnkiOiJGcmFuY2UiLCJ1c2VyX3BsYW5uZWRfdXNhZ2UiOiJNb24gdXNhZ2UiLCJ1c2VyX2NyZWF0aW9uX2RhdGUiOiIyMDIzLTA3LTMxIDE3OjE4OjQ3IiwiaWF0IjoxNjkzNDA2MDI3LCJleHAiOjE2OTM0MDc4Mjd9.pES4WXEsoN9QBo5OBoy3NmFW02OcvC8KyPT1E0zBRog"
             jest.spyOn(jwt, "sign").mockImplementation(() => { return expectedData })
@@ -60,7 +60,7 @@ describe("Auth Repository", () => {
                 organisation: "LOV",
                 country: "France",
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-                user_creation_date: '2023-08-01 10:30:00'
+                user_creation_utc_date_time: '2023-08-01 10:30:00'
             }
             const expectedData = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiU21pdGgiLCJlbWFpbCI6ImpvaG5AZ21haWwuY29tIiwic3RhdHVzIjoiUGVuZGluZyIsIm9yZ2FuaXNhdGlvbiI6IkxPViIsImNvdW50cnkiOiJGcmFuY2UiLCJ1c2VyX3BsYW5uZWRfdXNhZ2UiOiJNb24gdXNhZ2UiLCJ1c2VyX2NyZWF0aW9uX2RhdGUiOiIyMDIzLTA3LTMxIDE3OjE4OjQ3IiwiaWF0IjoxNjkzNDA2MDI3LCJleHAiOjE2OTM0MDc4Mjd9.pES4WXEsoN9QBo5OBoy3NmFW02OcvC8KyPT1E0zBRog"
             jest.spyOn(jwt, "sign").mockImplementation(() => { return expectedData })

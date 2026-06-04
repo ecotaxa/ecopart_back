@@ -32,10 +32,11 @@ export interface SampleRepository {
     listLpmRawFilesForSample(instrument_model: string, project_id: number, sample_name: string): Promise<string[]>;
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string;
     countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
+    countEcotaxaSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
 
     // CTD-specific methods
     listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]>;
-    importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[]): Promise<void>;
+    importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void>;
     deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void>;
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;
 }

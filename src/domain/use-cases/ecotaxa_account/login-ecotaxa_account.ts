@@ -66,7 +66,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
             ecotaxa_account_user_name: ecotaxa_data.ecotaxa_user_name,
             ecotaxa_account_user_email: ecotaxa_account_to_create.ecotaxa_user_login,
             ecotaxa_account_instance_id: ecotaxa_account_to_create.ecotaxa_instance_id,
-            ecotaxa_account_expiration_date: ecotaxa_data.ecotaxa_expiration_date
+            ecotaxa_account_expiration_utc_date_time: ecotaxa_data.ecotaxa_expiration_date
         }
     }
 }

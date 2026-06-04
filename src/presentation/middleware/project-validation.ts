@@ -267,7 +267,7 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .trim()
             .not().isEmpty().withMessage('Serial number cannot be empty.'),
         // Project Creation Date Validation
-        check('project_creation_date')
+        check('project_creation_utc_date_time')
             .isEmpty().withMessage('Project creation date cannot be set manually.'),
         // ecotaxa_project_id Validation
         check('ecotaxa_project_id').optional({ nullable: true })

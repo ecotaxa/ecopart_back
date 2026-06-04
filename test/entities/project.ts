@@ -486,15 +486,15 @@ export const privateProjectRequestCreationModel_withmissingOverrideDepthOffset =
 export const projectResponseModel: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 1,
-    project_creation_date: '2024-04-29 15:43:10',
-    last_backup_date: null
+    project_creation_utc_date_time: '2024-04-29 15:43:10',
+    last_backup_utc_date_time: null
 }
 
 export const projectResponseModel2: PublicProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 2,
-    project_creation_date: '2024-04-30 12:15:11',
-    last_backup_date: null
+    project_creation_utc_date_time: '2024-04-30 12:15:11',
+    last_backup_utc_date_time: null
 }
 
 export const projectResponseModelArray: PublicProjectResponseModel[] = [projectResponseModel, projectResponseModel2]
@@ -556,5 +556,5 @@ export const projectUpdateModel_withPartialPrivilegeUpdate: PublicProjectUpdateM
 export const private_projectResponseModel: ProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 1,
-    project_creation_date: '2024-04-29 15:43:10'
+    project_creation_utc_date_time: '2024-04-29 15:43:10'
 }

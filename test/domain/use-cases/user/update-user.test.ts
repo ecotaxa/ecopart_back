@@ -112,7 +112,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00',
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
             deleted: '2023-08-01 10:30:00'
         }
 
@@ -162,7 +162,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
@@ -203,7 +203,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const OutputError = new Error("Cannot update user")
@@ -251,7 +251,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const OutputError = new Error("Logged user cannot update this property or user")
@@ -299,7 +299,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const OutputError = new Error("Logged user cannot update this property or user")
@@ -348,7 +348,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
@@ -390,7 +390,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
@@ -431,7 +431,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
@@ -473,7 +473,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
@@ -516,7 +516,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const OutputError = new Error("Cannot find updated user")
@@ -566,7 +566,7 @@ describe("Update User Use Case", () => {
             organisation: "LOV",
             country: "France",
             user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            user_creation_date: '2023-08-01 10:30:00'
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
         }
 
         const OutputError = new Error("Cannot update user")

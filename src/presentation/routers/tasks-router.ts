@@ -108,9 +108,9 @@ export default function TaskRouter(
      *       | `task_progress_pct` | number | |
      *       | `task_progress_msg` | string | |
      *       | `task_step` | number | |
-     *       | `task_creation_date` | string (ISO timestamp) | |
-     *       | `task_start_date` | string (ISO timestamp) or null | |
-     *       | `task_end_date` | string (ISO timestamp) or null | |
+     *       | `task_creation_utc_date_time` | string (ISO timestamp) | |
+     *       | `task_start_utc_date_time` | string (ISO timestamp) or null | |
+     *       | `task_end_utc_date_time` | string (ISO timestamp) or null | |
      *       | `task_type` | string | Computed — resolved to `task_type_id` |
      *       | `task_status` | string | Computed — resolved to `task_status_id` |
      *       | `for_managing` | boolean | Computed — restricts to tasks owned by or related to current user |

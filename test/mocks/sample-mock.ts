@@ -81,6 +81,9 @@ export class MockSampleRepository implements SampleRepository {
     countSamplesPerProject(): Promise<Map<number, number>> {
         throw new Error("Method not implemented for countSamplesPerProject");
     }
+    countEcotaxaSamplesPerProject(): Promise<Map<number, number>> {
+        throw new Error("Method not implemented for countEcotaxaSamplesPerProject");
+    }
 }
 
 // export class DeleteSample implements DeleteSampleUseCase

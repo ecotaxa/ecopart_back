@@ -37,7 +37,7 @@ export class SearchEcotaxaAccounts implements SearchEcotaxaAccountsUseCase {
         }
         else {
             //default sort by expiration date
-            options.sort_by = "asc(ecotaxa_account_expiration_date)"
+            options.sort_by = "asc(ecotaxa_account_expiration_utc_date_time)"
             options.sort_by = this.searchRepository.formatSortBy(options.sort_by as string);
 
         }
