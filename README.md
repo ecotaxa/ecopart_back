@@ -40,21 +40,117 @@ git tag -a vXX.XX.XX -m "version message"
 git push --follow-tags
 ```
 
+Once the image is published, the same workflow (`.github/workflows/public.yml`) automatically
+**redeploys the test server** (see "Automatic deployment to the test server" below).
+
+### Automatic deployment to the test server
+
+Each `v*.*.*` tag push runs a `deploy-test` job that, once the new `:latest` image is on Docker
+Hub, restarts the backend on the test server. Because the server sits behind a firewall, the job
+runs on a **self-hosted GitHub Actions runner installed on the test server itself** — no inbound
+SSH from GitHub is required.
+
+The test server runs **both the frontend and the backend** from a single, hand-maintained
+`docker-compose.yml` (see "Production Procedure" below). The deploy job restarts **only the
+backend (`api`) service** — the frontend (`web`) is never touched, and the compose file itself is
+never modified by CI.
+
+One-time setup on the test server (done by whoever administers the machine):
+
+1. **Install the runner at the _organization_ level** (not the repo level): GitHub
+   *organization* → *Settings → Actions → Runners → New runner*. A single org-level runner is
+   shared by both the backend and the frontend (`ecopart_front`) repos, so each repo's
+   `deploy-test` job can use it. Give it the label `ecopart-test`, then install it as a service
+   so it survives reboots:
+
+   ```bash
+   ./svc.sh install && ./svc.sh start
+   ```
+
+   > A repository-level runner only serves the repo it is registered to, so it could not be
+   > shared with the frontend. Register it once on the organization instead.
+
+2. **Docker access**: the runner's OS user must be in the `docker` group, and the server must
+   have **Docker Compose v2** (the `docker compose` plugin, not the legacy `docker-compose` v1).
+   The `docker-compose-plugin` apt package only exists in Docker's official apt repo; if Docker
+   was installed from Ubuntu's `docker.io` package (as on the current server), drop the plugin
+   binary in directly instead:
+
+   ```bash
+   sudo mkdir -p /usr/local/lib/docker/cli-plugins
+   sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+     -o /usr/local/lib/docker/cli-plugins/docker-compose
+   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+   docker compose version   # must print v2.x
+   ```
+
+   > If the server was previously running Compose **v1** (`docker-compose`), migrate the stack
+   > once after installing v2 — v1 and v2 name containers differently, so v2 won't reuse the v1
+   > containers and would otherwise collide on the published ports:
+   >
+   > ```bash
+   > cd /ecotaxadev2/ecopart/new_ecopart
+   > docker-compose down      # remove the old v1 api + web containers (data_storage is a bind-mount, untouched)
+   > docker compose up -d     # recreate both services under v2
+   > ```
+
+3. **Deployment directory** (`DEPLOY_DIR` in the workflow, set to
+   `/ecotaxadev2/ecopart/new_ecopart`): the directory that already holds the test server's
+   `docker-compose.yml`, its `.env`, and the persisted `data_storage/`. Update `DEPLOY_DIR` if
+   this ever moves.
+
+The job then runs, from that directory:
+
+```bash
+docker compose pull api      # pull the freshly published backend image
+docker compose up -d api     # recreate ONLY the backend container (frontend `web` stays up)
+```
+
+Database migrations are applied automatically when the backend container boots, so the new
+version is fully migrated after `up -d`.
+
+**Isolation.** The job pulls and recreates only the `api` service and removes only the previous
+backend image (and only if it changed and is no longer in use). The frontend, the compose file,
+and every other image/container on the host are left untouched. No host-wide `docker image
+prune` is run.
+
 
 ### Production Procedure
 
-To deploy a new version of the application to production, follow these steps:
+The test/production server runs the **frontend and backend together** from a single
+`docker-compose.yml`, both pulling published images from Docker Hub:
 
-1. **Prepare the Environment**:
-   - Copy the `empty.env` file to your server and rename it to `.env`. Set your environment variables as needed.
+```yaml
+services:
+  api:
+    image: 'ecotaxa/ecopart_back:latest'
+    env_file: .env
+    volumes:
+      - ./data_storage:/src/data_storage
+    ports:
+      - "5005:4000"
+    restart: unless-stopped
+  web:
+    image: 'ecotaxa/ecopart_front:latest'
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+```
 
-2. **Run the Application**:
-   - Copy the `docker-compose.yml` file to your server.
-   - Run the following command to start the application using Docker Compose:
+To set up or update the server manually:
 
-     ```bash
-     docker compose up
-     ```
+1. **Prepare the environment**: copy `empty.env` to the server (next to the compose file) and
+   rename it to `.env`, then set the variables. `data_storage/` persists the SQLite DB + files
+   across redeploys.
+
+2. **Run the stack**:
+
+   ```bash
+   docker compose pull && docker compose up -d
+   ```
+
+> Note: the root `docker-compose.yml` in this repository **builds the backend from source** and
+> is for local development only. The server uses the image-based compose shown above.
 
 ### Link with EcoTaxa
 

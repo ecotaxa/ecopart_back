@@ -45,3 +45,28 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:latest
+
+  deploy-test:
+    name: Deploy to test server
+    needs: build
+    runs-on: [self-hosted, ecopart-test] # label set when the runner is installed on the test server
+
+    steps:
+      - name: Deploy latest backend image
+        env:
+          # Directory on the server holding the front+back docker-compose.yml + .env.
+          # This compose file is maintained by hand on the server and is NOT touched by CI.
+          DEPLOY_DIR: /ecotaxadev2/ecopart/new_ecopart
+          SERVICE: api # backend service name in that compose (the frontend service `web` is left alone)
+        run: |
+          cd "$DEPLOY_DIR"
+          # Capture the running backend image so we can remove only ours afterwards.
+          OLD_IMAGE=$(docker compose images -q "$SERVICE")
+          # Pull + recreate ONLY the backend service; the frontend (web) stays untouched.
+          docker compose pull "$SERVICE"
+          docker compose up -d "$SERVICE"
+          # Remove the previous backend image only (if it changed and is now unused).
+          NEW_IMAGE=$(docker compose images -q "$SERVICE")
+          if [ -n "$OLD_IMAGE" ] && [ "$OLD_IMAGE" != "$NEW_IMAGE" ]; then
+            docker image rm "$OLD_IMAGE" 2>/dev/null || true
+          fi
