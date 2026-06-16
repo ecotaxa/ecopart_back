@@ -111,7 +111,7 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["ctd_longitude", "Longitude derived from the CTD file (when different from sample longitude).", "CTD file parser (TODO — empty until the parser is wired)."],
     ["visual_qc_status", "Visual QC status (`PENDING`, `VALIDATED`, or `REJECTED`).", "EcoPart `visual_quality_check_status` lookup (set in the QC UI)."],
     ["visual_qc_validator_email", "Email of the QC validator.", "EcoPart `user` table joined via `sample.visual_qc_validator_user_id`."],
-    ["number_of_black", "Number of black (lights-off) images at import — noise reference.", "EcoPart import-time computation (TODO — currently `0`)."],
+    ["number_of_black", "Number of black (lights-off) images at import — noise reference.", "UVP6: counted at import from rows in `particules.csv` where the light flag is `0:1`. UVP5: always `0` by design (UVP5 doesn't acquire black frames)."],
 ];
 
 function formatTable(rows: Array<[string, string, string]>): string {

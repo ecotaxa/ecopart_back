@@ -139,6 +139,28 @@ export class SampleRepositoryImpl implements SampleRepository {
         return this.extractPressures(fileContent);
     }
 
+    // UVP6 only — count rows in particules.csv where the lights are off (col[3] === "0:1").
+    // These are "black" reference images used to measure imager noise.
+    async countBlackParticulesUvp6(file_system_storage_project_folder: string, sample_name: string): Promise<number> {
+        const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
+        const fileContent = await this.readFileFromZip(zipPath, 'particules.csv', undefined);
+        return this.countBlackRowsInParticulesCsv(fileContent);
+    }
+
+    countBlackRowsInParticulesCsv(input: string): number {
+        let count = 0;
+        for (const line of input.split(/\r\n|\n|\r/)) {
+            // Data rows start with YYYYMMDD; headers (HW_CONF / ACQ_CONF) don't match.
+            if (!/^\d{8}/.test(line)) continue;
+            // Columns: timestamp, pressure, ?, light_flag, ...
+            // light_flag "1:1" = lights on, "0:1" = lights off (black).
+            const parts = line.split(",");
+            if (parts.length < 4) continue;
+            if (parts[3].trim() === "0:1") count += 1;
+        }
+        return count;
+    }
+
     async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
         let sample_fss = {};
         if (instrument_model.startsWith('UVP6')) {

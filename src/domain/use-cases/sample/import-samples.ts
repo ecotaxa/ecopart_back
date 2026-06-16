@@ -191,6 +191,11 @@ export class ImportSamples implements ImportSamplesUseCase {
             project_id: project.project_id,
             visual_qc_validator_user_id: current_user_id
         }
+        // nb_black is a UVP6-only count of rows in particules.csv where the light flag is "0:1"
+        // (lights off = noise reference). UVP5 doesn't acquire black/dark frames — the column
+        // is always 0 on UVP5 samples by design (not a TODO).
+        const fs_storage_project_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
+        const is_uvp6 = project.instrument_model.startsWith('UVP6');
         // Format samples to import
         const formated_samples: SampleRequestCreationModel[] = await Promise.all(
             samples_names_to_import.map(async (sample_name) => {
@@ -199,9 +204,16 @@ export class ImportSamples implements ImportSamplesUseCase {
                     project.instrument_model
                 );
                 sample.nb_vignettes = vignette_count_map.get(sample_name) ?? 0;
-                // TODO(marc): compute number-of-black at import. Until then default to 0 so the
-                // column ships with a safe value (matches DEFAULT 0 on the DB column).
-                sample.nb_black = 0;
+                if (is_uvp6) {
+                    try {
+                        sample.nb_black = await this.sampleRepository.countBlackParticulesUvp6(fs_storage_project_folder, sample_name);
+                    } catch {
+                        // particules.csv missing or unreadable — leave nb_black at 0 rather than fail the whole import.
+                        sample.nb_black = 0;
+                    }
+                } else {
+                    sample.nb_black = 0;
+                }
                 return sample;
             })
         );

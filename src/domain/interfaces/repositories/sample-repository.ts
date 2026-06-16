@@ -33,6 +33,7 @@ export interface SampleRepository {
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string;
     countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
     countEcotaxaSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
+    countBlackParticulesUvp6(file_system_storage_project_folder: string, sample_name: string): Promise<number>;
 
     // CTD-specific methods
     listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]>;
