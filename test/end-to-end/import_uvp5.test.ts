@@ -23,6 +23,8 @@ import fs from 'fs'
 import os from 'os'
 import yauzl from 'yauzl'
 
+import { ecotaxaE2eAvailable } from './ecotaxa-availability'
+
 import { MiddlewareAuthCookie } from '../../src/presentation/middleware/auth-cookie'
 import { MiddlewareAuthValidation } from '../../src/presentation/middleware/auth-validation'
 import { MiddlewareUserValidation } from '../../src/presentation/middleware/user-validation'
@@ -134,7 +136,15 @@ const ALL_SAMPLES = [
 const SAMPLES_WITH_IMAGES = [SAMPLE_WITH_IMAGES_ZIPPED, SAMPLE_WITH_IMAGES_UNZIPPED]
 const TARZST_SAMPLES = [SAMPLE_WITH_IMAGES_TARZST, SAMPLE_NO_IMAGES_TARZST]
 
-describe("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without images)", () => {
+const ECOTAXA_INSTANCE_URL = "https://ecotaxa-dev.imev-mer.fr:5003/"
+const DATASET_DIR = path.resolve(__dirname, "../../data_storage/ecopart_data_to_import/remote/ftp_plankton/Ecotaxa_Data_to_import/uvp5_endtoend_TEST")
+const e2eCheck = ecotaxaE2eAvailable(DATASET_DIR, ECOTAXA_INSTANCE_URL)
+if (!e2eCheck.available) {
+    console.warn(`[e2e] Skipping UVP5 import suite — ${e2eCheck.reason}`)
+}
+const describeE2E = e2eCheck.available ? describe : describe.skip
+
+describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without images)", () => {
     let db: sqlite3.Database
     let tmpDir: string
     let mailerAdapter: NodemailerAdapter
@@ -410,7 +420,7 @@ describe("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without ima
             .send({
                 ecotaxa_instance_name: "TEST",
                 ecotaxa_instance_description: "TEST instance for development",
-                ecotaxa_instance_url: "https://ecotaxa-dev.imev-mer.fr:5003/"
+                ecotaxa_instance_url: ECOTAXA_INSTANCE_URL
             })
 
         expect(instanceResponse.status).toBe(201)
