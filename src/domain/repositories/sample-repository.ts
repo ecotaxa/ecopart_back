@@ -212,10 +212,12 @@ export class SampleRepositoryImpl implements SampleRepository {
                 : instrument_model === 'UVP5HD' ? 1
                     : undefined;
 
-        // TODO(marc): UVP5 pressure_gain constant — Marc said "0.1 or 10". Lock the value
-        // and set it here (e.g. 0.1) once confirmed. Left undefined for now so the column
-        // is empty on UVP5 rows rather than wrong.
-        const instrument_settings_acq_pressure_gain: number | undefined = undefined;
+        // UVP5 stores raw pressure in centibar in the data files; UVP6 stores it in decibar.
+        // The "pressure gain" is the multiplicative factor that converts raw → decibar, i.e.
+        // raw_centibar × 0.1 = decibar. UVP6's gain is 1. Either convention (10 or 0.1)
+        // would work as long as the consumer knows which way to apply it; we pick the
+        // multiplicative form for consistency with UVP6's `1`.
+        const instrument_settings_acq_pressure_gain: number = 0.1;
 
         // Construct the sample object
         const sample_to_return: Partial<SampleRequestCreationModel> = {
@@ -611,12 +613,13 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_acq_threshold: parseInt(work_hdr_content['Thresh']),
             instrument_settings_particule_minimum_area_pixels: parseInt(work_hdr_content['SMbase']),
             instrument_settings_vignette_minimum_area_pixels: parseInt(work_hdr_content['SMzoo']),
-            // Marc's spec says these two are likely swapped relative to the HDR fields they
-            // currently read from (acq_shutter_speed should be the UVP5SD code, acq_exposure
-            // should be the UVP5HD/UVP6 shutter in µs). See follow-up #8 in the plan — fixing
-            // the swap requires a backfill and is tracked separately.
-            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['Exposure']) || undefined,
-            instrument_settings_acq_exposure: parseInt(work_hdr_content['ShutterSpeed']) || undefined
+            // Per Marc's spec:
+            //   instrument_settings_acq_shutter_speed = HDR `ShutterSpeed` (UVP5SD code, always 12 = 1/10000 s)
+            //   instrument_settings_acq_exposure      = HDR `Exposure`     (UVP5HD shutter in µs, +60 µs vs UVPdb net)
+            // Previous releases had these two assignments crossed; migration 019 backfills the
+            // already-stored rows by swapping their values.
+            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['ShutterSpeed']) || undefined,
+            instrument_settings_acq_exposure: parseInt(work_hdr_content['Exposure']) || undefined
         };
         return sample;
     }
