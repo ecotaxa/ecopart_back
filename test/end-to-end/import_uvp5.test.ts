@@ -42,6 +42,8 @@ import { MiddlewareExportValidation } from '../../src/presentation/middleware/ex
 
 import { SearchUsers } from '../../src/domain/use-cases/user/search-users'
 import { CreateUser } from '../../src/domain/use-cases/user/create-user'
+import { MigrateUsers } from '../../src/domain/use-cases/user/migrate-users'
+import { ResendMigrationEmails } from '../../src/domain/use-cases/user/resend-migration-emails'
 import { UpdateUser } from '../../src/domain/use-cases/user/update-user'
 import { LoginUser } from '../../src/domain/use-cases/auth/login'
 import { RefreshToken } from '../../src/domain/use-cases/auth/refresh-token'
@@ -262,6 +264,8 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new MiddlewareUserValidation(countriesAdapter),
             new MiddlewareAuthValidation(),
             new CreateUser(userRepo, transporter, mailerAdapter),
+            new MigrateUsers(userRepo, transporter, mailerAdapter),
+            new ResendMigrationEmails(userRepo, transporter, mailerAdapter),
             new UpdateUser(userRepo),
             new ValidUser(userRepo),
             new DeleteUser(userRepo, privilegeRepo),

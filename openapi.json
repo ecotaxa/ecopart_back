@@ -5450,6 +5450,372 @@
         }
       }
     },
+    "/users/migrate": {
+      "post": {
+        "summary": "Migrate legacy EcoPart users",
+        "description": "Admin-only. Bulk-imports users from the old EcoPart application, preserving their\nlegacy user id (`legacy_ecopart_user_id`). Each newly migrated user is created\n**already email-validated** (`valid_email = true`) with a **random throwaway password**,\nand is sent an email containing a link to set their own password. The link is a\nreset-password token valid for **one week**.\n\nA per-user flag `legacy_password_set` tracks whether the migrated user has set their\npassword yet (it flips to `true` automatically when they complete the reset flow), so\nthe batch can be re-run safely and is fully **idempotent**.\n\nThis endpoint only **creates** new users (sending each one its first migration email).\nIt never re-sends emails to already-migrated users — use `POST /users/migrate/resend`\nfor that.\n\nSet `dry_run: true` to validate the payload and preview the per-user outcome **without\ncreating any user or sending any email** (statuses are returned with a `would_` prefix).\n\n**Per-user outcome (`results[].status`):**\n| Status | Meaning | Email sent | DB write |\n|--------|---------|------------|----------|\n| `created` | No account had this email → new migrated user created and emailed | yes | insert |\n| `linked_existing_user` | A real (non-legacy) account already uses this email → its `legacy_ecopart_user_id` is linked so old data can be mapped; password/email untouched | no | link old id |\n| `skipped_already_migrated` | A legacy user with this email already exists (re-send via `/users/migrate/resend`) | no | none |\n| `error` | Row failed — e.g. the email is already linked to a **different** old id, or a unique-constraint race (`\"Email already exists\"`). `message` carries the reason. One failing row never aborts the rest of the batch. | no | none |\n| `would_create` / `would_link` | Dry-run preview of `created` / `linked_existing_user` | no | none |\n\nThe response also includes a `summary` object counting `total` plus the number of rows per status.\n",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "users"
+                ],
+                "properties": {
+                  "dry_run": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "users": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "legacy_ecopart_user_id",
+                        "email",
+                        "first_name",
+                        "last_name",
+                        "organisation",
+                        "country",
+                        "user_planned_usage"
+                      ],
+                      "properties": {
+                        "legacy_ecopart_user_id": {
+                          "type": "integer"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "first_name": {
+                          "type": "string"
+                        },
+                        "last_name": {
+                          "type": "string"
+                        },
+                        "organisation": {
+                          "type": "string"
+                        },
+                        "country": {
+                          "type": "string"
+                        },
+                        "user_planned_usage": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "dry_run": false,
+                "users": [
+                  {
+                    "legacy_ecopart_user_id": 4321,
+                    "email": "jane@lab.org",
+                    "first_name": "Jane",
+                    "last_name": "Doe",
+                    "organisation": "LOV",
+                    "country": "France",
+                    "user_planned_usage": "Research"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Migration report — a per-user result list plus a summary of counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dry_run": {
+                      "type": "boolean",
+                      "description": "Echoes the requested dry-run mode."
+                    },
+                    "summary": {
+                      "type": "object",
+                      "description": "Count of rows per status, plus the total.",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "created": {
+                          "type": "integer"
+                        },
+                        "linked_existing_user": {
+                          "type": "integer"
+                        },
+                        "skipped_already_migrated": {
+                          "type": "integer"
+                        },
+                        "would_create": {
+                          "type": "integer"
+                        },
+                        "would_link": {
+                          "type": "integer"
+                        },
+                        "error": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "legacy_ecopart_user_id": {
+                            "type": "integer"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "linked_existing_user",
+                              "skipped_already_migrated",
+                              "would_create",
+                              "would_link",
+                              "error"
+                            ]
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Present for `error` (and other non-trivial) outcomes — the human-readable reason."
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "dry_run": false,
+                  "summary": {
+                    "total": 3,
+                    "created": 1,
+                    "linked_existing_user": 1,
+                    "error": 1
+                  },
+                  "results": [
+                    {
+                      "email": "jane@lab.org",
+                      "legacy_ecopart_user_id": 4321,
+                      "status": "created"
+                    },
+                    {
+                      "email": "bob@lab.org",
+                      "legacy_ecopart_user_id": 88,
+                      "status": "linked_existing_user"
+                    },
+                    {
+                      "email": "amy@lab.org",
+                      "legacy_ecopart_user_id": 90,
+                      "status": "error",
+                      "message": "Email already linked to legacy id 12, not 90"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Logged user cannot migrate users or cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/migrate/resend": {
+      "post": {
+        "summary": "Resend migration emails",
+        "description": "Admin-only. Resends the \"set your password\" migration email to **every** legacy EcoPart\nuser who has not yet set their password — i.e. migrated users for whom\n`legacy_ecopart_user_id IS NOT NULL`, `legacy_password_set = false`, and the account is\nnot deleted. This targets people who never followed the original migration link.\n\nEach email carries a fresh reset-password token valid for **one week**. The recipient\nlist is computed server-side; this endpoint takes no user list.\n\nSet `dry_run: true` to preview who would be emailed (status `would_resend`) without\nsending anything or touching the database.\n\n**Per-user outcome (`results[].status`):**\n| Status | Meaning |\n|--------|---------|\n| `email_resent` | Migration email re-sent to this user |\n| `would_resend` | Dry-run preview — this user would be emailed |\n| `error` | This recipient failed (`message` carries the reason); the rest of the batch still runs |\n\nThe response also includes a `summary` object counting `total` plus the number of rows per status.\n",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dry_run": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true, list the recipients without sending any email."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resend report — a per-user result list plus a summary of counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "email_resent": {
+                          "type": "integer"
+                        },
+                        "would_resend": {
+                          "type": "integer"
+                        },
+                        "error": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "legacy_ecopart_user_id": {
+                            "type": "integer"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "email_resent",
+                              "would_resend",
+                              "error"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "dry_run": false,
+                  "summary": {
+                    "total": 2,
+                    "email_resent": 2
+                  },
+                  "results": [
+                    {
+                      "email": "jane@lab.org",
+                      "legacy_ecopart_user_id": 4321,
+                      "status": "email_resent"
+                    },
+                    {
+                      "email": "bob@lab.org",
+                      "legacy_ecopart_user_id": 88,
+                      "status": "email_resent"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Logged user cannot migrate users or cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/{user_id}": {
       "patch": {
         "summary": "Update user",

@@ -21,6 +21,8 @@ import ExportRouter from './presentation/routers/export-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
+import { MigrateUsers } from './domain/use-cases/user/migrate-users'
+import { ResendMigrationEmails } from './domain/use-cases/user/resend-migration-emails'
 import { UpdateUser } from './domain/use-cases/user/update-user'
 import { LoginUser } from './domain/use-cases/auth/login'
 import { RefreshToken } from './domain/use-cases/auth/refresh-token'
@@ -236,6 +238,8 @@ async function getSQLiteDS() {
             new MiddlewareUserValidation(countriesAdapter),
             new MiddlewareAuthValidation(),
             new CreateUser(user_repo, transporter, mailerAdapter),
+            new MigrateUsers(user_repo, transporter, mailerAdapter),
+            new ResendMigrationEmails(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
             new DeleteUser(user_repo, privilege_repo),

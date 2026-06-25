@@ -139,6 +139,69 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
         },
     ]
 
+    rulesMigrateUsers = [
+        // dry_run is optional, defaults to false
+        check('dry_run').optional()
+            .isBoolean().withMessage('Dry run must be a boolean.'),
+
+        // users must be a non-empty array
+        check('users')
+            .isArray({ min: 1 }).withMessage('Users must be a non-empty array.'),
+
+        // Legacy EcoPart user id
+        check('users.*.legacy_ecopart_user_id')
+            .not().isEmpty().withMessage('Legacy EcoPart user id is required.')
+            .bail()
+            .isInt().withMessage('Legacy EcoPart user id must be a number.'),
+
+        // Email
+        check('users.*.email')
+            .trim()
+            .normalizeEmail()
+            .isEmail().withMessage('Email must be a valid email address.')
+            .bail(),
+
+        // First name
+        check('users.*.first_name')
+            .trim()
+            .not().isEmpty().withMessage('First name is required.'),
+
+        // Last name
+        check('users.*.last_name')
+            .trim()
+            .not().isEmpty().withMessage('Last name is required.'),
+
+        // Organisation
+        check('users.*.organisation')
+            .trim()
+            .not().isEmpty().withMessage('Organisation is required.'),
+
+        // Country
+        check('users.*.country')
+            .trim()
+            .not().isEmpty().withMessage('Country is required.')
+            .custom(value => {
+                if (!this.countries.isValid(value)) {
+                    throw new Error('Invalid country. Please select from the list.');
+                }
+                return true;
+            }),
+
+        // User planned usage
+        check('users.*.user_planned_usage')
+            .trim()
+            .not().isEmpty().withMessage('User planned usage is required.'),
+
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
     rulesGetUsers = [
         query('page').default(1)
             .isInt({ min: 1 }).withMessage('Page must be a number and must be greater than 0.'),

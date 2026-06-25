@@ -4,6 +4,8 @@ import { Request, Response } from 'express'
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareUserValidation } from '../interfaces/middleware/user-validation'
 import { CreateUserUseCase } from '../../domain/interfaces/use-cases/user/create-user'
+import { MigrateUsersUseCase } from '../../domain/interfaces/use-cases/user/migrate-users'
+import { ResendMigrationEmailsUseCase } from '../../domain/interfaces/use-cases/user/resend-migration-emails'
 import { UpdateUserUseCase } from '../../domain/interfaces/use-cases/user/update-user'
 import { ValidUserUseCase } from '../../domain/interfaces/use-cases/user/valid-user'
 import { DeleteUserUseCase } from '../../domain/interfaces/use-cases/user/delete-user'
@@ -20,6 +22,8 @@ export default function UsersRouter(
     middlewareUserValidation: IMiddlewareUserValidation,
     middlewareAuthValidation: MiddlewareAuthValidation,
     createUserUseCase: CreateUserUseCase,
+    migrateUsersUseCase: MigrateUsersUseCase,
+    resendMigrationEmailsUseCase: ResendMigrationEmailsUseCase,
     updateUserUseCase: UpdateUserUseCase,
     validUserUseCase: ValidUserUseCase,
     deleteUserUseCase: DeleteUserUseCase,
@@ -285,6 +289,271 @@ export default function UsersRouter(
             else if (err.message === "Cannot find updated preexistent user") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find created user") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create user"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /users/migrate:
+     *   post:
+     *     summary: Migrate legacy EcoPart users
+     *     description: |
+     *       Admin-only. Bulk-imports users from the old EcoPart application, preserving their
+     *       legacy user id (`legacy_ecopart_user_id`). Each newly migrated user is created
+     *       **already email-validated** (`valid_email = true`) with a **random throwaway password**,
+     *       and is sent an email containing a link to set their own password. The link is a
+     *       reset-password token valid for **one week**.
+     *
+     *       A per-user flag `legacy_password_set` tracks whether the migrated user has set their
+     *       password yet (it flips to `true` automatically when they complete the reset flow), so
+     *       the batch can be re-run safely and is fully **idempotent**.
+     *
+     *       This endpoint only **creates** new users (sending each one its first migration email).
+     *       It never re-sends emails to already-migrated users — use `POST /users/migrate/resend`
+     *       for that.
+     *
+     *       Set `dry_run: true` to validate the payload and preview the per-user outcome **without
+     *       creating any user or sending any email** (statuses are returned with a `would_` prefix).
+     *
+     *       **Per-user outcome (`results[].status`):**
+     *       | Status | Meaning | Email sent | DB write |
+     *       |--------|---------|------------|----------|
+     *       | `created` | No account had this email → new migrated user created and emailed | yes | insert |
+     *       | `linked_existing_user` | A real (non-legacy) account already uses this email → its `legacy_ecopart_user_id` is linked so old data can be mapped; password/email untouched | no | link old id |
+     *       | `skipped_already_migrated` | A legacy user with this email already exists (re-send via `/users/migrate/resend`) | no | none |
+     *       | `error` | Row failed — e.g. the email is already linked to a **different** old id, or a unique-constraint race (`"Email already exists"`). `message` carries the reason. One failing row never aborts the rest of the batch. | no | none |
+     *       | `would_create` / `would_link` | Dry-run preview of `created` / `linked_existing_user` | no | none |
+     *
+     *       The response also includes a `summary` object counting `total` plus the number of rows per status.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [users]
+     *             properties:
+     *               dry_run:
+     *                 type: boolean
+     *                 default: false
+     *               users:
+     *                 type: array
+     *                 minItems: 1
+     *                 items:
+     *                   type: object
+     *                   required: [legacy_ecopart_user_id, email, first_name, last_name, organisation, country, user_planned_usage]
+     *                   properties:
+     *                     legacy_ecopart_user_id: { type: integer }
+     *                     email: { type: string }
+     *                     first_name: { type: string }
+     *                     last_name: { type: string }
+     *                     organisation: { type: string }
+     *                     country: { type: string }
+     *                     user_planned_usage: { type: string }
+     *           example:
+     *             dry_run: false
+     *             users:
+     *               - legacy_ecopart_user_id: 4321
+     *                 email: "jane@lab.org"
+     *                 first_name: "Jane"
+     *                 last_name: "Doe"
+     *                 organisation: "LOV"
+     *                 country: "France"
+     *                 user_planned_usage: "Research"
+     *     responses:
+     *       200:
+     *         description: Migration report — a per-user result list plus a summary of counts.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 dry_run:
+     *                   type: boolean
+     *                   description: Echoes the requested dry-run mode.
+     *                 summary:
+     *                   type: object
+     *                   description: Count of rows per status, plus the total.
+     *                   properties:
+     *                     total: { type: integer }
+     *                     created: { type: integer }
+     *                     linked_existing_user: { type: integer }
+     *                     skipped_already_migrated: { type: integer }
+     *                     would_create: { type: integer }
+     *                     would_link: { type: integer }
+     *                     error: { type: integer }
+     *                 results:
+     *                   type: array
+     *                   items:
+     *                     type: object
+     *                     properties:
+     *                       email: { type: string }
+     *                       legacy_ecopart_user_id: { type: integer }
+     *                       status:
+     *                         type: string
+     *                         enum: [created, linked_existing_user, skipped_already_migrated, would_create, would_link, error]
+     *                       message:
+     *                         type: string
+     *                         description: Present for `error` (and other non-trivial) outcomes — the human-readable reason.
+     *             example:
+     *               dry_run: false
+     *               summary: { total: 3, created: 1, linked_existing_user: 1, error: 1 }
+     *               results:
+     *                 - email: "jane@lab.org"
+     *                   legacy_ecopart_user_id: 4321
+     *                   status: "created"
+     *                 - email: "bob@lab.org"
+     *                   legacy_ecopart_user_id: 88
+     *                   status: "linked_existing_user"
+     *                 - email: "amy@lab.org"
+     *                   legacy_ecopart_user_id: 90
+     *                   status: "error"
+     *                   message: "Email already linked to legacy id 12, not 90"
+     *       401:
+     *         description: Unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: Logged user cannot migrate users or cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/migrate', middlewareAuth.auth, middlewareUserValidation.rulesMigrateUsers, async (req: Request, res: Response) => {
+        try {
+            const report = await migrateUsersUseCase.execute((req as CustomRequest).token, req.body.users, req.body.dry_run === true)
+            res.status(200).send(report)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "Logged user cannot migrate users") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot migrate users"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /users/migrate/resend:
+     *   post:
+     *     summary: Resend migration emails
+     *     description: |
+     *       Admin-only. Resends the "set your password" migration email to **every** legacy EcoPart
+     *       user who has not yet set their password — i.e. migrated users for whom
+     *       `legacy_ecopart_user_id IS NOT NULL`, `legacy_password_set = false`, and the account is
+     *       not deleted. This targets people who never followed the original migration link.
+     *
+     *       Each email carries a fresh reset-password token valid for **one week**. The recipient
+     *       list is computed server-side; this endpoint takes no user list.
+     *
+     *       Set `dry_run: true` to preview who would be emailed (status `would_resend`) without
+     *       sending anything or touching the database.
+     *
+     *       **Per-user outcome (`results[].status`):**
+     *       | Status | Meaning |
+     *       |--------|---------|
+     *       | `email_resent` | Migration email re-sent to this user |
+     *       | `would_resend` | Dry-run preview — this user would be emailed |
+     *       | `error` | This recipient failed (`message` carries the reason); the rest of the batch still runs |
+     *
+     *       The response also includes a `summary` object counting `total` plus the number of rows per status.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               dry_run:
+     *                 type: boolean
+     *                 default: false
+     *                 description: When true, list the recipients without sending any email.
+     *     responses:
+     *       200:
+     *         description: Resend report — a per-user result list plus a summary of counts.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 dry_run:
+     *                   type: boolean
+     *                 summary:
+     *                   type: object
+     *                   properties:
+     *                     total: { type: integer }
+     *                     email_resent: { type: integer }
+     *                     would_resend: { type: integer }
+     *                     error: { type: integer }
+     *                 results:
+     *                   type: array
+     *                   items:
+     *                     type: object
+     *                     properties:
+     *                       email: { type: string }
+     *                       legacy_ecopart_user_id: { type: integer }
+     *                       status:
+     *                         type: string
+     *                         enum: [email_resent, would_resend, error]
+     *                       message: { type: string }
+     *             example:
+     *               dry_run: false
+     *               summary: { total: 2, email_resent: 2 }
+     *               results:
+     *                 - email: "jane@lab.org"
+     *                   legacy_ecopart_user_id: 4321
+     *                   status: "email_resent"
+     *                 - email: "bob@lab.org"
+     *                   legacy_ecopart_user_id: 88
+     *                   status: "email_resent"
+     *       401:
+     *         description: Unauthorized.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: Logged user cannot migrate users or cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/migrate/resend', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const report = await resendMigrationEmailsUseCase.execute((req as CustomRequest).token, req.body?.dry_run === true)
+            res.status(200).send(report)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "Logged user cannot migrate users") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot resend migration emails"] })
         }
     })
 
