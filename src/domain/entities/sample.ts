@@ -58,6 +58,8 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
     sample_id: number;                          // Sample internal identifier
     sample_creation_utc_date_time: string;               // Creation date in ISO format
     visual_qc_status_id: number;                // Quality check status
+    visual_qc_comment: string | null;           // QC reviewer comment (null until reviewed)
+    visual_qc_validation_utc_date_time: string | null; // When the sample was validated/rejected (null until reviewed = source of truth for "reviewed")
     ecotaxa_import_status_id: number; // EcoTaxa import status
     ecotaxa_sample_imported: boolean;        // EcoTaxa sample imported flag
     ecotaxa_sample_import_utc_date_time: string;      // EcoTaxa sample import date
@@ -92,6 +94,10 @@ export interface PublicSampleModel extends PrivateSampleModel {
 export interface SampleUpdateModel {
     [key: string]: any;
     sample_id: number;                         // Sample internal identifier
+    visual_qc_status_id?: number;              // Quality check status (PENDING/VALIDATED/REJECTED id)
+    visual_qc_validator_user_id?: number;      // Who validated/rejected
+    visual_qc_comment?: string | null;         // QC reviewer comment
+    visual_qc_validation_utc_date_time?: string | null; // When validated/rejected (ISO)
     ecotaxa_import_status_id?: number | null; // EcoTaxa import status
     ecotaxa_sample_imported?: boolean;                           // EcoTaxa sample imported flag
     ecotaxa_sample_import_utc_date_time?: string | null;                  // EcoTaxa sample import date

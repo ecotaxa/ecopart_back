@@ -340,6 +340,10 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         check("samples")
             .exists().withMessage('Samples are required.')
             .isArray().withMessage('Samples must be an array.'),
+        check("validated_samples").optional()
+            .isArray().withMessage('validated_samples must be an array.'),
+        check("validated_samples.*")
+            .isString().withMessage('Each validated sample name must be a string.'),
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);

@@ -1,4 +1,5 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
@@ -40,4 +41,16 @@ export interface SampleRepository {
     importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void>;
     deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void>;
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;
+
+    // Import-time QC graphs
+    // Reads the sample's raw files and returns one normalised record per acquired image/frame.
+    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    // Pre-import variant: reads the per-image records straight from the project source folder
+    // (root_folder_path) for a sample that has not been imported yet.
+    getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    // Pre-import variant: reads the filtering/settings metadata (kept range, image volume, depth
+    // offset) straight from the project source folder for a not-yet-imported sample.
+    getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata>;
+    // Records a visual-QC decision (status + validator + timestamp + optional comment).
+    setSampleVisualQc(sample_id: number, visual_qc_status_id: number, visual_qc_validator_user_id: number, comment: string | null, validated_at: string): Promise<number>;
 }

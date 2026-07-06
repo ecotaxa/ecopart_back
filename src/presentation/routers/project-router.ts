@@ -15,6 +15,9 @@ import { ImportSamplesUseCase } from '../../domain/interfaces/use-cases/sample/i
 import { DeleteSampleUseCase } from '../../domain/interfaces/use-cases/sample/delete-sample'
 import { SearchSamplesUseCase } from '../../domain/interfaces/use-cases/sample/search-samples'
 import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
+import { GetSampleQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/get-sample-qc-graphs'
+import { SetSampleVisualQcUseCase } from '../../domain/interfaces/use-cases/sample/set-sample-visual-qc'
+import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/preview-samples-qc-graphs'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -56,6 +59,9 @@ export default function ProjectRouter(
     deleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase,
     listShipsUseCase: ListShipsUseCase,
     migrateEcotaxaProjectUseCase: MigrateEcotaxaProjectUseCase,
+    getSampleQcGraphsUseCase: GetSampleQcGraphsUseCase,
+    setSampleVisualQcUseCase: SetSampleVisualQcUseCase,
+    previewSamplesQcGraphsUseCase: PreviewSamplesQcGraphsUseCase,
 ) {
     const router = express.Router()
 
@@ -880,6 +886,7 @@ export default function ProjectRouter(
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
+            "Invalid validated_samples:": { status: 422, message: err.message },
             "Unknown instrument model": { status: 404, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
@@ -957,7 +964,8 @@ export default function ProjectRouter(
             task_import_samples = await importSamplesUseCase.execute(
                 (req as CustomRequest).token,
                 req.params.project_id as any,
-                { ...req.body }.samples
+                { ...req.body }.samples,
+                req.body.validated_samples
             );
 
             // Proceed with backup only if import is successful
@@ -1468,6 +1476,187 @@ export default function ProjectRouter(
 
     /**
      * @openapi
+     * /projects/{project_id}/samples/{sample_id}/qc-graphs:
+     *   get:
+     *     summary: Import QC graphs for a sample
+     *     description: |
+     *       Returns the data for the three import-time quality-control vertical profiles
+     *       (depth on the Y axis, in metres): (1) depth of each image with the kept-image
+     *       selection range, (2) imaged volume per depth bin, and (3) the "raw histogram" of
+     *       particle counts for pixel classes 1/2/3 — split into lit particles
+     *       (`particle_lpm_profile`) and lights-off black frames (`black_profile`, null when
+     *       the instrument has no dark frames). Computed on demand from the sample's raw files.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: QC graph datasets for the sample.
+     *       403:
+     *         description: User cannot be used or lacks access to the project.
+     *       404:
+     *         description: Sample or project not found.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.get('/:project_id/samples/:sample_id/qc-graphs', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const graphs = await getSampleQcGraphsUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id));
+            res.status(200).send(graphs)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get sample QC graphs"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/{sample_id}/visual-qc:
+     *   patch:
+     *     summary: Record a sample's visual-QC decision
+     *     description: |
+     *       Validates or rejects a sample after the user reviews its QC graphs. Sets the
+     *       visual QC status and records who decided, when, and an optional comment. Allowed
+     *       for admins or any member of the project. A sample must be VALIDATED before it can
+     *       be sent to EcoTaxa or exported.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [visual_qc_status_label]
+     *             properties:
+     *               visual_qc_status_label:
+     *                 type: string
+     *                 enum: [VALIDATED, REJECTED]
+     *               comment:
+     *                 type: string
+     *                 nullable: true
+     *     responses:
+     *       200:
+     *         description: The updated sample.
+     *       401:
+     *         description: Invalid visual QC status.
+     *       403:
+     *         description: User cannot be used or cannot validate in this project.
+     *       404:
+     *         description: Sample, project, or QC status not found.
+     *       422:
+     *         description: Validation error.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.patch('/:project_id/samples/:sample_id/visual-qc', middlewareAuth.auth, middlewareSampleValidation.rulesSetVisualQc, async (req: Request, res: Response) => {
+        try {
+            const updated_sample = await setSampleVisualQcUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id), req.body.visual_qc_status_label, req.body.comment);
+            res.status(200).send(updated_sample)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot validate samples in this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Invalid visual QC status") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find updated sample") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Visual QC status not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot update sample visual QC"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/qc-graphs-preview:
+     *   post:
+     *     summary: Preview import QC graphs for not-yet-imported samples
+     *     description: |
+     *       Returns the same QC graph datasets as the per-sample endpoint, but for a list of
+     *       samples that have **not been imported yet** — computed on the fly from the project
+     *       source folder. Lets the operator review quality before committing an import (and then
+     *       pass the approved names as `validated_samples` to the import endpoint). Each requested
+     *       name must be importable from the source folder. For a preview, `sample_id` is null and
+     *       `visual_qc_status_label` is `NOT_IMPORTED`.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [sample_names]
+     *             properties:
+     *               sample_names:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *     responses:
+     *       200:
+     *         description: QC graph datasets, one per requested sample.
+     *       403:
+     *         description: User cannot be used or lacks access to the project.
+     *       404:
+     *         description: Project or source folder not found.
+     *       422:
+     *         description: Validation error or a requested sample is not importable.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.post('/:project_id/samples/qc-graphs-preview', middlewareAuth.auth, middlewareSampleValidation.rulesPreviewQcGraphs, async (req: Request, res: Response) => {
+        try {
+            const graphs = await previewSamplesQcGraphsUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), req.body.sample_names);
+            res.status(200).send(graphs)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "No samples to preview") res.status(422).send({ errors: [err.message] })
+            else if (err.message.startsWith("Samples not importable")) res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot preview sample QC graphs"] })
+        }
+    })
+
+    /**
+     * @openapi
      * /projects/{project_id}/samples/searches:
      *   post:
      *     summary: Search samples
@@ -1753,6 +1942,7 @@ export default function ProjectRouter(
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
+            "Invalid validated_samples:": { status: 422, message: err.message },
             "Unknown instrument model": { status: 404, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };

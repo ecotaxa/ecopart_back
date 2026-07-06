@@ -62,6 +62,9 @@ import { UpdateProject } from '../../src/domain/use-cases/project/update-project
 import { SearchProject } from '../../src/domain/use-cases/project/search-projects'
 import { GetProject } from '../../src/domain/use-cases/project/get-project'
 import { MigrateEcotaxaProject } from '../../src/domain/use-cases/project/migrate-ecotaxa-project'
+import { GetSampleQcGraphs } from '../../src/domain/use-cases/sample/get-sample-qc-graphs'
+import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-visual-qc'
+import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -312,6 +315,9 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new DeleteImportedCTDSamples(sampleRepo, userRepo, privilegeRepo, projectRepo),
             new ListShips(projectRepo),
             new MigrateEcotaxaProject(userRepo, projectRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo),
+            new GetSampleQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo),
+            new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
+            new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
         )
 
         const taskMiddleware = TaskRouter(
@@ -519,10 +525,29 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             expect(importableNames).toContain(name)
         }
 
+        // Pre-import QC preview: graphs read straight from the source work/meta folders, before import.
+        const previewRes = await request(server)
+            .post(`/projects/${capturedProjectId}/samples/qc-graphs-preview`)
+            .set("Cookie", cookieHeader())
+            .send({ sample_names: ALL_SAMPLES })
+
+        expect(previewRes.status).toBe(200)
+        expect(previewRes.body.length).toBe(ALL_SAMPLES.length)
+        for (const g of previewRes.body) {
+            expect(ALL_SAMPLES).toContain(g.sample_name)
+            expect(g.sample_id).toBeNull()
+            expect(g.visual_qc_status_label).toBe("NOT_IMPORTED")
+            expect(g.image_depth_profile.points.length).toBeGreaterThan(0)
+            expect(g.image_filtering).toBeDefined()
+            // UVP5 has no lights-off frames → no black profile.
+            expect(g.black_profile).toBeNull()
+        }
+
+        // Import and validate at the same time (verified via the pre-import QC preview above).
         const importRes = await request(server)
             .post(`/projects/${capturedProjectId}/samples/import`)
             .set("Cookie", cookieHeader())
-            .send({ samples: ALL_SAMPLES, backup_project: false })
+            .send({ samples: ALL_SAMPLES, validated_samples: ALL_SAMPLES, backup_project: false })
 
         expect(importRes.status).toBe(200)
         expect(importRes.body.success).toBe(true)
@@ -534,6 +559,27 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             .set("Cookie", cookieHeader())
         expect(samplesRes.status).toBe(200)
         expect(samplesRes.body.samples.length).toBe(ALL_SAMPLES.length)
+
+        // Validated-at-import → every sample comes back VALIDATED (unblocks EcoTaxa import + raw export).
+        for (const name of ALL_SAMPLES) {
+            const s = samplesRes.body.samples.find((x: any) => x.sample_name === name)
+            expect(s).toBeDefined()
+            expect(s.visual_qc_status_label).toBe("VALIDATED")
+        }
+
+        // Parity: post-import QC graphs must equal the pre-import preview (same raw files, shared
+        // builder). Only sample_id + visual_qc_status_label may differ.
+        const previewByName = new Map<string, any>((previewRes.body as any[]).map(g => [g.sample_name, g]))
+        for (const name of ALL_SAMPLES) {
+            const s = samplesRes.body.samples.find((x: any) => x.sample_name === name)
+            const graphsRes = await request(server)
+                .get(`/projects/${capturedProjectId}/samples/${s.sample_id}/qc-graphs`)
+                .set("Cookie", cookieHeader())
+            expect(graphsRes.status).toBe(200)
+            const { sample_id: _pId, visual_qc_status_label: _pStatus, ...preview } = previewByName.get(name)
+            const { sample_id: _gId, visual_qc_status_label: _gStatus, ...post } = graphsRes.body
+            expect(post).toEqual(preview)
+        }
 
         // Samples without images: nb_vignettes must be 0
         for (const name of [SAMPLE_NO_IMAGES_ZIPPED, SAMPLE_NO_IMAGES_UNZIPPED]) {

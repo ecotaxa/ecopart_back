@@ -66,6 +66,9 @@ import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/creat
 import { ListOrganisations } from './domain/use-cases/user/list-organisations'
 import { ListShips } from './domain/use-cases/project/list-ships'
 import { MigrateEcotaxaProject } from './domain/use-cases/project/migrate-ecotaxa-project'
+import { GetSampleQcGraphs } from './domain/use-cases/sample/get-sample-qc-graphs'
+import { SetSampleVisualQc } from './domain/use-cases/sample/set-sample-visual-qc'
+import { PreviewSamplesQcGraphs } from './domain/use-cases/sample/preview-samples-qc-graphs'
 import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
 import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
@@ -289,6 +292,9 @@ async function getSQLiteDS() {
         new DeleteImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new ListShips(project_repo),
         new MigrateEcotaxaProject(user_repo, project_repo, sample_repo, privilege_repo, ecotaxa_account_repo),
+        new GetSampleQcGraphs(user_repo, sample_repo, project_repo, privilege_repo),
+        new SetSampleVisualQc(user_repo, sample_repo, privilege_repo),
+        new PreviewSamplesQcGraphs(user_repo, sample_repo, project_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
     )
 
     const taskMiddleWare = TaskRouter(

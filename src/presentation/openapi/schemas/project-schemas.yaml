@@ -376,6 +376,14 @@ components:
           description: List of sample names/identifiers to import.
           items:
             type: string
+        validated_samples:
+          type: array
+          description: >-
+            Optional subset of `samples` to mark visual-QC VALIDATED immediately after import
+            (verified via the pre-import QC preview). Must be a subset of `samples`. Samples not
+            listed here stay PENDING.
+          items:
+            type: string
         backup_project:
           type: boolean
           description: Whether to also create a project backup after import.

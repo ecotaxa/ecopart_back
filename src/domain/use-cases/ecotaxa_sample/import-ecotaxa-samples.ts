@@ -100,6 +100,8 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
             importable_samples = await this.listImportableEcoTaxaSamples(project);
             // Check that asked samples are in the importable list of samples
             await this.ensureEcoTaxaSamplesAreImportables(importable_samples, samples_names_to_import, task_id);
+            // QC gate: only visual-QC-validated samples may be sent to EcoTaxa
+            await this.ensureSamplesAreVisualQcValidated(importable_samples, samples_names_to_import);
         } catch (error) {
             await this.taskRepository.failedTask(task_id, error);
             return;
@@ -147,6 +149,22 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         //TODO LATER add more validation
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 20, "Step 1/5 EcoTaxa sample validation : done");
 
+    }
+
+    // Block samples that have not passed visual QC. Looks the candidate samples up by id
+    // (so it is scoped to this project's samples) and requires status VALIDATED.
+    async ensureSamplesAreVisualQcValidated(importable_samples: PublicImportableEcoTaxaSampleResponseModel[], samples_names_to_import: string[]) {
+        const ids = importable_samples
+            .filter(sample => samples_names_to_import.includes(sample.sample_name))
+            .map(sample => sample.sample_id);
+        if (ids.length === 0) return;
+        const samples = await this.sampleRepository.getSamplesByIds(ids);
+        const not_validated = samples
+            .filter(sample => sample.visual_qc_status_label !== "VALIDATED")
+            .map(sample => sample.sample_name);
+        if (not_validated.length > 0) {
+            throw new Error("Samples not validated: " + not_validated.join(", "));
+        }
     }
 
     ensureEcoTaxaSamplesAreInImportableList(samples: PublicImportableEcoTaxaSampleResponseModel[], samples_names_to_import: string[]) {

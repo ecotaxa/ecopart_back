@@ -7,6 +7,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
 import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
@@ -1655,6 +1656,20 @@ export class SampleRepositoryImpl implements SampleRepository {
         return result;
     }
 
+    // Visual-QC write. Bypasses the standardUpdateManySamples whitelist (which only allows
+    // ecotaxa/ctd fields) and writes the four QC audit fields directly via updateMany.
+    async setSampleVisualQc(sample_id: number, visual_qc_status_id: number, visual_qc_validator_user_id: number, comment: string | null, validated_at: string): Promise<number> {
+        return await this.sampleDataSource.updateMany(
+            {
+                visual_qc_status_id,
+                visual_qc_validator_user_id,
+                visual_qc_comment: comment,
+                visual_qc_validation_utc_date_time: validated_at,
+            },
+            { sample_id }
+        );
+    }
+
     async standardUpdateSample(sample: SampleUpdateModel): Promise<number> {
         const params_restricted: string[] = [
             "sample_id",
@@ -1771,6 +1786,233 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         }
         return present;
+    }
+
+    // ─── Import-time QC graphs: per-image raw extraction ───
+    // Returns one normalised record per acquired image/frame. IO only — binning into
+    // depth profiles is domain logic done in the GetSampleQcGraphs use case.
+    async getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageRecord[]> {
+        const project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+        if (instrument_model.startsWith("UVP6")) {
+            return this.getPerImageRecordsUVP6(project_folder, sample_name);
+        } else if (instrument_model.startsWith("UVP5")) {
+            return this.getPerImageRecordsUVP5(project_folder, sample_name);
+        }
+        throw new Error("Unknown instrument model");
+    }
+
+    private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
+        const zipPath = path.join(project_folder, sample_name, `${sample_name}_Particule.zip`);
+        const content = await this.readFileFromZip(zipPath, "particules.csv", undefined);
+        return this.parseParticulesCsvRecords(content);
+    }
+
+    // particules.csv: each data row is one image — `image_id, pressure, ?, <flash>:<first_class>, <;-separated blocks>`.
+    // Each block is `class_px, nb_particles, mean_grey, std_grey`; block 0's class_px is the
+    // flag's first_class (so its count is field 0), later blocks carry their own class_px.
+    parseParticulesCsvRecords(content: string): PerImageRecord[] {
+        const records: PerImageRecord[] = [];
+        let image_index = 0;
+        for (const line of content.split(/\r\n|\n|\r/)) {
+            // Data rows start with YYYYMMDD; HW_CONF / ACQ_CONF headers don't.
+            if (!/^\d{8}/.test(line)) continue;
+            const parts = line.split(",");
+            if (parts.length < 4) continue;
+            const raw_pressure = parseFloat(parts[1]);
+            if (isNaN(raw_pressure)) continue;
+            const flag = parts[3].trim().split(":");        // "<light>:<first_class>"
+            const light_on = flag[0] === "1";
+            const first_class = parseInt(flag[1], 10);
+            const spectrum_counts: Record<number, number> = {};
+            // Spectrum blocks live after the flag; commas inside, ';' between blocks.
+            const blocks = parts.slice(4).join(",").split(";");
+            blocks.forEach((block, i) => {
+                const v = block.split(",");
+                if (i === 0) {
+                    const cnt = parseInt(v[0], 10);
+                    if (!isNaN(first_class) && !isNaN(cnt)) spectrum_counts[first_class] = cnt;
+                } else {
+                    const cls = parseInt(v[0], 10);
+                    const cnt = parseInt(v[1], 10);
+                    if (!isNaN(cls) && !isNaN(cnt)) spectrum_counts[cls] = cnt;
+                }
+            });
+            records.push({ image_index: image_index++, image_id: parts[0].trim(), raw_pressure, light_on, spectrum_counts });
+        }
+        return records;
+    }
+
+    private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
+        const workZip = path.join(project_folder, sample_name, `${sample_name}_work.zip`);
+        // 1. datfile → per-frame raw_pressure (col idx 2), keyed by frame index (col idx 0).
+        const datfileContent = await this.readFileFromZip(workZip, `${sample_name}_datfile.txt`, undefined);
+        const frames = this.parseDatfileFrames(datfileContent);
+        // 2. .bru → per-particle pixel area (col idx 2 in the post-import bru1 variant), grouped by frame.
+        let spectraByFrame = new Map<number, Record<number, number>>();
+        try {
+            const bruContent = await this.readFileFromZip(workZip, `${sample_name}.bru`, undefined);
+            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+        } catch {
+            // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
+        }
+        return frames.map((f, i) => ({
+            image_index: i,
+            image_id: String(f.frame_idx),
+            raw_pressure: f.raw_pressure,
+            // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
+            light_on: true,
+            spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
+        }));
+    }
+
+    // ─── Pre-import QC graphs: read raw files straight from the project source folder ───
+    // The source layout differs from the post-import per-sample storage layout. UVP6 happens to
+    // match (ecodata/<sample>/<sample>_Particule.zip), so we reuse the existing readers; UVP5
+    // needs to handle the source work archive (tar.zst / zip / plain folder) and the shared
+    // meta/uvp5_header_sn*.txt header that has not yet been copied per-sample.
+    async getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageRecord[]> {
+        const root_abs = path.join(this.base_folder, root_folder_path);
+        if (instrument_model.startsWith("UVP6")) {
+            // Same layout as post-import storage → reuse the existing UVP6 reader.
+            return this.getPerImageRecordsUVP6(path.join(root_abs, "ecodata"), sample_name);
+        } else if (instrument_model.startsWith("UVP5")) {
+            return this.getPerImageRecordsUVP5FromSource(root_abs, sample_name);
+        }
+        throw new Error("Unknown instrument model");
+    }
+
+    async getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata> {
+        const root_abs = path.join(this.base_folder, root_folder_path);
+        if (instrument_model.startsWith("UVP6")) {
+            const ini = await this.getSampleFromMetadataIni(path.join(root_abs, "ecodata"), sample_name);
+            return {
+                filter_first_image: ini.filter_first_image ?? null,
+                filter_last_image: ini.filter_last_image ?? null,
+                instrument_settings_image_volume_l: ini.instrument_settings_image_volume_l ?? null,
+                instrument_settings_depth_offset_m: ini.instrument_settings_depth_offset_m ?? null,
+                sample_type_label: this.sampleTypeLabelFromLetter(ini.sampleType),
+            };
+        } else if (instrument_model.startsWith("UVP5")) {
+            const header = await this.readMetaHeaderFromSource(root_abs, sample_name);
+            return {
+                filter_first_image: header.filter_first_image ?? null,
+                filter_last_image: header.filter_last_image ?? null,
+                instrument_settings_image_volume_l: header.instrument_settings_image_volume_l ?? null,
+                // The UVP5 meta header carries no depth offset — defaults to no offset like at import.
+                instrument_settings_depth_offset_m: null,
+                sample_type_label: this.sampleTypeLabelFromLetter(header.sampleType),
+            };
+        }
+        throw new Error("Unknown instrument model");
+    }
+
+    // Map the raw sample-type letter to its label without a DB lookup (mirrors computeSampleTypeId:
+    // UVP6 T=Time D=Depth; UVP5 N/Y=Depth, H=Time; P also Depth). Returns null for unknown.
+    private sampleTypeLabelFromLetter(letter: string | undefined): string | null {
+        if (letter === "T" || letter === "H") return "Time";
+        if (letter === "D" || letter === "N" || letter === "Y" || letter === "P") return "Depth";
+        return null;
+    }
+
+    // UVP5 source: read the datfile + .bru from the work archive (tar.zst > zip > folder),
+    // matching by path so a top-level folder prefix inside the archive is tolerated.
+    private async getPerImageRecordsUVP5FromSource(root_abs: string, sample_name: string): Promise<PerImageRecord[]> {
+        const esc = sample_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const datfilePattern = new RegExp(`(^|/)${esc}_datfile\\.txt$`);
+        const bruPattern = new RegExp(`(^|/)${esc}\\.bru$`);
+
+        const datfileContent = await this.readWorkSourceFile(root_abs, sample_name, `${sample_name}_datfile.txt`, datfilePattern);
+        const frames = this.parseDatfileFrames(datfileContent);
+
+        let spectraByFrame = new Map<number, Record<number, number>>();
+        try {
+            const bruContent = await this.readWorkSourceFile(root_abs, sample_name, `${sample_name}.bru`, bruPattern);
+            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+        } catch {
+            // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
+        }
+        return frames.map((f, i) => ({
+            image_index: i,
+            image_id: String(f.frame_idx),
+            raw_pressure: f.raw_pressure,
+            // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
+            light_on: true,
+            spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
+        }));
+    }
+
+    // Read one file from the UVP5 source work entry, whatever its on-disk form.
+    private async readWorkSourceFile(root_abs: string, sample_name: string, file_base_name: string, pattern: RegExp): Promise<string> {
+        const workTarZst = path.join(root_abs, "work", `${sample_name}.tar.zst`);
+        const workZip = path.join(root_abs, "work", `${sample_name}.zip`);
+        const workDirFile = path.join(root_abs, "work", sample_name, file_base_name);
+
+        if (await this.pathExists(workTarZst)) {
+            return this.readFileFromTarZst(workTarZst, undefined, pattern);
+        }
+        if (await this.pathExists(workZip)) {
+            return this.readFileFromZip(workZip, undefined, pattern);
+        }
+        // Plain folder: files sit directly under work/<sample>/.
+        return fsPromises.readFile(workDirFile, "utf8");
+    }
+
+    // UVP5 source: the meta header is the shared meta/uvp5_header_sn*.txt (not yet zipped per sample).
+    private async readMetaHeaderFromSource(root_abs: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
+        const metaDir = path.join(root_abs, "meta");
+        const files = await fsPromises.readdir(metaDir);
+        const headerFile = files.find((f) => /^uvp5_header_sn.*\.txt$/i.test(f));
+        if (!headerFile) {
+            throw new Error("Meta header file not found");
+        }
+        const content = await fsPromises.readFile(path.join(metaDir, headerFile), "utf8");
+        return this.parseMetaHeader(content, headerFile, sample_name);
+    }
+
+    private async pathExists(target_path: string): Promise<boolean> {
+        try {
+            await fsPromises.access(target_path);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    // datfile rows are `frame_idx; timestamp; pressure; …` (semicolon-separated).
+    parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number }[] {
+        const frames: { frame_idx: number; raw_pressure: number }[] = [];
+        for (const line of content.split(/\r\n|\n|\r/)) {
+            const cols = line.split(";").map((c) => c.trim());
+            if (cols.length < 3) continue;
+            const frame_idx = parseInt(cols[0], 10);
+            const raw_pressure = parseInt(cols[2], 10);
+            if (isNaN(frame_idx) || isNaN(raw_pressure)) continue;
+            frames.push({ frame_idx, raw_pressure });
+        }
+        return frames;
+    }
+
+    // .bru is large (~100 MB). Scan line-by-line via indexOf to avoid building a huge array.
+    // bru1 (post-import {sample}.bru): `frame_idx; blob_idx; area_px; …` (semicolon-separated).
+    parseBruSpectraByFrame(content: string): Map<number, Record<number, number>> {
+        const byFrame = new Map<number, Record<number, number>>();
+        const len = content.length;
+        let start = 0;
+        while (start < len) {
+            let end = content.indexOf("\n", start);
+            if (end === -1) end = len;
+            const line = content.slice(start, end);
+            start = end + 1;
+            const cols = line.split(";");
+            if (cols.length < 3) continue;
+            const frame_idx = parseInt(cols[0], 10);
+            const area_px = parseInt(cols[2], 10);
+            if (isNaN(frame_idx) || isNaN(area_px)) continue;
+            let spectrum = byFrame.get(frame_idx);
+            if (!spectrum) { spectrum = {}; byFrame.set(frame_idx, spectrum); }
+            spectrum[area_px] = (spectrum[area_px] ?? 0) + 1;
+        }
+        return byFrame;
     }
 
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string {
