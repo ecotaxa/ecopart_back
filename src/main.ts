@@ -115,8 +115,7 @@ const config = {
 
     PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
-    PORT_PUBLIC: parseInt(process.env.PORT_PUBLIC as string, 10),
-    BASE_URL_PUBLIC: process.env.BASE_URL_PUBLIC || '',
+    API_URL: process.env.API_URL || '',
     FRONTEND_URL: process.env.FRONTEND_URL || '',
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
@@ -204,7 +203,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
+    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
@@ -277,7 +276,7 @@ async function getSQLiteDS() {
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
         new GetProject(user_repo, project_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
-        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.BASE_URL_PUBLIC),
+        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.API_URL),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
@@ -325,7 +324,7 @@ async function getSQLiteDS() {
     server.use("/exports", ExportRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExportValidation(),
-        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.BASE_URL_PUBLIC),
+        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.API_URL),
     ))
 
 
