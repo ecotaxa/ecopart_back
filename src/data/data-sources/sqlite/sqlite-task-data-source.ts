@@ -82,8 +82,22 @@ export class SQLiteTaskDataSource implements TaskDataSource {
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<TaskResponseModel>> {
         // options folllow be PrivateTaskRequestModel
 
+        // The three LEFT JOINs are needed both by the outer SELECT and by the COUNT(*)
+        // sub-query, otherwise a filter on a joined/computed column (task_owner) is
+        // unresolvable in the sub-query. They are all many-to-one, so they never multiply
+        // rows and COUNT(*) stays exact.
+        const JOINS = ` LEFT JOIN user ON task.task_owner_id = user.user_id LEFT JOIN task_type ON task.task_type_id = task_type.task_type_id LEFT JOIN task_status ON task.task_status_id = task_status.task_status_id`
+
+        // Resolve a domain filter field to the physical SQL column/expression to filter on.
+        // task_owner is not a real column: it is the "First Last (email)" string built from the
+        // joined user row, so it is filtered against that same concatenation.
+        const resolveFilterColumn = (field: string): string => {
+            if (field === "task_owner") return "(user.first_name || ' ' || user.last_name || ' (' || user.email || ')')";
+            return "task." + field;
+        };
+
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT task.*, user.first_name, user.last_name, user.email, task_type.task_type_label, task_status.task_status_label, (SELECT COUNT(*) FROM task`
+        let sql = `SELECT task.*, user.first_name, user.last_name, user.email, task_type.task_type_label, task_status.task_status_label, (SELECT COUNT(*) FROM task` + JOINS
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -92,32 +106,33 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
+                const column = resolveFilterColumn(filter.field);
                 if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
-                        filtering_sql += "task." + filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
+                        filtering_sql += column + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
                         params_filtering.push(...filter.value)
                     }
                 }
                 // If value is true or false, set to 1 or 0
                 else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += "task." + filter.field + ` = 1`;
+                    filtering_sql += column + ` = 1`;
                 }
                 else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += "task." + filter.field + ` = 0`;
+                    filtering_sql += column + ` = 0`;
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
                     if (filter.operator == "=") {
-                        filtering_sql += "task." + filter.field + ` IS NULL`;
+                        filtering_sql += column + ` IS NULL`;
                     } else if (filter.operator == "<>") {
-                        filtering_sql += "task." + filter.field + ` IS NOT NULL`;
+                        filtering_sql += column + ` IS NOT NULL`;
                     }
                 }
 
                 else {
-                    filtering_sql += "task." + filter.field + ` ` + filter.operator + ` (?)`
+                    filtering_sql += column + ` ` + filter.operator + ` (?)`
                     params_filtering.push(filter.value)
                 }
                 filtering_sql += ` AND `;
@@ -130,7 +145,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         // Add params_filtering to params
         params.push(...params_filtering)
 
-        sql += `) AS total_count FROM task LEFT JOIN user ON task.task_owner_id = user.user_id LEFT JOIN task_type ON task.task_type_id = task_type.task_type_id LEFT JOIN task_status ON task.task_status_id = task_status.task_status_id`
+        sql += `) AS total_count FROM task` + JOINS
 
         // Add filtering_sql to sql
         sql += filtering_sql
@@ -175,7 +190,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_status_id: row.task_status_id,
                             task_status: row.task_status_label,
                             task_owner_id: row.task_owner_id,
-                            task_owner: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
+                            task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
                             task_progress_pct: row.task_progress_pct,
@@ -242,7 +257,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_status_id: row.task_status_id,
                             task_status: row.task_status_label,
                             task_owner_id: row.task_owner_id,
-                            task_owner: row.user_first_name + " " + row.user_last_name + " (" + row.email + ")", // Doe John (john.doe@mail.com)
+                            task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
                             task_progress_pct: row.task_progress_pct,

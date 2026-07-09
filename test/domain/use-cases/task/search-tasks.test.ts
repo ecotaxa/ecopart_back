@@ -337,6 +337,33 @@ describe("Search Task Use Case", () => {
             expect(mockSearchRepository.formatSearchInfo).toBeCalledTimes(1)
         });
     });
+    describe("filter label mapping", () => {
+        test("task_type filter is resolved against task_type_label, not task_type_id", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 }
+            const options: SearchOptions = { page: 1, limit: 10, sort_by: "asc(task_id)" }
+            const filters = [{ field: "task_type", operator: "LIKE", value: "%import%" }]
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockSearchRepository, "formatFilters").mockImplementation(() => filters)
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [{ sort_by: "task_id", order_by: "asc" }])
+            const getTaskType = jest.spyOn(mockTaskRepository, "standardGetTaskType")
+                .mockResolvedValue({ total: 1, items: [{ task_type_id: 5, task_type_label: "IMPORT" }] })
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+            const getTasks = jest.spyOn(mockTaskRepository, "standardGetTasks").mockResolvedValue({ total: 0, items: [] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }))
+
+            await searchTasksUseCase.execute(current_user, options, filters)
+
+            // The lookup must filter on the LABEL column (client sends the human-readable label).
+            expect(getTaskType).toBeCalledWith(expect.objectContaining({
+                filter: [{ field: "task_type_label", operator: "LIKE", value: "%import%" }],
+            }))
+            // The resolved filter handed to the data source is the numeric id set (IN).
+            const handed = getTasks.mock.calls[0][0]
+            expect(handed.filter).toContainEqual({ field: "task_type_id", operator: "IN", value: [5] })
+        })
+    })
+
     describe("success cases", () => {
         test("not an admin searching tasks with multiples filters", async () => {
             const current_user: UserUpdateModel = {

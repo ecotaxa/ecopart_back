@@ -187,10 +187,11 @@ export class TaskRepositoryImpl implements TaskRepository {
     // }
 
     async standardGetTasks(options: PreparedSearchOptions): Promise<SearchResult<TaskResponseModel>> {
-        // Can be filtered by 
-        const filter_params_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_utc_date_time", "task_start_utc_date_time", "task_end_utc_date_time"]
+        // Can be filtered by (task_owner is the computed "First Last (email)" string resolved
+        // against the joined user row in the data source).
+        const filter_params_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_owner", "task_project_id", "task_log_file_path", "task_creation_utc_date_time", "task_start_utc_date_time", "task_end_utc_date_time"]
 
-        // Can be sort_by 
+        // Can be sort_by
         const sort_param_restricted = ["task_id", "task_type_id", "task_status_id", "task_owner_id", "task_project_id", "task_log_file_path", "task_creation_utc_date_time", "task_start_utc_date_time", "task_end_utc_date_time"]
 
         return await this.getTasks(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)

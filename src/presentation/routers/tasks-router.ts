@@ -111,8 +111,9 @@ export default function TaskRouter(
      *       | `task_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `task_start_utc_date_time` | string (ISO timestamp) or null | |
      *       | `task_end_utc_date_time` | string (ISO timestamp) or null | |
-     *       | `task_type` | string | Computed — resolved to `task_type_id` |
-     *       | `task_status` | string | Computed — resolved to `task_status_id` |
+     *       | `task_type` | string | Computed — matched against the task type **label** (e.g. `LIKE "%import%"`), resolved to `task_type_id` |
+     *       | `task_status` | string | Computed — matched against the task status **label** (e.g. `LIKE "%done%"`), resolved to `task_status_id` |
+     *       | `task_owner` | string | Computed — matched against the owner display string `First Last (email)` via the joined user row |
      *       | `for_managing` | boolean | Computed — restricts to tasks owned by or related to current user |
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
