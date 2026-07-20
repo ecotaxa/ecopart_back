@@ -11,6 +11,7 @@
   },
   "servers": [
     {
+      "url": "/",
       "description": "Development server"
     }
   ],
@@ -970,6 +971,81 @@
             }
           }
         }
+      },
+      "EcoTaxaSampleListItem": {
+        "type": "object",
+        "description": "An EcoTaxa-imported sample enriched with live classification counts fetched from EcoTaxa.",
+        "properties": {
+          "sample_id": {
+            "type": "integer",
+            "description": "Internal EcoPart sample id.",
+            "example": 42
+          },
+          "sample_name": {
+            "type": "string",
+            "example": "station_017"
+          },
+          "ecotaxa_sample_id": {
+            "type": "integer",
+            "description": "EcoTaxa-side sample id.",
+            "example": 90123
+          },
+          "nb_objects": {
+            "type": "integer",
+            "description": "Total number of objects (sum of the four classification counts below).",
+            "minimum": 0,
+            "example": 1500
+          },
+          "nb_unclassified": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 200
+          },
+          "nb_validated": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 1000
+          },
+          "nb_dubious": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 100
+          },
+          "nb_predicted": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 200
+          }
+        },
+        "required": [
+          "sample_id",
+          "sample_name",
+          "ecotaxa_sample_id",
+          "nb_objects",
+          "nb_unclassified",
+          "nb_validated",
+          "nb_dubious",
+          "nb_predicted"
+        ]
+      },
+      "EcoTaxaSampleListResponse": {
+        "type": "object",
+        "description": "Paginated list of EcoTaxa samples with classification counts.",
+        "properties": {
+          "search_info": {
+            "$ref": "#/components/schemas/SearchInfo"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EcoTaxaSampleListItem"
+            }
+          }
+        },
+        "required": [
+          "search_info",
+          "items"
+        ]
       },
       "InstrumentModelResponse": {
         "type": "object",
