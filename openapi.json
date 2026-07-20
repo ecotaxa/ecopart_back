@@ -50,6 +50,10 @@
     {
       "name": "File System",
       "description": "File system operations"
+    },
+    {
+      "name": "Admin",
+      "description": "Administration and application statistics"
     }
   ],
   "components": {
@@ -68,6 +72,482 @@
       }
     },
     "schemas": {
+      "LabelCount": {
+        "type": "object",
+        "description": "A generic \"label → count\" bucket produced by a GROUP BY breakdown.",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The group label (instrument name, task type/status label, QC status, …).",
+            "example": "UVP6LP"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of items in this group.",
+            "minimum": 0,
+            "example": 8
+          }
+        },
+        "required": [
+          "label",
+          "count"
+        ]
+      },
+      "OrganisationCount": {
+        "type": "object",
+        "description": "Number of active users belonging to an organisation.",
+        "properties": {
+          "organisation": {
+            "type": "string",
+            "example": "LOV"
+          },
+          "users": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 12
+          }
+        },
+        "required": [
+          "organisation",
+          "users"
+        ]
+      },
+      "AdminUsersStats": {
+        "type": "object",
+        "description": "User counts. \"Active\" excludes soft-deleted users (deleted IS NULL).",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Active users (not soft-deleted).",
+            "minimum": 0,
+            "example": 42
+          },
+          "admins": {
+            "type": "integer",
+            "description": "Active users with the admin flag.",
+            "minimum": 0,
+            "example": 2
+          },
+          "validated_email": {
+            "type": "integer",
+            "description": "Active users whose email is validated.",
+            "minimum": 0,
+            "example": 38
+          },
+          "pending_validation": {
+            "type": "integer",
+            "description": "Active users whose email is not yet validated.",
+            "minimum": 0,
+            "example": 4
+          },
+          "deleted": {
+            "type": "integer",
+            "description": "Soft-deleted users (deleted IS NOT NULL).",
+            "minimum": 0,
+            "example": 5
+          },
+          "distinct_organisations": {
+            "type": "integer",
+            "description": "Number of distinct organisations among active users.",
+            "minimum": 0,
+            "example": 9
+          }
+        },
+        "required": [
+          "total",
+          "admins",
+          "validated_email",
+          "pending_validation",
+          "deleted",
+          "distinct_organisations"
+        ]
+      },
+      "AdminProjectsStats": {
+        "type": "object",
+        "description": "Project counts and breakdown by instrument.",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 12
+          },
+          "backed_up": {
+            "type": "integer",
+            "description": "Projects that have been backed up at least once (last_backup_utc_date_time IS NOT NULL).",
+            "minimum": 0,
+            "example": 7
+          },
+          "linked_to_ecotaxa": {
+            "type": "integer",
+            "description": "Projects linked to an EcoTaxa project (ecotaxa_project_id IS NOT NULL).",
+            "minimum": 0,
+            "example": 10
+          },
+          "by_instrument": {
+            "type": "array",
+            "description": "Project counts grouped by instrument model name (label \"UNKNOWN\" when unset), sorted by count desc.",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "backed_up",
+          "linked_to_ecotaxa",
+          "by_instrument"
+        ]
+      },
+      "AdminTasksStats": {
+        "type": "object",
+        "description": "Task counts, derived aggregates and breakdowns by type and status.",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 130
+          },
+          "exports": {
+            "type": "integer",
+            "description": "Tasks of type EXPORT, EXPORT_BACKUP or EXPORT_RAW.",
+            "minimum": 0,
+            "example": 30
+          },
+          "imports": {
+            "type": "integer",
+            "description": "Tasks of type IMPORT, IMPORT_BACKUP, IMPORT_CTD or IMPORT_ECO_TAXA.",
+            "minimum": 0,
+            "example": 60
+          },
+          "running": {
+            "type": "integer",
+            "description": "Tasks currently in the RUNNING status.",
+            "minimum": 0,
+            "example": 1
+          },
+          "failed": {
+            "type": "integer",
+            "description": "Tasks in the ERROR status.",
+            "minimum": 0,
+            "example": 4
+          },
+          "by_type": {
+            "type": "array",
+            "description": "Task counts grouped by type label (one of: EXPORT, EXPORT_BACKUP, EXPORT_RAW, DELETE, UPDATE, IMPORT, IMPORT_BACKUP, IMPORT_CTD, IMPORT_ECO_TAXA), sorted by count desc.",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          },
+          "by_status": {
+            "type": "array",
+            "description": "Task counts grouped by status label (one of: PENDING, VALIDATING, RUNNING, WAITING_FOR_RESPONSE, DONE, ERROR), sorted by count desc.",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "exports",
+          "imports",
+          "running",
+          "failed",
+          "by_type",
+          "by_status"
+        ]
+      },
+      "AdminSamplesStats": {
+        "type": "object",
+        "description": "Sample counts and breakdown by visual QC status.",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 540
+          },
+          "imported_to_ecotaxa": {
+            "type": "integer",
+            "description": "Samples flagged as imported to EcoTaxa (ecotaxa_sample_imported = 1).",
+            "minimum": 0,
+            "example": 300
+          },
+          "by_qc_status": {
+            "type": "array",
+            "description": "Sample counts grouped by visual QC status label (one of: PENDING, VALIDATED, REJECTED), sorted by count desc.",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "imported_to_ecotaxa",
+          "by_qc_status"
+        ]
+      },
+      "AdminStorageStats": {
+        "type": "object",
+        "description": "On-disk storage usage. Computed only when include_storage=true (expensive filesystem walk).",
+        "properties": {
+          "total_size_bytes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Sum of all project folder sizes on disk, in bytes. `null` when include_storage was not requested.",
+            "minimum": 0,
+            "example": 123456789
+          }
+        },
+        "required": [
+          "total_size_bytes"
+        ]
+      },
+      "AdminTotals": {
+        "type": "object",
+        "description": "Current point-in-time state of the whole application (independent of the selected period).",
+        "properties": {
+          "users": {
+            "$ref": "#/components/schemas/AdminUsersStats"
+          },
+          "projects": {
+            "$ref": "#/components/schemas/AdminProjectsStats"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/AdminTasksStats"
+          },
+          "samples": {
+            "$ref": "#/components/schemas/AdminSamplesStats"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/AdminStorageStats"
+          },
+          "top_organisations": {
+            "type": "array",
+            "description": "Top 10 organisations by number of active users, sorted by users desc.",
+            "items": {
+              "$ref": "#/components/schemas/OrganisationCount"
+            }
+          }
+        },
+        "required": [
+          "users",
+          "projects",
+          "tasks",
+          "samples",
+          "storage",
+          "top_organisations"
+        ]
+      },
+      "AdminPeriodTasks": {
+        "type": "object",
+        "description": "Tasks created within the selected window.",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 25
+          },
+          "exports": {
+            "type": "integer",
+            "description": "Export-type tasks created within the window.",
+            "minimum": 0,
+            "example": 6
+          },
+          "by_type": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          },
+          "by_status": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "exports",
+          "by_type",
+          "by_status"
+        ]
+      },
+      "AdminPeriodBaseline": {
+        "type": "object",
+        "description": "State strictly before the window start `from` (used to seed the cumulative series).",
+        "properties": {
+          "projects": {
+            "type": "integer",
+            "description": "Projects created before `from`.",
+            "minimum": 0,
+            "example": 10
+          },
+          "samples": {
+            "type": "integer",
+            "description": "Samples created before `from`.",
+            "minimum": 0,
+            "example": 500
+          },
+          "data_size_bytes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "On-disk size (bytes) of projects created before `from`. `null` unless include_storage=true.",
+            "minimum": 0,
+            "example": 100000000
+          }
+        },
+        "required": [
+          "projects",
+          "samples",
+          "data_size_bytes"
+        ]
+      },
+      "AdminStatsSeriePoint": {
+        "type": "object",
+        "description": "One point of the period time series (one per interval; intervals with no activity are returned with zeros).",
+        "properties": {
+          "interval": {
+            "type": "string",
+            "description": "Interval key: YYYY-MM-DD (day), YYYY-WW (week, SQLite %W) or YYYY-MM (month).",
+            "example": "2026-01"
+          },
+          "projects_created": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 2
+          },
+          "samples_created": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 40
+          },
+          "data_size_bytes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Data added in this interval, in bytes (attributed by project creation date). `null` unless include_storage=true.",
+            "minimum": 0,
+            "example": 23456789
+          },
+          "cumulative_projects": {
+            "type": "integer",
+            "description": "Running total of projects up to and including this interval (includes the pre-window baseline).",
+            "minimum": 0,
+            "example": 12
+          },
+          "cumulative_samples": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 540
+          },
+          "cumulative_data_size_bytes": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Running total of on-disk data size (bytes) up to this interval. `null` unless include_storage=true.",
+            "minimum": 0,
+            "example": 123456789
+          }
+        },
+        "required": [
+          "interval",
+          "projects_created",
+          "samples_created",
+          "data_size_bytes",
+          "cumulative_projects",
+          "cumulative_samples",
+          "cumulative_data_size_bytes"
+        ]
+      },
+      "AdminPeriod": {
+        "type": "object",
+        "description": "Activity within the selected [from, to] window, including the time series for charts.",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Resolved window start (defaults to the earliest activity date).",
+            "example": "2026-01-01"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Resolved window end (a date-only `to` is normalized to end-of-day; defaults to now).",
+            "example": "2026-03-31T23:59:59.999Z"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Resolved time-series interval size.",
+            "example": "month"
+          },
+          "new_users": {
+            "type": "integer",
+            "description": "Active users created within the window.",
+            "minimum": 0,
+            "example": 3
+          },
+          "new_projects": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 2
+          },
+          "new_samples": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 40
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/AdminPeriodTasks"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/AdminPeriodBaseline"
+          },
+          "series": {
+            "type": "array",
+            "description": "Ordered time series (oldest first), one point per interval.",
+            "items": {
+              "$ref": "#/components/schemas/AdminStatsSeriePoint"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "granularity",
+          "new_users",
+          "new_projects",
+          "new_samples",
+          "tasks",
+          "baseline",
+          "series"
+        ]
+      },
+      "AdminStats": {
+        "type": "object",
+        "description": "Application statistics. `totals` is the current point-in-time state (independent of the period);\n`period` is the activity within the selected [from, to] window, including a time series for charts.\nStorage / data-size fields are `null` unless the request was made with `include_storage=true`.\n",
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO timestamp of when the statistics were computed.",
+            "example": "2026-07-20T09:12:00.000Z"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AdminTotals"
+          },
+          "period": {
+            "$ref": "#/components/schemas/AdminPeriod"
+          }
+        },
+        "required": [
+          "generated_at",
+          "totals",
+          "period"
+        ]
+      },
       "AuthUserCredentials": {
         "type": "object",
         "description": "User login credentials.",
@@ -1797,6 +2277,118 @@
     }
   },
   "paths": {
+    "/admin/stats": {
+      "get": {
+        "summary": "Application statistics (admin only)",
+        "description": "Returns global application statistics in a single call. Reserved to administrators.\n\nThe response has two parts:\n- `totals`: current point-in-time state — counts of users, projects, tasks (incl. exports),\n  samples, on-disk storage size, plus breakdowns and health indicators. Ignores the period.\n- `period`: activity within the selected `[from, to]` window, including time series for\n  charts: number of projects created, number of samples created, and stored-data size,\n  per interval (with a pre-window baseline and running cumulatives).\n\nThe window is optional: `from` defaults to the earliest activity date, `to` to now.\nSeries `interval` keys are `YYYY-MM-DD` (day), `YYYY-WW` (week) or `YYYY-MM` (month) depending\non `granularity` (auto-selected from the span when omitted). Intervals with no activity are\nreturned with zero values.\n\nOn-disk storage sizes are **expensive** (a filesystem walk of every project folder) and are\ncomputed only when `include_storage=true`. Otherwise `totals.storage.total_size_bytes`,\n`period.baseline.data_size_bytes` and every `series[].data_size_bytes` /\n`series[].cumulative_data_size_bytes` are `null`.\n",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Window start (ISO 8601). Defaults to the earliest activity date."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Window end (ISO 8601). Defaults to now."
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            },
+            "description": "Time-series interval size. Defaults to auto (day ≤ 92d, week ≤ 730d, else month)."
+          },
+          {
+            "in": "query",
+            "name": "include_storage",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Compute on-disk storage sizes (expensive filesystem walk). When false, all data-size fields are null."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application statistics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user is not allowed (not an admin, or account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "summary": "User login",

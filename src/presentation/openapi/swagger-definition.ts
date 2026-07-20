@@ -28,6 +28,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'Tasks', description: 'Background task management' },
         { name: 'Instrument Models', description: 'Instrument model reference data' },
         { name: 'EcoTaxa Instances', description: 'EcoTaxa instance management' },
+        { name: 'Admin', description: 'Administration and application statistics' },
     ],
     components: {
         securitySchemes: {

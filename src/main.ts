@@ -9,6 +9,7 @@ import { MiddlewareSampleValidation } from './presentation/middleware/sample-val
 import { MiddlewareInstrumentModelValidation } from './presentation/middleware/instrument_model-validation'
 import { MiddlewareTaskValidation } from './presentation/middleware/task-validation'
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
+import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -18,6 +19,7 @@ import TaskRouter from './presentation/routers/tasks-router'
 import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
 import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
+import AdminRouter from './presentation/routers/admin-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -84,6 +86,8 @@ import { BackupProject } from './domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from './domain/use-cases/export/export-raw-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
+import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
+import { GetStats } from './domain/use-cases/admin/get-stats'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -93,6 +97,7 @@ import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-pri
 import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
 import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
 import { SQLiteEcotaxaAccountDataSource } from './data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
+import { SQLiteStatsDataSource } from './data/data-sources/sqlite/sqlite-stats-data-source'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -213,6 +218,7 @@ async function getSQLiteDS() {
     const task_datasource = new SQLiteTaskDataSource(db)
     const sample_dataSource = new SQLiteSampleDataSource(db)
     const ecotaxa_account_dataSource = new SQLiteEcotaxaAccountDataSource(db)
+    const stats_dataSource = new SQLiteStatsDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -233,6 +239,7 @@ async function getSQLiteDS() {
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
+    const stats_repo = new StatsRepositoryImpl(stats_dataSource)
 
     const userMiddleWare =
         UserRouter(
@@ -325,6 +332,11 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExportValidation(),
         new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.API_URL),
+    ))
+    server.use("/admin", AdminRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareAdminValidation(),
+        new GetStats(user_repo, stats_repo)
     ))
 
 
