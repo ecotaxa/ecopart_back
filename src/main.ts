@@ -10,6 +10,7 @@ import { MiddlewareInstrumentModelValidation } from './presentation/middleware/i
 import { MiddlewareTaskValidation } from './presentation/middleware/task-validation'
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
+import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -20,6 +21,7 @@ import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-route
 import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
 import AdminRouter from './presentation/routers/admin-router'
+import BroadcastMessageRouter from './presentation/routers/broadcast_message-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -88,6 +90,10 @@ import { ExportRawData } from './domain/use-cases/export/export-raw-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
 import { GetStats } from './domain/use-cases/admin/get-stats'
+import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
+import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
+import { SetBroadcastMessage } from './domain/use-cases/broadcast_message/set-broadcast-message'
+import { DeleteBroadcastMessage } from './domain/use-cases/broadcast_message/delete-broadcast-message'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -98,6 +104,7 @@ import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-dat
 import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
 import { SQLiteEcotaxaAccountDataSource } from './data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
 import { SQLiteStatsDataSource } from './data/data-sources/sqlite/sqlite-stats-data-source'
+import { SQLiteBroadcastMessageDataSource } from './data/data-sources/sqlite/sqlite-broadcast_message-data-source'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -219,6 +226,7 @@ async function getSQLiteDS() {
     const sample_dataSource = new SQLiteSampleDataSource(db)
     const ecotaxa_account_dataSource = new SQLiteEcotaxaAccountDataSource(db)
     const stats_dataSource = new SQLiteStatsDataSource(db)
+    const broadcast_message_dataSource = new SQLiteBroadcastMessageDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -240,6 +248,7 @@ async function getSQLiteDS() {
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
+    const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
     const userMiddleWare =
         UserRouter(
@@ -337,6 +346,13 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareAdminValidation(),
         new GetStats(user_repo, stats_repo)
+    ))
+    server.use("/broadcast_messages", BroadcastMessageRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareBroadcastMessageValidation(),
+        new GetBroadcastMessage(user_repo, broadcast_message_repo),
+        new SetBroadcastMessage(user_repo, broadcast_message_repo),
+        new DeleteBroadcastMessage(user_repo, broadcast_message_repo)
     ))
 
 

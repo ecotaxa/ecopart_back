@@ -29,6 +29,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'Instrument Models', description: 'Instrument model reference data' },
         { name: 'EcoTaxa Instances', description: 'EcoTaxa instance management' },
         { name: 'Admin', description: 'Administration and application statistics' },
+        { name: 'Broadcast Messages', description: 'Application-wide message shown to users, managed by admins' },
     ],
     components: {
         securitySchemes: {

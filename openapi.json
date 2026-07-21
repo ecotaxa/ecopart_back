@@ -55,6 +55,10 @@
     {
       "name": "Admin",
       "description": "Administration and application statistics"
+    },
+    {
+      "name": "Broadcast Messages",
+      "description": "Application-wide message shown to users, managed by admins"
     }
   ],
   "components": {
@@ -668,6 +672,76 @@
           "new_password",
           "reset_password_token"
         ]
+      },
+      "BroadcastMessageInput": {
+        "type": "object",
+        "required": [
+          "message",
+          "level"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Main message text shown to users.",
+            "example": "Scheduled maintenance tonight."
+          },
+          "sub_message": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional secondary line displayed under the main message.",
+            "example": "The platform will be unavailable from 22:00 to 23:00 UTC."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "description": "Severity level, driving the front-end display style.",
+            "example": "warning"
+          }
+        }
+      },
+      "BroadcastMessage": {
+        "type": "object",
+        "properties": {
+          "broadcast_message_id": {
+            "type": "integer",
+            "description": "Always 1 — the application holds a single broadcast message.",
+            "example": 1
+          },
+          "message": {
+            "type": "string",
+            "example": "Scheduled maintenance tonight."
+          },
+          "sub_message": {
+            "type": "string",
+            "nullable": true,
+            "example": "The platform will be unavailable from 22:00 to 23:00 UTC."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "example": "warning"
+          },
+          "created_by_user_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Id of the admin who set the message.",
+            "example": 42
+          },
+          "message_creation_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the message was set (ISO 8601, UTC).",
+            "example": "2026-07-20T21:30:00.000Z"
+          }
+        }
       },
       "ErrorResponse": {
         "type": "object",
@@ -2848,6 +2922,203 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/broadcast_messages": {
+      "get": {
+        "summary": "Current broadcast message",
+        "description": "Returns the single application-wide broadcast message currently set, or `null` when\nnone is set. Readable by any authenticated user — the front-end displays it to everyone.\n",
+        "tags": [
+          "Broadcast Messages"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The current broadcast message, or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/BroadcastMessage"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user is not allowed (account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Set the broadcast message (admin only)",
+        "description": "Sets or replaces the single application-wide broadcast message. Reserved to administrators.\nThe application holds only one message at a time, so this overwrites any existing one.\n",
+        "tags": [
+          "Broadcast Messages"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastMessageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The broadcast message that was set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastMessage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user is not allowed (not an admin, or account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete the broadcast message (admin only)",
+        "description": "Clears the single application-wide broadcast message. Reserved to administrators.\nSucceeds even if no message is currently set.\n",
+        "tags": [
+          "Broadcast Messages"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The broadcast message was cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Broadcast message deleted"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user is not allowed (not an admin, or account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

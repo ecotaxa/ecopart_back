@@ -30,6 +30,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'EcoTaxa Instances', description: 'EcoTaxa instance management' },
         { name: 'File System', description: 'File system operations' },
         { name: 'Admin', description: 'Administration and application statistics' },
+        { name: 'Broadcast Messages', description: 'Application-wide message shown to users, managed by admins' },
     ],
     components: {
         securitySchemes: {
