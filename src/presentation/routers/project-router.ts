@@ -593,7 +593,38 @@ export default function ProjectRouter(
      * /projects/{project_id}/backup:
      *   post:
      *     summary: Backup project
-     *     description: Start a project backup task. Reads sample data from the filesystem and stores it in the database.
+     *     description: |
+     *       Start an asynchronous **L0-b backup** task (returns a Task immediately; poll the task for progress).
+     *
+     *       The task reads the project source acquisition folder (`root_folder_path`, which must contain the
+     *       `raw/`, `meta/` and `config/` subfolders) and copies it into the internal backup folder
+     *       `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/`. Nothing is written to the database except the
+     *       project's `last_backup_utc_date_time` timestamp.
+     *
+     *       **What is backed up and in which format:**
+     *
+     *       | Source | Destination | Format |
+     *       |---|---|---|
+     *       | `meta/` (whole folder) | `l0b_backup/meta/` | copied verbatim, uncompressed |
+     *       | `config/` (whole folder) | `l0b_backup/config/` | copied verbatim, uncompressed |
+     *       | each `raw/<sample_folder>/` | `l0b_backup/raw/<sample_folder>.zip` | one ZIP per sample folder (DEFLATE, level 9) |
+     *       | each `raw/<sample_folder>.zip` (already zipped at source) | `l0b_backup/raw/<sample_folder>.zip` | copied as-is |
+     *
+     *       **Per instrument** — the mechanism is identical; only the contents of the copied folders differ:
+     *
+     *       - **UVP5 (UVP5SD / UVP5HD):** `meta/uvp5_header_<sn>.txt`; `config/` with `cruise_info.txt`,
+     *         `process_install_config.txt` and the `uvp5_settings/` folder; `raw/` holds one `HDR<timestamp>`
+     *         folder per cast, each zipped to `HDR<timestamp>.zip`.
+     *       - **UVP6:** `meta/uvp6_header_<sn>.txt`; `config/` with `cruise_info.txt`, `ACQ_TIME_*.txt`,
+     *         `HW_TIME_<sn>.txt`, `compute_vignette.txt`, `timetable.txt`; `raw/` holds one
+     *         `<YYYYMMDD-HHMMSS>[_suffix]` acquisition folder per sample (containing `<folder>_data.txt`),
+     *         each zipped to `<YYYYMMDD-HHMMSS>[_suffix].zip`.
+     *
+     *       **Option `skip_already_imported`:**
+     *
+     *       - `true` — incremental: a `raw/` sample folder is skipped when its `.zip` already exists in the
+     *         backup; `meta/` and `config/` are always refreshed.
+     *       - `false` — full: every `raw/` sample folder is (re-)zipped, overwriting existing archives.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -735,7 +766,26 @@ export default function ProjectRouter(
      * /projects/{project_id}/backup/export:
      *   post:
      *     summary: Export project backup
-     *     description: Start a backup export task. Exports backed-up project data, optionally to FTP.
+     *     description: |
+     *       Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).
+     *       Requires a prior successful backup — fails if `l0b_backup/` does not exist for the project.
+     *
+     *       The whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and
+     *       `config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)
+     *       is compressed into a single archive named
+     *       `ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).
+     *
+     *       This export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains
+     *       the `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the
+     *       `<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.
+     *
+     *       **Destination(s):**
+     *
+     *       - Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via
+     *         `GET /tasks/{task_id}/export`.
+     *       - **Option `out_to_ftp`:** when `true`, the same archive is additionally written to the FTP export
+     *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the
+     *         download link; when `false`, only the download link is returned.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []

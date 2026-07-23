@@ -355,7 +355,10 @@ components:
       properties:
         skip_already_imported:
           type: boolean
-          description: Whether to skip samples that have already been imported.
+          description: >-
+            Incremental backup toggle. When `true`, a `raw/` sample folder is skipped if its `.zip`
+            already exists in the backup (`meta/` and `config/` are always refreshed); when `false`,
+            every `raw/` sample folder is re-zipped and existing archives are overwritten.
           example: true
 
     ProjectBackupExportRequest:
@@ -364,7 +367,10 @@ components:
       properties:
         out_to_ftp:
           type: boolean
-          description: Whether to export the backup to FTP.
+          description: >-
+            FTP export toggle. The export archive is always written to the task folder and downloadable
+            via `GET /tasks/{task_id}/export`. When `true`, the same archive is additionally written to
+            the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and both paths are returned.
           example: false
 
     SampleImportRequest:
