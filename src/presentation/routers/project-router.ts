@@ -1251,7 +1251,28 @@ export default function ProjectRouter(
      * /projects/{project_id}/ctd_samples/import:
      *   post:
      *     summary: Import CTD samples
-     *     description: Imports selected CTD files into the project backup storage.
+     *     description: |
+     *       Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous
+     *       **CTD import** task and returns it immediately (poll the task for progress). Requires admin rights
+     *       or a privilege on the project. Unlike sample import, this attaches CTD data to samples that already
+     *       exist in the project — it does **not** trigger a backup.
+     *
+     *       **Source** — CTD files are read from an instrument-specific folder inside the project source
+     *       (`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named
+     *       `<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is
+     *       tab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth
+     *       samples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).
+     *
+     *       **Task pipeline (per requested sample):**
+     *
+     *       1. **Validation** — every requested name must appear in the project's importable-CTD list (a
+     *          `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.
+     *       2. **Copy** the `<sample>.ctd` file into the internal sample folder
+     *          `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).
+     *       3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,
+     *          `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,
+     *          `ctd_imported_file_name` and `ctd_importator_user_id`. `ctd_latitude`/`ctd_longitude` stay null
+     *          (CTD-file coordinate parsing not yet wired).
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -2044,7 +2065,31 @@ export default function ProjectRouter(
      * /projects/{project_id}/ecotaxa_samples/import:
      *   post:
      *     summary: Import EcoTaxa samples
-     *     description: Import selected EcoTaxa samples into the project. Optionally triggers a backup after import.
+     *     description: |
+     *       Send the selected samples to the project's linked **EcoTaxa** instance. Starts an asynchronous
+     *       **EcoTaxa import** task and returns it immediately as `task_import_samples` (poll the task for
+     *       progress). Requires admin rights or a privilege on the project. This operates on samples already
+     *       imported into the project (see `POST /projects/{project_id}/samples/import`) — it uploads their
+     *       vignettes + TSV to EcoTaxa rather than copying raw acquisition files.
+     *
+     *       **Task pipeline (per requested sample):**
+     *
+     *       1. **Validation** — every requested name must appear in the project's importable-EcoTaxa list;
+     *          otherwise the whole task fails.
+     *       2. **Visual-QC gate** — only samples whose visual-QC status is `VALIDATED` may be sent to EcoTaxa;
+     *          any non-validated sample aborts the task (nothing is sent).
+     *       3. **Mark in database** — the matching sample rows are flagged `ecotaxa_sample_imported = true`
+     *          with `ecotaxa_sample_import_utc_date_time`, `ecotaxa_sample_nb_images`,
+     *          `ecotaxa_sample_tsv_file_name` and `ecotaxa_sample_local_folder_tsv_path`.
+     *       4. **Upload to EcoTaxa** — the samples (TSV + images) are pushed to the linked EcoTaxa instance via
+     *          its API. If any step fails, the EcoTaxa flags set in step 3 are rolled back and the task fails.
+     *
+     *       **Optional backup** — when `backup_project` is `true`, a project backup task is started after a
+     *       successful import and returned as `task_backup_project` (see `POST /projects/{project_id}/backup`;
+     *       `backup_project_skip_already_imported` maps to that endpoint's `skip_already_imported`).
+     *
+     *       **Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;
+     *       otherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages.
      *     tags: [EcoTaxa Samples]
      *     security:
      *       - cookieAccessToken: []
