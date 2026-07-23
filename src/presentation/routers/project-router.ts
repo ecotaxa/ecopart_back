@@ -957,7 +957,38 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples/import:
      *   post:
      *     summary: Import samples
-     *     description: Import selected samples into the project. Optionally triggers a backup after import.
+     *     description: |
+     *       Import the selected samples into the project. Starts an asynchronous **import** task and returns it
+     *       immediately as `task_import_samples` (poll the task for progress); the work below runs in the
+     *       background. Requires admin rights or a privilege on the project.
+     *
+     *       **Task pipeline (per sample requested in `samples`):**
+     *
+     *       1. **Validation** — the sample must appear both in the instrument header (`meta/`) and in the source
+     *          data folder, and must pass QC level 1 (its source acquisition files are present). Any sample
+     *          missing, unknown, or failing QC aborts the whole task (nothing is imported). `validated_samples`
+     *          must be a subset of `samples`.
+     *       2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:
+     *          - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or
+     *            `.tar.zst` — normalized so files sit at the archive root) is re-zipped to `<sample>_work.zip`;
+     *            a `<sample>_meta_conf.zip` is built from `meta/` + `config/cruise_info.txt`,
+     *            `config/uvp5_settings/uvp5_configuration_data.txt` and `config/process_install_config.txt`.
+     *          - **UVP6:** only the `<sample>_Particule.zip` and `<sample>_Images.zip` archives found under
+     *            `ecodata/<sample>/` are copied as-is.
+     *       3. **Create the sample rows** in the database — metadata parsed from the copied files, plus
+     *          `nb_vignettes` and (UVP6 only) `nb_black` (rows of `particules.csv` acquired lights-off; always 0
+     *          on UVP5). Samples listed in `validated_samples` are flipped to visual-QC VALIDATED with audit
+     *          fields set as a manual review. If DB creation fails, the copied source files are rolled back
+     *          (deleted) and the task is marked failed.
+     *
+     *       **Optional backup** — when `backup_project` is `true`, a project backup task is started **after** a
+     *       successful import (see `POST /projects/{project_id}/backup`; `backup_project_skip_already_imported`
+     *       maps to that endpoint's `skip_already_imported`) and returned as `task_backup_project`. The backup is
+     *       skipped if the import fails.
+     *
+     *       **Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;
+     *       otherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages — a
+     *       failed backup after a successful import still returns `task_import_samples` alongside the error.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []

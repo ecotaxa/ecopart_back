@@ -392,11 +392,16 @@ components:
             type: string
         backup_project:
           type: boolean
-          description: Whether to also create a project backup after import.
+          description: >-
+            When `true`, a project backup task is started after a successful import (skipped if the
+            import fails). See `POST /projects/{project_id}/backup` for what the backup copies.
           example: false
         backup_project_skip_already_imported:
           type: boolean
-          description: Whether to skip already imported samples in the backup.
+          description: >-
+            Forwarded to the backup task as `skip_already_imported` (only used when `backup_project`
+            is `true`): `true` = incremental (skip `raw/` folders already backed up), `false` = full
+            re-zip.
           example: true
 
     SampleImportResponse:
