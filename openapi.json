@@ -2348,6 +2348,27 @@
             "type": "string",
             "description": "Account creation date.",
             "example": "2024-01-15T10:30:00.000Z"
+          },
+          "managing_projects": {
+            "type": "array",
+            "description": "Ids of the projects the user manages. Only populated when the requester is an administrator.",
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              3,
+              7
+            ]
+          },
+          "member_projects": {
+            "type": "array",
+            "description": "Ids of the projects the user is a member of. Only populated when the requester is an administrator.",
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              5
+            ]
           }
         }
       },

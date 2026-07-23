@@ -263,7 +263,7 @@ async function getSQLiteDS() {
             new DeleteUser(user_repo, privilege_repo),
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
-            new SearchUsers(user_repo, search_repo),
+            new SearchUsers(user_repo, search_repo, privilege_repo),
             new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
             new ListOrganisations(user_repo)
         )
@@ -275,7 +275,7 @@ async function getSQLiteDS() {
         new ChangePassword(user_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
-        new SearchUsers(user_repo, search_repo)
+        new SearchUsers(user_repo, search_repo, privilege_repo)
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),

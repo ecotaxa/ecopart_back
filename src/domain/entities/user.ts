@@ -76,6 +76,9 @@ export interface UserResponseModel extends PublicUserModel {
     reset_password_code?: string | null;
     legacy_ecopart_user_id?: number | null;
     legacy_password_set?: boolean | null;
+    // Project memberships, only populated for admin searches
+    managing_projects?: number[];
+    member_projects?: number[];
 }
 export interface PublicUserModel {
     user_id: number;

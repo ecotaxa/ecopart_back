@@ -262,7 +262,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new DeleteUser(userRepo, privilegeRepo),
             new LoginEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new LogoutEcotaxaAccount(userRepo, ecotaxaAccountRepo),
-            new SearchUsers(userRepo, searchRepo),
+            new SearchUsers(userRepo, searchRepo, privilegeRepo),
             new SearchEcotaxaAccounts(userRepo, ecotaxaAccountRepo, searchRepo),
             new ListOrganisations(userRepo)
         )
@@ -275,7 +275,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new ChangePassword(userRepo),
             new ResetPasswordRequest(userRepo, transporter, mailerAdapter),
             new ResetPassword(userRepo),
-            new SearchUsers(userRepo, searchRepo)
+            new SearchUsers(userRepo, searchRepo, privilegeRepo)
         )
 
         const projectMiddleware = ProjectRouter(

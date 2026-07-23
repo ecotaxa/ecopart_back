@@ -4,6 +4,8 @@ import { SearchRepository } from "../../../../src/domain/interfaces/repositories
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { SearchUsers } from '../../../../src/domain/use-cases/user/search-users'
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
+import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 
 describe("Get All Users Use Case", () => {
 
@@ -21,13 +23,15 @@ describe("Get All Users Use Case", () => {
 
     let mockUserRepository: UserRepository;
     let mockSearchRepository: SearchRepository;
+    let mockPrivilegeRepository: PrivilegeRepository;
     let searchUsersUse: SearchUsers;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
         mockSearchRepository = new MockSearchRepository()
-        searchUsersUse = new SearchUsers(mockUserRepository, mockSearchRepository)
+        mockPrivilegeRepository = new MockPrivilegeRepository()
+        searchUsersUse = new SearchUsers(mockUserRepository, mockSearchRepository, mockPrivilegeRepository)
     })
 
     test("deleted or invalidated user should not be able to search for users", async () => {
@@ -153,8 +157,9 @@ describe("Get All Users Use Case", () => {
             items: [private_user, private_user],
             total: 2
         }
+        const enriched_user = { ...private_user, managing_projects: [3, 7], member_projects: [5] }
         const expectedResponse = {
-            users: [public_user, public_user],
+            users: [enriched_user, enriched_user],
 
             search_info: { limit: 10, page: 1, pages: 1, total: 2, total_on_page: 2 }
         }
@@ -174,10 +179,14 @@ describe("Get All Users Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "adminGetUsers").mockImplementation(() => Promise.resolve(ExpectedResult))
         jest.spyOn(mockUserRepository, "toPublicUser").mockImplementation(() => { return public_user })
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByManagers").mockImplementation(() => Promise.resolve([3, 7]))
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByMembers").mockImplementation(() => Promise.resolve([5]))
         jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return { limit: 10, page: 1, pages: 1, total: 2, total_on_page: 2 } })
 
         const result = await searchUsersUse.execute(current_user, options, filters);
         expect(result).toStrictEqual(expectedResponse)
+        expect(mockPrivilegeRepository.getProjectsByManagers).toBeCalledWith([1])
+        expect(mockPrivilegeRepository.getProjectsByMembers).toBeCalledWith([1])
     });
     test("Should return data for admin user with filter and sort", async () => {
         const public_user = {

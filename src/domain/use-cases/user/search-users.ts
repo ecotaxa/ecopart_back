@@ -2,15 +2,18 @@ import { FilterSearchOptions, PreparedSearchOptions, SearchInfo, SearchOptions }
 import { UserResponseModel, UserUpdateModel } from "../../entities/user";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { SearchRepository } from "../../interfaces/repositories/search-repository";
+import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchUsersUseCase } from "../../interfaces/use-cases/user/search-user";
 
 export class SearchUsers implements SearchUsersUseCase {
     userRepository: UserRepository
     searchRepository: SearchRepository
+    privilegeRepository: PrivilegeRepository
 
-    constructor(userRepository: UserRepository, searchRepository: SearchRepository) {
+    constructor(userRepository: UserRepository, searchRepository: SearchRepository, privilegeRepository: PrivilegeRepository) {
         this.userRepository = userRepository
         this.searchRepository = searchRepository
+        this.privilegeRepository = privilegeRepository
     }
 
     async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ users: UserResponseModel[], search_info: SearchInfo }> {
@@ -37,6 +40,14 @@ export class SearchUsers implements SearchUsersUseCase {
         if (await this.userRepository.isAdmin(current_user.user_id)) {
             result = await this.userRepository.adminGetUsers(options as PreparedSearchOptions);
             users = result.items;
+            // Enrich each user with the projects they manage / are member of
+            users = await Promise.all(users.map(async user => {
+                const [managing_projects, member_projects] = await Promise.all([
+                    this.privilegeRepository.getProjectsByManagers([user.user_id]),
+                    this.privilegeRepository.getProjectsByMembers([user.user_id])
+                ]);
+                return { ...user, managing_projects, member_projects };
+            }));
         } else {
             result = await this.userRepository.standardGetUsers(options as PreparedSearchOptions);
             users = result.items.map(user => this.userRepository.toPublicUser(user));
