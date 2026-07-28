@@ -21,7 +21,11 @@ components:
           description: Optional comment.
         instrument_serial_number:
           type: string
-          description: Instrument serial number.
+          description: |
+            Instrument serial number, written with the usual UVP convention: `sn` prefix + digits
+            for UVP5 (`sn205`, `sn002zd`), digits + model suffix without prefix for UVP6 (`000241LP`).
+            Read from the `meta/uvp5_header_sn<serial>_*.txt` file name (UVP5) or from
+            `metadata.ini` `HW_CONF.Camera_ref` (UVP6).
           example: "000002LP"
         optional_structure_id:
           type: string

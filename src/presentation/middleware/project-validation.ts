@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult, query } from 'express-validator';
 import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-validation';
+import { instrumentFamilyFromModelName, normalizeInstrumentSerialNumber } from '../../domain/constants/instrument_serial_number';
 
 
 export class MiddlewareProjectValidation implements IMiddlewareProjectValidation {
@@ -99,7 +100,10 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Serial number Validation
         check('serial_number').optional()
             .trim()
-            .not().isEmpty().withMessage('Serial number is required.'),
+            .not().isEmpty().withMessage('Serial number is required.')
+            // `sn` prefix for UVP5, none for UVP6. Left untouched when instrument_model is
+            // not part of the request (update without a model change): the family is unknown.
+            .customSanitizer((value: string, { req }) => normalizeInstrumentSerialNumber(value, instrumentFamilyFromModelName(req.body?.instrument_model))),
         // Project contact Validation
         check('contact')
             .exists().withMessage('Contact is required.')
@@ -265,7 +269,10 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Serial number Validation,
         check('serial_number').optional()
             .trim()
-            .not().isEmpty().withMessage('Serial number cannot be empty.'),
+            .not().isEmpty().withMessage('Serial number cannot be empty.')
+            // `sn` prefix for UVP5, none for UVP6. Left untouched when instrument_model is
+            // not part of the request (update without a model change): the family is unknown.
+            .customSanitizer((value: string, { req }) => normalizeInstrumentSerialNumber(value, instrumentFamilyFromModelName(req.body?.instrument_model))),
         // Project Creation Date Validation
         check('project_creation_utc_date_time')
             .isEmpty().withMessage('Project creation date cannot be set manually.'),

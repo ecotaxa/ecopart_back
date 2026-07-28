@@ -450,7 +450,19 @@ components:
       type: object
       description: |
         Project metadata extracted from an import folder. Used to pre-fill the project creation form.
-        Sources: `config/cruise_info.txt` (INI key=value) and `meta/*header*.txt` (semicolon-delimited CSV).
+        Every field is best-effort: a missing, unreadable or malformed source file never fails the
+        request, the fields it would have filled are simply returned as `null`.
+
+        **The two source files, and how they are located:**
+
+        | File | How it is picked | How it is parsed |
+        | --- | --- | --- |
+        | `<folder>/config/cruise_info.txt` | Fixed path. | INI-like. Lines `key=value`, trimmed. Section headers (`[...]`), comments (`;`, `#`), blank lines and entries with an empty value are ignored. Keys are case-sensitive. |
+        | `<folder>/meta/<name>header<...>.txt` | First entry of `meta/` whose name contains `header`, ends with `.txt` and does **not** contain `backup`. | Semicolon-delimited. Line 1 (headers) is skipped; only line 2 (first data row) is used. Needs at least 2 lines, otherwise treated as absent. |
+
+        The serial number itself comes from the **name** of that header file, not from its content,
+        and is rewritten with the convention of the detected instrument family (`sn` prefix for
+        UVP5, none for UVP6).
       properties:
         project_acronym:
           type: string
@@ -465,30 +477,45 @@ components:
         cruise:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 1 (cruise) of the first data
-            row. Fallback: `config/cruise_info.txt` → key `acron`."
+          description: "Source: `meta/*header*.txt` → field 1 (`;`-separated) of the first
+            data row. Fallback: `config/cruise_info.txt` → key `acron`."
           example: "MPS2024"
         ship:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 2 (ship) of the first data
-            row."
+          description: "Source: `meta/*header*.txt` → field 2 (`;`-separated) of the first
+            data row. No fallback: null when the header file is absent."
           example: "R/V Thalassa"
         serial_number:
           type: string
           nullable: true
-          description: "Source: `config/cruise_info.txt` → key `sn`. Fallback: extracted
-            from the header filename pattern `sn<serial_number>_` (e.g.
-            `uvp6_header_sn000241lp_...txt`)."
-          example: "002LP"
+          description: |
+            Serial number of the instrument unit, written with the usual UVP convention, which
+            differs per instrument family:
+
+            - **UVP5** — `sn` prefix + digits, model letters kept when the unit has them: `sn205`, `sn002zd`
+            - **UVP6** — no prefix, digits + model suffix: `000241LP`, `000158HF`
+
+            Source: `config/cruise_info.txt` → key `sn` (e.g. `sn=000241LP`).
+            Fallback: the **name** of the `meta/*header*.txt` file, matched with `/sn([^_.]+)/i` —
+            everything between `sn` and the next `_` or `.` (e.g. `uvp5_header_sn002zd_omer_2.txt`,
+            `uvp6_header_sn000241lp_20240404_hope02.txt`).
+
+            The `sn` prefix is then added or removed to match the family detected from the folder
+            structure, so this is the exact same string as the sample-level `instrument_serial_number`
+            (UVP5: same header file name, UVP6: `metadata.ini` `HW_CONF.Camera_ref`).
+            The family drives only the prefix — the model letters are always kept.
+          example: "000241LP"
         instrument_model:
           type: string
           nullable: true
           description: |
-            Deduced automatically from two sources:
-            1. Folder structure: presence of `ecodata/` → UVP6, presence of `work/` → UVP5.
-            2. Serial number suffix: LP → UVP6LP, HF → UVP6HF, MHP → UVP6MHP, MHF → UVP6MHF, HD → UVP5HD, SD → UVP5SD, ZD → UVP5Z.
-            Returns null if instrument type cannot be determined.
+            Not read from any file — deduced by combining two clues:
+            1. Folder structure: presence of `<folder>/ecodata/` → UVP6, else presence of `<folder>/work/` → UVP5.
+            2. Suffix of `serial_number` (case-insensitive): UVP6 → `LP` → UVP6LP, `MHF` → UVP6MHF, `MHP` → UVP6MHP, `HF` → UVP6HF; UVP5 → `hd` → UVP5HD, `sd` → UVP5SD, `zd` → UVP5Z.
+
+            Returns null when neither subfolder exists, when `serial_number` is null, or when its
+            suffix matches no known model.
           example: "UVP6LP"
           enum: [ UVP5HD, UVP5SD, UVP5Z, UVP6LP, UVP6HF, UVP6MHP, UVP6MHF ]
         data_owner:
@@ -496,19 +523,22 @@ components:
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
           description: "Source: `config/cruise_info.txt` → keys `do_name` (name) and
-            `do_email` (email). `ecopart_user_id` is resolved by looking up the
-            email in the EcoPart user database."
+            `do_email` (email). Null when both keys are absent; otherwise the missing
+            one is returned as an empty string. `ecopart_user_id` is resolved by
+            looking up `do_email` in the EcoPart user database (null if no match)."
         operator:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
           description: "Source: `config/cruise_info.txt` → keys `op_name` (name) and
-            `op_email` (email). `ecopart_user_id` is resolved by looking up the
-            email in the EcoPart user database."
+            `op_email` (email). Null when both keys are absent; otherwise the missing
+            one is returned as an empty string. `ecopart_user_id` is resolved by
+            looking up `op_email` in the EcoPart user database (null if no match)."
         chief_scientist:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/ProjectMetadataPerson"
           description: "Source: `config/cruise_info.txt` → keys `cs_name` (name) and
-            `cs_email` (email). `ecopart_user_id` is resolved by looking up the
-            email in the EcoPart user database."
+            `cs_email` (email). Null when both keys are absent; otherwise the missing
+            one is returned as an empty string. `ecopart_user_id` is resolved by
+            looking up `cs_email` in the EcoPart user database (null if no match)."

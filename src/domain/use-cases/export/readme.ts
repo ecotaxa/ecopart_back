@@ -73,7 +73,7 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["ecotaxa_import_status_id", "Numeric EcoTaxa import status.", "EcoPart `ecotaxa_import_status` lookup."],
     ["ecotaxa_import_status_label", "Label form: `IN_PROGRESS`, `SUCCESS`, or `ERROR`.", "EcoPart `ecotaxa_import_status` lookup."],
     ["ecotaxa_sample_task_id", "Internal task identifier for the EcoTaxa import.", "EcoPart `task` table."],
-    ["instrument_settings_serial_number", "Serial number of the imager.", "UVP5: extracted from the `uvp5_header_sn(\\d+).txt` filename. UVP6: `metadata.ini` `HW_CONF.Camera_ref`."],
+    ["instrument_settings_serial_number", "Serial number of the imager, written with the usual UVP convention: `sn`-prefixed for UVP5 (`sn205`, `sn002zd`), bare digits + model suffix for UVP6 (`000241LP`).", "UVP5: extracted from the `uvp5_header_sn<serial>_*.txt` filename. UVP6: `metadata.ini` `HW_CONF.Camera_ref`."],
     ["instrument_settings_aa", "Coefficient used for the conversion between size in pixels and in mm² (UVP6: divided by 10^6).", "UVP5: `meta_header.aa`. UVP6: `metadata.ini` `HW_CONF.Aa`."],
     ["instrument_settings_exp", "Coefficient used for the conversion between size in pixels and in mm².", "UVP5: `meta_header.exp`. UVP6: `metadata.ini` `HW_CONF.Exp`."],
     ["instrument_settings_image_volume_l", "Volume of one image, in L.", "UVP5: `meta_header.volimage`. UVP6: `metadata.ini` `HW_CONF.Image_volume`."],

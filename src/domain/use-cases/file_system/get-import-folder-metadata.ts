@@ -3,6 +3,7 @@ import path from 'path';
 import { GetImportFolderMetadataUseCase } from '../../interfaces/use-cases/file_system/get-import-folder-metadata';
 import { ProjectMetadataModel, ProjectMetadataPersonModel } from '../../entities/project';
 import { UserRepository } from '../../interfaces/repositories/user-repository';
+import { extractInstrumentSerialNumberFromFileName, normalizeInstrumentSerialNumber } from '../../constants/instrument_serial_number';
 
 export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     importFolderPath: string;
@@ -30,8 +31,9 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
         // Read header file for cruise and ship
         const headerInfo = await this.readHeaderFirstLine(fullPath);
 
-        // Deduce instrument model from type + serial number
-        const serialNumber = cruiseInfo?.sn || headerInfo?.serialNumber || null;
+        // Deduce instrument model from type + serial number (written with the convention of
+        // the detected family: `sn205`/`sn002zd` for UVP5, `000241LP` for UVP6)
+        const serialNumber = normalizeInstrumentSerialNumber(cruiseInfo?.sn || headerInfo?.serialNumber, instrumentType) || null;
         const instrumentModel = this.deduceInstrumentModel(instrumentType, serialNumber);
 
         // Lookup users by email
@@ -129,8 +131,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
             const fields = lines[1].split(';');
 
             // Extract serial number from filename pattern: uvp5_header_sn002zd_omer_2.txt or uvp6_header_sn000241lp_*.txt
-            const snMatch = headerFile.match(/sn([^_]+)/i);
-            const serialNumber = snMatch ? snMatch[1] : '';
+            const serialNumber = extractInstrumentSerialNumberFromFileName(headerFile) ?? '';
 
             return {
                 cruise: fields[0] || '',

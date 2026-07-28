@@ -484,7 +484,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
                 visible_duration: 24,
                 public_duration: 36,
                 instrument_model: "UVP6LP",
-                serial_number: "sn000213lp",
+                serial_number: "000213LP",
                 contact: { user_id: capturedUserId },
                 managers: [{ user_id: capturedUserId }],
                 members: [],

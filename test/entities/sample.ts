@@ -5,7 +5,7 @@ export const sampleModel_1: PublicSampleModel = {
     sample_id: 1,
     sample_name: "perle3_001",
     comment: "no",
-    instrument_serial_number: "205",
+    instrument_serial_number: "sn205",
     max_pressure: 1331,
     station_id: "A01",
     sampling_utc_date_time: "20200313004656",

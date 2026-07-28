@@ -1738,7 +1738,7 @@
       },
       "ProjectMetadata": {
         "type": "object",
-        "description": "Project metadata extracted from an import folder. Used to pre-fill the project creation form.\nSources: `config/cruise_info.txt` (INI key=value) and `meta/*header*.txt` (semicolon-delimited CSV).\n",
+        "description": "Project metadata extracted from an import folder. Used to pre-fill the project creation form.\nEvery field is best-effort: a missing, unreadable or malformed source file never fails the\nrequest, the fields it would have filled are simply returned as `null`.\n\n**The two source files, and how they are located:**\n\n| File | How it is picked | How it is parsed |\n| --- | --- | --- |\n| `<folder>/config/cruise_info.txt` | Fixed path. | INI-like. Lines `key=value`, trimmed. Section headers (`[...]`), comments (`;`, `#`), blank lines and entries with an empty value are ignored. Keys are case-sensitive. |\n| `<folder>/meta/<name>header<...>.txt` | First entry of `meta/` whose name contains `header`, ends with `.txt` and does **not** contain `backup`. | Semicolon-delimited. Line 1 (headers) is skipped; only line 2 (first data row) is used. Needs at least 2 lines, otherwise treated as absent. |\n\nThe serial number itself comes from the **name** of that header file, not from its content,\nand is rewritten with the convention of the detected instrument family (`sn` prefix for\nUVP5, none for UVP6).\n",
         "properties": {
           "project_acronym": {
             "type": "string",
@@ -1755,25 +1755,25 @@
           "cruise": {
             "type": "string",
             "nullable": true,
-            "description": "Source: `meta/*header*.txt` → column 1 (cruise) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`.",
+            "description": "Source: `meta/*header*.txt` → field 1 (`;`-separated) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`.",
             "example": "MPS2024"
           },
           "ship": {
             "type": "string",
             "nullable": true,
-            "description": "Source: `meta/*header*.txt` → column 2 (ship) of the first data row.",
+            "description": "Source: `meta/*header*.txt` → field 2 (`;`-separated) of the first data row. No fallback: null when the header file is absent.",
             "example": "R/V Thalassa"
           },
           "serial_number": {
             "type": "string",
             "nullable": true,
-            "description": "Source: `config/cruise_info.txt` → key `sn`. Fallback: extracted from the header filename pattern `sn<serial_number>_` (e.g. `uvp6_header_sn000241lp_...txt`).",
-            "example": "002LP"
+            "description": "Serial number of the instrument unit, written with the usual UVP convention, which\ndiffers per instrument family:\n\n- **UVP5** — `sn` prefix + digits, model letters kept when the unit has them: `sn205`, `sn002zd`\n- **UVP6** — no prefix, digits + model suffix: `000241LP`, `000158HF`\n\nSource: `config/cruise_info.txt` → key `sn` (e.g. `sn=000241LP`).\nFallback: the **name** of the `meta/*header*.txt` file, matched with `/sn([^_.]+)/i` —\neverything between `sn` and the next `_` or `.` (e.g. `uvp5_header_sn002zd_omer_2.txt`,\n`uvp6_header_sn000241lp_20240404_hope02.txt`).\n\nThe `sn` prefix is then added or removed to match the family detected from the folder\nstructure, so this is the exact same string as the sample-level `instrument_serial_number`\n(UVP5: same header file name, UVP6: `metadata.ini` `HW_CONF.Camera_ref`).\nThe family drives only the prefix — the model letters are always kept.\n",
+            "example": "000241LP"
           },
           "instrument_model": {
             "type": "string",
             "nullable": true,
-            "description": "Deduced automatically from two sources:\n1. Folder structure: presence of `ecodata/` → UVP6, presence of `work/` → UVP5.\n2. Serial number suffix: LP → UVP6LP, HF → UVP6HF, MHP → UVP6MHP, MHF → UVP6MHF, HD → UVP5HD, SD → UVP5SD, ZD → UVP5Z.\nReturns null if instrument type cannot be determined.\n",
+            "description": "Not read from any file — deduced by combining two clues:\n1. Folder structure: presence of `<folder>/ecodata/` → UVP6, else presence of `<folder>/work/` → UVP5.\n2. Suffix of `serial_number` (case-insensitive): UVP6 → `LP` → UVP6LP, `MHF` → UVP6MHF, `MHP` → UVP6MHP, `HF` → UVP6HF; UVP5 → `hd` → UVP5HD, `sd` → UVP5SD, `zd` → UVP5Z.\n\nReturns null when neither subfolder exists, when `serial_number` is null, or when its\nsuffix matches no known model.\n",
             "example": "UVP6LP",
             "enum": [
               "UVP5HD",
@@ -1792,7 +1792,7 @@
                 "$ref": "#/components/schemas/ProjectMetadataPerson"
               }
             ],
-            "description": "Source: `config/cruise_info.txt` → keys `do_name` (name) and `do_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+            "description": "Source: `config/cruise_info.txt` → keys `do_name` (name) and `do_email` (email). Null when both keys are absent; otherwise the missing one is returned as an empty string. `ecopart_user_id` is resolved by looking up `do_email` in the EcoPart user database (null if no match)."
           },
           "operator": {
             "nullable": true,
@@ -1801,7 +1801,7 @@
                 "$ref": "#/components/schemas/ProjectMetadataPerson"
               }
             ],
-            "description": "Source: `config/cruise_info.txt` → keys `op_name` (name) and `op_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+            "description": "Source: `config/cruise_info.txt` → keys `op_name` (name) and `op_email` (email). Null when both keys are absent; otherwise the missing one is returned as an empty string. `ecopart_user_id` is resolved by looking up `op_email` in the EcoPart user database (null if no match)."
           },
           "chief_scientist": {
             "nullable": true,
@@ -1810,7 +1810,7 @@
                 "$ref": "#/components/schemas/ProjectMetadataPerson"
               }
             ],
-            "description": "Source: `config/cruise_info.txt` → keys `cs_name` (name) and `cs_email` (email). `ecopart_user_id` is resolved by looking up the email in the EcoPart user database."
+            "description": "Source: `config/cruise_info.txt` → keys `cs_name` (name) and `cs_email` (email). Null when both keys are absent; otherwise the missing one is returned as an empty string. `ecopart_user_id` is resolved by looking up `cs_email` in the EcoPart user database (null if no match)."
           }
         }
       },
@@ -1839,7 +1839,7 @@
           },
           "instrument_serial_number": {
             "type": "string",
-            "description": "Instrument serial number.",
+            "description": "Instrument serial number, written with the usual UVP convention: `sn` prefix + digits\nfor UVP5 (`sn205`, `sn002zd`), digits + model suffix without prefix for UVP6 (`000241LP`).\nRead from the `meta/uvp5_header_sn<serial>_*.txt` file name (UVP5) or from\n`metadata.ini` `HW_CONF.Camera_ref` (UVP6).\n",
             "example": "000002LP"
           },
           "optional_structure_id": {
@@ -3400,7 +3400,7 @@
     "/file_system/import_folder_metadata": {
       "get": {
         "summary": "Get metadata from an import folder",
-        "description": "Reads metadata files from the given import folder path and returns project-level metadata to pre-fill the project creation form. Works for both UVP5 and UVP6 folder structures.\n\n**Files read:**\n- `config/cruise_info.txt` — INI-style file (`[General]` section) containing cruise/project info and contact details.\n- `meta/*header*.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names.\n\n**Instrument detection:**\n- Presence of an `ecodata/` subdirectory → UVP6\n- Presence of a `work/` subdirectory → UVP5\n- The exact model (e.g. UVP6LP, UVP5HD) is deduced from the serial number suffix.\n\n**User lookup:** For each person (data_owner, operator, chief_scientist), the email is looked up in the EcoPart user database. If a match is found, `ecopart_user_id` is returned.\n",
+        "description": "Reads metadata files from the given import folder path and returns project-level metadata to pre-fill the project creation form. Works for both UVP5 and UVP6 folder structures.\n\nNothing is written and nothing is imported: the endpoint only reads. Every field is\nbest-effort — a missing or malformed source file yields `null` fields, not an error.\n\n**Where each returned field is read from:**\n\n| Field | Source |\n| --- | --- |\n| `project_acronym` | `config/cruise_info.txt` → `acron` |\n| `project_description` | `config/cruise_info.txt` → `description` |\n| `cruise` | `meta/*header*.txt` → field 1 of the first data row; fallback `config/cruise_info.txt` → `acron` |\n| `ship` | `meta/*header*.txt` → field 2 of the first data row |\n| `serial_number` | `config/cruise_info.txt` → `sn`; fallback: the `sn…` part of the `meta/*header*.txt` **file name**. Rewritten with the family convention: `sn` prefix for UVP5 (`sn002zd`), none for UVP6 (`000241LP`) |\n| `instrument_model` | Deduced: `ecodata/` → UVP6 / `work/` → UVP5, refined by the `serial_number` suffix (LP, HF, MHP, MHF, hd, sd, zd) |\n| `data_owner` | `config/cruise_info.txt` → `do_name`, `do_email` |\n| `operator` | `config/cruise_info.txt` → `op_name`, `op_email` |\n| `chief_scientist` | `config/cruise_info.txt` → `cs_name`, `cs_email` |\n\n**File selection & parsing:**\n- `config/cruise_info.txt` — INI-like `key=value`; section headers (`[...]`), `;`/`#` comments, blank lines and empty values are skipped.\n- `meta/*header*.txt` — first file of `meta/` containing `header`, ending in `.txt`, and **not** containing `backup`; semicolon-delimited, only the first data row (line 2) is read.\n\n**User lookup:** For each person (data_owner, operator, chief_scientist), the email is looked up in the EcoPart user database. If a match is found, `ecopart_user_id` is returned, otherwise it is null.\n",
         "tags": [
           "File System"
         ],

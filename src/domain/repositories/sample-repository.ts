@@ -10,6 +10,7 @@ import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, Importa
 import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
+import { extractInstrumentSerialNumberFromFileName, normalizeInstrumentSerialNumber } from "../constants/instrument_serial_number";
 
 
 import * as fs from 'fs'; // For createWriteStream
@@ -684,12 +685,13 @@ export class SampleRepositoryImpl implements SampleRepository {
         sample_name: string
     ): SampleFromMetaHeaderModel {
 
-        // Extract instrument serial number from filename
-        const instrumentSerialMatch = fileName.match(/sn(\d+)/i);
-        if (!instrumentSerialMatch) {
+        // Extract instrument serial number from filename. Meta headers are UVP5-only, so the
+        // UVP5 convention applies: uvp5_header_sn002zd_omer_2.txt -> sn002zd
+        const rawInstrumentSerialNumber = extractInstrumentSerialNumberFromFileName(fileName);
+        if (!rawInstrumentSerialNumber) {
             throw new Error('Instrument serial number not found in meta header filename');
         }
-        const instrumentSerialNumber = instrumentSerialMatch[1];
+        const instrumentSerialNumber = normalizeInstrumentSerialNumber(rawInstrumentSerialNumber, "UVP5");
 
         // Split file into non-empty lines
         const lines = data.split(/\r\n|\n|\r/).filter(line => line.trim() !== '');
@@ -775,7 +777,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const sample: MetadataIniSampleModel = {
             sample_name: ini_content.sample_metadata['profileid'] as string,
             comment: ini_content.sample_metadata['comment'] as string,
-            instrument_serial_number: ini_content.HW_CONF['Camera_ref'] as string,
+            instrument_serial_number: normalizeInstrumentSerialNumber(ini_content.HW_CONF['Camera_ref'] as string, "UVP6"),
             station_id: ini_content.sample_metadata['stationid'] as string,
             sampling_utc_date_time: this.parseUvpDateToIso(ini_content.sample_metadata['sampledatetime'] as string),
             wind_direction: ini_content.sample_metadata['winddir'] as number,
