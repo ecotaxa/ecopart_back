@@ -179,6 +179,10 @@ export class ExportRawData implements ExportRawDataUseCase {
         const missing = sample_ids.filter(id => !found_ids.has(id));
         if (missing.length > 0) throw new Error(`Sample(s) not found: ${missing.join(", ")}`);
 
+        // QC gate: only visual-QC-validated samples may be exported.
+        const not_validated = samples.filter(s => s.visual_qc_status_label !== "VALIDATED").map(s => s.sample_name);
+        if (not_validated.length > 0) throw new Error(`Sample(s) not validated: ${not_validated.join(", ")}`);
+
         const project_ids = Array.from(new Set(samples.map(s => s.project_id)));
         const projects_by_id = new Map<number, ProjectResponseModel>();
         for (const project_id of project_ids) {

@@ -334,6 +334,8 @@ describe('SQLiteUserDataSource', () => {
                 user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
+                legacy_ecopart_user_id: null,
+                legacy_password_set: null,
             }
             // Call the getOne method
             const user = await dataSource.getOne({ user_id: 3 });
@@ -354,6 +356,8 @@ describe('SQLiteUserDataSource', () => {
                 expect(user.user_id).toEqual(user_by_id.user_id);
                 expect(user.user_planned_usage).toEqual(user_by_id.user_planned_usage);
                 expect(user.valid_email).toEqual(user_by_id.valid_email);
+                expect(user.legacy_ecopart_user_id).toEqual(user_by_id.legacy_ecopart_user_id);
+                expect(user.legacy_password_set).toEqual(user_by_id.legacy_password_set);
 
                 // Check for additional keys
                 const userKeys = Object.keys(user);
@@ -377,6 +381,8 @@ describe('SQLiteUserDataSource', () => {
                 user_id: 3,
                 user_planned_usage: "Usage",
                 valid_email: true,
+                legacy_ecopart_user_id: null,
+                legacy_password_set: null,
             }
             // Call the getOne method
             const user = await dataSource.getOne({ email: "john.doe@example.com" });
@@ -397,6 +403,8 @@ describe('SQLiteUserDataSource', () => {
                 expect(user.user_id).toEqual(user_by_id.user_id);
                 expect(user.user_planned_usage).toEqual(user_by_id.user_planned_usage);
                 expect(user.valid_email).toEqual(user_by_id.valid_email);
+                expect(user.legacy_ecopart_user_id).toEqual(user_by_id.legacy_ecopart_user_id);
+                expect(user.legacy_password_set).toEqual(user_by_id.legacy_password_set);
 
                 // Check for additional keys
                 const userKeys = Object.keys(user);

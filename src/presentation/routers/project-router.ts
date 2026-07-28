@@ -15,6 +15,9 @@ import { ImportSamplesUseCase } from '../../domain/interfaces/use-cases/sample/i
 import { DeleteSampleUseCase } from '../../domain/interfaces/use-cases/sample/delete-sample'
 import { SearchSamplesUseCase } from '../../domain/interfaces/use-cases/sample/search-samples'
 import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/sample/list-importable-samples'
+import { GetSampleQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/get-sample-qc-graphs'
+import { SetSampleVisualQcUseCase } from '../../domain/interfaces/use-cases/sample/set-sample-visual-qc'
+import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/preview-samples-qc-graphs'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -56,6 +59,9 @@ export default function ProjectRouter(
     deleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase,
     listShipsUseCase: ListShipsUseCase,
     migrateEcotaxaProjectUseCase: MigrateEcotaxaProjectUseCase,
+    getSampleQcGraphsUseCase: GetSampleQcGraphsUseCase,
+    setSampleVisualQcUseCase: SetSampleVisualQcUseCase,
+    previewSamplesQcGraphsUseCase: PreviewSamplesQcGraphsUseCase,
 ) {
     const router = express.Router()
 
@@ -587,7 +593,38 @@ export default function ProjectRouter(
      * /projects/{project_id}/backup:
      *   post:
      *     summary: Backup project
-     *     description: Start a project backup task. Reads sample data from the filesystem and stores it in the database.
+     *     description: |
+     *       Start an asynchronous **L0-b backup** task (returns a Task immediately; poll the task for progress).
+     *
+     *       The task reads the project source acquisition folder (`root_folder_path`, which must contain the
+     *       `raw/`, `meta/` and `config/` subfolders) and copies it into the internal backup folder
+     *       `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/`. Nothing is written to the database except the
+     *       project's `last_backup_utc_date_time` timestamp.
+     *
+     *       **What is backed up and in which format:**
+     *
+     *       | Source | Destination | Format |
+     *       |---|---|---|
+     *       | `meta/` (whole folder) | `l0b_backup/meta/` | copied verbatim, uncompressed |
+     *       | `config/` (whole folder) | `l0b_backup/config/` | copied verbatim, uncompressed |
+     *       | each `raw/<sample_folder>/` | `l0b_backup/raw/<sample_folder>.zip` | one ZIP per sample folder (DEFLATE, level 9) |
+     *       | each `raw/<sample_folder>.zip` (already zipped at source) | `l0b_backup/raw/<sample_folder>.zip` | copied as-is |
+     *
+     *       **Per instrument** — the mechanism is identical; only the contents of the copied folders differ:
+     *
+     *       - **UVP5 (UVP5SD / UVP5HD):** `meta/uvp5_header_<sn>.txt`; `config/` with `cruise_info.txt`,
+     *         `process_install_config.txt` and the `uvp5_settings/` folder; `raw/` holds one `HDR<timestamp>`
+     *         folder per cast, each zipped to `HDR<timestamp>.zip`.
+     *       - **UVP6:** `meta/uvp6_header_<sn>.txt`; `config/` with `cruise_info.txt`, `ACQ_TIME_*.txt`,
+     *         `HW_TIME_<sn>.txt`, `compute_vignette.txt`, `timetable.txt`; `raw/` holds one
+     *         `<YYYYMMDD-HHMMSS>[_suffix]` acquisition folder per sample (containing `<folder>_data.txt`),
+     *         each zipped to `<YYYYMMDD-HHMMSS>[_suffix].zip`.
+     *
+     *       **Option `skip_already_imported`:**
+     *
+     *       - `true` — incremental: a `raw/` sample folder is skipped when its `.zip` already exists in the
+     *         backup; `meta/` and `config/` are always refreshed.
+     *       - `false` — full: every `raw/` sample folder is (re-)zipped, overwriting existing archives.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -729,7 +766,26 @@ export default function ProjectRouter(
      * /projects/{project_id}/backup/export:
      *   post:
      *     summary: Export project backup
-     *     description: Start a backup export task. Exports backed-up project data, optionally to FTP.
+     *     description: |
+     *       Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).
+     *       Requires a prior successful backup — fails if `l0b_backup/` does not exist for the project.
+     *
+     *       The whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and
+     *       `config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)
+     *       is compressed into a single archive named
+     *       `ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).
+     *
+     *       This export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains
+     *       the `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the
+     *       `<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.
+     *
+     *       **Destination(s):**
+     *
+     *       - Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via
+     *         `GET /tasks/{task_id}/export`.
+     *       - **Option `out_to_ftp`:** when `true`, the same archive is additionally written to the FTP export
+     *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the
+     *         download link; when `false`, only the download link is returned.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -880,6 +936,7 @@ export default function ProjectRouter(
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
+            "Invalid validated_samples:": { status: 422, message: err.message },
             "Unknown instrument model": { status: 404, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
@@ -900,7 +957,38 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples/import:
      *   post:
      *     summary: Import samples
-     *     description: Import selected samples into the project. Optionally triggers a backup after import.
+     *     description: |
+     *       Import the selected samples into the project. Starts an asynchronous **import** task and returns it
+     *       immediately as `task_import_samples` (poll the task for progress); the work below runs in the
+     *       background. Requires admin rights or a privilege on the project.
+     *
+     *       **Task pipeline (per sample requested in `samples`):**
+     *
+     *       1. **Validation** — the sample must appear both in the instrument header (`meta/`) and in the source
+     *          data folder, and must pass QC level 1 (its source acquisition files are present). Any sample
+     *          missing, unknown, or failing QC aborts the whole task (nothing is imported). `validated_samples`
+     *          must be a subset of `samples`.
+     *       2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:
+     *          - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or
+     *            `.tar.zst` — normalized so files sit at the archive root) is re-zipped to `<sample>_work.zip`;
+     *            a `<sample>_meta_conf.zip` is built from `meta/` + `config/cruise_info.txt`,
+     *            `config/uvp5_settings/uvp5_configuration_data.txt` and `config/process_install_config.txt`.
+     *          - **UVP6:** only the `<sample>_Particule.zip` and `<sample>_Images.zip` archives found under
+     *            `ecodata/<sample>/` are copied as-is.
+     *       3. **Create the sample rows** in the database — metadata parsed from the copied files, plus
+     *          `nb_vignettes` and (UVP6 only) `nb_black` (rows of `particules.csv` acquired lights-off; always 0
+     *          on UVP5). Samples listed in `validated_samples` are flipped to visual-QC VALIDATED with audit
+     *          fields set as a manual review. If DB creation fails, the copied source files are rolled back
+     *          (deleted) and the task is marked failed.
+     *
+     *       **Optional backup** — when `backup_project` is `true`, a project backup task is started **after** a
+     *       successful import (see `POST /projects/{project_id}/backup`; `backup_project_skip_already_imported`
+     *       maps to that endpoint's `skip_already_imported`) and returned as `task_backup_project`. The backup is
+     *       skipped if the import fails.
+     *
+     *       **Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;
+     *       otherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages — a
+     *       failed backup after a successful import still returns `task_import_samples` alongside the error.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -957,7 +1045,8 @@ export default function ProjectRouter(
             task_import_samples = await importSamplesUseCase.execute(
                 (req as CustomRequest).token,
                 req.params.project_id as any,
-                { ...req.body }.samples
+                { ...req.body }.samples,
+                req.body.validated_samples
             );
 
             // Proceed with backup only if import is successful
@@ -1162,7 +1251,28 @@ export default function ProjectRouter(
      * /projects/{project_id}/ctd_samples/import:
      *   post:
      *     summary: Import CTD samples
-     *     description: Imports selected CTD files into the project backup storage.
+     *     description: |
+     *       Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous
+     *       **CTD import** task and returns it immediately (poll the task for progress). Requires admin rights
+     *       or a privilege on the project. Unlike sample import, this attaches CTD data to samples that already
+     *       exist in the project — it does **not** trigger a backup.
+     *
+     *       **Source** — CTD files are read from an instrument-specific folder inside the project source
+     *       (`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named
+     *       `<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is
+     *       tab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth
+     *       samples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).
+     *
+     *       **Task pipeline (per requested sample):**
+     *
+     *       1. **Validation** — every requested name must appear in the project's importable-CTD list (a
+     *          `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.
+     *       2. **Copy** the `<sample>.ctd` file into the internal sample folder
+     *          `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).
+     *       3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,
+     *          `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,
+     *          `ctd_imported_file_name` and `ctd_importator_user_id`. `ctd_latitude`/`ctd_longitude` stay null
+     *          (CTD-file coordinate parsing not yet wired).
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1468,6 +1578,187 @@ export default function ProjectRouter(
 
     /**
      * @openapi
+     * /projects/{project_id}/samples/{sample_id}/qc-graphs:
+     *   get:
+     *     summary: Import QC graphs for a sample
+     *     description: |
+     *       Returns the data for the three import-time quality-control vertical profiles
+     *       (depth on the Y axis, in metres): (1) depth of each image with the kept-image
+     *       selection range, (2) imaged volume per depth bin, and (3) the "raw histogram" of
+     *       particle counts for pixel classes 1/2/3 — split into lit particles
+     *       (`particle_lpm_profile`) and lights-off black frames (`black_profile`, null when
+     *       the instrument has no dark frames). Computed on demand from the sample's raw files.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     responses:
+     *       200:
+     *         description: QC graph datasets for the sample.
+     *       403:
+     *         description: User cannot be used or lacks access to the project.
+     *       404:
+     *         description: Sample or project not found.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.get('/:project_id/samples/:sample_id/qc-graphs', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const graphs = await getSampleQcGraphsUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id));
+            res.status(200).send(graphs)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get sample QC graphs"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/{sample_id}/visual-qc:
+     *   patch:
+     *     summary: Record a sample's visual-QC decision
+     *     description: |
+     *       Validates or rejects a sample after the user reviews its QC graphs. Sets the
+     *       visual QC status and records who decided, when, and an optional comment. Allowed
+     *       for admins or any member of the project. A sample must be VALIDATED before it can
+     *       be sent to EcoTaxa or exported.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [visual_qc_status_label]
+     *             properties:
+     *               visual_qc_status_label:
+     *                 type: string
+     *                 enum: [VALIDATED, REJECTED]
+     *               comment:
+     *                 type: string
+     *                 nullable: true
+     *     responses:
+     *       200:
+     *         description: The updated sample.
+     *       401:
+     *         description: Invalid visual QC status.
+     *       403:
+     *         description: User cannot be used or cannot validate in this project.
+     *       404:
+     *         description: Sample, project, or QC status not found.
+     *       422:
+     *         description: Validation error.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.patch('/:project_id/samples/:sample_id/visual-qc', middlewareAuth.auth, middlewareSampleValidation.rulesSetVisualQc, async (req: Request, res: Response) => {
+        try {
+            const updated_sample = await setSampleVisualQcUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id), req.body.visual_qc_status_label, req.body.comment);
+            res.status(200).send(updated_sample)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot validate samples in this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Invalid visual QC status") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find updated sample") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Visual QC status not found") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot update sample visual QC"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/qc-graphs-preview:
+     *   post:
+     *     summary: Preview import QC graphs for not-yet-imported samples
+     *     description: |
+     *       Returns the same QC graph datasets as the per-sample endpoint, but for a list of
+     *       samples that have **not been imported yet** — computed on the fly from the project
+     *       source folder. Lets the operator review quality before committing an import (and then
+     *       pass the approved names as `validated_samples` to the import endpoint). Each requested
+     *       name must be importable from the source folder. For a preview, `sample_id` is null and
+     *       `visual_qc_status_label` is `NOT_IMPORTED`.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [sample_names]
+     *             properties:
+     *               sample_names:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *     responses:
+     *       200:
+     *         description: QC graph datasets, one per requested sample.
+     *       403:
+     *         description: User cannot be used or lacks access to the project.
+     *       404:
+     *         description: Project or source folder not found.
+     *       422:
+     *         description: Validation error or a requested sample is not importable.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.post('/:project_id/samples/qc-graphs-preview', middlewareAuth.auth, middlewareSampleValidation.rulesPreviewQcGraphs, async (req: Request, res: Response) => {
+        try {
+            const graphs = await previewSamplesQcGraphsUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), req.body.sample_names);
+            res.status(200).send(graphs)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "No samples to preview") res.status(422).send({ errors: [err.message] })
+            else if (err.message.startsWith("Samples not importable")) res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot preview sample QC graphs"] })
+        }
+    })
+
+    /**
+     * @openapi
      * /projects/{project_id}/samples/searches:
      *   post:
      *     summary: Search samples
@@ -1753,6 +2044,7 @@ export default function ProjectRouter(
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
+            "Invalid validated_samples:": { status: 422, message: err.message },
             "Unknown instrument model": { status: 404, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
@@ -1773,7 +2065,31 @@ export default function ProjectRouter(
      * /projects/{project_id}/ecotaxa_samples/import:
      *   post:
      *     summary: Import EcoTaxa samples
-     *     description: Import selected EcoTaxa samples into the project. Optionally triggers a backup after import.
+     *     description: |
+     *       Send the selected samples to the project's linked **EcoTaxa** instance. Starts an asynchronous
+     *       **EcoTaxa import** task and returns it immediately as `task_import_samples` (poll the task for
+     *       progress). Requires admin rights or a privilege on the project. This operates on samples already
+     *       imported into the project (see `POST /projects/{project_id}/samples/import`) — it uploads their
+     *       vignettes + TSV to EcoTaxa rather than copying raw acquisition files.
+     *
+     *       **Task pipeline (per requested sample):**
+     *
+     *       1. **Validation** — every requested name must appear in the project's importable-EcoTaxa list;
+     *          otherwise the whole task fails.
+     *       2. **Visual-QC gate** — only samples whose visual-QC status is `VALIDATED` may be sent to EcoTaxa;
+     *          any non-validated sample aborts the task (nothing is sent).
+     *       3. **Mark in database** — the matching sample rows are flagged `ecotaxa_sample_imported = true`
+     *          with `ecotaxa_sample_import_utc_date_time`, `ecotaxa_sample_nb_images`,
+     *          `ecotaxa_sample_tsv_file_name` and `ecotaxa_sample_local_folder_tsv_path`.
+     *       4. **Upload to EcoTaxa** — the samples (TSV + images) are pushed to the linked EcoTaxa instance via
+     *          its API. If any step fails, the EcoTaxa flags set in step 3 are rolled back and the task fails.
+     *
+     *       **Optional backup** — when `backup_project` is `true`, a project backup task is started after a
+     *       successful import and returned as `task_backup_project` (see `POST /projects/{project_id}/backup`;
+     *       `backup_project_skip_already_imported` maps to that endpoint's `skip_already_imported`).
+     *
+     *       **Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;
+     *       otherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages.
      *     tags: [EcoTaxa Samples]
      *     security:
      *       - cookieAccessToken: []

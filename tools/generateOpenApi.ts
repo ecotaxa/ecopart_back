@@ -15,7 +15,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
     },
     servers: [
         {
-            url: process.env.API_URL,
+            url: process.env.API_URL || '/',
             description: process.env.NODE_ENV === 'PROD' ? 'Production server' : process.env.NODE_ENV === 'TEST' ? 'Testing server' : 'Development server',
         },
     ],
@@ -29,6 +29,8 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'Instrument Models', description: 'Instrument model reference data' },
         { name: 'EcoTaxa Instances', description: 'EcoTaxa instance management' },
         { name: 'File System', description: 'File system operations' },
+        { name: 'Admin', description: 'Administration and application statistics' },
+        { name: 'Broadcast Messages', description: 'Application-wide message shown to users, managed by admins' },
     ],
     components: {
         securitySchemes: {

@@ -1,4 +1,4 @@
-import { UserRequestCreationModel, UserRequestModel, UserResponseModel, UserUpdateModel, UserSeedModel } from "../../../domain/entities/user";
+import { UserRequestCreationModel, UserRequestModel, UserResponseModel, UserUpdateModel, UserSeedModel, UserMigrationRequestModel } from "../../../domain/entities/user";
 import { AuthUserCredentialsModel, } from "../../../domain/entities/auth";
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
@@ -39,6 +39,56 @@ export class SQLiteUserDataSource implements UserDataSource {
                 } else {
                     const result = this.lastID;
                     resolve(result);
+                }
+            });
+        })
+    }
+
+    async createMigratedUser(user: UserMigrationRequestModel, password_hash: string): Promise<number> {
+        // Migrated legacy users are created already-validated (valid_email=1), with their old
+        // EcoPart id preserved and legacy_password_set=0 until they set a new password.
+        const params = [user.first_name, user.last_name, user.email, password_hash, 1, user.legacy_ecopart_user_id, 0, user.organisation, user.country, user.user_planned_usage, new Date().toISOString()]
+        const placeholders = params.map(() => '(?)').join(',');
+        const sql = `INSERT INTO user (first_name, last_name, email, password_hash, valid_email, legacy_ecopart_user_id, legacy_password_set, organisation, country, user_planned_usage, user_creation_utc_date_time) VALUES (` + placeholders + `);`;
+
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) {
+                    console.log("DB error--", err)
+                    if (err.message && err.message.includes("UNIQUE constraint failed: user.email")) reject(new Error("Email already exists"));
+                    else reject(err);
+                } else {
+                    resolve(this.lastID);
+                }
+            });
+        })
+    }
+
+    async getLegacyUsersWithoutPassword(): Promise<UserResponseModel[]> {
+        // Migrated legacy users who have not set their new password yet (and are not deleted).
+        const sql = `SELECT * FROM user WHERE legacy_ecopart_user_id IS NOT NULL AND legacy_password_set = 0 AND deleted IS NULL;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve((rows ?? []).map(row => ({
+                        user_id: row.user_id,
+                        first_name: row.first_name,
+                        last_name: row.last_name,
+                        email: row.email,
+                        confirmation_code: row.confirmation_code,
+                        reset_password_code: row.reset_password_code,
+                        valid_email: row.valid_email == 1 ? true : false,
+                        is_admin: row.is_admin == 1 ? true : false,
+                        organisation: row.organisation,
+                        country: row.country,
+                        user_planned_usage: row.user_planned_usage,
+                        user_creation_utc_date_time: row.user_creation_utc_date_time,
+                        deleted: row.deleted,
+                        legacy_ecopart_user_id: row.legacy_ecopart_user_id,
+                        legacy_password_set: row.legacy_password_set === null || row.legacy_password_set === undefined ? null : row.legacy_password_set == 1
+                    })));
                 }
             });
         })
@@ -138,7 +188,9 @@ export class SQLiteUserDataSource implements UserDataSource {
                             country: row.country,
                             user_planned_usage: row.user_planned_usage,
                             user_creation_utc_date_time: row.user_creation_utc_date_time,
-                            deleted: row.deleted
+                            deleted: row.deleted,
+                            legacy_ecopart_user_id: row.legacy_ecopart_user_id,
+                            legacy_password_set: row.legacy_password_set === null || row.legacy_password_set === undefined ? null : row.legacy_password_set == 1
                         })),
                         total: rows[0]?.total_count || 0
                     };
@@ -155,7 +207,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         const params: any[] = []
         let placeholders: string = ""
         for (const [key, value] of Object.entries(userData)) {
-            if (key == "is_admin" || key == "valid_email") { // TODO somewhere else?
+            if (key == "is_admin" || key == "valid_email" || key == "legacy_password_set") { // TODO somewhere else?
                 params.push(value == true || value == "true" ? 1 : 0) // TODO clean
             } else {
                 params.push(value)
@@ -214,7 +266,9 @@ export class SQLiteUserDataSource implements UserDataSource {
                             country: row.country,
                             user_planned_usage: row.user_planned_usage,
                             user_creation_utc_date_time: row.user_creation_utc_date_time,
-                            deleted: row.deleted
+                            deleted: row.deleted,
+                            legacy_ecopart_user_id: row.legacy_ecopart_user_id,
+                            legacy_password_set: row.legacy_password_set === null || row.legacy_password_set === undefined ? null : row.legacy_password_set == 1
                         };
                         resolve(result);
                     }

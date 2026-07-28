@@ -95,13 +95,15 @@ export class SearchTask implements SearchTasksUseCase {
         }
         return options;
     }
-    // Applies the instrument model filter.
+    // Applies the task_type model filter.
     private async applyTaskTypeFilter(options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
-        // If filter on instrument model, searsch id of instrument model matching the filter and then set the filter to IN [] of instrument model id
+        // If filter on task type, search the ids of the task types whose LABEL matches the
+        // filter, then rewrite the filter to `task_type_id IN [...]`. The client filters by the
+        // human-readable label (e.g. LIKE "%import%"), never by the numeric id.
         const taskFilter = options.filter.find(f => f.field === "task_type");
         if (taskFilter) {
             const tasks = await this.taskRepository.standardGetTaskType({
-                filter: [{ field: "task_type_id", operator: taskFilter.operator, value: taskFilter.value }],
+                filter: [{ field: "task_type_label", operator: taskFilter.operator, value: taskFilter.value }],
                 sort_by: [],
                 limit: 1000,
                 page: 1
@@ -111,7 +113,7 @@ export class SearchTask implements SearchTasksUseCase {
                 throw new Error("Task type label not found");
             }
 
-            // Set the new filter for instrument model operator to IN and value to array of instrument model id
+            // Set the new filter for task type operator to IN and value to array of task type id
             taskFilter.field = "task_type_id";
             taskFilter.operator = "IN";
             taskFilter.value = tasks.items.map(i => i.task_type_id);

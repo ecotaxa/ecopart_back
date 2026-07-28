@@ -6,6 +6,8 @@ import { UserRepository } from "../../src/domain/interfaces/repositories/user-re
 import { EcotaxaAccountRepository } from "../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 
 import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
+import { MigrateUsersUseCase } from "../../src/domain/interfaces/use-cases/user/migrate-users";
+import { ResendMigrationEmailsUseCase } from "../../src/domain/interfaces/use-cases/user/resend-migration-emails";
 import { UpdateUserUseCase } from "../../src/domain/interfaces/use-cases/user/update-user";
 import { ValidUserUseCase } from "../../src/domain/interfaces/use-cases/user/valid-user";
 import { DeleteUserUseCase } from "../../src/domain/interfaces/use-cases/user/delete-user";
@@ -74,6 +76,18 @@ export class MockUserRepository implements UserRepository {
     }
     createUser(): Promise<number> {
         throw new Error("Method not implemented : createUser");
+    }
+    migrateUser(): Promise<number> {
+        throw new Error("Method not implemented : migrateUser");
+    }
+    markLegacyPasswordSet(): Promise<number> {
+        throw new Error("Method not implemented : markLegacyPasswordSet");
+    }
+    linkLegacyUser(): Promise<number> {
+        throw new Error("Method not implemented : linkLegacyUser");
+    }
+    getLegacyUsersWithoutPassword(): Promise<UserResponseModel[]> {
+        throw new Error("Method not implemented : getLegacyUsersWithoutPassword");
     }
     getUsers(): Promise<UserResponseModel[]> {
         throw new Error("Method not implemented : getUsers");
@@ -202,6 +216,16 @@ export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
 export class MockCreateUserUseCase implements CreateUserUseCase {
     execute(): Promise<void> {
         throw new Error("Method not implemented for CreateUserUseCase");
+    }
+}
+export class MockMigrateUsersUseCase implements MigrateUsersUseCase {
+    execute(): Promise<import("../../src/domain/entities/user").MigrateUsersResponseModel> {
+        throw new Error("Method not implemented for MigrateUsersUseCase");
+    }
+}
+export class MockResendMigrationEmailsUseCase implements ResendMigrationEmailsUseCase {
+    execute(): Promise<import("../../src/domain/entities/user").MigrateUsersResponseModel> {
+        throw new Error("Method not implemented for ResendMigrationEmailsUseCase");
     }
 }
 export class MockUpdateUserUseCase implements UpdateUserUseCase {

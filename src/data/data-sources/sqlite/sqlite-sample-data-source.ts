@@ -67,6 +67,8 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         visual_qc_validator_email: qc_email ?? "",
         visual_qc_status_id: row.visual_qc_status_id,
         visual_qc_status_label: row.visual_qc_status_label,
+        visual_qc_comment: row.visual_qc_comment ?? null,
+        visual_qc_validation_utc_date_time: row.visual_qc_validation_utc_date_time ?? null,
         sample_type_id: row.sample_type_id,
         sample_type_label: row.sample_type_label,
         project_id: row.project_id,

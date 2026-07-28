@@ -24,6 +24,16 @@ export class ListImportFolders implements ListImportFoldersUseCase {
         for (const entry of entries) {
             if (entry.isDirectory()) {
                 folders.push(path.join(folder_path, entry.name));
+            } else if (entry.isSymbolicLink()) {
+                // readdir does not follow symlinks: stat the target to keep links pointing to directories
+                try {
+                    const stats = await fs.stat(path.join(resolvedPath, entry.name));
+                    if (stats.isDirectory()) {
+                        folders.push(path.join(folder_path, entry.name));
+                    }
+                } catch {
+                    // broken or unreadable symlink: skip it
+                }
             }
         }
         return folders.sort((a, b) => a.localeCompare(b));

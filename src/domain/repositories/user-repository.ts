@@ -2,7 +2,7 @@
 import { CryptoWrapper } from "../../infra/cryptography/crypto-wrapper";
 import { UserDataSource } from "../../data/interfaces/data-sources/user-data-source";
 import { AuthUserCredentialsModel, ChangeCredentialsModel, DecodedToken } from "../entities/auth";
-import { UserResponseModel, UserRequestCreationModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../entities/user";
+import { UserResponseModel, UserRequestCreationModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel, UserMigrationRequestModel } from "../entities/user";
 import { UserRepository } from "../interfaces/repositories/user-repository";
 import { JwtWrapper } from "../../infra/auth/jwt-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -89,13 +89,36 @@ export class UserRepositoryImpl implements UserRepository {
         return result;
     }
 
+    async migrateUser(user: UserMigrationRequestModel): Promise<number> {
+        // Migrated users have no known password: set a random throwaway hash. They set a real
+        // password through the reset-password flow triggered by the migration email.
+        const password_hash = await this.userCrypto.hash(this.userCrypto.generate_uuid())
+        const result = await this.userDataSource.createMigratedUser(user, password_hash)
+        return result;
+    }
+
+    async markLegacyPasswordSet(user_id: number): Promise<number> {
+        const nb_of_updated_user = await this.updateUser({ user_id, legacy_password_set: true }, ["user_id", "legacy_password_set"])
+        return nb_of_updated_user
+    }
+
+    async linkLegacyUser(user_id: number, legacy_ecopart_user_id: number): Promise<number> {
+        // Attach the old EcoPart id to a user who already has a working account. legacy_password_set
+        // is set true because they already have a usable password — they must not be e-mailed.
+        const nb_of_updated_user = await this.updateUser(
+            { user_id, legacy_ecopart_user_id, legacy_password_set: true },
+            ["user_id", "legacy_ecopart_user_id", "legacy_password_set"]
+        )
+        return nb_of_updated_user
+    }
+
     generateValidationToken(user: UserRequestModel): string {
         const token = this.userJwt.sign({ user_id: user.user_id, confirmation_code: user.confirmation_code }, this.VALIDATION_TOKEN_SECRET, { expiresIn: '24h' })
         return token
     }
 
-    generateResetPasswordToken(user: UserRequestModel): string {
-        const token = this.userJwt.sign({ user_id: user.user_id, reset_password_code: user.reset_password_code }, this.RESET_PASSWORD_TOKEN_SECRET, { expiresIn: '3h' })
+    generateResetPasswordToken(user: UserRequestModel, expiresIn: string = '3h'): string {
+        const token = this.userJwt.sign({ user_id: user.user_id, reset_password_code: user.reset_password_code }, this.RESET_PASSWORD_TOKEN_SECRET, { expiresIn })
         return token
     }
 
@@ -294,5 +317,9 @@ export class UserRepositoryImpl implements UserRepository {
 
     async getDistinctOrganisations(): Promise<string[]> {
         return await this.userDataSource.getDistinctOrganisations();
+    }
+
+    async getLegacyUsersWithoutPassword(): Promise<UserResponseModel[]> {
+        return await this.userDataSource.getLegacyUsersWithoutPassword();
     }
 }

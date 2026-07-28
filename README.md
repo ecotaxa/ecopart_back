@@ -152,6 +152,79 @@ To set up or update the server manually:
 > Note: the root `docker-compose.yml` in this repository **builds the backend from source** and
 > is for local development only. The server uses the image-based compose shown above.
 
+### Mounting a remote folder into the import `remote/` directory
+
+The import browser (endpoint `GET /file_system/import_folders`) lists the sub-folders of
+`<DATA_STORAGE_IMPORT>/remote/`. To make a remote/network storage (NFS, another local disk, an
+FTP export, …) importable from EcoPart, expose it in that `remote/` directory as a **symbolic
+link**, then make sure the container can actually follow the link. There are two independent
+layers to get right — the **host** and the **container**.
+
+#### 1. On the host — create the symlink
+
+```bash
+cd <DATA_STORAGE_IMPORT>/remote          # e.g. <deploy_dir>/data_storage/ecopart_data_to_import/remote
+ln -s /path/to/local/storage    my_folder        # link name → real target on the host
+ln -s /path/to/nfs/mount        my_archive
+```
+
+The link *name* is what appears in the import browser; the target is the real path on the host
+(a mount point, an NFS mount, another folder, …). Check the targets resolve and are readable:
+
+```bash
+ls -la                                      # shows "my_folder -> /path/to/local/storage"
+readlink -f my_folder && ls -ld "$(readlink -f my_folder)"
+```
+
+#### 2. In the container — bind-mount the link **targets** at the same absolute path
+
+A symlink stores a *path*, not the data. The container resolves that path **inside its own
+filesystem**, so the link target must be mounted into the container **at the exact same absolute
+path** it points to on the host — otherwise the container sees a broken/empty link and the folder
+appears empty (or the endpoint returns `[]`).
+
+In the `api` service of your `docker-compose.yml`:
+
+```yaml
+services:
+  api:
+    volumes:
+      - ./data_storage:/src/data_storage
+      # one entry per symlink target, SAME path on both sides, read-only for import sources
+      - /path/to/local/storage:/path/to/local/storage:ro
+      - /path/to/nfs/mount:/path/to/nfs/mount:ro
+```
+
+> **Bind the actual mount points, not a shared parent.** If several targets are *separate mount
+> points* under one directory (e.g. two NFS mounts under the same parent), mount each one
+> individually. Bind-mounting only the shared parent would expose empty stub directories, because
+> the child mounts are not propagated into that bind.
+
+Recreate the container so the new volumes take effect, then verify **through the symlink**:
+
+```bash
+docker compose up -d --force-recreate api
+docker exec -it <api-container> sh -c 'ls /src/data_storage/ecopart_data_to_import/remote/ftp/'
+```
+
+#### Gotchas
+
+- **Use Docker from the official apt repo, not the Snap package.** The Snap Docker runs under
+  strict confinement and **cannot** bind-mount arbitrary host paths outside `$HOME` (e.g.
+  system or NFS mount points); the folders show up empty in the container no matter what. Install
+  `docker-ce` via apt for any server that mounts system/NFS paths.
+- **Mount propagation.** The Docker daemon has its own mount namespace. If a target filesystem
+  was mounted on the host *after* the daemon started, the daemon may not see it and will bind an
+  empty directory. Fix by refreshing the daemon's view (`sudo systemctl restart docker`) and
+  recreating the container, or by making the host mounts shared (`sudo mount --make-shared
+  <target>`) and requesting `propagation: rshared` on the bind.
+- **Read-only + permissions.** Import sources should be mounted `:ro`. Files may be owned by
+  numeric UIDs with no matching name in the container — that is fine as long as they are
+  world-readable (`r--`/`r-x` for "others"), which is all the import needs.
+- **Security note.** The import browser follows any symlink placed under `remote/`, wherever it
+  points — the path-traversal guard is intentionally permissive so these links work. Only
+  trusted operators/admins should be able to create links in that directory.
+
 ### Link with EcoTaxa
 
 ### OpenAPI Documentation

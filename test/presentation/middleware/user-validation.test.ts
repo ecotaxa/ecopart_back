@@ -21,7 +21,9 @@ import { MiddlewareUserValidation } from "../../../src/presentation/middleware/u
 import { CountriesAdapter } from "../../../src/infra/countries/country";
 import { SearchInfo } from "../../../src/domain/entities/search";
 
-import { MockCreateUserUseCase, MockDeleteUserUseCase, MockListOrganisationsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockMiddlewareAuth, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
+import { MockCreateUserUseCase, MockMigrateUsersUseCase, MockResendMigrationEmailsUseCase, MockDeleteUserUseCase, MockListOrganisationsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockMiddlewareAuth, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase } from "../../mocks/user-mock";
+import { MigrateUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/migrate-users";
+import { ResendMigrationEmailsUseCase } from "../../../src/domain/interfaces/use-cases/user/resend-migration-emails";
 import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth-validation";
 import { public_ecotaxa_account_response_model } from "../../entities/user";
@@ -32,6 +34,8 @@ describe("User Router", () => {
     let middlewareUserValidation: IMiddlewareUserValidation;
     let middlewareAuthValidation: IMiddlewareAuthValidation;
     let mockCreateUserUseCase: CreateUserUseCase;
+    let mockMigrateUsersUseCase: MigrateUsersUseCase;
+    let mockResendMigrationEmailsUseCase: ResendMigrationEmailsUseCase;
     let mockUpdateUserUseCase: UpdateUserUseCase;
     let mockValidUserUseCase: ValidUserUseCase;
     let mockDeleteUserUseCase: DeleteUserUseCase;
@@ -47,6 +51,8 @@ describe("User Router", () => {
         middlewareUserValidation = new MiddlewareUserValidation(countriesAdapter)
         middlewareAuthValidation = new MiddlewareAuthValidation()
         mockCreateUserUseCase = new MockCreateUserUseCase()
+        mockMigrateUsersUseCase = new MockMigrateUsersUseCase()
+        mockResendMigrationEmailsUseCase = new MockResendMigrationEmailsUseCase()
         mockUpdateUserUseCase = new MockUpdateUserUseCase()
         mockValidUserUseCase = new MockValidUserUseCase()
         mockDeleteUserUseCase = new MockDeleteUserUseCase()
@@ -56,7 +62,7 @@ describe("User Router", () => {
         mockSearchEcotaxaAccountsUseCase = new MockSearchEcotaxaAccountsUseCase()
         mockListOrganisationsUseCase = new MockListOrganisationsUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, middlewareAuthValidation, mockCreateUserUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, middlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase))
     })
 
     beforeEach(() => {

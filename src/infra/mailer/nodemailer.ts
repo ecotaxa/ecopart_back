@@ -86,4 +86,33 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
             }
         });
     }
+
+    async send_migration_email(transporter: nodemailer.Transporter, user: UserResponseModel, resetPasswordToken: string): Promise<void> {
+        // Read the HTML file
+        let htmlContent = "error"
+        try {
+            const filePath = path.join(__dirname + "/templates/account_migration_email.html")
+            htmlContent = fs.readFileSync(filePath, 'utf8');
+        } catch (err) {
+            console.error(err)
+        }
+
+        // prepare the custom reset_password_path path (reused to let migrated users set a password)
+        const custom_reset_password_path = this.base_url_path + "/auth/password/reset/" + resetPasswordToken
+        const mail_sender = this.mail_sender
+
+        // Send the email
+        transporter.sendMail({
+            from: mail_sender, // sender address
+            to: this.node_env == "PROD" ? user.email : this.TEST_MAIL_DEFAULT_RECIPIENT, // list of receivers
+            subject: "Welcome to the new EcoPart — set your password", // Subject line
+            html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body
+        }, (err, info) => {
+            if (err) {
+                console.log(err)
+            } else {
+                console.log('Email sent: ' + info.response)
+            }
+        });
+    }
 }

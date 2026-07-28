@@ -1,0 +1,50 @@
+components:
+  schemas:
+    BroadcastMessageInput:
+      type: object
+      required:
+        - message
+        - level
+      properties:
+        message:
+          type: string
+          description: Main message text shown to users.
+          example: Scheduled maintenance tonight.
+        sub_message:
+          type: string
+          nullable: true
+          description: Optional secondary line displayed under the main message.
+          example: The platform will be unavailable from 22:00 to 23:00 UTC.
+        level:
+          type: string
+          enum: [info, warning, error]
+          description: Severity level, driving the front-end display style.
+          example: warning
+    BroadcastMessage:
+      type: object
+      properties:
+        broadcast_message_id:
+          type: integer
+          description: Always 1 — the application holds a single broadcast message.
+          example: 1
+        message:
+          type: string
+          example: Scheduled maintenance tonight.
+        sub_message:
+          type: string
+          nullable: true
+          example: The platform will be unavailable from 22:00 to 23:00 UTC.
+        level:
+          type: string
+          enum: [info, warning, error]
+          example: warning
+        created_by_user_id:
+          type: integer
+          nullable: true
+          description: Id of the admin who set the message.
+          example: 42
+        message_creation_utc_date_time:
+          type: string
+          format: date-time
+          description: When the message was set (ISO 8601, UTC).
+          example: '2026-07-20T21:30:00.000Z'

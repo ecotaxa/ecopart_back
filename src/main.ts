@@ -9,6 +9,8 @@ import { MiddlewareSampleValidation } from './presentation/middleware/sample-val
 import { MiddlewareInstrumentModelValidation } from './presentation/middleware/instrument_model-validation'
 import { MiddlewareTaskValidation } from './presentation/middleware/task-validation'
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
+import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
+import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -18,9 +20,13 @@ import TaskRouter from './presentation/routers/tasks-router'
 import EcoTaxaInstanceRouter from './presentation/routers/ecotaxa_instance-router'
 import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
+import AdminRouter from './presentation/routers/admin-router'
+import BroadcastMessageRouter from './presentation/routers/broadcast_message-router'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
+import { MigrateUsers } from './domain/use-cases/user/migrate-users'
+import { ResendMigrationEmails } from './domain/use-cases/user/resend-migration-emails'
 import { UpdateUser } from './domain/use-cases/user/update-user'
 import { LoginUser } from './domain/use-cases/auth/login'
 import { RefreshToken } from './domain/use-cases/auth/refresh-token'
@@ -64,6 +70,9 @@ import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/creat
 import { ListOrganisations } from './domain/use-cases/user/list-organisations'
 import { ListShips } from './domain/use-cases/project/list-ships'
 import { MigrateEcotaxaProject } from './domain/use-cases/project/migrate-ecotaxa-project'
+import { GetSampleQcGraphs } from './domain/use-cases/sample/get-sample-qc-graphs'
+import { SetSampleVisualQc } from './domain/use-cases/sample/set-sample-visual-qc'
+import { PreviewSamplesQcGraphs } from './domain/use-cases/sample/preview-samples-qc-graphs'
 import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
 import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
@@ -79,6 +88,12 @@ import { BackupProject } from './domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from './domain/use-cases/export/export-raw-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
+import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
+import { GetStats } from './domain/use-cases/admin/get-stats'
+import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
+import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
+import { SetBroadcastMessage } from './domain/use-cases/broadcast_message/set-broadcast-message'
+import { DeleteBroadcastMessage } from './domain/use-cases/broadcast_message/delete-broadcast-message'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -88,6 +103,8 @@ import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-pri
 import { SQLiteTaskDataSource } from './data/data-sources/sqlite/sqlite-task-data-source'
 import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample-data-source'
 import { SQLiteEcotaxaAccountDataSource } from './data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
+import { SQLiteStatsDataSource } from './data/data-sources/sqlite/sqlite-stats-data-source'
+import { SQLiteBroadcastMessageDataSource } from './data/data-sources/sqlite/sqlite-broadcast_message-data-source'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -110,8 +127,7 @@ const config = {
 
     PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
-    PORT_PUBLIC: parseInt(process.env.PORT_PUBLIC as string, 10),
-    BASE_URL_PUBLIC: process.env.BASE_URL_PUBLIC || '',
+    API_URL: process.env.API_URL || '',
     FRONTEND_URL: process.env.FRONTEND_URL || '',
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
@@ -199,7 +215,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter((config.BASE_URL_PUBLIC + config.PORT_PUBLIC), config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
+    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
@@ -209,6 +225,8 @@ async function getSQLiteDS() {
     const task_datasource = new SQLiteTaskDataSource(db)
     const sample_dataSource = new SQLiteSampleDataSource(db)
     const ecotaxa_account_dataSource = new SQLiteEcotaxaAccountDataSource(db)
+    const stats_dataSource = new SQLiteStatsDataSource(db)
+    const broadcast_message_dataSource = new SQLiteBroadcastMessageDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -229,6 +247,8 @@ async function getSQLiteDS() {
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
+    const stats_repo = new StatsRepositoryImpl(stats_dataSource)
+    const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
     const userMiddleWare =
         UserRouter(
@@ -236,12 +256,14 @@ async function getSQLiteDS() {
             new MiddlewareUserValidation(countriesAdapter),
             new MiddlewareAuthValidation(),
             new CreateUser(user_repo, transporter, mailerAdapter),
+            new MigrateUsers(user_repo, transporter, mailerAdapter),
+            new ResendMigrationEmails(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
             new DeleteUser(user_repo, privilege_repo),
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
-            new SearchUsers(user_repo, search_repo),
+            new SearchUsers(user_repo, search_repo, privilege_repo),
             new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
             new ListOrganisations(user_repo)
         )
@@ -253,7 +275,7 @@ async function getSQLiteDS() {
         new ChangePassword(user_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
         new ResetPassword(user_repo),
-        new SearchUsers(user_repo, search_repo)
+        new SearchUsers(user_repo, search_repo, privilege_repo)
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),
@@ -270,7 +292,7 @@ async function getSQLiteDS() {
         new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
         new GetProject(user_repo, project_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
-        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.BASE_URL_PUBLIC),
+        new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.API_URL),
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
@@ -285,6 +307,9 @@ async function getSQLiteDS() {
         new DeleteImportedCTDSamples(sample_repo, user_repo, privilege_repo, project_repo),
         new ListShips(project_repo),
         new MigrateEcotaxaProject(user_repo, project_repo, sample_repo, privilege_repo, ecotaxa_account_repo),
+        new GetSampleQcGraphs(user_repo, sample_repo, project_repo, privilege_repo),
+        new SetSampleVisualQc(user_repo, sample_repo, privilege_repo),
+        new PreviewSamplesQcGraphs(user_repo, sample_repo, project_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
     )
 
     const taskMiddleWare = TaskRouter(
@@ -315,7 +340,19 @@ async function getSQLiteDS() {
     server.use("/exports", ExportRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExportValidation(),
-        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.BASE_URL_PUBLIC),
+        new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.API_URL),
+    ))
+    server.use("/admin", AdminRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareAdminValidation(),
+        new GetStats(user_repo, stats_repo)
+    ))
+    server.use("/broadcast_messages", BroadcastMessageRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareBroadcastMessageValidation(),
+        new GetBroadcastMessage(user_repo, broadcast_message_repo),
+        new SetBroadcastMessage(user_repo, broadcast_message_repo),
+        new DeleteBroadcastMessage(user_repo, broadcast_message_repo)
     ))
 
 

@@ -1,7 +1,7 @@
 
 import { AuthUserCredentialsModel, DecodedToken, ChangeCredentialsModel } from "../../entities/auth";
 import { PaginedSearchOptions, PreparedSearchOptions, SearchResult } from "../../entities/search";
-import { UserRequestCreationModel, UserResponseModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel } from "../../entities/user";
+import { UserRequestCreationModel, UserResponseModel, UserRequestModel, UserUpdateModel, PublicUserModel, PrivateUserModel, UserMigrationRequestModel } from "../../entities/user";
 export interface UserRepository {
     changePassword(user_to_update: ChangeCredentialsModel): Promise<number>;
     getUser(user: UserRequestModel): Promise<UserResponseModel | null>;
@@ -9,13 +9,17 @@ export interface UserRepository {
     standardUpdateUser(user: UserUpdateModel): Promise<number>;
     verifyUserLogin(user: AuthUserCredentialsModel): Promise<boolean>;
     createUser(user: UserRequestCreationModel): Promise<number>;
+    migrateUser(user: UserMigrationRequestModel): Promise<number>;
+    markLegacyPasswordSet(user_id: number): Promise<number>;
+    linkLegacyUser(user_id: number, legacy_ecopart_user_id: number): Promise<number>;
+    getLegacyUsersWithoutPassword(): Promise<UserResponseModel[]>;
     adminGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult<UserResponseModel>>;
     standardGetUsers(options: PreparedSearchOptions | PaginedSearchOptions): Promise<SearchResult<UserResponseModel>>;
     isAdmin(user_id: number): Promise<boolean>;
     validUser(user: UserRequestModel): Promise<number>;
     generateValidationToken(user: UserRequestModel): string;
     verifyValidationToken(confirmation_token: string): DecodedToken | null;
-    generateResetPasswordToken(user: UserRequestModel): string;
+    generateResetPasswordToken(user: UserRequestModel, expiresIn?: string): string;
     verifyResetPasswordToken(reset_password_token: string): DecodedToken | null;
     setResetPasswordCode(user: UserUpdateModel): Promise<number>;
     toPublicUser(createdUser: PrivateUserModel): PublicUserModel;

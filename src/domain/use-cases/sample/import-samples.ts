@@ -29,12 +29,15 @@ export class ImportSamples implements ImportSamplesUseCase {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[], validated_samples: string[] = []): Promise<TaskResponseModel> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
         // Ensure the current user has permission to get the project importable samples
         await this.ensureUserCanGet(current_user, project_id);
+
+        // Samples pre-validated via the QC preview must be part of the imported set.
+        this.ensureValidatedSamplesAreImported(samples_names_to_import, validated_samples);
 
         const project: ProjectResponseModel = await this.getProjectIfExist(project_id);
 
@@ -48,9 +51,17 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
 
         // start the task
-        this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user);
+        this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user, validated_samples);
 
         return task;
+    }
+
+    private ensureValidatedSamplesAreImported(samples_names_to_import: string[], validated_samples: string[]): void {
+        const importable_set = new Set(samples_names_to_import);
+        const invalid = validated_samples.filter((name) => !importable_set.has(name));
+        if (invalid.length > 0) {
+            throw new Error("Invalid validated_samples: " + invalid.join(", "));
+        }
     }
 
     async createImportSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]): Promise<number> {
@@ -92,7 +103,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
     }
 
-    private async startImportTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel) {
+    private async startImportTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel, current_user: UserUpdateModel, validated_samples: string[] = []) {
         const task_id = task.task_id;
         let importable_samples: PublicHeaderSampleResponseModel[] = [];
         try {
@@ -115,7 +126,7 @@ export class ImportSamples implements ImportSamplesUseCase {
 
             // 4/4 Create samples
             const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
-            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import, vignette_count_map);
+            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import, vignette_count_map, validated_samples);
 
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -184,7 +195,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.taskRepository.logMessage(task_file_path.task_log_file_path, "Samples import failed, sources files deleted for samples: " + samples_names_to_import.join(", "));
     }
 
-    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number> = new Map()): Promise<number[]> {
+    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number> = new Map(), validated_samples: string[] = []): Promise<number[]> {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
         // Common sample data
         const base_sample: Partial<SampleRequestCreationModel> = {
@@ -219,7 +230,35 @@ export class ImportSamples implements ImportSamplesUseCase {
         );
         // Create samples
         const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
+
+        // Mark the pre-validated samples VALIDATED (verified via the pre-import QC preview).
+        await this.markSamplesValidatedAtImport(samples_names_to_import, created_samples_ids, validated_samples, current_user_id);
+
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/4 samples db creation done");
         return created_samples_ids;
+    }
+
+    // createManySamples returns ids in the same order as the input names, so we zip names→ids by
+    // index and flip each validated sample to VALIDATED via the shared visual-QC write path
+    // (so the audit fields — validator, timestamp, comment — are set exactly as a manual review).
+    private async markSamplesValidatedAtImport(samples_names_to_import: string[], created_samples_ids: number[], validated_samples: string[], current_user_id: number): Promise<void> {
+        if (!validated_samples || validated_samples.length === 0) return;
+
+        const status = await this.sampleRepository.getVisualQCStatus({ visual_qc_status_label: "VALIDATED" });
+        if (!status) throw new Error("Visual QC status not found");
+
+        const name_to_id = new Map(samples_names_to_import.map((name, i) => [name, created_samples_ids[i]]));
+        const validated_at = new Date().toISOString();
+        for (const sample_name of validated_samples) {
+            const sample_id = name_to_id.get(sample_name);
+            if (sample_id === undefined) continue;
+            await this.sampleRepository.setSampleVisualQc(
+                sample_id,
+                status.visual_qc_status_id,
+                current_user_id,
+                "Validated at import (pre-import visual QC)",
+                validated_at
+            );
+        }
     }
 }

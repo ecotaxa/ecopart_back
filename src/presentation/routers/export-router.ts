@@ -78,6 +78,7 @@ export default function ExportRouter(
             if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
             else if (msg.startsWith("Logged user cannot export raw data")) res.status(401).send({ errors: [msg] })
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
+            else if (msg.startsWith("Sample(s) not validated")) res.status(409).send({ errors: [msg] })
             else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export raw data"] })

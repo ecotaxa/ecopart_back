@@ -743,4 +743,70 @@ describe("Delete Sample Use Case", () => {
             });
         });
     });
+
+    describe("validate at import", () => {
+        test("rejects validated_samples that are not part of the imported set (before any task is created)", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 };
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true);
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+            const createTask = jest.spyOn(mockTaskRepository, "createTask");
+            const getProject = jest.spyOn(mockProjectRepository, "getProject");
+
+            await expect(
+                importSamplesUseCase.execute(current_user, 1, ["sample1"], ["sample1", "sampleX"])
+            ).rejects.toThrow("Invalid validated_samples: sampleX");
+
+            // Fails fast — no project lookup, no task created.
+            expect(getProject).toBeCalledTimes(0);
+            expect(createTask).toBeCalledTimes(0);
+        });
+
+        test("flips only the validated samples to VALIDATED after creation, with the audit fields", async () => {
+            const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE);
+
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
+            // createManySamples returns ids in the same order as the input names.
+            jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+            const getStatus = jest.spyOn(mockSampleRepository, "getVisualQCStatus").mockResolvedValue({ visual_qc_status_id: 2, visual_qc_status_label: "VALIDATED" });
+            const setQc = jest.spyOn(mockSampleRepository, "setSampleVisualQc").mockResolvedValue(1);
+
+            await (is as any).importSamples(
+                TaskResponseModel_1.task_id,
+                projectResponseModel,
+                7,
+                ["perle3_001", "Mooring_0N_23W_201910_850m"],
+                new Map(),
+                ["Mooring_0N_23W_201910_850m"]
+            );
+
+            expect(getStatus).toBeCalledWith({ visual_qc_status_label: "VALIDATED" });
+            expect(setQc).toBeCalledTimes(1);
+            expect(setQc).toBeCalledWith(202, 2, 7, "Validated at import (pre-import visual QC)", expect.any(String));
+        });
+
+        test("does not touch visual QC when no samples are validated", async () => {
+            const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE);
+
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
+            jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+            const getStatus = jest.spyOn(mockSampleRepository, "getVisualQCStatus");
+            const setQc = jest.spyOn(mockSampleRepository, "setSampleVisualQc");
+
+            await (is as any).importSamples(
+                TaskResponseModel_1.task_id,
+                projectResponseModel,
+                7,
+                ["perle3_001", "Mooring_0N_23W_201910_850m"],
+                new Map(),
+                []
+            );
+
+            expect(getStatus).toBeCalledTimes(0);
+            expect(setQc).toBeCalledTimes(0);
+        });
+    });
 });

@@ -22,6 +22,12 @@ class MockUserDataSource implements UserDataSource {
     create(): Promise<number> {
         throw new Error("Method not implemented for create");
     }
+    createMigratedUser(): Promise<number> {
+        throw new Error("Method not implemented for createMigratedUser");
+    }
+    getLegacyUsersWithoutPassword(): Promise<UserResponseModel[]> {
+        throw new Error("Method not implemented for getLegacyUsersWithoutPassword");
+    }
     ensureSeedUser(): Promise<void> {
         throw new Error("Method not implemented for ensureSeedUser");
     }

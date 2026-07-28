@@ -34,5 +34,12 @@ export class ResetPassword implements ResetPasswordUseCase {
         // Change the password
         nb_of_updated_user = await this.userRepository.changePassword({ ...preexistant_user, ...credentials })
         if (nb_of_updated_user == 0) throw new Error("Cannot change password");
+
+        // For a migrated legacy user setting their password for the first time, record that
+        // it is now set so the migration email is not re-sent to them.
+        const is_legacy = preexistant_user.legacy_ecopart_user_id !== null && preexistant_user.legacy_ecopart_user_id !== undefined
+        if (is_legacy && !preexistant_user.legacy_password_set) {
+            await this.userRepository.markLegacyPasswordSet(preexistant_user.user_id)
+        }
     }
 }
