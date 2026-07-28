@@ -27,6 +27,15 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         return transporter
     }
 
+    // Outside PROD every email is diverted to TEST_MAIL_DEFAULT_RECIPIENT so tests never reach
+    // real users. When that variable is not configured, fall back to the real address rather
+    // than sending to an empty one — an unset test recipient used to silently break every
+    // outgoing email on non-PROD environments.
+    private recipientFor(real_email: string): string {
+        if (this.node_env == "PROD") return real_email
+        return this.TEST_MAIL_DEFAULT_RECIPIENT ? this.TEST_MAIL_DEFAULT_RECIPIENT : real_email
+    }
+
     // send confirmation email
     async send_confirmation_email(transporter: Transporter, created_user: UserResponseModel, confirmation_code: string): Promise<void> {
 
@@ -46,7 +55,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: this.node_env == "PROD" ? created_user.email : this.TEST_MAIL_DEFAULT_RECIPIENT, // TODO PROD : created_user.email,// list of receivers
+            to: this.recipientFor(created_user.email), // list of receivers
             subject: "Validate your EcoPart account", // Subject line
             html: htmlContent.replaceAll("{{confirmation_path}}", custom_confirmation_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {
@@ -75,7 +84,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: this.node_env == "PROD" ? user.email : this.TEST_MAIL_DEFAULT_RECIPIENT, // list of receivers
+            to: this.recipientFor(user.email), // list of receivers
             subject: "Reset your EcoPart password", // Subject line
             html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body //TODO DYNAMIC URL
         }, (err, info) => {
@@ -104,7 +113,7 @@ export class NodemailerAdapter implements MailerWrapper {//implements sendeamils
         // Send the email
         transporter.sendMail({
             from: mail_sender, // sender address
-            to: this.node_env == "PROD" ? user.email : this.TEST_MAIL_DEFAULT_RECIPIENT, // list of receivers
+            to: this.recipientFor(user.email), // list of receivers
             subject: "Welcome to the new EcoPart — set your password", // Subject line
             html: htmlContent.replaceAll("{{reset_password_path}}", custom_reset_password_path), // html body
         }, (err, info) => {
