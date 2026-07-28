@@ -740,9 +740,22 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_aa: parseFloat(row.aa),
             instrument_settings_exp: parseFloat(row.exp),
             instrument_settings_image_volume_l: parseFloat(row.volimage),
+            // `integrationtime` only exists in the extended UVP5 meta-header format. The
+            // 21-column format every current dataset ships has no such column, so the field
+            // stays undefined there instead of NaN — parsed defensively so TIME-mode samples
+            // from an extended header export a real value without a second code change.
+            instrument_settings_integration_time: this.parseOptionalFloat(row.integrationtime),
         };
 
         return sample;
+    }
+
+    // Header columns that only exist in some UVP file-format revisions: return undefined for
+    // a missing/blank/non-numeric cell rather than NaN, which would reach the DB as garbage.
+    private parseOptionalFloat(value: unknown): number | undefined {
+        if (value === undefined || value === null || String(value).trim() === "") return undefined;
+        const parsed = parseFloat(String(value));
+        return Number.isNaN(parsed) ? undefined : parsed;
     }
 
 

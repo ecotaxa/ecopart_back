@@ -467,6 +467,12 @@ export class ExportRawData implements ExportRawDataUseCase {
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
     ): Promise<void> {
+        // TODO(camille): the LPM/data artifacts are copied verbatim from import, so their
+        // own header values still hold the original acquisition values and can disagree with
+        // what `metadata/samples.tsv` exports for the same sample (re-processed lat/long,
+        // ISO-normalised dates, serial number rewritten to the per-instrument convention…).
+        // These headers must be rewritten at export time so data and metadata agree.
+        // Blocked on Camille: get the meaning of every header field before touching them.
         for (const sample of samples) {
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;

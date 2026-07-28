@@ -375,6 +375,7 @@ export interface SampleFromMetaHeaderModel {
     instrument_settings_aa: number,             // aa
     instrument_settings_exp: number,            // exp
     instrument_settings_image_volume_l: number, // volimage
+    instrument_settings_integration_time?: number, // integrationtime — extended header format only
 
 }
 export interface SampleFromWorkDatfileModel {
