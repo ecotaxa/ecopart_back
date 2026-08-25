@@ -55,7 +55,7 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["sample_type", "Profile or time based.", "UVP5: derived from `meta_header.yoyo`. UVP6: derived from `metadata.ini` `sampleType`."],
     ["sampling_utc_date_time", "Start time of the sample (ISO UTC).", "UVP5: `meta_header.sampledatetime`. UVP6: `metadata.ini` `sample_metadata.sampledatetime`."],
     ["sample_import_utc_date_time", "ISO UTC timestamp of when the sample was imported into EcoPart.", "EcoPart DB (`sample_creation_utc_date_time`, auto at row insert)."],
-    ["sample_max_pressure", "Maximum pressure reached by the instrument during the sample (decibar).", "UVP5: computed from `work/<sample>_datfile.txt`. UVP6: computed from `particules.csv`."],
+    ["sample_max_pressure", "Maximum pressure reached by the instrument during the sample, **in the raw unit of the instrument files**: centibar for the UVP5, decibar for the UVP6. Multiply by `instrument_settings_acq_pressure_gain` to get decibar (≈ metres) for both.", "UVP5: max of the pressure column of `work/<sample>_datfile.txt`. UVP6: max of the pressure column of `particules.csv`."],
     ["station_id", "Name of the station within which this sample was taken.", "UVP5: `meta_header.stationid`. UVP6: `metadata.ini` `sample_metadata.stationid`."],
     ["sample_latitude", "Start latitude of the sample (decimal degrees, negative for South).", "UVP5: `meta_header.latitude` (re-processed). UVP6: `metadata.ini` `sample_metadata.latitude` (re-processed)."],
     ["sample_longitude", "Start longitude of the sample (decimal degrees, negative for West).", "UVP5: `meta_header.longitude` (re-processed). UVP6: `metadata.ini` `sample_metadata.longitude` (re-processed)."],
@@ -77,12 +77,12 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["instrument_settings_aa", "Coefficient used for the conversion between size in pixels and in mm² (UVP6: divided by 10^6).", "UVP5: `meta_header.aa`. UVP6: `metadata.ini` `HW_CONF.Aa`."],
     ["instrument_settings_exp", "Coefficient used for the conversion between size in pixels and in mm².", "UVP5: `meta_header.exp`. UVP6: `metadata.ini` `HW_CONF.Exp`."],
     ["instrument_settings_image_volume_l", "Volume of one image, in L.", "UVP5: `meta_header.volimage`. UVP6: `metadata.ini` `HW_CONF.Image_volume`."],
-    ["instrument_settings_pixel_size_mm", "Size of the side of one pixel, in mm.", "UVP5: `config/uvp5_settings/uvp5_configuration_data.txt` `Pixel_Size`. UVP6: `metadata.ini` `HW_CONF.Pixel_Size`."],
-    ["instrument_settings_depth_offset_m", "Offset, in m, between the pressure sensor and the UVP field of view; can be provided here or at the project level (the project-level setting overrides this one when present).", "UVP5: not currently parsed (empty). UVP6: `metadata.ini` `HW_CONF.Pressure_offset`."],
+    ["instrument_settings_pixel_size_mm", "Size of the side of one pixel. **Unit differs per instrument**: mm on the UVP5 (e.g. `0.118`), µm on the UVP6 (e.g. `73`) — the value is exported exactly as the instrument files carry it, divide the UVP6 one by 1000 to get mm.", "UVP5: `config/uvp5_settings/uvp5_configuration_data.txt` `pixel` (mm). UVP6: `metadata.ini` `HW_CONF.Pixel_Size` (µm)."],
+    ["instrument_settings_depth_offset_m", "Offset, in m, between the pressure sensor and the UVP field of view; can be provided here or at the project level (the project-level setting overrides this one when present). Only kept when `0 <= offset < 100`, as in legacy EcoPart — an out-of-range value is discarded so the project-level offset applies.", "UVP5: not carried by the UVP5 files (empty — set it at project level). UVP6: `metadata.ini` `HW_CONF.Pressure_offset`."],
     ["instrument_settings_acq_pressure_gain", "Multiplicative factor that converts the raw pressure value in the LPM data files to decibar (`raw × pressure_gain = decibar`). UVP5 stores centibar in raw, so `0.1`; UVP6 stores decibar, so `1`. Informational on this export (LPM data is exported in decibar) — kept for the raw-import use case.", "UVP5: constant `0.1`. UVP6: constant `1`."],
-    ["instrument_settings_particule_minimum_area_pixels", "Minimum size for the counting and sizing of the objects in the processed image, in pixel².", "UVP5: `work/HDR*.txt` `SMbase`. UVP6: `data.txt` `ACQ_CONF` line (TODO position) converted via Aa/Exp."],
-    ["instrument_settings_vignette_minimum_area_pixels", "Minimum size for the saving of the image of the objects detected in the processed image, in pixel².", "UVP5: `work/HDR*.txt` `SMzoo`. UVP6: `data.txt` `ACQ_CONF` line (TODO position) converted via Aa/Exp."],
-    ["instrument_settings_acq_shutter_speed", "Shutter code for UVP5SD (`12` = 100 µs = 1/10000 s).", "UVP5: `work/HDR*.txt` `ShutterSpeed`. UVP6: not currently parsed (empty)."],
+    ["instrument_settings_particule_minimum_area_pixels", "Minimum size for the counting and sizing of the objects in the processed image, in pixel².", "UVP5: `work/HDR*.txt` `SMbase`. UVP6: `metadata.ini` `ACQ_CONF.Limit_lpm_detection_size` (ESD in µm) converted to an area in pixels with `floor(((π / Aa) × (ESD_mm / 2)²) ^ (1 / Exp))`, `Aa` in mm²/px."],
+    ["instrument_settings_vignette_minimum_area_pixels", "Minimum size for the saving of the image of the objects detected in the processed image, in pixel².", "UVP5: `work/HDR*.txt` `SMzoo`. UVP6: `metadata.ini` `ACQ_CONF.Vignetting_lower_limit_size` (ESD in µm), same conversion as above."],
+    ["instrument_settings_acq_shutter_speed", "Shutter code for UVP5SD (`12` = 100 µs = 1/10000 s).", "UVP5: `work/HDR*.txt` `ShutterSpeed`. UVP6: not applicable — the UVP6 gives its shutter directly in µs, exported as `instrument_settings_acq_exposure`."],
     ["instrument_settings_acq_gain", "Gain applied to the imager at acquisition.", "UVP5: `work/HDR*.txt` `Gain`. UVP6: `metadata.ini` `HW_CONF.Gain`."],
     ["instrument_settings_acq_x_size", "The X dimension of the imager (pixels).", "UVP5: `config/uvp5_settings/uvp5_configuration_data.txt` `xsize`. UVP6: not currently parsed (empty)."],
     ["instrument_settings_acq_y_size", "The Y dimension of the imager (pixels).", "UVP5: `config/uvp5_settings/uvp5_configuration_data.txt` `ysize`. UVP6: not currently parsed (empty)."],
@@ -90,25 +90,28 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["instrument_settings_acq_choice", "Flag indicating whether a full image (`0`) or a vignette (`1`) is saved when an object larger than `smzoo` is detected.", "UVP5: `work/HDR*.txt` `Choice`. UVP6: not applicable."],
     ["instrument_settings_acq_disk_type", "Disk type setting: `0` = FD, `1` = HD.", "UVP5: `work/HDR*.txt` `DiskType`. UVP6: not applicable."],
     ["instrument_settings_acq_threshold", "Gray level (0–255 gray scale) segmentation value for the detection of the objects in the processed image.", "UVP5: `work/HDR*.txt` `Thresh`. UVP6: `metadata.ini` `HW_CONF.Threshold`."],
-    ["instrument_settings_acq_exposure", "Shutter value in µs (UVP5HD: increased by 60 µs vs the UVPdb 'net' value — important when comparing with UVPdb; UVP6: the value in µs).", "UVP5: `work/HDR*.txt` `Exposure`. UVP6: not currently parsed (empty)."],
+    ["instrument_settings_acq_exposure", "Shutter value in µs (UVP5HD: increased by 60 µs vs the UVPdb 'net' value — important when comparing with UVPdb; UVP6: the value in µs).", "UVP5: `work/HDR*.txt` `Exposure` (absent from UVP5SD headers, which only carry the `ShutterSpeed` code → empty). UVP6: `metadata.ini` `HW_CONF.Shutter`."],
     ["instrument_settings_acq_erase_border", "Flag enabling (`1`) or disabling (`0`) the counting of objects touching the sides of the processed image.", "UVP5: `work/HDR*.txt` `EraseBorderBlobs`. UVP6: not currently parsed (empty)."],
     ["instrument_settings_acq_task_type", "UVP5: HDR `TaskType` — enum `-1` error, `0` save only, `1` process only, `2` mixt process, `3` full process. UVP6: not read.", "UVP5: `work/HDR*.txt` `TaskType`. UVP6: not applicable."],
     ["instrument_settings_acq_vignette_roi_enlargement_ratio", "Enlargement ratio for the saving of the vignette — a wider area than the ROI is cropped around each detected object.", "UVP5: `work/HDR*.txt` `Ratio`. UVP6: `metadata.ini` `ACQ_CONF.Appendices_ratio`."],
-    ["instrument_settings_process_gamma", "Gamma value for the enhancement of the vignettes for EcoTaxa.", "UVP5: `config/process_install_config.txt` `gamma`. UVP6: `compute_vignettes.txt` `gamma`."],
-    ["instrument_settings_process_vignette_resize_factor", "Scale factor used to resize vignettes when saving them.", "UVP5: constant per sub-model (UVP5SD = 2, UVP5HD = 1). UVP6: `compute_vignettes.txt` scale factor (TODO)."],
-    ["instrument_settings_process_datetime", "Date of process by Zooprocess (UVP5SD / UVP5HD).", "UVP5: Zooprocess output (TODO — not currently persisted at import, will be empty until wired up). UVP6: not applicable."],
+    ["instrument_settings_process_gamma", "Gamma value for the enhancement of the vignettes for EcoTaxa.", "UVP5: `config/process_install_config.txt` `gamma`. UVP6: `compute_vignette.txt` `gamma` (inside `<sample>_Images.zip`, so empty when the sample was imported without images)."],
+    ["instrument_settings_process_vignette_resize_factor", "Scale factor used to resize vignettes when saving them (`1` = unchanged, `>1` = enlarged with bicubic interpolation).", "UVP5: constant per sub-model (UVP5SD = 2, UVP5HD = 1). UVP6: `compute_vignette.txt` `scale` (inside `<sample>_Images.zip`, so empty when the sample was imported without images)."],
+    ["instrument_settings_process_datetime", "Date of process by Zooprocess (UVP5SD / UVP5HD). Always empty on export: no UVP file carries it — in legacy EcoPart it is a manual field of the sample edition form, and EcoPart has no editing screen for it yet.", "Not read from any file (manual field in legacy EcoPart)."],
     ["instrument_settings_images_post_process", "Post-process software (`Zooprocess` for UVP5; also `Zooprocess` for UVP6 today, which is erroneous — separate bug).", "Hardcoded at import: UVP5 → `\"zooprocess\"`, UVP6 → `\"uvpapp\"`."],
-    ["sample_integration_time", "Integration time in seconds, defined at the sample level in the text file in the meta folder. Set when samples are created in TIME mode in UVPapp; will eventually be replaced by per-bin information from the parsed data at export.", "UVP5: `meta_header.integrationtime` — only present in the extended meta-header format; empty for the 21-column format currently shipped by Zooprocess. UVP6: not currently parsed (empty)."],
+    ["sample_integration_time", "Integration time in seconds, defined at the sample level. Set when samples are created in TIME mode in UVPapp; will eventually be replaced by per-bin information from the parsed data at export.", "UVP5: `meta_header.integrationtime` — only present in the extended meta-header format; empty for the 21-column format shipped by Zooprocess. UVP6: `metadata.ini` `[sample_metadata] integrationtime` (also present in the UVP6 meta header; `nan` on depth-mode samples → empty)."],
     ["filename", "Raw acquisition filename per UVP metadata.", "UVP5: `meta_header.filename`. UVP6: `metadata.ini` `sample_metadata.filename`."],
     ["filter_first_image", "First image used after frame filtering.", "UVP5: `meta_header.firstimage`. UVP6: `metadata.ini` `sample_metadata.firstimage`."],
-    ["filter_last_image", "Last image used after frame filtering.", "UVP5: `meta_header.endimg`. UVP6: `metadata.ini` `sample_metadata.endimg`."],
+    ["filter_last_image", "Last image of the operator-selected window. Beware: this is the raw header value, which is frequently the sentinel `99999999999` (meaning “keep to the end”), and it is *not* the last image the descent filter kept — see `filter_last_image_used`.", "UVP5: `meta_header.endimg`. UVP6: `metadata.ini` `sample_metadata.endimg`."],
+    ["filter_last_image_used", "Identifier of the deepest image kept by the descent filter — the legacy EcoPart `lastimgused`. Equal to the last image of the window when the filter does not apply (time-based sample, or `project_enable_descent_filter` false). Empty when the sample's particle file could not be read (a line then appears in the task log).", "Recomputed at export time from the per-image records of the sample's particle file, with the same logic as the import QC graphs."],
+    ["filter_removed_images_count", "Number of images the descent filter drops **inside** the operator-selected window (ascent portions). `0` when the filter does not apply. ⚠️ This is not the total number of unused images: the images acquired **before** `filter_first_image` and **after** `filter_last_image` are excluded from the sample as well, and are not counted here.", "Same computation as `filter_last_image_used`."],
+    ["filter_removed_images_percent", "Same as `filter_removed_images_count`, as a percentage of the images **in the window** (not of all acquired images).", "Same computation as `filter_last_image_used`."],
     ["ctd_original_file_name", "File name as found in the source CTD folder before import.", "EcoPart CTD import flow (basename of the file in `ctd_data_cnv/` (UVP5) or `CTDdata/` (UVP6))."],
     ["ctd_imported_file_name", "File name stored under the per-sample folder post-import.", "EcoPart CTD import flow (file written into the per-sample storage folder)."],
     ["ctd_importator_name", "Display name of the user who ran the CTD import.", "EcoPart `user` table joined via `sample.ctd_importator_user_id`."],
     ["ctd_importator_email", "Email of the CTD importer.", "EcoPart `user` table joined via `sample.ctd_importator_user_id`."],
     ["ctd_import_utc_date_time", "ISO UTC timestamp of the CTD import.", "EcoPart DB (set at CTD import time)."],
-    ["ctd_latitude", "Latitude derived from the CTD file (when different from sample latitude).", "CTD file parser (TODO — empty until the parser is wired)."],
-    ["ctd_longitude", "Longitude derived from the CTD file (when different from sample longitude).", "CTD file parser (TODO — empty until the parser is wired)."],
+    ["ctd_latitude", "Latitude derived from the CTD file (when different from sample latitude). Always empty today: position is not part of the CTD data model (legacy EcoPart's CTD columns carry no lat/long either — a CTD file that provides them lands in the free `extra measurement` columns).", "CTD file parser (not wired)."],
+    ["ctd_longitude", "Longitude derived from the CTD file (when different from sample longitude). Always empty today — see `ctd_latitude`.", "CTD file parser (not wired)."],
     ["visual_qc_status", "Visual QC status (`PENDING`, `VALIDATED`, or `REJECTED`).", "EcoPart `visual_quality_check_status` lookup (set in the QC UI)."],
     ["visual_qc_validator_email", "Email of the QC validator.", "EcoPart `user` table joined via `sample.visual_qc_validator_user_id`."],
     ["number_of_black", "Number of black (lights-off) images at import — noise reference.", "UVP6: counted at import from rows in `particules.csv` where the light flag is `0:1`. UVP5: always `0` by design (UVP5 doesn't acquire black frames)."],
@@ -142,7 +145,13 @@ export function renderReadme(export_types: RawExportType[]): string {
         parts.push("│   └── samples.tsv");
     }
     if (has("lpm")) {
-        parts.push("├── lpm/<project_id>/<sample_name>/<instrument-specific raw files>");
+        parts.push("├── lpm/<project_id>/<sample_name>/                 UVP5: <sample>_work.zip — UVP6: <sample>_Particule.zip");
+    }
+    if (has("images")) {
+        parts.push("├── images/<project_id>/<sample_name>/              UVP6 only: <sample>_Images.zip (vignettes)");
+    }
+    if (has("instrument_config")) {
+        parts.push("├── instrument_config/<project_id>/<sample_name>/   UVP5 only: <sample>_meta_conf.zip (config/ + meta/ headers)");
     }
     if (has("ctd")) {
         parts.push("├── ctd/<project_id>/<sample_name>.<ext>");
@@ -171,9 +180,29 @@ export function renderReadme(export_types: RawExportType[]): string {
     if (has("lpm")) {
         parts.push("## `lpm/`");
         parts.push("");
-        parts.push("Raw per-sample LPM artifacts as produced by the import:");
-        parts.push("- **UVP5**: `<sample_name>_work.zip` + `<sample_name>_meta_conf.zip`.");
-        parts.push("- **UVP6**: `<sample_name>_Particule.zip` (mandatory) + `<sample_name>_Images.zip` (only when images were imported).");
+        parts.push("Per-sample **particle data**, copied exactly as imported:");
+        parts.push("- **UVP5**: `<sample_name>_work.zip` — the `work` folder of the sample (`<sample>_datfile.txt`, `HDR*.txt`, `.bru`).");
+        parts.push("- **UVP6**: `<sample_name>_Particule.zip` — `particules.csv` + `metadata.ini`.");
+        parts.push("");
+        parts.push("A sample with no particle artifact on disk is skipped with a warning line in the task log.");
+        parts.push("");
+        parts.push("⚠️ The values inside these files are the original acquisition values: they can disagree with `metadata/samples.tsv` (re-processed latitude/longitude, ISO-normalised dates, corrected acquisition settings), and **the project's descent filter is not applied to them** — the ascent images EcoPart discards when it computes its own histograms are still present here.");
+        parts.push("");
+    }
+
+    if (has("images")) {
+        parts.push("## `images/`");
+        parts.push("");
+        parts.push("Vignettes: `<sample_name>_Images.zip`, **UVP6 only** and only for samples imported with images. UVP5 vignettes are not stored by EcoPart, so a UVP5 sample never produces anything here (a line in the task log states it).");
+        parts.push("");
+    }
+
+    if (has("instrument_config")) {
+        parts.push("## `instrument_config/`");
+        parts.push("");
+        parts.push("Instrument configuration and original acquisition headers: `<sample_name>_meta_conf.zip`, **UVP5 only** (`config/cruise_info.txt`, `config/process_install_config.txt`, `config/uvp5_settings/uvp5_configuration_data.txt`, `meta/uvp5_header_sn*.txt`, plus whatever backup headers the source folder contained under `meta/old/`). The UVP6 keeps its configuration inside `metadata.ini`, shipped with `lpm/`, so a UVP6 sample produces nothing here.");
+        parts.push("");
+        parts.push("These are the files the values in `metadata/samples.tsv` were parsed from — read the TSV for the values EcoPart actually stored, and these for the untouched originals.");
         parts.push("");
     }
 

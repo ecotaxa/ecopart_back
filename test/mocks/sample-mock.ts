@@ -73,8 +73,8 @@ export class MockSampleRepository implements SampleRepository {
     getSamplesByIds(): Promise<PublicSampleModel[]> {
         throw new Error("Method not implemented for getSamplesByIds");
     }
-    listLpmRawFilesForSample(): Promise<string[]> {
-        throw new Error("Method not implemented for listLpmRawFilesForSample");
+    listRawFilesForSample(): Promise<string[]> {
+        throw new Error("Method not implemented for listRawFilesForSample");
     }
     getCTDFileAbsolutePath(): string {
         throw new Error("Method not implemented for getCTDFileAbsolutePath");

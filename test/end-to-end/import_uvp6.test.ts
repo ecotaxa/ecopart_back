@@ -689,7 +689,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             .set("Cookie", cookieHeader())
             .send({
                 sample_ids,
-                export_types: ["metadata", "lpm", "ctd", "ecotaxa"],
+                export_types: ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"],
                 ecotaxa_exclude_not_living: true,
             })
         expect(exportRes.status).toBe(200)
@@ -720,13 +720,16 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
         expect(entries).toContain("metadata/projects.tsv")
         expect(entries).toContain("metadata/samples.tsv")
 
-        // LPM: UVP6 raw Particule zip per sample (Images zip only for sample with images)
+        // LPM: particle data only — the Particule zip. Vignettes now land in `images/`, and the
+        // UVP6 has no separate config archive so `instrument_config/` stays empty.
         for (const name of ALL_SAMPLES) {
             expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Particule.zip`)
+            expect(entries).not.toContain(`lpm/${capturedProjectId}/${name}/${name}_Images.zip`)
         }
         for (const name of SAMPLES_WITH_IMAGES) {
-            expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Images.zip`)
+            expect(entries).toContain(`images/${capturedProjectId}/${name}/${name}_Images.zip`)
         }
+        expect(entries.some(e => e.startsWith("instrument_config/"))).toBe(false)
 
         // CTD: one file per imported sample, as imported (.ctd)
         for (const name of ALL_SAMPLES) {

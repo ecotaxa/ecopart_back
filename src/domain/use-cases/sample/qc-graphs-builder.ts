@@ -29,15 +29,29 @@ export interface QcGraphInput {
     instrument_settings_depth_offset_m: number | null;
     instrument_settings_image_volume_l: number | null;
     is_depth_profile: boolean;           // descent filter only applies to depth (pressure) profiles, not time series
+    // Whether the project has the descent filter enabled. Left undefined by the QC-graph endpoints,
+    // which show the filter's effect on every depth profile regardless of the project setting; the
+    // raw export passes the real setting so its metadata matches what a consumer should expect.
+    descent_filter_enabled?: boolean;
     records: PerImageRecord[];
 }
 
-export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponseModel {
-    // depth (m) = raw_pressure * gain + depth_offset (UVP5 gain 0.1, UVP6 gain 1).
+// depth (m) = raw_pressure * gain + depth_offset (UVP5 gain 0.1, UVP6 gain 1).
+function depthConverter(input: QcGraphInput): (raw_pressure: number) => number {
     const gain = input.instrument_model.startsWith("UVP5") ? 0.1 : 1;
     const depth_offset = input.instrument_settings_depth_offset_m ?? 0;
+    return (raw_pressure: number): number => raw_pressure * gain + depth_offset;
+}
+
+// Descent-filter outcome alone, for callers that need the metadata without the three profiles
+// (the raw-data export reports it in `metadata/samples.tsv`).
+export function buildImageFilteringMetadata(input: QcGraphInput): ImageFilteringMetadata {
+    return buildImageFiltering(input, input.records, depthConverter(input));
+}
+
+export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponseModel {
     const image_volume_l = input.instrument_settings_image_volume_l ?? 0;
-    const toDepth = (raw_pressure: number): number => raw_pressure * gain + depth_offset;
+    const toDepth = depthConverter(input);
     const binCentre = (bin: number): number => bin * BIN_SIZE_M + BIN_SIZE_M / 2;
 
     const records = input.records;
@@ -140,8 +154,9 @@ function buildImageFiltering(input: QcGraphInput, records: PerImageRecord[], toD
     }
 
     // The descent filter is depth-only (per Marc): for a time-series profile it does not apply, so
-    // every image in the window is used and nothing is removed.
-    if (!input.is_depth_profile) {
+    // every image in the window is used and nothing is removed. Same outcome when the caller states
+    // the project has the filter disabled.
+    if (!input.is_depth_profile || input.descent_filter_enabled === false) {
         return {
             first_image,
             last_image,

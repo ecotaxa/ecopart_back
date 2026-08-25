@@ -697,13 +697,13 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             .send({ sample_ids, export_types: ["ecotaxa"] })
         expect(invalidRes.status).toBe(422)
 
-        // Full export: all four types in a single ZIP, living-only EcoTaxa objects.
+        // Full export: every export type in a single ZIP, living-only EcoTaxa objects.
         const exportRes = await request(server)
             .post("/exports/raw")
             .set("Cookie", cookieHeader())
             .send({
                 sample_ids,
-                export_types: ["metadata", "lpm", "ctd", "ecotaxa"],
+                export_types: ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"],
                 ecotaxa_exclude_not_living: true,
             })
         expect(exportRes.status).toBe(200)
@@ -734,11 +734,14 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
         expect(entries).toContain("metadata/projects.tsv")
         expect(entries).toContain("metadata/samples.tsv")
 
-        // LPM: UVP5 raw work + meta_conf zips per sample (regardless of images / zipped)
+        // LPM: particle data only — the work zip. The config/headers archive now has its own
+        // export type, and UVP5 vignettes are not stored, so `images/` stays empty here.
         for (const name of ALL_SAMPLES) {
             expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_work.zip`)
-            expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_meta_conf.zip`)
+            expect(entries).not.toContain(`lpm/${capturedProjectId}/${name}/${name}_meta_conf.zip`)
+            expect(entries).toContain(`instrument_config/${capturedProjectId}/${name}/${name}_meta_conf.zip`)
         }
+        expect(entries.some(e => e.startsWith("images/"))).toBe(false)
 
         // CTD: one file per imported sample, as imported (.ctd)
         for (const name of ALL_SAMPLES) {

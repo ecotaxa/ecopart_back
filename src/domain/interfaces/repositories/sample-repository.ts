@@ -1,4 +1,4 @@
-import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
@@ -30,7 +30,7 @@ export interface SampleRepository {
 
     // Raw-data export helpers
     getSamplesByIds(sample_ids: number[]): Promise<PublicSampleModel[]>;
-    listLpmRawFilesForSample(instrument_model: string, project_id: number, sample_name: string): Promise<string[]>;
+    listRawFilesForSample(instrument_model: string, project_id: number, sample_name: string, category: RawFileCategory): Promise<string[]>;
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string;
     countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
     countEcotaxaSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;

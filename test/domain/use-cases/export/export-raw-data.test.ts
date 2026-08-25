@@ -274,6 +274,50 @@ describe("ExportRawDataUseCase", () => {
 
             expect(mockTaskRepository.createTask).toBeCalledTimes(0);
         });
+
+        describe("skip_not_validated", () => {
+            test("exports the validated samples only, and records the choice on the task", async () => {
+                jest.spyOn(mockSampleRepository, "getSamplesByIds")
+                    .mockImplementation(() => Promise.resolve([validated(sampleModel_1), sampleModel_2]));
+                jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel));
+                jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1.task_id));
+                jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+                stubBackgroundWork();
+
+                const task = await exportRawDataUseCase.execute(current_user,
+                    { sample_ids: [1, 2], export_types: ["metadata"], skip_not_validated: true });
+
+                expect(task).toStrictEqual(TaskResponseModel_1);
+                expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
+                    task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true },
+                }));
+                // Only the validated sample's project is authorized/resolved.
+                expect(mockProjectRepository.getProject).toBeCalledTimes(1);
+                expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: sampleModel_1.project_id });
+            });
+
+            test("still refuses the export when no validated sample remains", async () => {
+                jest.spyOn(mockSampleRepository, "getSamplesByIds")
+                    .mockImplementation(() => Promise.resolve([sampleModel_1, sampleModel_2]));
+
+                await expect(exportRawDataUseCase.execute(current_user,
+                    { sample_ids: [1, 2], export_types: ["metadata"], skip_not_validated: true }))
+                    .rejects.toThrow(`Sample(s) not validated: ${sampleModel_1.sample_name}, ${sampleModel_2.sample_name}`);
+
+                expect(mockTaskRepository.createTask).toBeCalledTimes(0);
+            });
+
+            test("defaults to false: an explicit false behaves like the flag being absent", async () => {
+                jest.spyOn(mockSampleRepository, "getSamplesByIds")
+                    .mockImplementation(() => Promise.resolve([validated(sampleModel_1), sampleModel_2]));
+
+                await expect(exportRawDataUseCase.execute(current_user,
+                    { sample_ids: [1, 2], export_types: ["metadata"], skip_not_validated: false }))
+                    .rejects.toThrow(`Sample(s) not validated: ${sampleModel_2.sample_name}`);
+
+                expect(mockTaskRepository.createTask).toBeCalledTimes(0);
+            });
+        });
     });
 
     describe("task creation", () => {
@@ -304,6 +348,7 @@ describe("ExportRawDataUseCase", () => {
                     sample_ids: [1],
                     export_types: ["metadata", "ecotaxa"],
                     ecotaxa_exclude_not_living: true,
+                    skip_not_validated: false,
                 },
             }));
             // Cross-project export: the task is deliberately not tied to a single project.

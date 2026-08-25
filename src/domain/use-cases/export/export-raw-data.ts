@@ -5,7 +5,7 @@ import archiver from "archiver";
 
 import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicSampleModel } from "../../entities/sample";
+import { PublicSampleModel, RawFileCategory } from "../../entities/sample";
 import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 import { UserRepository } from "../../interfaces/repositories/user-repository";
@@ -16,11 +16,23 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportRawDataRequestModel, ExportRawDataUseCase, RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
+import { buildImageFilteringMetadata } from "../sample/qc-graphs-builder";
+import { ImageFilteringMetadata } from "../../entities/sample-qc-graph";
 import { computeProjectPrivacy } from "./project-privacy";
 import { renderReadme } from "./readme";
 import { MinimalUserModel } from "../../entities/user";
 
-const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "ctd", "ecotaxa"];
+const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
+
+// The three artifact-copying steps: each export type maps to one category of stored artifact and
+// one folder of the archive. `warn_when_empty` is false for the categories that are legitimately
+// absent (no vignettes imported, UVP6 has no separate config archive) so the task log only reports
+// what actually looks like a problem.
+const ARTIFACT_STEPS: Record<"lpm" | "images" | "instrument_config", { category: RawFileCategory; folder: string; label: string; warn_when_empty: boolean }> = {
+    lpm: { category: "lpm", folder: "lpm", label: "LPM", warn_when_empty: true },
+    images: { category: "images", folder: "images", label: "Images", warn_when_empty: false },
+    instrument_config: { category: "instrument_config", folder: "instrument_config", label: "Instrument config", warn_when_empty: false },
+};
 
 const PROJECT_TSV_COLUMNS: string[] = [
     "ecopart_project_id",
@@ -112,6 +124,9 @@ const SAMPLE_TSV_COLUMNS: string[] = [
     "filename",
     "filter_first_image",
     "filter_last_image",
+    "filter_last_image_used",
+    "filter_removed_images_count",
+    "filter_removed_images_percent",
     "ctd_original_file_name",
     "ctd_imported_file_name",
     "ctd_importator_name",
@@ -171,17 +186,31 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         const { sample_ids, export_types } = this.validateRequest(request);
         const ecotaxa_exclude_not_living = !!request.ecotaxa_exclude_not_living;
+        const skip_not_validated = !!request.skip_not_validated;
 
         // Resolve samples + projects, then authorize each distinct project.
-        const samples = await this.sampleRepository.getSamplesByIds(sample_ids);
-        if (samples.length === 0) throw new Error("No samples found");
-        const found_ids = new Set(samples.map(s => s.sample_id));
+        const all_samples = await this.sampleRepository.getSamplesByIds(sample_ids);
+        if (all_samples.length === 0) throw new Error("No samples found");
+        const found_ids = new Set(all_samples.map(s => s.sample_id));
         const missing = sample_ids.filter(id => !found_ids.has(id));
         if (missing.length > 0) throw new Error(`Sample(s) not found: ${missing.join(", ")}`);
 
-        // QC gate: only visual-QC-validated samples may be exported.
-        const not_validated = samples.filter(s => s.visual_qc_status_label !== "VALIDATED").map(s => s.sample_name);
-        if (not_validated.length > 0) throw new Error(`Sample(s) not validated: ${not_validated.join(", ")}`);
+        // QC gate: only visual-QC-validated samples may be exported. By default a single
+        // non-validated sample aborts the whole export; with `skip_not_validated` the caller accepts
+        // a partial archive instead — the dropped samples are then named in the task log. Either way
+        // an export with nothing left to ship is refused with the same error, so the route still
+        // answers 409 and the caller learns which samples are at fault.
+        const not_validated = all_samples.filter(s => s.visual_qc_status_label !== "VALIDATED");
+        const skipped_not_validated = not_validated.map(s => `${s.sample_name} (${s.visual_qc_status_label})`);
+        if (not_validated.length > 0 && !skip_not_validated) {
+            throw new Error(`Sample(s) not validated: ${not_validated.map(s => s.sample_name).join(", ")}`);
+        }
+        const samples = skip_not_validated
+            ? all_samples.filter(s => s.visual_qc_status_label === "VALIDATED")
+            : all_samples;
+        if (samples.length === 0) {
+            throw new Error(`Sample(s) not validated: ${not_validated.map(s => s.sample_name).join(", ")}`);
+        }
 
         const project_ids = Array.from(new Set(samples.map(s => s.project_id)));
         const projects_by_id = new Map<number, ProjectResponseModel>();
@@ -197,7 +226,7 @@ export class ExportRawData implements ExportRawDataUseCase {
             task_status: TasksStatus.Pending,
             task_owner_id: current_user.user_id,
             // Cross-project export: keep task_project_id unset.
-            task_params: { sample_ids, export_types, ecotaxa_exclude_not_living },
+            task_params: { sample_ids, export_types, ecotaxa_exclude_not_living, skip_not_validated },
         } as PublicTaskRequestCreationModel);
 
         const task = await this.taskRepository.getOneTask({ task_id });
@@ -205,7 +234,7 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         // Fire-and-forget — the route returns the task immediately and the frontend polls.
         const export_started_at = new Date();
-        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at);
+        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated);
 
         return task;
     }
@@ -243,10 +272,18 @@ export class ExportRawData implements ExportRawDataUseCase {
         export_types: RawExportType[],
         ecotaxa_exclude_not_living: boolean,
         export_started_at: Date,
+        skipped_not_validated: string[],
     ): Promise<void> {
         const task_id = task.task_id;
         try {
             await this.taskRepository.startTask({ task_id });
+
+            // Traceability of a partial export: the archive itself only holds validated samples, so
+            // the task log is the only place stating what the caller asked for and did not get.
+            if (skipped_not_validated.length > 0) {
+                await this.taskRepository.logMessage(task.task_log_file_path,
+                    `QC: ${skipped_not_validated.length} sample(s) excluded from this export because they are not VALIDATED: ${skipped_not_validated.join(", ")}`);
+            }
 
             const base_folder = path.join(__dirname, "..", "..", "..", "..");
             const task_folder = path.join(base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${task_id}`);
@@ -262,9 +299,9 @@ export class ExportRawData implements ExportRawDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
                 if (export_type === "metadata") {
-                    await this.writeMetadata(work_folder, samples, projects_by_id, export_started_at, export_types);
-                } else if (export_type === "lpm") {
-                    await this.writeLpm(task, work_folder, samples, projects_by_id);
+                    await this.writeMetadata(task, work_folder, samples, projects_by_id, export_started_at, export_types);
+                } else if (export_type === "lpm" || export_type === "images" || export_type === "instrument_config") {
+                    await this.writeArtifacts(task, work_folder, samples, projects_by_id, ARTIFACT_STEPS[export_type]);
                 } else if (export_type === "ctd") {
                     await this.writeCtd(task, work_folder, samples, projects_by_id);
                 } else if (export_type === "ecotaxa") {
@@ -293,6 +330,7 @@ export class ExportRawData implements ExportRawDataUseCase {
     }
 
     private async writeMetadata(
+        task: TaskResponseModel,
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
@@ -379,6 +417,8 @@ export class ExportRawData implements ExportRawDataUseCase {
         const ordered_samples = [...samples].sort((a, b) =>
             a.project_id - b.project_id || a.sample_id - b.sample_id);
 
+        const filtering_by_sample_id = await this.computeImageFiltering(task, ordered_samples, projects_by_id);
+
         const sample_rows: Record<string, string>[] = ordered_samples.map(sample => ({
             ecopart_project_id: serialize(sample.project_id),
             ecopart_sample_id: serialize(sample.sample_id),
@@ -434,6 +474,9 @@ export class ExportRawData implements ExportRawDataUseCase {
             filename: serialize(sample.filename),
             filter_first_image: serialize(sample.filter_first_image),
             filter_last_image: serialize(sample.filter_last_image),
+            filter_last_image_used: serialize(filtering_by_sample_id.get(sample.sample_id)?.last_image_used),
+            filter_removed_images_count: serialize(filtering_by_sample_id.get(sample.sample_id)?.removed_images.count),
+            filter_removed_images_percent: serialize(filtering_by_sample_id.get(sample.sample_id)?.removed_images.percent),
             ctd_original_file_name: serialize(sample.ctd_original_file_name),
             ctd_imported_file_name: serialize(sample.ctd_imported_file_name),
             ctd_importator_name: serialize(sample.ctd_importator_name),
@@ -449,6 +492,47 @@ export class ExportRawData implements ExportRawDataUseCase {
         await fsPromises.writeFile(path.join(dir, "samples.tsv"), toTsv(SAMPLE_TSV_COLUMNS, sample_rows));
     }
 
+    /* Descent-filter outcome per sample, replayed at export time from the stored per-image records
+     * with the very same logic the QC graphs use (`buildImageFilteringMetadata`), and honouring the
+     * project's `enable_descent_filter`. Nothing is persisted at import, so this is recomputed on
+     * every export — it re-reads each sample's particle file, hence the per-sample error handling:
+     * a sample whose data cannot be read is reported in the task log and leaves the three
+     * `filter_*_used/removed` cells empty rather than failing the whole export.
+     *
+     * Note: this only *reports* the filter. The exported data files themselves are still unfiltered
+     * — see the TODO on writeArtifacts. */
+    private async computeImageFiltering(
+        task: TaskResponseModel,
+        samples: PublicSampleModel[],
+        projects_by_id: Map<number, ProjectResponseModel>,
+    ): Promise<Map<number, ImageFilteringMetadata>> {
+        const by_sample_id = new Map<number, ImageFilteringMetadata>();
+        for (const sample of samples) {
+            const project = projects_by_id.get(sample.project_id);
+            if (!project) continue;
+            try {
+                const records = await this.sampleRepository.getPerImageRecords(sample.project_id, sample.sample_name, project.instrument_model);
+                by_sample_id.set(sample.sample_id, buildImageFilteringMetadata({
+                    sample_id: sample.sample_id,
+                    sample_name: sample.sample_name,
+                    instrument_model: project.instrument_model,
+                    visual_qc_status_label: sample.visual_qc_status_label,
+                    filter_first_image: sample.filter_first_image ?? null,
+                    filter_last_image: sample.filter_last_image ?? null,
+                    instrument_settings_depth_offset_m: project.override_depth_offset ?? sample.instrument_settings_depth_offset_m ?? null,
+                    instrument_settings_image_volume_l: sample.instrument_settings_image_volume_l ?? null,
+                    is_depth_profile: sample.sample_type_label === "Depth",
+                    descent_filter_enabled: project.enable_descent_filter,
+                    records,
+                }));
+            } catch (error) {
+                await this.taskRepository.logMessage(task.task_log_file_path,
+                    `Descent filter: cannot compute image filtering for sample '${sample.sample_name}' (${(error as Error).message}) — the filter_* columns stay empty for it`);
+            }
+        }
+        return by_sample_id;
+    }
+
     private async resolveEcotaxaInstanceUrl(ecotaxa_instance_id: number | null): Promise<string | null> {
         if (!ecotaxa_instance_id) return null;
         const instance = await this.ecotaxaAccountRepository.getOneEcoTaxaInstance(ecotaxa_instance_id);
@@ -461,27 +545,43 @@ export class ExportRawData implements ExportRawDataUseCase {
         return instrument?.bodc_url ?? null;
     }
 
-    private async writeLpm(
+    // Copies one category of stored per-sample artifact into `<category folder>/<project_id>/<sample_name>/`.
+    // Shared by the `lpm`, `images` and `instrument_config` steps: only the source category, the
+    // destination folder and the "is an empty result worth a warning" policy differ.
+    //
+    // TODO(camille): the artifacts are copied verbatim from import, so their own header values still
+    // hold the original acquisition values and can disagree with what `metadata/samples.tsv` exports
+    // for the same sample (re-processed lat/long, ISO-normalised dates, serial number rewritten to
+    // the per-instrument convention…). These headers must be rewritten at export time so data and
+    // metadata agree. Blocked on Camille: get the meaning of every header field before touching them.
+    //
+    // TODO: the project's descent filter (`project.enable_descent_filter`) is NOT applied to the
+    // exported data either, so consumers get the ascent images EcoPart itself discards and will not
+    // recompute EcoPart's abundances. The algorithm already exists as pure logic —
+    // `buildImageFiltering` in use-cases/sample/qc-graphs-builder.ts — but its outcome (removed
+    // count, last image actually used) is not persisted: `filter_last_image` is the raw header
+    // value. Applying it means producing derived files, hence the dependency on the TODO above.
+    // See docs/export-raw-todo.md section E.
+    private async writeArtifacts(
         task: TaskResponseModel,
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
+        step: { category: RawFileCategory; folder: string; label: string; warn_when_empty: boolean },
     ): Promise<void> {
-        // TODO(camille): the LPM/data artifacts are copied verbatim from import, so their
-        // own header values still hold the original acquisition values and can disagree with
-        // what `metadata/samples.tsv` exports for the same sample (re-processed lat/long,
-        // ISO-normalised dates, serial number rewritten to the per-instrument convention…).
-        // These headers must be rewritten at export time so data and metadata agree.
-        // Blocked on Camille: get the meaning of every header field before touching them.
         for (const sample of samples) {
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;
-            const files = await this.sampleRepository.listLpmRawFilesForSample(project.instrument_model, project.project_id, sample.sample_name);
+            const files = await this.sampleRepository.listRawFilesForSample(project.instrument_model, project.project_id, sample.sample_name, step.category);
             if (files.length === 0) {
-                await this.taskRepository.logMessage(task.task_log_file_path, `LPM: no raw files found for sample '${sample.sample_name}' (project ${project.project_id}, instrument ${project.instrument_model})`);
+                if (step.warn_when_empty) {
+                    await this.taskRepository.logMessage(task.task_log_file_path, `${step.label}: no raw files found for sample '${sample.sample_name}' (project ${project.project_id}, instrument ${project.instrument_model})`);
+                } else {
+                    await this.taskRepository.logMessage(task.task_log_file_path, `${step.label}: nothing to export for sample '${sample.sample_name}' (instrument ${project.instrument_model})`);
+                }
                 continue;
             }
-            const dest_dir = path.join(work_folder, "lpm", `${project.project_id}`, sample.sample_name);
+            const dest_dir = path.join(work_folder, step.folder, `${project.project_id}`, sample.sample_name);
             await fsPromises.mkdir(dest_dir, { recursive: true });
             for (const src of files) {
                 await fsPromises.copyFile(src, path.join(dest_dir, path.basename(src)));

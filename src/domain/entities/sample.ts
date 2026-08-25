@@ -212,6 +212,16 @@ export interface PublicSampleUpdateModel extends PrivateSampleUpdateModel {
 }
 
 /* COMPUTE VIGNETTES */
+/* RAW EXPORT — categories of per-sample artifact stored at import time.
+ * One category = one folder of the export archive, so that asking for the particle data does not
+ * also ship the vignettes or the instrument configuration:
+ *   - lpm               UVP5 `<sample>_work.zip` (datfile + HDR) / UVP6 `<sample>_Particule.zip`
+ *   - images            UVP6 `<sample>_Images.zip` (vignettes). No UVP5 equivalent stored.
+ *   - instrument_config UVP5 `<sample>_meta_conf.zip` (config/ + meta/ headers). UVP6 ships its
+ *                       configuration inside the Particule archive (metadata.ini), so nothing here.
+ */
+export type RawFileCategory = "lpm" | "images" | "instrument_config";
+
 export interface ComputeVignettesModel {
     gamma: number;              // gamma coefficiant of the gamma correction
     invert: string;             // invert image (black => white) : Values Y/N case insensitive
@@ -337,10 +347,10 @@ export interface MetadataIniSampleModel {
     instrument_settings_aa: number;
     instrument_settings_exp: number;
     instrument_settings_image_volume_l: number;
-    instrument_settings_pixel_size_mm: number;
-    instrument_settings_depth_offset_m: number;
-    instrument_settings_particule_minimum_area_pixels: number | undefined;   // Renamed; UVP6 will parse from data.txt ACQ_CONF (TODO position)
-    instrument_settings_vignette_minimum_area_pixels: number | undefined;    // Renamed; UVP6 will parse from data.txt ACQ_CONF (TODO position)
+    instrument_settings_pixel_size_mm: number;                               // /!\ UVP6 metadata.ini gives it in µm, not mm
+    instrument_settings_depth_offset_m: number | undefined;                  // dropped unless 0 <= value < 100 (legacy sanity range)
+    instrument_settings_particule_minimum_area_pixels: number | undefined;   // UVP6: from ACQ_CONF.Limit_lpm_detection_size (µm ESD)
+    instrument_settings_vignette_minimum_area_pixels: number | undefined;    // UVP6: from ACQ_CONF.Vignetting_lower_limit_size (µm ESD)
     instrument_settings_acq_shutter_speed: number | undefined;
     instrument_settings_acq_exposure: number | undefined;
     instrument_settings_integration_time?: number;
