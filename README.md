@@ -40,8 +40,20 @@ git tag -a vXX.XX.XX -m "version message"
 git push --follow-tags
 ```
 
+Each tag push publishes the image under **two** Docker Hub tags:
+
+| Docker tag | Meaning |
+| --- | --- |
+| `ecopart_back:vXX.XX.XX` | Immutable. The exact build for that git tag — never overwritten. |
+| `ecopart_back:latest` | Moving. Always the most recently published version; the test server tracks it. |
+
 Once the image is published, the same workflow (`.github/workflows/public.yml`) automatically
 **redeploys the test server** (see "Automatic deployment to the test server" below).
+
+The git tag says **nothing** about where the version is deployed — it only identifies a version
+of the code. Deployment to preprod is a separate, deliberate promotion step (see "Deployment to
+the preprod server" below), so that only a version already validated on the test server ever
+reaches preprod.
 
 ### Automatic deployment to the test server
 
@@ -114,6 +126,53 @@ backend image (and only if it changed and is no longer in use). The frontend, th
 and every other image/container on the host are left untouched. No host-wide `docker image
 prune` is run.
 
+### Deployment to the preprod server
+
+> **Not active yet** — the workflow is in place, but it needs a self-hosted runner on the preprod
+> server before it can do anything. See "One-time setup" below.
+
+Preprod is **never** deployed by a tag push. It is promoted on demand, from the GitHub UI:
+
+*Actions* → **Deploy to preprod server** → *Run workflow* → enter the version (e.g. `v0.0.67`).
+
+That runs `.github/workflows/preprod.yml`, which:
+
+1. **Checks** the requested `vXX.XX.XX` image exists on Docker Hub, and fails loudly if not.
+2. **Re-points the moving `:preprod` Docker tag** at that version, using
+   `docker buildx imagetools create`. This is a registry-side manifest copy — no rebuild, no
+   pull, and the multi-arch (amd64 + arm64) manifest is preserved.
+3. **Restarts only the `api` service** on the preprod server, exactly like the test job does.
+
+The preprod `docker-compose.yml` therefore pins `image: 'ecotaxa/ecopart_back:preprod'` and never
+has to be edited to change version — CI moves the tag underneath it. A `concurrency` group
+serialises promotions so two runs can't race.
+
+Because `:preprod` is a moving tag, it doesn't show which version is live. Every run writes the
+promoted version to its GitHub job summary, and on the server `docker compose images api` gives
+the running digest.
+
+**Rolling back** is the same operation with an older version number — no revert commit, no
+rebuild.
+
+One-time setup on the preprod server:
+
+1. **Register a self-hosted runner** with the label **`ecopart-preprod`**, following the exact
+   same procedure as the test server above (register it at the _organization_ level so the
+   frontend repo can share it, then `./svc.sh install && ./svc.sh start`). Same Docker
+   prerequisites: the runner's OS user in the `docker` group, and Docker Compose **v2**.
+
+2. **Create the deployment directory** with its hand-maintained `docker-compose.yml`, its `.env`
+   (from `empty.env`) and its `data_storage/`, following "Production Procedure" below — but with
+   the `api` service pinned to `:preprod` instead of `:latest`, and on ports that don't collide
+   with the test stack if both live on the same host.
+
+3. **Set `DEPLOY_DIR`** in `.github/workflows/preprod.yml` to that directory. It currently holds
+   the placeholder `/ecotaxadev2/ecopart/preprod`; the job fails immediately with an explicit
+   message if no `docker-compose.yml` is found there.
+
+4. **Seed the `:preprod` tag** by running the workflow once with a recent version. Versioned
+   image tags only exist for versions published *after* this change, so `v0.0.66` and earlier are
+   not promotable — only `:latest` was pushed for those.
 
 ### Production Procedure
 
@@ -151,6 +210,17 @@ To set up or update the server manually:
 
 > Note: the root `docker-compose.yml` in this repository **builds the backend from source** and
 > is for local development only. The server uses the image-based compose shown above.
+
+> On the **preprod** server the compose file is identical except that the backend pins the
+> promoted tag rather than the newest build:
+>
+> ```yaml
+>   api:
+>     image: 'ecotaxa/ecopart_back:preprod'   # moved by the promotion workflow, not by tag pushes
+> ```
+>
+> If preprod shares a host with the test stack, give it its own directory, its own
+> `data_storage/`, and non-colliding published ports.
 
 ### Mounting a remote folder into the import `remote/` directory
 
