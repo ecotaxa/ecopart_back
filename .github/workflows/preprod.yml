@@ -53,26 +53,36 @@ jobs:
   deploy-preprod:
     name: Restart the backend on the preprod server
     needs: promote
-    # TODO: this job stays queued until a self-hosted runner carrying the `ecopart-preprod`
-    # label is registered on the preprod server (see README, "Deployment to the preprod server").
+    # The job stays queued until the runner carrying the `ecopart-preprod` label is online
+    # (see README, "Deployment to the preprod server").
     runs-on: [self-hosted, ecopart-preprod]
 
     steps:
       - name: Deploy the promoted backend image
         env:
-          # TODO: confirm this path once the preprod server is set up. Directory on the server
-          # holding the front+back docker-compose.yml + .env. That compose file is maintained by
-          # hand on the server and is NOT touched by CI; its `api` service must use the image
-          # `ecotaxa/ecopart_back:preprod`.
-          DEPLOY_DIR: /ecotaxadev2/ecopart/preprod
+          # Directory on the preprod server holding the compose file, its .env and data_storage/.
+          # That compose file is maintained by hand on the server and is NOT touched by CI; its
+          # `api` service must use the image `ecotaxa/ecopart_back:preprod`.
+          DEPLOY_DIR: /home/ecopart/ecopart_pre_prod
           SERVICE: api # backend service name in that compose (the frontend service `web` is left alone)
           VERSION: ${{ inputs.version }}
         run: |
-          if [ ! -f "$DEPLOY_DIR/docker-compose.yml" ]; then
-            echo "::error::No docker-compose.yml in $DEPLOY_DIR. Fix DEPLOY_DIR in .github/workflows/preprod.yml."
+          cd "$DEPLOY_DIR" || {
+            echo "::error::$DEPLOY_DIR not found. Fix DEPLOY_DIR in .github/workflows/preprod.yml."
+            exit 1
+          }
+          # Name-agnostic check: accepts docker-compose.yml, docker-compose.yaml, compose.yaml…
+          docker compose config --quiet || {
+            echo "::error::No usable compose file in $DEPLOY_DIR."
+            exit 1
+          }
+          # Fail early with a readable message if the compose file still pins another tag,
+          # otherwise the deploy would silently be a no-op.
+          if ! docker compose config | grep -q "ecopart_back:preprod"; then
+            echo "::error::The api service in $DEPLOY_DIR does not use ecotaxa/ecopart_back:preprod."
+            echo "::error::Pin that image in the compose file, see README 'Deployment to the preprod server'."
             exit 1
           fi
-          cd "$DEPLOY_DIR"
           # Capture the running backend image so we can remove only ours afterwards.
           OLD_IMAGE=$(docker compose images -q "$SERVICE")
           # Pull + recreate ONLY the backend service; the frontend (web) stays untouched.

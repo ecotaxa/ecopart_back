@@ -166,9 +166,11 @@ One-time setup on the preprod server:
    the `api` service pinned to `:preprod` instead of `:latest`, and on ports that don't collide
    with the test stack if both live on the same host.
 
-3. **Set `DEPLOY_DIR`** in `.github/workflows/preprod.yml` to that directory. It currently holds
-   the placeholder `/ecotaxadev2/ecopart/preprod`; the job fails immediately with an explicit
-   message if no `docker-compose.yml` is found there.
+3. **`DEPLOY_DIR`** in `.github/workflows/preprod.yml` points at that directory
+   (`/home/ecopart/ecopart_pre_prod`). Update it if the stack ever moves. The job fails
+   immediately, with an explicit message, if the directory holds no usable compose file or if
+   the `api` service does not pin `ecotaxa/ecopart_back:preprod` — a compose file left on
+   `:latest` would make the deploy a silent no-op.
 
 4. **Seed the `:preprod` tag** by running the workflow once with a recent version. Versioned
    image tags only exist for versions published *after* this change, so `v0.0.66` and earlier are
