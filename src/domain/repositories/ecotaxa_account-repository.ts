@@ -50,14 +50,22 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         };
     }
 
-    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string) {
+    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string, ECOTAXA_ALLOW_SELF_SIGNED_CERT: boolean = false) {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
-        this.insecureHttpsAgent =
-            NODE_ENV !== "PROD"
-                ? new https.Agent({ rejectUnauthorized: false })
-                : undefined;
-
+        // Skipping TLS verification is now an explicit opt-in instead of "anything that is not
+        // PROD". `NODE_ENV !== "PROD"` silently disabled certificate checks on every staging,
+        // test and CI environment — including ones talking to a real EcoTaxa over the network.
+        // DEV keeps the old behaviour because the local EcoTaxa instance serves a self-signed
+        // certificate; every other environment must ask for it via the env var.
+        const normalized_node_env = (NODE_ENV || "").toLowerCase()
+        const allow_insecure_tls =
+            ECOTAXA_ALLOW_SELF_SIGNED_CERT
+            || normalized_node_env === "dev"
+            || normalized_node_env === "development"
+        this.insecureHttpsAgent = allow_insecure_tls
+            ? new https.Agent({ rejectUnauthorized: false })
+            : undefined;
     }
 
     async getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel> {

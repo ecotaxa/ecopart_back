@@ -128,7 +128,6 @@ const config = {
     PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
     API_URL: process.env.API_URL || '',
-    FRONTEND_URL: process.env.FRONTEND_URL || '',
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
@@ -148,6 +147,7 @@ const config = {
     MAIL_SENDER: process.env.MAIL_SENDER || '',
 
     NODE_ENV: process.env.NODE_ENV || '',
+    ECOTAXA_ALLOW_SELF_SIGNED_CERT: (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || '').toLowerCase() === 'true',
 
     GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
     TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || '',
@@ -215,7 +215,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
+    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
@@ -246,7 +246,7 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT)
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 

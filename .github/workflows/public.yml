@@ -44,7 +44,11 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:latest
+          # `:latest` is what the test server tracks; the immutable `:vX.Y.Z` tag is what the
+          # preprod promotion workflow (preprod.yml) points the `:preprod` tag at.
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:${{ github.ref_name }}
 
   deploy-test:
     name: Deploy to test server
