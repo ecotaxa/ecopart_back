@@ -128,7 +128,6 @@ const config = {
     PORT_LOCAL: parseInt(process.env.PORT_LOCAL as string, 10),
     BASE_URL_LOCAL: process.env.BASE_URL_LOCAL || '',
     API_URL: process.env.API_URL || '',
-    FRONTEND_URL: process.env.FRONTEND_URL || '',
 
     DATA_STORAGE_FOLDER: process.env.DATA_STORAGE_FOLDER || '',
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
@@ -216,7 +215,7 @@ async function getSQLiteDS() {
 
     const bcryptAdapter = new BcryptAdapter()
     const jwtAdapter = new JwtAdapter()
-    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT, config.FRONTEND_URL)
+    const mailerAdapter = new NodemailerAdapter(config.API_URL, config.MAIL_SENDER, config.NODE_ENV, config.TEST_MAIL_DEFAULT_RECIPIENT)
     const countriesAdapter = new CountriesAdapter()
     const fsAdapter = new FsAdapter()
 
