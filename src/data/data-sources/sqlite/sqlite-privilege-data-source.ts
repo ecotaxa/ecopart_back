@@ -166,7 +166,7 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
                         items: rows.map(row => ({
                             privilege_id: row.privilege_id,
                             user_id: row.user_id,
-                            user_name: row.user_first_name + " " + row.user_last_name,
+                            user_name: row.first_name + " " + row.last_name,
                             email: row.email,
                             project_id: row.project_id,
                             privilege_name: row.privilege_name,
@@ -206,7 +206,7 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
                         const result = {
                             privilege_id: row.privilege_id,
                             user_id: row.user_id,
-                            user_name: row.user_first_name + " " + row.user_last_name,
+                            user_name: row.first_name + " " + row.last_name,
                             email: row.email,
                             project_id: row.project_id,
                             privilege_name: row.privilege_name,

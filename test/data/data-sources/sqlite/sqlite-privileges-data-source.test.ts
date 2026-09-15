@@ -251,6 +251,8 @@ describe('SQLitePrivilegeDataSource', () => {
             expect(getAllOutput.total).toEqual(1);
             expect(getAllOutput.items.length).toEqual(1);
             expect(getAllOutput.items[0].privilege_name).toEqual('manager');
+            expect(getAllOutput.items[0].user_name).toEqual('admin admin');
+            expect(getAllOutput.items[0].email).toEqual('julie.coustenoble@imev-mer.fr');
         });
 
         test('should return all privileges with filtering on not null', async () => {
@@ -337,6 +339,8 @@ describe('SQLitePrivilegeDataSource', () => {
                 expect(privilege.contact).toEqual(true);
                 expect(privilege.user_id).toEqual(user_id);
                 expect(privilege.project_id).toEqual(project_id);
+                expect(privilege.user_name).toEqual("John Smith");
+                expect(privilege.email).toEqual(userRequestCreationModel_2.email);
             }
         });
     });
