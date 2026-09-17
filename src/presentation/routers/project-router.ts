@@ -450,7 +450,35 @@ export default function ProjectRouter(
      * /projects/{project_id}:
      *   patch:
      *     summary: Update project
-     *     description: Update an existing project. Can update project info, privileges, and EcoTaxa settings.
+     *     description: |
+     *       Update an existing project. Can update project info, privileges, and EcoTaxa settings.
+     *
+     *       ### Managing the EcoTaxa link
+     *
+     *       * **Link an existing EcoTaxa project**: send `ecotaxa_project_id`, `ecotaxa_instance_id`
+     *         and `ecotaxa_account_id`. The EcoTaxa account must be manager of that EcoTaxa project,
+     *         and the EcoTaxa project must not already be linked to another EcoPart project.
+     *       * **Create and link a new EcoTaxa project**: send `new_ecotaxa_project: true`,
+     *         `ecotaxa_instance_id` and `ecotaxa_account_id` (`ecotaxa_project_id` must be omitted or null).
+     *       * **Unlink the EcoTaxa project currently linked**: send `ecotaxa_project_id: null`.
+     *         This is the only field required, `ecotaxa_instance_id` and `ecotaxa_account_id` can be omitted.
+     *
+     *       ### What unlinking does
+     *
+     *       1. Clears `ecotaxa_project_id`, `ecotaxa_project_name` and `ecotaxa_instance_id` on the EcoPart project.
+     *       2. Resets the EcoTaxa import state of every sample of the project: `ecotaxa_sample_imported`,
+     *          `ecotaxa_import_status_id`, `ecotaxa_sample_import_utc_date_time`, `ecotaxa_sample_id`,
+     *          `ecotaxa_sample_tsv_file_name`, `ecotaxa_sample_local_folder_tsv_path`,
+     *          `ecotaxa_sample_nb_images` and `ecotaxa_sample_task_id`.
+     *       3. Removes the generic EcoPart account from the managers of the EcoTaxa project.
+     *
+     *       The EcoTaxa project and the data already exported to it are never deleted. Once unlinked,
+     *       the same EcoTaxa project can be linked again, to this project or to another one.
+     *       Unlinking a project that has no EcoTaxa link only resets the local fields.
+     *
+     *       If the EcoTaxa project still exists but the generic EcoPart account cannot manage it anymore,
+     *       the call fails with `Given EcoTaxa account is not manager in the old EcoTaxa project...` (500).
+     *       If the EcoTaxa project no longer exists on the EcoTaxa side (404), the link is removed anyway.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -467,6 +495,30 @@ export default function ProjectRouter(
      *         application/json:
      *           schema:
      *             $ref: '#/components/schemas/ProjectUpdate'
+     *           examples:
+     *             update_project_info:
+     *               summary: Update project information
+     *               value:
+     *                 project_title: New project title
+     *                 chief_scientist_name: Jane Doe
+     *             link_existing_ecotaxa_project:
+     *               summary: Link an existing EcoTaxa project
+     *               value:
+     *                 ecotaxa_project_id: 1234
+     *                 ecotaxa_instance_id: 1
+     *                 ecotaxa_account_id: 5
+     *             create_new_ecotaxa_project:
+     *               summary: Create a new EcoTaxa project and link it
+     *               value:
+     *                 new_ecotaxa_project: true
+     *                 ecotaxa_instance_id: 1
+     *                 ecotaxa_account_id: 5
+     *             unlink_ecotaxa_project:
+     *               summary: Unlink the linked EcoTaxa project
+     *               description: Only ecotaxa_project_id = null is needed. Sample import statuses are reset
+     *                 and the generic EcoPart account is removed from the EcoTaxa project managers.
+     *               value:
+     *                 ecotaxa_project_id: null
      *     responses:
      *       200:
      *         description: Updated project.
