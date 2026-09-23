@@ -1,0 +1,225 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<!--
+    Shared shell for every EcoPart transactional email.
+
+    Visual identity is ported from the frontend theme (ecopart_front/src/theme):
+    teal-led palette, gradient AppBar header (secondblue 800 -> 500), Dosis for
+    display/button labels and Source Sans 3 for body copy.
+
+    Email-client constraints that drive the odd-looking markup:
+      - table layout + inline styles, because Gmail strips <style> in some views
+      - CSS gradients are ignored by Outlook, so every gradient cell also carries
+        a solid `bgcolor` fallback
+      - the logo is an inline CID attachment, so it renders without a public
+        image host; its `alt` text is styled to stay readable if images are blocked
+
+    Placeholders (double-curly) are filled by the `NodemailerAdapter` in a single pass:
+    title, preheader, content, logo_src, website_url, year. Do NOT write a literal
+    placeholder in a comment: the body is injected on the first "content" match.
+-->
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>{{title}}</title>
+
+    <!--[if !mso]><!-->
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Dosis:wght@600;700&display=swap" />
+    <!--<![endif]-->
+
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td, p, a, h1, h2 { font-family: Arial, Helvetica, sans-serif !important; }
+    </style>
+    <![endif]-->
+
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100% !important;
+            background-color: #f1f6f6;
+            -webkit-font-smoothing: antialiased;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+
+        table {
+            border-collapse: collapse;
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        img {
+            border: 0;
+            outline: none;
+            text-decoration: none;
+            -ms-interpolation-mode: bicubic;
+        }
+
+        a {
+            color: #207171;
+        }
+
+        /* Long URLs in the fallback panel must wrap instead of stretching the card. */
+        .ep-break {
+            word-break: break-all;
+            word-wrap: break-word;
+        }
+
+        @media only screen and (max-width: 620px) {
+            .ep-shell {
+                width: 100% !important;
+            }
+
+            .ep-pad {
+                padding-left: 24px !important;
+                padding-right: 24px !important;
+            }
+
+            .ep-h1 {
+                font-size: 22px !important;
+            }
+
+            /* Full-width tap target on phones. */
+            .ep-btn {
+                width: 100% !important;
+            }
+
+            .ep-btn a {
+                display: block !important;
+            }
+        }
+
+        /* Honored by Apple Mail / iOS. Clients that force-invert instead are
+           covered by the solid backgrounds set inline. */
+        @media (prefers-color-scheme: dark) {
+            body,
+            .ep-page {
+                background-color: #0b1c22 !important;
+            }
+
+            .ep-card {
+                background-color: #0e242d !important;
+                border-color: #163b40 !important;
+            }
+
+            .ep-h1 {
+                color: #a6e4ea !important;
+            }
+
+            .ep-text {
+                color: #eef1f4 !important;
+            }
+
+            .ep-muted,
+            .ep-footer-text {
+                color: #b2bbc9 !important;
+            }
+
+            .ep-panel {
+                background-color: #163b40 !important;
+                border-color: #1d5658 !important;
+            }
+
+            .ep-panel-text {
+                color: #a6e4ea !important;
+            }
+
+            .ep-note {
+                background-color: #10282e !important;
+            }
+
+            .ep-footer {
+                background-color: #0b1c22 !important;
+                border-color: #163b40 !important;
+            }
+
+            .ep-footer-link {
+                color: #6ec8cf !important;
+            }
+        }
+    </style>
+</head>
+
+<body
+    style="margin:0; padding:0; background-color:#f1f6f6; font-family:'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+    <!-- Inbox preview line: shown next to the subject, hidden inside the email. -->
+    <div
+        style="display:none; font-size:1px; color:#f1f6f6; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all;">
+        {{preheader}}
+    </div>
+
+    <table class="ep-page" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+        style="background-color:#f1f6f6;">
+        <tr>
+            <td align="center" style="padding:32px 12px;">
+
+                <table class="ep-shell" role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"
+                    style="width:600px; max-width:600px;">
+
+                    <!-- Header: mirrors the app's gradient AppBar with the white wordmark. -->
+                    <tr>
+                        <td class="ep-pad" bgcolor="#1d5658" align="left"
+                            style="padding:28px 40px; background-color:#1d5658; background-image:linear-gradient(90deg, #163b40 0%, #258a8b 100%); border-radius:8px 8px 0 0;">
+                            <img src="{{logo_src}}" width="140" height="41" alt="EcoPart"
+                                style="display:block; width:140px; height:41px; border:0; color:#ffffff; font-family:'Dosis', Arial, sans-serif; font-size:24px; font-weight:700;" />
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td class="ep-card" bgcolor="#ffffff"
+                            style="background-color:#ffffff; border-left:1px solid #d9dee7; border-right:1px solid #d9dee7;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td class="ep-pad" style="padding:36px 40px 40px 40px;">
+                                        {{content}}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td class="ep-footer ep-pad" bgcolor="#f8faf9" align="center"
+                            style="padding:24px 40px 28px 40px; background-color:#f8faf9; border:1px solid #d9dee7; border-top:none; border-radius:0 0 8px 8px;">
+                            <p class="ep-footer-text"
+                                style="margin:0 0 10px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:13px; line-height:1.5; color:#687182;">
+                                <a class="ep-footer-link" href="{{website_url}}"
+                                    style="color:#207171; text-decoration:none; font-weight:600;">EcoPart</a>
+                                &nbsp;&middot;&nbsp;
+                                <a class="ep-footer-link" href="{{website_url}}/about"
+                                    style="color:#207171; text-decoration:none;">About</a>
+                                &nbsp;&middot;&nbsp;
+                                <a class="ep-footer-link" href="https://ecotaxa.obs-vlfr.fr/"
+                                    style="color:#207171; text-decoration:none;">EcoTaxa</a>
+                            </p>
+                            <p class="ep-footer-text"
+                                style="margin:0 0 6px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.5; color:#8593a4;">
+                                Plankton and particle data from the Underwater Vision Profiler.
+                            </p>
+                            <p class="ep-footer-text"
+                                style="margin:0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:12px; line-height:1.5; color:#8593a4;">
+                                This is an automated message. Please do not reply.<br />
+                                &copy; {{year}} EcoPart, Laboratoire d'Oc&eacute;anographie de Villefranche.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>

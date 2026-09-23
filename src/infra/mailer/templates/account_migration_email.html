@@ -1,68 +1,71 @@
-<!DOCTYPE html>
-<html>
+<!--
+    Body of the legacy-account migration email. Rendered inside `layout.html`
+    (which supplies the branded header, footer and <head>).
+    Placeholders (double-curly): greeting, reset_password_path, website_url.
+-->
 
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>Ecopart - Welcome to the new EcoPart</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
+<h1 class="ep-h1"
+    style="margin:0 0 20px 0; font-family:'Dosis', 'Source Sans 3', Helvetica, Arial, sans-serif; font-size:26px; line-height:1.25; font-weight:700; color:#163b40;">
+    Welcome to the new EcoPart</h1>
 
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            background-color: #f4f4f4;
-        }
+<p class="ep-text"
+    style="margin:0 0 16px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:16px; line-height:1.65; color:#2c2b34;">
+    {{greeting}}</p>
 
-        h1 {
-            font-family: 'Verdana';
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-        }
+<p class="ep-text"
+    style="margin:0 0 16px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:16px; line-height:1.65; color:#2c2b34;">
+    EcoPart has moved to a brand new application, and your account came with it, along with your projects,
+    samples and access rights.</p>
 
-        .header {
-            background-color: #1976D2;
-        }
-    </style>
-</head>
+<p class="ep-text"
+    style="margin:0 0 28px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:16px; line-height:1.65; color:#2c2b34;">
+    For security reasons your former password was not transferred. Set a new one to get started:</p>
 
-<body>
-    <table cellpadding="0" cellspacing="0" border="0" width="100%"
-        style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-collapse: collapse;">
-        <tr>
-            <td class="header">
-                <h1>EcoPart app</h1>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 20px;">
-                <p>Hello,</p>
-                <p>EcoPart has moved to a brand new application, and your account has been migrated.</p>
-                <p>To keep your account secure, your password was not transferred. Please use the button below to set
-                    a new password and start using the new EcoPart:</p>
-                <p style="text-align: center;">
-                    <a href="{{reset_password_path}}"
-                        style="display: inline-block; padding: 10px 20px; background-color: #1976D2; color: #ffffff; text-decoration: none; border-radius: 5px;">Set
-                        my password</a>
-                </p>
-                <p>If the button above does not work, you can copy and paste the following link into your browser:</p>
-                <p>{{reset_password_path}}</p>
+<!-- Bulletproof button: the bgcolor on the <td> is what Outlook actually paints. -->
+<table class="ep-btn" role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"
+    style="margin:0 auto 28px auto;">
+    <tr>
+        <td align="center" bgcolor="#207171" style="background-color:#207171; border-radius:4px;">
+            <a href="{{reset_password_path}}"
+                style="display:inline-block; padding:14px 36px; font-family:'Dosis', 'Source Sans 3', Helvetica, Arial, sans-serif; font-size:17px; font-weight:600; letter-spacing:0.01em; color:#ffffff; text-decoration:none; border-radius:4px;">
+                Set my password</a>
+        </td>
+    </tr>
+</table>
 
-                <p>If you don’t use this link within one week, it will expire. To get a new link, visit
-                    https://ecopart.obs-vlfr.fr/password/reset.</p>
+<p class="ep-muted"
+    style="margin:0 0 10px 0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:14px; line-height:1.6; color:#535664;">
+    If the button does not work, copy and paste this link into your browser:</p>
 
-                <p style="margin-top: 30px;">Best regards,<br>Ecopart Team 🩵</p>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 20px; text-align: center; background-color: #1976D2; color: #ffffff;">
-                <p>🌐 <a href="https://ecopart.obs-vlfr.fr/about"
-                        style="text-decoration: none; color: #ffffff;">ecopart.obs-vlfr.fr</a></p>
-                <p>&copy; 2023 Ecopart. All rights reserved.</p>
-            </td>
-        </tr>
-    </table>
-</body>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 28px 0;">
+    <tr>
+        <td class="ep-panel" bgcolor="#f1f6f6"
+            style="background-color:#f1f6f6; border:1px solid #d5f0f5; border-radius:4px; padding:12px 16px;">
+            <a class="ep-panel-text ep-break" href="{{reset_password_path}}"
+                style="font-family:'Source Code Pro', Consolas, Menlo, monospace; font-size:12px; line-height:1.6; color:#1d5658; text-decoration:none; word-break:break-all;">{{reset_password_path}}</a>
+        </td>
+    </tr>
+</table>
 
-</html>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 28px 0;">
+    <tr>
+        <td class="ep-note" bgcolor="#f8fbfb"
+            style="background-color:#f8fbfb; border-left:3px solid #6ec8cf; padding:14px 18px;">
+            <p class="ep-muted"
+                style="margin:0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:14px; line-height:1.6; color:#535664;">
+                This link expires in <strong style="color:#2c2b34;">one week</strong>. If it has, request a new one from
+                the <a class="ep-footer-link" href="{{website_url}}/password/reset"
+                    style="color:#207171; font-weight:600;">password reset page</a> using this email address.</p>
+        </td>
+    </tr>
+</table>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+        <td style="border-top:1px solid #d9dee7; padding-top:20px;">
+            <p class="ep-muted"
+                style="margin:0; font-family:'Source Sans 3', Helvetica, Arial, sans-serif; font-size:15px; line-height:1.6; color:#535664;">
+                Happy exploring,<br /><strong class="ep-text" style="color:#163b40;">The EcoPart team</strong></p>
+        </td>
+    </tr>
+</table>

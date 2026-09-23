@@ -8,7 +8,7 @@ export class MiddlewareTaskValidation implements IMiddlewareTaskValidation {
             .isInt({ min: 1 }).withMessage('Page must be a number and must be greater than 0.'),
         query('limit').default(10)
             .isInt({ min: 1 }).withMessage('Limit must be a number and must be greater than 0.'),
-        query('sort_by').default("asc(user_id)"),
+        query('sort_by').default("asc(task_id)"),
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
