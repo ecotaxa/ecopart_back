@@ -10,6 +10,7 @@ import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, Importa
 import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
+import { decodeUvpText } from "../utils/decode-uvp-text";
 
 
 import * as fs from 'fs'; // For createWriteStream
@@ -74,9 +75,10 @@ export class SampleRepositoryImpl implements SampleRepository {
                                 return reject(err || new Error('Failed to open read stream'));
                             }
 
-                            let data = '';
-                            readStream.on('data', (chunk) => (data += chunk));
-                            readStream.on('end', () => resolve(data));
+                            // Decode once at the end: a multi-byte character can straddle two chunks.
+                            const chunks: Buffer[] = [];
+                            readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
+                            readStream.on('end', () => resolve(decodeUvpText(Buffer.concat(chunks))));
                         });
                     } else {
                         zipfile.readEntry();
@@ -107,7 +109,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                     found = true;
                     const chunks: Buffer[] = [];
                     entry.on('data', (chunk: Buffer) => chunks.push(chunk));
-                    entry.on('end', () => resolve(Buffer.concat(chunks).toString()));
+                    entry.on('end', () => resolve(decodeUvpText(Buffer.concat(chunks))));
                     entry.on('error', reject);
                 } else {
                     entry.resume();
@@ -941,7 +943,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                         return this.extractNumberOfTsvDataLines(tsv_content);
                     } catch {
                         const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
-                        const tsv_content = await fsPromises.readFile(tsv_file_path, 'utf8');
+                        const tsv_content = decodeUvpText(await fsPromises.readFile(tsv_file_path));
                         return this.extractNumberOfTsvDataLines(tsv_content);
                     }
                 }
@@ -1167,7 +1169,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             for (const file of files) {
                 if (/^uvp[56]_header.*\.txt$/i.test(file)) {
                     const filePath = path.join(header_path, file);
-                    const content = await fsPromises.readFile(filePath, 'utf8');
+                    const content = decodeUvpText(await fsPromises.readFile(filePath));
 
                     const lines = content.trim().split(/\r\n|\n|\r/);
                     for (let i = 1; i < lines.length; i++) {
@@ -1954,7 +1956,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             return this.readFileFromZip(workZip, undefined, pattern);
         }
         // Plain folder: files sit directly under work/<sample>/.
-        return fsPromises.readFile(workDirFile, "utf8");
+        return decodeUvpText(await fsPromises.readFile(workDirFile));
     }
 
     // UVP5 source: the meta header is the shared meta/uvp5_header_sn*.txt (not yet zipped per sample).
@@ -1965,7 +1967,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         if (!headerFile) {
             throw new Error("Meta header file not found");
         }
-        const content = await fsPromises.readFile(path.join(metaDir, headerFile), "utf8");
+        const content = decodeUvpText(await fsPromises.readFile(path.join(metaDir, headerFile)));
         return this.parseMetaHeader(content, headerFile, sample_name);
     }
 
