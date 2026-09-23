@@ -680,6 +680,16 @@ export class SampleRepositoryImpl implements SampleRepository {
         return s;
     }
 
+    // Acquisition time of one image (UVP6 image id "20240303-000001-1", UVP5 datfile
+    // "20200809002355_947") as epoch ms UTC, at second resolution — the sub-second suffix is
+    // dropped. Null when the value is not a UVP timestamp.
+    private parseUvpTimestampMs(raw: string | null | undefined): number | null {
+        const iso = this.parseUvpDateToIso(raw);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(iso)) return null;
+        const ms = Date.parse(iso);
+        return isNaN(ms) ? null : ms;
+    }
+
     parseMetaHeader(
         data: string,
         fileName: string,
@@ -1839,7 +1849,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     if (!isNaN(cls) && !isNaN(cnt)) spectrum_counts[cls] = cnt;
                 }
             });
-            records.push({ image_index: image_index++, image_id: parts[0].trim(), raw_pressure, light_on, spectrum_counts });
+            const image_id = parts[0].trim();
+            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts });
         }
         return records;
     }
@@ -1861,6 +1872,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             image_index: i,
             image_id: String(f.frame_idx),
             raw_pressure: f.raw_pressure,
+            image_time_ms: f.time_ms,
             // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
             light_on: true,
             spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
@@ -1887,9 +1899,11 @@ export class SampleRepositoryImpl implements SampleRepository {
         const root_abs = path.join(this.base_folder, root_folder_path);
         if (instrument_model.startsWith("UVP6")) {
             const ini = await this.getSampleFromMetadataIni(path.join(root_abs, "ecodata"), sample_name);
+            // The INI parser turns numeric values into numbers (`firstimage=0` → 0); stringify them
+            // so the preview reports the bounds exactly like the post-import sample (TEXT columns).
             return {
-                filter_first_image: ini.filter_first_image ?? null,
-                filter_last_image: ini.filter_last_image ?? null,
+                filter_first_image: ini.filter_first_image != null ? String(ini.filter_first_image) : null,
+                filter_last_image: ini.filter_last_image != null ? String(ini.filter_last_image) : null,
                 instrument_settings_image_volume_l: ini.instrument_settings_image_volume_l ?? null,
                 instrument_settings_depth_offset_m: ini.instrument_settings_depth_offset_m ?? null,
                 sample_type_label: this.sampleTypeLabelFromLetter(ini.sampleType),
@@ -1937,6 +1951,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             image_index: i,
             image_id: String(f.frame_idx),
             raw_pressure: f.raw_pressure,
+            image_time_ms: f.time_ms,
             // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
             light_on: true,
             spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
@@ -1981,15 +1996,15 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // datfile rows are `frame_idx; timestamp; pressure; …` (semicolon-separated).
-    parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number }[] {
-        const frames: { frame_idx: number; raw_pressure: number }[] = [];
+    parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number; time_ms: number | null }[] {
+        const frames: { frame_idx: number; raw_pressure: number; time_ms: number | null }[] = [];
         for (const line of content.split(/\r\n|\n|\r/)) {
             const cols = line.split(";").map((c) => c.trim());
             if (cols.length < 3) continue;
             const frame_idx = parseInt(cols[0], 10);
             const raw_pressure = parseInt(cols[2], 10);
             if (isNaN(frame_idx) || isNaN(raw_pressure)) continue;
-            frames.push({ frame_idx, raw_pressure });
+            frames.push({ frame_idx, raw_pressure, time_ms: this.parseUvpTimestampMs(cols[1]) });
         }
         return frames;
     }

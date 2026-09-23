@@ -44,6 +44,7 @@ export class GetSampleQcGraphs implements GetSampleQcGraphsUseCase {
             instrument_settings_depth_offset_m: sample.instrument_settings_depth_offset_m ?? null,
             instrument_settings_image_volume_l: sample.instrument_settings_image_volume_l ?? null,
             is_depth_profile: sample.sample_type_label === "Depth",
+            descent_filter_enabled: project.enable_descent_filter,
             records,
         });
     }

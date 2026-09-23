@@ -1634,12 +1634,21 @@ export default function ProjectRouter(
      *   get:
      *     summary: Import QC graphs for a sample
      *     description: |
-     *       Returns the data for the three import-time quality-control vertical profiles
-     *       (depth on the Y axis, in metres): (1) depth of each image with the kept-image
-     *       selection range, (2) imaged volume per depth bin, and (3) the "raw histogram" of
-     *       particle counts for pixel classes 1/2/3 — split into lit particles
-     *       (`particle_lpm_profile`) and lights-off black frames (`black_profile`, null when
-     *       the instrument has no dark frames). Computed on demand from the sample's raw files.
+     *       Returns the data for the three import-time quality-control vertical profiles:
+     *       (1) depth of each image with its selection flag, (2) imaged volume per bin, and
+     *       (3) the "raw histogram" of particle counts for pixel classes 1/2/3 — split into lit
+     *       particles (`particle_lpm_profile`) and lights-off black frames (`black_profile`, null
+     *       when the instrument has no dark frames). Computed on demand from the sample's raw files.
+     *
+     *       - **Vertical axis** (`vertical_axis`): `depth` for depth samples — depth in metres,
+     *         1 m bins (`depth_m`); `time` for time-series samples — hours since
+     *         `time_origin_utc_date_time` (UTC hour of the first image), 1 h bins (`time_h`).
+     *         Each binned profile repeats its `axis`; graph-1 points carry both `depth_m` and `time_h`.
+     *       - **Selection** (`is_selected`): an image is used when it lies inside the header window
+     *         `[firstimage, endimg]` (UVP5: frame indices; UVP6: ranks, row k of `particules.csv`
+     *         being rank `firstimage + k`) and, on a depth sample whose project enables the descent
+     *         filter, is kept by it. Graph 1 shows every image; graphs 2 and 3 only count the
+     *         selected ones, and the imaged volume only the lit (flash on) images among them.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1753,11 +1762,12 @@ export default function ProjectRouter(
      *   post:
      *     summary: Preview import QC graphs for not-yet-imported samples
      *     description: |
-     *       Returns the same QC graph datasets as the per-sample endpoint, but for a list of
-     *       samples that have **not been imported yet** — computed on the fly from the project
-     *       source folder. Lets the operator review quality before committing an import (and then
-     *       pass the approved names as `validated_samples` to the import endpoint). Each requested
-     *       name must be importable from the source folder. For a preview, `sample_id` is null and
+     *       Returns the same QC graph datasets as the per-sample endpoint (same vertical axis,
+     *       image selection and binning rules), but for a list of samples that have **not been
+     *       imported yet** — computed on the fly from the project source folder. Lets the operator
+     *       review quality before committing an import (and then pass the approved names as
+     *       `validated_samples` to the import endpoint). Each requested name must be importable
+     *       from the source folder. For a preview, `sample_id` is null and
      *       `visual_qc_status_label` is `NOT_IMPORTED`.
      *     tags: [Samples]
      *     security:
