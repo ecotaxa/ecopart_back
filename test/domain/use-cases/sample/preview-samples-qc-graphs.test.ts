@@ -29,8 +29,8 @@ const meta: SampleSourceQcMetadata = {
 };
 
 const records: PerImageRecord[] = [
-    { image_index: 0, image_id: "a", raw_pressure: 0.5, light_on: true, spectrum_counts: { 1: 10 } },
-    { image_index: 1, image_id: "b", raw_pressure: 1.5, light_on: true, spectrum_counts: { 1: 20 } },
+    { image_index: 0, image_id: "a", raw_pressure: 0.5, image_time_ms: null, light_on: true, spectrum_counts: { 1: 10 } },
+    { image_index: 1, image_id: "b", raw_pressure: 1.5, image_time_ms: null, light_on: true, spectrum_counts: { 1: 20 } },
 ];
 
 beforeEach(() => {
@@ -71,6 +71,22 @@ describe("PreviewSamplesQcGraphs", () => {
         // Reads straight from the source folder (root_folder_path), not the per-sample storage.
         expect(mockSampleRepository.getPerImageRecordsFromSource).toBeCalledWith("root/path", "s1", "UVP6LP");
         expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledWith("root/path", "s1", "UVP6LP");
+    });
+
+    test("honours the project's descent filter setting", async () => {
+        // b (1.0 m) comes back up after a (1.5 m): an ascent image on this depth sample.
+        jest.spyOn(mockSampleRepository, "getPerImageRecordsFromSource").mockResolvedValue([
+            { ...records[0], raw_pressure: 1.5 },
+            { ...records[1], raw_pressure: 1.0 },
+        ]);
+
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ ...project, enable_descent_filter: true });
+        const [filtered] = await useCase.execute(current_user, 1, ["s1"]);
+        expect(filtered.image_depth_profile.points.map((p) => p.is_selected)).toEqual([true, false]);
+
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ ...project, enable_descent_filter: false });
+        const [unfiltered] = await useCase.execute(current_user, 1, ["s1"]);
+        expect(unfiltered.image_depth_profile.points.map((p) => p.is_selected)).toEqual([true, true]);
     });
 
     test("rejects a requested name that is not importable, before any file read", async () => {
