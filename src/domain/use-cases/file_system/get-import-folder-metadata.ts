@@ -3,6 +3,7 @@ import path from 'path';
 import { GetImportFolderMetadataUseCase } from '../../interfaces/use-cases/file_system/get-import-folder-metadata';
 import { ProjectMetadataModel, ProjectMetadataPersonModel } from '../../entities/project';
 import { UserRepository } from '../../interfaces/repositories/user-repository';
+import { decodeUvpText } from '../../utils/decode-uvp-text';
 
 export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     importFolderPath: string;
@@ -92,7 +93,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     private async readCruiseInfo(folderPath: string): Promise<Record<string, string> | null> {
         const cruiseInfoPath = path.join(folderPath, 'config', 'cruise_info.txt');
         try {
-            const content = await fs.readFile(cruiseInfoPath, 'utf8');
+            const content = decodeUvpText(await fs.readFile(cruiseInfoPath));
             const result: Record<string, string> = {};
             const lines = content.split(/\r\n|\n|\r/);
             for (const line of lines) {
@@ -121,7 +122,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
             const headerFile = files.find(f => f.includes('header') && f.endsWith('.txt') && !f.includes('backup'));
             if (!headerFile) return null;
 
-            const content = await fs.readFile(path.join(metaPath, headerFile), 'utf8');
+            const content = decodeUvpText(await fs.readFile(path.join(metaPath, headerFile)));
             const lines = content.trim().split(/\r\n|\n|\r/);
             if (lines.length < 2) return null;
 

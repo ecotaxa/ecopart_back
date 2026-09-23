@@ -21,6 +21,8 @@ describe("parseParticulesCsvRecords (UVP6)", () => {
             image_index: 0,
             image_id: "20240612-003906-1",
             raw_pressure: 3.13,
+            // The image id carries the acquisition time (UTC, the "-1" sub-second suffix dropped).
+            image_time_ms: Date.UTC(2024, 5, 12, 0, 39, 6),
             light_on: true,
             spectrum_counts: { 1: 5117, 2: 498, 3: 101, 4: 38 },
         });
@@ -28,23 +30,31 @@ describe("parseParticulesCsvRecords (UVP6)", () => {
         // Black row: flag "0:1" → light off; later blocks carry their own class index.
         expect(records[1].light_on).toBe(false);
         expect(records[1].image_index).toBe(1);
+        expect(records[1].image_time_ms).toBe(Date.UTC(2024, 5, 12, 0, 39, 7));
         expect(records[1].spectrum_counts).toEqual({ 1: 7, 2: 3 });
     });
 });
 
 describe("parseDatfileFrames (UVP5)", () => {
-    test("reads frame index (col 0) and raw pressure (col 2)", () => {
+    test("reads frame index (col 0), acquisition time (col 1) and raw pressure (col 2)", () => {
         const content = [
             "     9;\t20120520080214_203;\t00150;00356;00356;",
-            "    10;\t20120520080214_296;\t00151;00356;00356;",
+            "    10;\t20120520080215_296;\t00151;00356;00356;",
         ].join("\n");
 
         const frames = repo.parseDatfileFrames(content);
 
+        // Time at second resolution, like legacy EcoPart (`row[1][0:14]`): the "_mmm" suffix is dropped.
         expect(frames).toEqual([
-            { frame_idx: 9, raw_pressure: 150 },
-            { frame_idx: 10, raw_pressure: 151 },
+            { frame_idx: 9, raw_pressure: 150, time_ms: Date.UTC(2012, 4, 20, 8, 2, 14) },
+            { frame_idx: 10, raw_pressure: 151, time_ms: Date.UTC(2012, 4, 20, 8, 2, 15) },
         ]);
+    });
+
+    test("an unreadable timestamp leaves the frame without a time, the frame is still kept", () => {
+        const frames = repo.parseDatfileFrames("    11;\tnot-a-date;\t00152;00356;");
+
+        expect(frames).toEqual([{ frame_idx: 11, raw_pressure: 152, time_ms: null }]);
     });
 });
 

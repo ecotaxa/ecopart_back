@@ -72,9 +72,9 @@ function graphsOnly(payload: any) {
 describe("QC graphs parity: pre-import preview === post-import", () => {
     test("UVP5 (integer ids, with a gap)", async () => {
         const records: PerImageRecord[] = [
-            { image_index: 0, image_id: "10", raw_pressure: 100, light_on: true, spectrum_counts: { 1: 5 } },
-            { image_index: 1, image_id: "11", raw_pressure: 110, light_on: true, spectrum_counts: { 1: 6 } },
-            { image_index: 2, image_id: "14", raw_pressure: 140, light_on: true, spectrum_counts: { 1: 7 } },
+            { image_index: 0, image_id: "10", raw_pressure: 100, image_time_ms: null, light_on: true, spectrum_counts: { 1: 5 } },
+            { image_index: 1, image_id: "11", raw_pressure: 110, image_time_ms: null, light_on: true, spectrum_counts: { 1: 6 } },
+            { image_index: 2, image_id: "14", raw_pressure: 140, image_time_ms: null, light_on: true, spectrum_counts: { 1: 7 } },
         ];
         const meta: SampleSourceQcMetadata = {
             filter_first_image: "11",
@@ -97,9 +97,9 @@ describe("QC graphs parity: pre-import preview === post-import", () => {
 
     test("UVP6 (timestamp ids, with a black frame)", async () => {
         const records: PerImageRecord[] = [
-            { image_index: 0, image_id: "20240612-003906-1", raw_pressure: 0.5, light_on: true, spectrum_counts: { 1: 10, 2: 5 } },
-            { image_index: 1, image_id: "20240612-003907-1", raw_pressure: 1.5, light_on: true, spectrum_counts: { 1: 20 } },
-            { image_index: 2, image_id: "20240612-003908-1", raw_pressure: 1.7, light_on: false, spectrum_counts: { 1: 3 } },
+            { image_index: 0, image_id: "20240612-003906-1", raw_pressure: 0.5, image_time_ms: null, light_on: true, spectrum_counts: { 1: 10, 2: 5 } },
+            { image_index: 1, image_id: "20240612-003907-1", raw_pressure: 1.5, image_time_ms: null, light_on: true, spectrum_counts: { 1: 20 } },
+            { image_index: 2, image_id: "20240612-003908-1", raw_pressure: 1.7, image_time_ms: null, light_on: false, spectrum_counts: { 1: 3 } },
         ];
         const meta: SampleSourceQcMetadata = {
             filter_first_image: "20240612-003906-1",
@@ -113,6 +113,30 @@ describe("QC graphs parity: pre-import preview === post-import", () => {
         const pre = await preImportGraphs("UVP6LP", records, meta);
 
         expect(post.black_profile).not.toBeNull();
+        expect(graphsOnly(pre)).toEqual(graphsOnly(post));
+    });
+
+    test("UVP6 time series with rank bounds: a number from metadata.ini and the stored TEXT agree", async () => {
+        const records: PerImageRecord[] = [
+            { image_index: 0, image_id: "20240303-000001-1", raw_pressure: 150, image_time_ms: Date.UTC(2024, 2, 3, 0, 0, 1), light_on: false, spectrum_counts: { 1: 3 } },
+            { image_index: 1, image_id: "20240303-000030-1", raw_pressure: 150, image_time_ms: Date.UTC(2024, 2, 3, 0, 0, 30), light_on: true, spectrum_counts: { 1: 10 } },
+            { image_index: 2, image_id: "20240303-040030-1", raw_pressure: 150, image_time_ms: Date.UTC(2024, 2, 3, 4, 0, 30), light_on: true, spectrum_counts: { 1: 20 } },
+        ];
+        const stored: SampleSourceQcMetadata = {
+            filter_first_image: "0",
+            filter_last_image: "2",
+            instrument_settings_image_volume_l: 0.53,
+            instrument_settings_depth_offset_m: 0,
+            sample_type_label: "Time",
+        };
+        // Before import the INI reader may hand the bounds over as numbers.
+        const from_ini = { ...stored, filter_first_image: 0 as any, filter_last_image: 2 as any };
+
+        const post = await postImportGraphs("UVP6LP", records, stored);
+        const pre = await preImportGraphs("UVP6LP", records, from_ini);
+
+        expect(pre.vertical_axis).toBe("time");
+        expect(pre.image_filtering.first_image).toBe("0");
         expect(graphsOnly(pre)).toEqual(graphsOnly(post));
     });
 });

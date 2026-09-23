@@ -62,6 +62,7 @@ export class PreviewSamplesQcGraphs implements PreviewSamplesQcGraphsUseCase {
                 instrument_settings_depth_offset_m: meta.instrument_settings_depth_offset_m,
                 instrument_settings_image_volume_l: meta.instrument_settings_image_volume_l,
                 is_depth_profile: meta.sample_type_label === "Depth",
+                descent_filter_enabled: project.enable_descent_filter,
                 records,
             }));
         }
