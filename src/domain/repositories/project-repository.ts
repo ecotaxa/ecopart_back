@@ -252,33 +252,104 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async copy_metadata(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
-        const foldersToCopy = [
-            { source: 'meta', dest: 'meta' },
-            { source: 'config', dest: 'config' }
-        ];
+        // Replaced versions go next to the backup folder (<dest_folder>_history/<date>/), not inside it,
+        // so the backup export keeps its raw/meta/config shape.
+        const history_root = path.join(base_folder, path.dirname(dest_folder), `${path.basename(dest_folder)}_history`);
+        const history_run = await this.firstFreePath(path.join(history_root, this.getFormattedDate(new Date())));
 
-        for (const folder of foldersToCopy) {
-            const sourcePath = path.join(base_folder, source_folder, folder.source);
-            const destPath = path.join(base_folder, dest_folder, folder.dest);
-            const oldDestPath = path.join(base_folder, dest_folder, `old_${folder.dest}`);
-
-            // Ensure the destination folder exists
-            await fsPromises.mkdir(destPath, { recursive: true });
-
-            // Rename dest folder to old_{folder.dest}
-            await fsPromises.rename(destPath, oldDestPath);
-            try {
-                // Copy source folder to dest folder using cp
-                await fsPromises.cp(sourcePath, destPath, { recursive: true });
-            } catch (error) {
-                // If an error occurs, restore the old_{folder.dest}
-                await fsPromises.rename(oldDestPath, destPath);
-                throw error;
-            }
-
-            // If everything is ok, remove old_{folder.dest}
-            await fsPromises.rm(oldDestPath, { recursive: true, force: true });
+        for (const folder of ['meta', 'config']) {
+            await this.replaceFolderKeepingHistory(
+                path.join(base_folder, source_folder, folder),
+                path.join(base_folder, dest_folder, folder),
+                path.join(history_run, folder)
+            );
         }
+    }
+
+    // Replaces dest_path by a copy of source_path. The copy is made in a staging folder and swapped in
+    // with renames, so a failed or interrupted copy never leaves dest_path partial. The replaced version
+    // is moved to history_path, unless it is empty or identical to the new one.
+    async replaceFolderKeepingHistory(source_path: string, dest_path: string, history_path: string): Promise<void> {
+        const staging_path = `${dest_path}.staging`;
+        const legacy_old_path = path.join(path.dirname(dest_path), `old_${path.basename(dest_path)}`);
+
+        // Leftovers of an interrupted run: an incomplete staging copy, and the previous version left
+        // behind by the former rename-to-old_<folder> strategy.
+        await fsPromises.rm(staging_path, { recursive: true, force: true });
+        if (await this.checkFileExists(legacy_old_path)) {
+            await fsPromises.mkdir(path.dirname(history_path), { recursive: true });
+            await fsPromises.rename(legacy_old_path, path.join(path.dirname(history_path), path.basename(legacy_old_path)));
+        }
+
+        try {
+            await fsPromises.cp(source_path, staging_path, { recursive: true });
+        } catch (error) {
+            await fsPromises.rm(staging_path, { recursive: true, force: true }).catch(() => undefined);
+            throw error;
+        }
+
+        const has_current_version = (await this.listFilesRecursive(dest_path)).length > 0;
+        if (!has_current_version) {
+            await fsPromises.rm(dest_path, { recursive: true, force: true });
+        } else if (await this.foldersHaveSameContent(dest_path, staging_path)) {
+            await fsPromises.rm(staging_path, { recursive: true, force: true });
+            return;
+        } else {
+            await fsPromises.mkdir(path.dirname(history_path), { recursive: true });
+            await fsPromises.rename(dest_path, history_path);
+        }
+
+        try {
+            await fsPromises.rename(staging_path, dest_path);
+        } catch (error) {
+            if (has_current_version) await fsPromises.rename(history_path, dest_path).catch(() => undefined);
+            throw error;
+        }
+    }
+
+    async foldersHaveSameContent(folder_a: string, folder_b: string): Promise<boolean> {
+        const files_a = await this.listFilesRecursive(folder_a);
+        const files_b = await this.listFilesRecursive(folder_b);
+        if (files_a.length !== files_b.length || files_a.some((file, i) => file !== files_b[i])) return false;
+
+        for (const file of files_a) {
+            const [content_a, content_b] = await Promise.all([
+                fsPromises.readFile(path.join(folder_a, file)),
+                fsPromises.readFile(path.join(folder_b, file))
+            ]);
+            if (!content_a.equals(content_b)) return false;
+        }
+        return true;
+    }
+
+    // Sorted relative paths of every file under folder; [] when folder does not exist.
+    async listFilesRecursive(folder: string): Promise<string[]> {
+        let entries: fs.Dirent[];
+        try {
+            entries = await fsPromises.readdir(folder, { withFileTypes: true });
+        } catch (error: any) {
+            if (error.code === 'ENOENT') return [];
+            throw error;
+        }
+
+        const files: string[] = [];
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const sub_files = await this.listFilesRecursive(path.join(folder, entry.name));
+                files.push(...sub_files.map(sub_file => path.join(entry.name, sub_file)));
+            } else {
+                files.push(entry.name);
+            }
+        }
+        return files.sort();
+    }
+
+    async firstFreePath(candidate: string): Promise<string> {
+        let free_path = candidate;
+        for (let i = 1; await this.checkFileExists(free_path); i++) {
+            free_path = `${candidate}_${i}`;
+        }
+        return free_path;
     }
 
     async copyAllL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {

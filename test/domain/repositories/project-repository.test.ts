@@ -10,6 +10,10 @@ import { privateProjectUpdateModel, projectRequestCreationModel, projectRequestC
 import { MockProjectDataSource } from "../../mocks/project-mock";
 
 import 'dotenv/config'
+import fs from "fs";
+import fsPromisesModule from "fs/promises";
+import os from "os";
+import path from "path";
 
 describe("Project Repository", () => {
     let mockProjectDataSource: ProjectDataSource;
@@ -251,6 +255,125 @@ describe("Project Repository", () => {
             const result = projectRepository.toPublicProject(projectResponseModel, publicPrivileges_WithMemberAndManager)
             const { new_ecotaxa_project, ecotaxa_account_id, ...expectedResult } = projectResponseModel as any
             expect(result).toStrictEqual(expectedResult)
+        });
+    });
+
+    describe("copy_metadata", () => {
+        let repository: ProjectRepositoryImpl;
+        let tmp_dir: string;
+        const source_folder = "source";
+        const dest_folder = path.join("fs_storage", "1", "l0b_backup");
+
+        const writeTree = (root: string, files: Record<string, string>) => {
+            for (const [file, content] of Object.entries(files)) {
+                fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+                fs.writeFileSync(path.join(root, file), content);
+            }
+        };
+        const readTree = (root: string): Record<string, string> => {
+            const files: Record<string, string> = {};
+            for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+                const entry_path = path.join(root, entry.name);
+                if (entry.isDirectory()) {
+                    for (const [file, content] of Object.entries(readTree(entry_path))) files[path.join(entry.name, file)] = content;
+                } else {
+                    files[entry.name] = fs.readFileSync(entry_path, "utf8");
+                }
+            }
+            return files;
+        };
+        const sourcePath = (...parts: string[]) => path.join(tmp_dir, source_folder, ...parts);
+        const backupPath = (...parts: string[]) => path.join(tmp_dir, dest_folder, ...parts);
+        const historyPath = (...parts: string[]) => path.join(tmp_dir, "fs_storage", "1", "l0b_backup_history", ...parts);
+        const historyRuns = () => fs.existsSync(historyPath()) ? fs.readdirSync(historyPath()) : [];
+
+        beforeEach(() => {
+            repository = new ProjectRepositoryImpl(mockProjectDataSource, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, DATA_STORAGE_FOLDER, "");
+            tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-copy-metadata-"));
+            writeTree(sourcePath(), {
+                "meta/uvp5_header_sn203.txt": "header v2",
+                "config/cruise_info.txt": "cruise",
+                "config/uvp5_settings/uvp5_configuration_data.txt": "settings",
+            });
+        });
+        afterEach(() => {
+            jest.restoreAllMocks();
+            fs.rmSync(tmp_dir, { recursive: true, force: true });
+        });
+
+        test("Should copy meta and config on first backup without creating history", async () => {
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
+
+            expect(readTree(backupPath("meta"))).toStrictEqual(readTree(sourcePath("meta")));
+            expect(readTree(backupPath("config"))).toStrictEqual(readTree(sourcePath("config")));
+            expect(historyRuns()).toStrictEqual([]);
+        });
+
+        test("Should keep the replaced meta in history when its content changed", async () => {
+            writeTree(backupPath(), {
+                "meta/uvp5_header_sn203.txt": "header v1",
+                "meta/removed_from_source.txt": "old file",
+                "config/cruise_info.txt": "cruise",
+                "config/uvp5_settings/uvp5_configuration_data.txt": "settings",
+            });
+
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
+
+            expect(readTree(backupPath("meta"))).toStrictEqual({ "uvp5_header_sn203.txt": "header v2" });
+            const runs = historyRuns();
+            expect(runs).toHaveLength(1);
+            expect(runs[0]).toMatch(/^\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}$/);
+            expect(readTree(historyPath(runs[0]))).toStrictEqual({
+                [path.join("meta", "uvp5_header_sn203.txt")]: "header v1",
+                [path.join("meta", "removed_from_source.txt")]: "old file",
+            });
+        });
+
+        test("Should not create a history entry when meta and config are unchanged", async () => {
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
+
+            expect(historyRuns()).toStrictEqual([]);
+            expect(readTree(backupPath("meta"))).toStrictEqual(readTree(sourcePath("meta")));
+        });
+
+        test("Should leave the current meta untouched when the copy fails midway", async () => {
+            writeTree(backupPath(), { "meta/uvp5_header_sn203.txt": "header v1" });
+            const real_mkdir = fsPromisesModule.mkdir;
+            const real_writeFile = fsPromisesModule.writeFile;
+            jest.spyOn(fsPromisesModule, "cp").mockImplementationOnce(async (_source, destination) => {
+                await real_mkdir(destination as string, { recursive: true });
+                await real_writeFile(path.join(destination as string, "partial.txt"), "partial");
+                throw new Error("ENOSPC: no space left on device");
+            });
+
+            await expect(repository.copy_metadata(tmp_dir, source_folder, dest_folder)).rejects.toThrow("ENOSPC: no space left on device");
+
+            expect(readTree(backupPath())).toStrictEqual({ [path.join("meta", "uvp5_header_sn203.txt")]: "header v1" });
+            expect(historyRuns()).toStrictEqual([]);
+        });
+
+        test("Should recover from the leftovers of an interrupted backup", async () => {
+            writeTree(backupPath(), {
+                "meta.staging/partial.txt": "partial",
+                "old_meta/uvp5_header_sn203.txt": "header v1",
+            });
+
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
+
+            expect(fs.readdirSync(backupPath()).sort()).toStrictEqual(["config", "meta"]);
+            expect(readTree(backupPath("meta"))).toStrictEqual(readTree(sourcePath("meta")));
+            const runs = historyRuns();
+            expect(runs).toHaveLength(1);
+            expect(readTree(historyPath(runs[0]))).toStrictEqual({ [path.join("old_meta", "uvp5_header_sn203.txt")]: "header v1" });
+        });
+
+        test("Should suffix the history folder when one already exists for the same date", async () => {
+            fs.mkdirSync(historyPath("2026_09_24_10_00_00"), { recursive: true });
+
+            const result = await repository.firstFreePath(historyPath("2026_09_24_10_00_00"));
+
+            expect(result).toBe(historyPath("2026_09_24_10_00_00_1"));
         });
     });
 
