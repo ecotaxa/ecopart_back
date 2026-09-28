@@ -1823,9 +1823,9 @@
             "description": "Unique sample identifier.",
             "example": 1
           },
-          "sample_creation_date": {
+          "sample_creation_utc_date_time": {
             "type": "string",
-            "description": "Sample creation date in ISO format.",
+            "description": "Sample creation date (UTC, ISO format).",
             "example": "2024-01-15T10:30:00.000Z"
           },
           "sample_name": {
@@ -1842,10 +1842,6 @@
             "description": "Instrument serial number.",
             "example": "000002LP"
           },
-          "optional_structure_id": {
-            "type": "string",
-            "description": "Optional structure ID (e.g., Argo or Glider ID)."
-          },
           "max_pressure": {
             "type": "number",
             "description": "Maximum pressure recorded."
@@ -1854,9 +1850,9 @@
             "type": "string",
             "description": "Station identifier."
           },
-          "sampling_date": {
+          "sampling_utc_date_time": {
             "type": "string",
-            "description": "Sampling date in ISO format.",
+            "description": "Start time of the sample (UTC, ISO format).",
             "example": "2024-06-15T08:00:00.000Z"
           },
           "latitude": {
@@ -1928,17 +1924,17 @@
             "type": "number",
             "description": "Acquisition disk type."
           },
-          "instrument_settings_acq_appendices_ratio": {
+          "instrument_settings_acq_vignette_roi_enlargement_ratio": {
             "type": "number",
-            "description": "Acquisition appendices ratio."
+            "description": "Enlargement ratio for the saving of the vignette (a wider area than the ROI is cropped around each detected object)."
           },
-          "instrument_settings_acq_xsize": {
+          "instrument_settings_acq_x_size": {
             "type": "number",
-            "description": "Acquisition X size in pixels."
+            "description": "X dimension of the imager, in pixels."
           },
-          "instrument_settings_acq_ysize": {
+          "instrument_settings_acq_y_size": {
             "type": "number",
-            "description": "Acquisition Y size in pixels."
+            "description": "Y dimension of the imager, in pixels."
           },
           "instrument_settings_acq_erase_border": {
             "type": "number",
@@ -1948,6 +1944,10 @@
             "type": "number",
             "description": "Acquisition threshold value."
           },
+          "instrument_settings_acq_pressure_gain": {
+            "type": "number",
+            "description": "Factor converting the raw pressure of the LPM data files to decibar (`raw × pressure_gain = decibar`):\n`0.1` for UVP5, `1` for UVP6. Omitted when not set.\n"
+          },
           "instrument_settings_process_datetime": {
             "type": "string",
             "description": "Process date and time in ISO format."
@@ -1955,6 +1955,10 @@
           "instrument_settings_process_gamma": {
             "type": "number",
             "description": "Process gamma value."
+          },
+          "instrument_settings_process_vignette_resize_factor": {
+            "type": "number",
+            "description": "Scale factor used to resize vignettes when saving them (`1` = unchanged): UVP5SD = 2, UVP5HD = 1,\nUVP6 = `scale` from `compute_vignettes.txt`. Omitted when not set.\n"
           },
           "instrument_settings_images_post_process": {
             "type": "string",
@@ -1980,33 +1984,33 @@
             "type": "number",
             "description": "Depth offset in meters."
           },
-          "instrument_settings_particle_minimum_size_pixels": {
+          "instrument_settings_particule_minimum_area_pixels": {
             "type": "number",
-            "description": "Particle minimum size in pixels."
+            "description": "Minimum object area for counting and sizing in the processed image, in pixel²."
           },
-          "instrument_settings_vignettes_minimum_size_pixels": {
+          "instrument_settings_vignette_minimum_area_pixels": {
             "type": "number",
-            "description": "Vignettes minimum size in pixels."
-          },
-          "instrument_settings_particle_minimum_size_esd": {
-            "type": "number",
-            "description": "Particle minimum size in ESD."
-          },
-          "instrument_settings_vignettes_minimum_size_esd": {
-            "type": "number",
-            "description": "Vignettes minimum size in ESD."
-          },
-          "instrument_settings_acq_shutter": {
-            "type": "number",
-            "description": "Acquisition shutter."
+            "description": "Minimum object area for saving its vignette, in pixel²."
           },
           "instrument_settings_acq_shutter_speed": {
             "type": "number",
-            "description": "Acquisition shutter speed."
+            "description": "Shutter code for UVP5SD (`12` = 100 µs = 1/10000 s)."
           },
           "instrument_settings_acq_exposure": {
             "type": "number",
-            "description": "Acquisition exposure."
+            "description": "Shutter value in µs (UVP5HD, UVP6)."
+          },
+          "instrument_settings_integration_time": {
+            "type": "number",
+            "description": "Integration time in seconds (UVP5 Time samples, from the meta file). Omitted when not set."
+          },
+          "nb_vignettes": {
+            "type": "integer",
+            "description": "Number of vignettes at import time."
+          },
+          "nb_black": {
+            "type": "integer",
+            "description": "Number of black (lights-off) images at import time, used as noise reference."
           },
           "visual_qc_validator_user_id": {
             "type": "integer",
@@ -2023,7 +2027,21 @@
           },
           "visual_qc_validator_user": {
             "type": "string",
-            "description": "Quality check validator user name (format: last_name first_name (email))."
+            "description": "Quality check validator user name (format: first_name last_name (email)). `()` when there is no validator."
+          },
+          "visual_qc_validator_email": {
+            "type": "string",
+            "description": "Quality check validator email. Empty string when there is no validator."
+          },
+          "visual_qc_comment": {
+            "type": "string",
+            "nullable": true,
+            "description": "Quality check reviewer comment. Null until the sample is reviewed."
+          },
+          "visual_qc_validation_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date the sample was validated or rejected (UTC, ISO format). Null until the sample is reviewed."
           },
           "sample_type_id": {
             "type": "integer",
@@ -2050,21 +2068,102 @@
             "type": "boolean",
             "description": "Whether the sample has been imported to EcoTaxa."
           },
-          "ecotaxa_sample_import_date": {
+          "ecotaxa_sample_import_utc_date_time": {
             "type": "string",
-            "description": "EcoTaxa import date."
+            "nullable": true,
+            "description": "EcoTaxa import date (UTC, ISO format)."
           },
           "ecotaxa_sample_id": {
             "type": "integer",
+            "nullable": true,
             "description": "EcoTaxa sample ID."
           },
           "ecotaxa_sample_tsv_file_name": {
             "type": "string",
+            "nullable": true,
             "description": "EcoTaxa TSV file name."
+          },
+          "ecotaxa_sample_local_folder_tsv_path": {
+            "type": "string",
+            "nullable": true,
+            "description": "Server-side path of the TSV file sent to EcoTaxa."
           },
           "ecotaxa_sample_nb_images": {
             "type": "integer",
+            "nullable": true,
             "description": "Number of EcoTaxa images."
+          },
+          "ecotaxa_sample_task_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the task that imported the sample into EcoTaxa (see `GET /projects/{project_id}/tasks/{task_id}`)."
+          },
+          "ctd_imported": {
+            "type": "boolean",
+            "description": "Whether a CTD file is imported for the sample. All other `ctd_*` fields are null when false."
+          },
+          "ctd_station_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sample station ID at CTD import time."
+          },
+          "ctd_file_extension": {
+            "type": "string",
+            "nullable": true,
+            "description": "Extension of the imported CTD file.",
+            "example": "ctd"
+          },
+          "ctd_import_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "CTD import date (UTC, ISO format).",
+            "example": "2024-01-15T10:30:00.000Z"
+          },
+          "ctd_original_file_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "CTD file name in the project CTD folder."
+          },
+          "ctd_imported_file_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "CTD file name in the sample storage folder."
+          },
+          "ctd_importator_user_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the user who imported the CTD file."
+          },
+          "ctd_importator_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Name (first + last) of the user who imported the CTD file."
+          },
+          "ctd_importator_email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email of the user who imported the CTD file."
+          },
+          "ctd_import_task_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the IMPORT_CTD task that imported the CTD file (see `GET /projects/{project_id}/tasks/{task_id}`).\nNull when that task was deleted, or when the CTD file was imported before this field existed.\n"
+          },
+          "ctd_description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Custom (non-standard) columns of the imported CTD file, numbered in file order, one `NN=<column title>` per line\n(legacy EcoPart `ctd_desc`). Standard columns and their accepted alternative spellings are not listed; the list\nof standard columns is in `GET /projects/{project_id}/ctd_samples/can_be_imported`. Computed per sample from its own\nCTD file header, so it can differ between samples of a project. Null when the file has no custom column, or when\nthe CTD file was imported before this field existed.\n",
+            "example": "01=pH\n02=Turbidity [NTU]"
+          },
+          "ctd_latitude": {
+            "type": "number",
+            "nullable": true,
+            "description": "Latitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired)."
+          },
+          "ctd_longitude": {
+            "type": "number",
+            "nullable": true,
+            "description": "Longitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired)."
           }
         }
       },
@@ -4683,7 +4782,7 @@
     "/projects/{project_id}/ctd_samples/import": {
       "post": {
         "summary": "Import CTD samples",
-        "description": "Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous\n**CTD import** task and returns it immediately (poll the task for progress). Requires admin rights\nor a privilege on the project. Unlike sample import, this attaches CTD data to samples that already\nexist in the project — it does **not** trigger a backup.\n\n**Source** — CTD files are read from an instrument-specific folder inside the project source\n(`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named\n`<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is\ntab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth\nsamples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).\n\n**Task pipeline (per requested sample):**\n\n1. **Validation** — every requested name must appear in the project's importable-CTD list (a\n   `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.\n2. **Copy** the `<sample>.ctd` file into the internal sample folder\n   `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).\n3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,\n   `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,\n   `ctd_imported_file_name` and `ctd_importator_user_id`. `ctd_latitude`/`ctd_longitude` stay null\n   (CTD-file coordinate parsing not yet wired).\n",
+        "description": "Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous\n**CTD import** task and returns it immediately (poll the task for progress). Requires admin rights\nor a privilege on the project. Unlike sample import, this attaches CTD data to samples that already\nexist in the project — it does **not** trigger a backup.\n\n**Source** — CTD files are read from an instrument-specific folder inside the project source\n(`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named\n`<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is\ntab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth\nsamples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).\n\n**Task pipeline (per requested sample):**\n\n1. **Validation** — every requested name must appear in the project's importable-CTD list (a\n   `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.\n2. **Copy** the `<sample>.ctd` file into the internal sample folder\n   `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).\n3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,\n   `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,\n   `ctd_imported_file_name`, `ctd_importator_user_id`, `ctd_import_task_id` (the id of this task) and\n   `ctd_description`. `ctd_description` lists the custom (non-standard) columns of the file header,\n   numbered in file order, one `NN=<column title>` per line (e.g. `01=pH`), or is null when every column\n   is standard. `ctd_latitude`/`ctd_longitude` stay null (CTD-file coordinate parsing not yet wired).\n",
         "tags": [
           "CTD Samples"
         ],
@@ -4884,7 +4983,7 @@
       },
       "delete": {
         "summary": "Delete imported CTD samples",
-        "description": "Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples.",
+        "description": "Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples:\n`ctd_imported` is set to false and every other `ctd_*` field (`ctd_station_id`, `ctd_file_extension`,\n`ctd_import_utc_date_time`, `ctd_original_file_name`, `ctd_imported_file_name`, `ctd_importator_user_id`,\n`ctd_import_task_id`, `ctd_description`, `ctd_latitude`, `ctd_longitude`) is reset to null.\n",
         "tags": [
           "CTD Samples"
         ],

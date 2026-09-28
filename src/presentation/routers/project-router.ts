@@ -1323,8 +1323,10 @@ export default function ProjectRouter(
      *          `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).
      *       3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,
      *          `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,
-     *          `ctd_imported_file_name` and `ctd_importator_user_id`. `ctd_latitude`/`ctd_longitude` stay null
-     *          (CTD-file coordinate parsing not yet wired).
+     *          `ctd_imported_file_name`, `ctd_importator_user_id`, `ctd_import_task_id` (the id of this task) and
+     *          `ctd_description`. `ctd_description` lists the custom (non-standard) columns of the file header,
+     *          numbered in file order, one `NN=<column title>` per line (e.g. `01=pH`), or is null when every column
+     *          is standard. `ctd_latitude`/`ctd_longitude` stay null (CTD-file coordinate parsing not yet wired).
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1481,7 +1483,11 @@ export default function ProjectRouter(
      * /projects/{project_id}/ctd_samples:
      *   delete:
      *     summary: Delete imported CTD samples
-     *     description: Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples.
+     *     description: |
+     *       Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples:
+     *       `ctd_imported` is set to false and every other `ctd_*` field (`ctd_station_id`, `ctd_file_extension`,
+     *       `ctd_import_utc_date_time`, `ctd_original_file_name`, `ctd_imported_file_name`, `ctd_importator_user_id`,
+     *       `ctd_import_task_id`, `ctd_description`, `ctd_latitude`, `ctd_longitude`) is reset to null.
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
