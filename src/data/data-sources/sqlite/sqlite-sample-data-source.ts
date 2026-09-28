@@ -90,6 +90,8 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         ctd_importator_user_id: row.ctd_importator_user_id ?? null,
         ctd_latitude: row.ctd_latitude ?? null,
         ctd_longitude: row.ctd_longitude ?? null,
+        ctd_import_task_id: row.ctd_import_task_id ?? null,
+        ctd_description: row.ctd_description ?? null,
         ctd_importator_name,
         ctd_importator_email: ctd_email ?? null,
         nb_vignettes: row.nb_vignettes ?? 0,

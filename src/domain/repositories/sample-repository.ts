@@ -11,6 +11,7 @@ import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-gr
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
+import { CTD_COLUMN_ALIASES, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
 
 
 import * as fs from 'fs'; // For createWriteStream
@@ -1089,6 +1090,24 @@ export class SampleRepositoryImpl implements SampleRepository {
         return true;
     }
 
+    // Legacy `ctd_desc`: custom (non-standard) columns numbered in file order, "NN=<column title>" per line.
+    buildCTDDescription(file_content: string): string | null {
+        const header_line = file_content.split(/\r\n|\n|\r/).find((line) => line.trim().length > 0) ?? "";
+        const custom_columns = header_line
+            .split("\t")
+            .map((col) => col.trim())
+            .filter((col) => col.length > 0)
+            .filter((col) => {
+                const normalized = this.normalizeHeaderName(col);
+                return !CTD_STANDARD_COLUMNS.has(CTD_COLUMN_ALIASES[normalized] ?? normalized);
+            });
+
+        if (custom_columns.length === 0) {
+            return null;
+        }
+        return custom_columns.map((col, i) => `${String(i + 1).padStart(2, "0")}=${col}`).join("\n");
+    }
+
     async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
@@ -1146,7 +1165,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return importable_samples;
     }
 
-    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void> {
+    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number, import_task_id: number): Promise<void> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
         const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
@@ -1195,6 +1214,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
             const sample_info = sample_id_by_name.get(sample_name);
             if (sample_info !== undefined) {
+                const ctd_description = this.buildCTDDescription((await fsPromises.readFile(dest_file_path)).toString("latin1"));
                 await this.sampleDataSource.updateOne({
                     sample_id: sample_info.sample_id,
                     ctd_imported: true,
@@ -1204,6 +1224,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     ctd_original_file_name,
                     ctd_imported_file_name,
                     ctd_importator_user_id: importator_user_id,
+                    ctd_import_task_id: import_task_id,
+                    ctd_description,
                     // ctd_latitude / ctd_longitude stay null until the CTD-file parser is wired (plan follow-up).
                 } as any);
             }
@@ -1771,7 +1793,14 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_utc_date_time"
+            "ctd_import_utc_date_time",
+            "ctd_original_file_name",
+            "ctd_imported_file_name",
+            "ctd_importator_user_id",
+            "ctd_latitude",
+            "ctd_longitude",
+            "ctd_import_task_id",
+            "ctd_description"
         ];
         const updated_sample_nb = await this.updateSample(sample, params_restricted)
         return updated_sample_nb
@@ -2440,6 +2469,13 @@ export class SampleRepositoryImpl implements SampleRepository {
                 ctd_station_id: undefined,
                 ctd_file_extension: undefined,
                 ctd_import_utc_date_time: undefined,
+                ctd_original_file_name: undefined,
+                ctd_imported_file_name: undefined,
+                ctd_importator_user_id: undefined,
+                ctd_latitude: undefined,
+                ctd_longitude: undefined,
+                ctd_import_task_id: undefined,
+                ctd_description: undefined,
             };
             await this.standardUpdateSample(sample_update);
         }

@@ -77,6 +77,8 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
     ctd_importator_user_id: number | null;   // User who ran the CTD import
     ctd_latitude: number | null;             // Latitude derived from the CTD file (when different from sample.latitude)
     ctd_longitude: number | null;            // Longitude derived from the CTD file (when different from sample.longitude)
+    ctd_import_task_id: number | null;       // IMPORT_CTD task that imported the CTD file
+    ctd_description: string | null;          // Custom CTD columns, one "NN=<column title>" per line (legacy ctd_desc)
 
     nb_vignettes: number;                    // Number of vignettes at import time
     nb_black: number;                        // Number of black (lights-off) images at import — noise reference
@@ -115,6 +117,8 @@ export interface SampleUpdateModel {
     ctd_importator_user_id?: number | null;                     // User who ran the CTD import
     ctd_latitude?: number | null;                               // CTD-derived latitude
     ctd_longitude?: number | null;                              // CTD-derived longitude
+    ctd_import_task_id?: number | null;                         // IMPORT_CTD task that imported the CTD file
+    ctd_description?: string | null;                            // Custom CTD columns ("NN=<column title>" lines)
     nb_black?: number;                                          // Number of black (lights-off) images at import
 }
 

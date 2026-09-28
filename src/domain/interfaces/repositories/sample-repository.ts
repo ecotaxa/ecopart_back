@@ -38,7 +38,7 @@ export interface SampleRepository {
 
     // CTD-specific methods
     listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]>;
-    importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void>;
+    importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number, import_task_id: number): Promise<void>;
     deleteImportedCTDSamplesFromDb(samples: PublicSampleModel[]): Promise<void>;
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;
 

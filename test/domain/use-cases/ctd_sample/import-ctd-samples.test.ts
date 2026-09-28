@@ -212,5 +212,39 @@ describe("Import CTD Samples Use Case", () => {
             expect(mockTaskRepository.createTask).toBeCalledTimes(1);
             expect(mockTaskRepository.getOneTask).toBeCalledWith({ task_id: 99 });
         });
+
+        test("background task imports the CTD files under its own task_id", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 };
+            const task = { ...TaskResponseModel_1, task_id: 42 };
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve());
+            jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true));
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(false));
+            jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(projectResponseModel);
+            jest.spyOn(mockTaskRepository, "createTask").mockResolvedValue(42);
+            jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(task);
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue(undefined);
+            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue([
+                { sample_name: "sample_a", file_extension: "ctd" },
+            ]);
+            jest.spyOn(mockSampleRepository, "importCTDSamples").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue(undefined);
+
+            await importCTDSamplesUseCase.execute(current_user, 1, ["sample_a"]);
+            await new Promise((resolve) => setImmediate(resolve));
+
+            expect(mockSampleRepository.importCTDSamples).toBeCalledWith(
+                projectResponseModel.root_folder_path,
+                projectResponseModel.instrument_model,
+                projectResponseModel.project_id,
+                ["sample_a"],
+                current_user.user_id,
+                42
+            );
+            expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: 42 });
+            expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
+        });
     });
 });
