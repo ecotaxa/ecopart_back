@@ -857,7 +857,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             wind_speed: ini_content.sample_metadata['windspeed'] as number,
             sea_state: ini_content.sample_metadata['seastate'] as string,
             nebulousness: ini_content.sample_metadata['nebuloussness'] as number,
-            bottom_depth: ini_content.sample_metadata['bottom_depth'] as number,
+            bottom_depth: this.parseOptionalFloat(ini_content.sample_metadata['bottomdepth']),
             instrument_operator_email: ini_content.HW_CONF['Operator_email'] as string,
             filename: ini_content.sample_metadata['filename'] as string,
             filter_first_image: ini_content.sample_metadata['firstimage'] as string,

@@ -61,7 +61,7 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["sample_longitude", "Start longitude of the sample (decimal degrees, negative for West).", "UVP5: `meta_header.longitude` (re-processed). UVP6: `metadata.ini` `sample_metadata.longitude` (re-processed)."],
     ["environment_wind_direction", "Wind direction in degrees from North.", "UVP5: `meta_header.winddir`. UVP6: `metadata.ini` `sample_metadata.winddir`."],
     ["environment_sea_state", "Sea-state descriptor — free text, ideally Beaufort scale.", "UVP5: `meta_header.seastate`. UVP6: `metadata.ini` `sample_metadata.seastate`."],
-    ["environment_bottom_depth", "Bottom depth in metres.", "UVP5: `meta_header.bottomdepth`. UVP6: `metadata.ini` `sample_metadata.bottom_depth`."],
+    ["environment_bottom_depth", "Bottom depth in metres.", "UVP5: `meta_header.bottomdepth`. UVP6: `metadata.ini` `sample_metadata.bottomdepth`."],
     ["environment_wind_speed", "Wind speed in knots.", "UVP5: `meta_header.windspeed`. UVP6: `metadata.ini` `sample_metadata.windspeed`."],
     ["environment_nebulousness", "Cloud coverage — free text, ideally coded in 1/8th of the sky covered by clouds.", "UVP5: `meta_header.nebuloussness`. UVP6: `metadata.ini` `sample_metadata.nebuloussness`."],
     ["instrument_operator_email", "Email of the UVP operator for this sample — the person capable of informing about the quality of the data, the problems encountered, etc.", "UVP5: `config/cruise_info.txt` `op_email`. UVP6: `metadata.ini` `HW_CONF.Operator_email`."],

@@ -327,7 +327,7 @@ export interface MetadataIniSampleModel {
     wind_speed: number;                        // Wind speed (in relevant unit)
     sea_state: string;                         // Description or classification of sea state
     nebulousness: number;                      // Cloud coverage percentage (0-100)
-    bottom_depth: number;                      // Bottom depth (in meters or relevant unit)
+    bottom_depth: number | undefined;          // [sample_metadata] bottomdepth — often `NA` / `nan`, hence optional
     instrument_operator_email: string;                    // Operator's email
     filename: string;                          // source file name
 

@@ -101,6 +101,16 @@ describe("parseIniContent (UVP6 metadata.ini)", () => {
         expect(repo.parseIniContent(blank).instrument_settings_vignette_minimum_area_pixels).toBe(0);
     });
 
+    test("bottomdepth is read from [sample_metadata] and tolerates the `NA` / `nan` placeholders", () => {
+        expect(repo.parseIniContent(UVP6_METADATA_INI).bottom_depth).toBeUndefined();
+
+        const filled = UVP6_METADATA_INI.replace("bottomdepth=NA", "bottomdepth=2450");
+        expect(repo.parseIniContent(filled).bottom_depth).toBe(2450);
+
+        const nan_ini = UVP6_METADATA_INI.replace("bottomdepth=NA", "bottomdepth=nan");
+        expect(repo.parseIniContent(nan_ini).bottom_depth).toBeUndefined();
+    });
+
     test("the depth offset is only kept inside the legacy sanity range 0 <= offset < 100", () => {
         expect(repo.parseIniContent(UVP6_METADATA_INI).instrument_settings_depth_offset_m).toBe(0);
 
