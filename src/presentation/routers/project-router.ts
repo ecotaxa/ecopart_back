@@ -664,6 +664,12 @@ export default function ProjectRouter(
      *       | each `raw/<sample_folder>/` | `l0b_backup/raw/<sample_folder>.zip` | one ZIP per sample folder (DEFLATE, level 9) |
      *       | each `raw/<sample_folder>.zip` (already zipped at source) | `l0b_backup/raw/<sample_folder>.zip` | copied as-is |
      *
+     *       **History of `meta/` and `config/`:** each backup replaces `l0b_backup/meta/` and `l0b_backup/config/`
+     *       with the current source folders. When a folder's content changed, the replaced version is kept in
+     *       `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup_history/<YYYY_MM_DD_HH_MM_SS>/meta|config/`
+     *       (date of the backup that replaced it). An unchanged folder creates no history entry. The history
+     *       is not part of the backup export.
+     *
      *       **Per instrument** — the mechanism is identical; only the contents of the copied folders differ:
      *
      *       - **UVP5 (UVP5SD / UVP5HD):** `meta/uvp5_header_<sn>.txt`; `config/` with `cruise_info.txt`,
