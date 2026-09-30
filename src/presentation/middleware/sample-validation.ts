@@ -38,6 +38,20 @@ export class MiddlewareSampleValidation implements IMiddlewareSampleValidation {
         },
     ];
 
+    rulesSelectSampleCoordinates = [
+        body('use_ctd_coordinates')
+            .exists().withMessage('use_ctd_coordinates is required.').bail()
+            .isBoolean({ strict: true }).withMessage('use_ctd_coordinates must be a boolean.').bail()
+            .toBoolean(true),
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
     rulesPreviewQcGraphs = [
         body('sample_names')
             .exists().withMessage('sample_names are required.').bail()

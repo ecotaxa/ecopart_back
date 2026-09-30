@@ -74,7 +74,8 @@ export default function ExportRouter(
      *       - `instrument_settings_process_gamma` / `instrument_settings_process_vignette_resize_factor`: read from
      *         `compute_vignette.txt` inside `<sample>_Images.zip`, so both are empty for UVP6 samples imported
      *         without images.
-     *       - `ctd_latitude` / `ctd_longitude`: always empty — position is not part of the CTD data model.
+     *       - `ctd_latitude` / `ctd_longitude`: the start position read from the CTD file `LAT`/`LON` columns;
+     *         empty without an imported CTD or when the file has no position (UVP5 files have none).
      *       - **Units are instrument-dependent on two columns**: `sample_max_pressure` is raw (centibar for the
      *         UVP5, decibar for the UVP6 — multiply by `instrument_settings_acq_pressure_gain` to normalise) and
      *         `instrument_settings_pixel_size_mm` is mm on the UVP5 but µm on the UVP6. `instrument_settings_aa`

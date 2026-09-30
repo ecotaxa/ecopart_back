@@ -61,6 +61,7 @@ import { MigrateEcotaxaProject } from '../../src/domain/use-cases/project/migrat
 import { GetSampleQcGraphs } from '../../src/domain/use-cases/sample/get-sample-qc-graphs'
 import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
+import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/select-sample-coordinates'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -306,6 +307,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new GetSampleQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo),
             new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
+            new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
         )
 
         const taskMiddleware = TaskRouter(
@@ -618,6 +620,36 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             expect(entry!.file_extension).toBe("ctd")
             expect(entry!.ctd_import_utc_date_time).toMatch(/\d{4}-\d{2}-\d{2}T/)
         }
+    })
+
+    test("CTD start position is stored on the sample and can be selected", async () => {
+        const samplesRes = await request(server)
+            .get(`/projects/${capturedProjectId}/samples/?page=1&limit=20`)
+            .set("Cookie", cookieHeader())
+        expect(samplesRes.status).toBe(200)
+
+        // The UVP6 CTD files carry LAT/LON; their first valid row is the header position, unrounded.
+        for (const name of ALL_SAMPLES) {
+            const s = samplesRes.body.samples.find((x: any) => x.sample_name === name)
+            expect(s.ctd_latitude).toBeCloseTo(s.latitude, 3)
+            expect(s.ctd_longitude).toBeCloseTo(s.longitude, 3)
+            expect(s.use_ctd_coordinates).toBe(false)
+        }
+
+        const sample = samplesRes.body.samples.find((x: any) => x.sample_name === SAMPLE_NO_IMAGES)
+        const selectRes = await request(server)
+            .patch(`/projects/${capturedProjectId}/samples/${sample.sample_id}/coordinates`)
+            .set("Cookie", cookieHeader())
+            .send({ use_ctd_coordinates: true })
+        expect(selectRes.status).toBe(200)
+        expect(selectRes.body.use_ctd_coordinates).toBe(true)
+
+        const resetRes = await request(server)
+            .patch(`/projects/${capturedProjectId}/samples/${sample.sample_id}/coordinates`)
+            .set("Cookie", cookieHeader())
+            .send({ use_ctd_coordinates: false })
+        expect(resetRes.status).toBe(200)
+        expect(resetRes.body.use_ctd_coordinates).toBe(false)
     })
 
     // ─── Phase 8: Import samples to EcoTaxa (only ones with images) ─────

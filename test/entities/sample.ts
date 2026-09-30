@@ -77,6 +77,7 @@ export const sampleModel_1: PublicSampleModel = {
     ctd_longitude: null,
     ctd_import_task_id: null,
     ctd_description: null,
+    use_ctd_coordinates: false,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -155,6 +156,7 @@ export const sampleModel_2: PublicSampleModel =
     ctd_longitude: null,
     ctd_import_task_id: null,
     ctd_description: null,
+    use_ctd_coordinates: false,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {

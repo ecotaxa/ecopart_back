@@ -279,11 +279,25 @@ components:
         ctd_latitude:
           type: number
           nullable: true
-          description: Latitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired).
+          description: |
+            Start latitude read from the imported CTD file (decimal degrees, negative for South): the `LAT` column
+            (case-insensitive; `latitude` also accepted) of the first data row whose latitude and longitude are both valid.
+            Null when no CTD file is imported, or when the file has no position columns or no valid row (e.g. UVP5 files).
+          example: 63.3475635770627
         ctd_longitude:
           type: number
           nullable: true
-          description: Longitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired).
+          description: |
+            Start longitude read from the imported CTD file (decimal degrees, negative for West): the `LON` column
+            (case-insensitive; `long` and `longitude` also accepted), same row as `ctd_latitude`.
+          example: -20.2736111743117
+        use_ctd_coordinates:
+          type: boolean
+          description: |
+            Which position is selected for the sample. false (default) = the particle-file coordinates
+            (`latitude`/`longitude`); true = the CTD-file ones (`ctd_latitude`/`ctd_longitude`). Set with
+            `PATCH /projects/{project_id}/samples/{sample_id}/coordinates`; reset to false when the CTD is deleted.
+          example: false
 
     SampleSearchResponse:
       type: object

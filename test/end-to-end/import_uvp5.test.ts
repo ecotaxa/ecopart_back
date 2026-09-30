@@ -65,6 +65,7 @@ import { MigrateEcotaxaProject } from '../../src/domain/use-cases/project/migrat
 import { GetSampleQcGraphs } from '../../src/domain/use-cases/sample/get-sample-qc-graphs'
 import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
+import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/select-sample-coordinates'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -318,6 +319,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new GetSampleQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo),
             new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
+            new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
         )
 
         const taskMiddleware = TaskRouter(

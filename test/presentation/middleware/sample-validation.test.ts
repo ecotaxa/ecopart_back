@@ -27,6 +27,8 @@ import { ImportEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-
 import { DeleteEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
 import { SearchEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
 import { ListShipsUseCase } from "../../../src/domain/interfaces/use-cases/project/list-ships";
+import { SelectSampleCoordinatesUseCase } from "../../../src/domain/interfaces/use-cases/sample/select-sample-coordinates";
+import { sampleModel_1 } from "../../entities/sample";
 export class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
         next()
@@ -54,6 +56,9 @@ describe("Project Router", () => {
     let mockDeleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase;
     let mockSearchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase;
     let mockListShipsUseCase: ListShipsUseCase;
+    const mockSelectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase = {
+        execute(): Promise<any> { throw new Error("Method not implemented for SelectSampleCoordinatesUseCase") }
+    };
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -76,7 +81,7 @@ describe("Project Router", () => {
         mockSearchEcoTaxaSamplesUseCase = new MockSearchEcoTaxaSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, mockSelectSampleCoordinatesUseCase))
     })
 
     beforeEach(() => {
@@ -158,5 +163,44 @@ describe("Project Router", () => {
         expect(mockSearchSamplesUseCase.execute).toBeCalledTimes(1)
 
     });
-})
 
+    describe("PATCH /projects/:project_id/samples/:sample_id/coordinates", () => {
+        test("passes a boolean selection to the use case", async () => {
+            const updated = { ...sampleModel_1, use_ctd_coordinates: true };
+            jest.spyOn(mockSelectSampleCoordinatesUseCase, "execute").mockResolvedValue(updated);
+
+            const response = await request(server).patch("/projects/1/samples/1/coordinates").send({ use_ctd_coordinates: true });
+
+            expect(response.status).toBe(200);
+            expect(response.body.use_ctd_coordinates).toBe(true);
+            expect(mockSelectSampleCoordinatesUseCase.execute).toBeCalledWith(undefined, 1, 1, true);
+        });
+
+        test("rejects a missing use_ctd_coordinates", async () => {
+            const spy = jest.spyOn(mockSelectSampleCoordinatesUseCase, "execute");
+
+            const response = await request(server).patch("/projects/1/samples/1/coordinates").send({});
+
+            expect(response.status).toBe(422);
+            expect(spy).not.toBeCalled();
+        });
+
+        test("rejects a non-boolean use_ctd_coordinates", async () => {
+            const spy = jest.spyOn(mockSelectSampleCoordinatesUseCase, "execute");
+
+            const response = await request(server).patch("/projects/1/samples/1/coordinates").send({ use_ctd_coordinates: "yes" });
+
+            expect(response.status).toBe(422);
+            expect(spy).not.toBeCalled();
+        });
+
+        test("maps a sample without CTD coordinates to 422", async () => {
+            jest.spyOn(mockSelectSampleCoordinatesUseCase, "execute").mockRejectedValue(new Error("Sample has no CTD coordinates"));
+
+            const response = await request(server).patch("/projects/1/samples/1/coordinates").send({ use_ctd_coordinates: true });
+
+            expect(response.status).toBe(422);
+            expect(response.body).toStrictEqual({ errors: ["Sample has no CTD coordinates"] });
+        });
+    });
+})

@@ -36,3 +36,8 @@ export const CTD_COLUMN_ALIASES: Readonly<Record<string, string>> = {
     "pressure in water column [db]": "pressure [db]",
     "spar [µmol m-2 s-1]": "spar [umol m-2 s-1]",
 };
+
+// Position columns (lower-cased) read at CTD import into `sample.ctd_latitude` / `ctd_longitude`.
+// Not part of legacy `CTDFixedCol`, so they stay listed in `ctd_description` as custom columns.
+export const CTD_LATITUDE_COLUMNS: ReadonlySet<string> = new Set(["lat", "latitude"]);
+export const CTD_LONGITUDE_COLUMNS: ReadonlySet<string> = new Set(["lon", "long", "longitude"]);

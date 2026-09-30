@@ -11,7 +11,7 @@ import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-gr
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
-import { CTD_COLUMN_ALIASES, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
+import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
 
 
 import * as fs from 'fs'; // For createWriteStream
@@ -1108,6 +1108,32 @@ export class SampleRepositoryImpl implements SampleRepository {
         return custom_columns.map((col, i) => `${String(i + 1).padStart(2, "0")}=${col}`).join("\n");
     }
 
+    // Start position of the cast: first data row whose LAT and LON are both valid decimal degrees
+    // (the particle-file header position is the same point, rounded). Null without such columns/rows.
+    readCTDCoordinates(file_content: string): { latitude: number, longitude: number } | null {
+        const lines = file_content.split(/\r\n|\n|\r/).filter((line) => line.trim().length > 0);
+        const header_columns = (lines[0] ?? "").split("\t").map((col) => this.normalizeHeaderName(col));
+        const lat_index = header_columns.findIndex((col) => CTD_LATITUDE_COLUMNS.has(col));
+        const lon_index = header_columns.findIndex((col) => CTD_LONGITUDE_COLUMNS.has(col));
+        if (lat_index === -1 || lon_index === -1) {
+            return null;
+        }
+
+        const toDegrees = (raw: string | undefined, max: number): number | null => {
+            const value = raw?.trim() ? Number(raw) : NaN;
+            return Number.isFinite(value) && Math.abs(value) <= max ? value : null;
+        };
+        for (const line of lines.slice(1)) {
+            const fields = line.split("\t");
+            const latitude = toDegrees(fields[lat_index], 90);
+            const longitude = toDegrees(fields[lon_index], 180);
+            if (latitude !== null && longitude !== null) {
+                return { latitude, longitude };
+            }
+        }
+        return null;
+    }
+
     async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
@@ -1214,7 +1240,9 @@ export class SampleRepositoryImpl implements SampleRepository {
 
             const sample_info = sample_id_by_name.get(sample_name);
             if (sample_info !== undefined) {
-                const ctd_description = this.buildCTDDescription((await fsPromises.readFile(dest_file_path)).toString("latin1"));
+                const file_content = (await fsPromises.readFile(dest_file_path)).toString("latin1");
+                const ctd_description = this.buildCTDDescription(file_content);
+                const ctd_coordinates = this.readCTDCoordinates(file_content);
                 await this.sampleDataSource.updateOne({
                     sample_id: sample_info.sample_id,
                     ctd_imported: true,
@@ -1226,7 +1254,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     ctd_importator_user_id: importator_user_id,
                     ctd_import_task_id: import_task_id,
                     ctd_description,
-                    // ctd_latitude / ctd_longitude stay null until the CTD-file parser is wired (plan follow-up).
+                    ctd_latitude: ctd_coordinates?.latitude ?? null,
+                    ctd_longitude: ctd_coordinates?.longitude ?? null,
                 } as any);
             }
         }
@@ -1744,7 +1773,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_utc_date_time"
+            "ctd_import_utc_date_time",
+            "use_ctd_coordinates"
         ];
         const unauthorizedParams: string[] = [];
         const filteredData: Partial<SampleUpdateModel> = {};
@@ -1800,7 +1830,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_latitude",
             "ctd_longitude",
             "ctd_import_task_id",
-            "ctd_description"
+            "ctd_description",
+            "use_ctd_coordinates"
         ];
         const updated_sample_nb = await this.updateSample(sample, params_restricted)
         return updated_sample_nb
@@ -2476,6 +2507,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 ctd_longitude: undefined,
                 ctd_import_task_id: undefined,
                 ctd_description: undefined,
+                use_ctd_coordinates: false,
             };
             await this.standardUpdateSample(sample_update);
         }

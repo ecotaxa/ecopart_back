@@ -74,6 +74,7 @@ class MockMiddlewareProjectValidation implements IMiddlewareProjectValidation {
 class MockIMiddlewareSampleValidation implements IMiddlewareSampleValidation {
     rulesGetSamples = []
     rulesSetVisualQc = []
+    rulesSelectSampleCoordinates = []
     rulesPreviewQcGraphs = []
     rulesSampleRequestCreationModel = []
     rulesSampleUpdateModel = []
@@ -138,7 +139,7 @@ describe("Project Router", () => {
         mockDeleteImportedCTDSamplesUseCase = new MockDeleteImportedCTDSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any))
     })
 
     beforeEach(() => {

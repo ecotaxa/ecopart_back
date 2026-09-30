@@ -2158,12 +2158,19 @@
           "ctd_latitude": {
             "type": "number",
             "nullable": true,
-            "description": "Latitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired)."
+            "description": "Start latitude read from the imported CTD file (decimal degrees, negative for South): the `LAT` column\n(case-insensitive; `latitude` also accepted) of the first data row whose latitude and longitude are both valid.\nNull when no CTD file is imported, or when the file has no position columns or no valid row (e.g. UVP5 files).\n",
+            "example": 63.3475635770627
           },
           "ctd_longitude": {
             "type": "number",
             "nullable": true,
-            "description": "Longitude derived from the CTD file. Always null (CTD-file coordinate parsing is not wired)."
+            "description": "Start longitude read from the imported CTD file (decimal degrees, negative for West): the `LON` column\n(case-insensitive; `long` and `longitude` also accepted), same row as `ctd_latitude`.\n",
+            "example": -20.2736111743117
+          },
+          "use_ctd_coordinates": {
+            "type": "boolean",
+            "description": "Which position is selected for the sample. false (default) = the particle-file coordinates\n(`latitude`/`longitude`); true = the CTD-file ones (`ctd_latitude`/`ctd_longitude`). Set with\n`PATCH /projects/{project_id}/samples/{sample_id}/coordinates`; reset to false when the CTD is deleted.\n",
+            "example": false
           }
         }
       },
@@ -3357,7 +3364,7 @@
     "/exports/raw": {
       "post": {
         "summary": "Export raw data for a list of samples (possibly across multiple projects)",
-        "description": "Creates an asynchronous task that bundles the requested raw artifacts for the given samples into a single ZIP.\nThe samples may span several projects; the archive is organised per project.\n\n### Pipeline\n1. **Authorization** — the caller must be usable, then must be admin *or* hold a privilege on\n   **every distinct project** the requested samples belong to.\n2. **Resolution** — all `sample_ids` must resolve; any unknown id aborts the whole export (`404`).\n3. **Visual QC gate** — every requested sample must be in visual QC status `VALIDATED`.\n   A single `PENDING` or `REJECTED` sample aborts the export with `409` and the offending\n   sample names in the error message; nothing is exported partially. Pass\n   `skip_not_validated=true` to accept a partial archive instead: the non-validated samples\n   are then excluded and listed in the task log (`409` still applies if none remains).\n4. **Task** — a `EXPORT_RAW` task is created and returned immediately. Because the export can\n   span projects, the task is deliberately **not** tied to a `task_project_id`.\n5. **Background build** — the archive is produced fire-and-forget, one step per requested export\n   type, with progress reported on the task. Per-sample problems that are not fatal (no LPM file\n   on disk, no CTD imported, project not linked to EcoTaxa, sample not imported into EcoTaxa)\n   are **skipped with a warning line in the task log**, not failed.\n\n### Archive contents per export type\n- `metadata` → `metadata/projects.tsv` (one row per distinct project) + `metadata/samples.tsv`\n  (one row per sample, ordered by `(ecopart_project_id, ecopart_sample_id)`). Tab-separated UTF-8,\n  one header row, cells sanitised of tabs/CR/LF, booleans as `true`/`false`, timestamps ISO 8601 UTC.\n- `lpm` → `lpm/<project_id>/<sample_name>/…` the per-sample **particle data**, copied exactly as\n  imported: UVP5 → `<sample>_work.zip` (datfile + HDR + bru); UVP6 → `<sample>_Particule.zip`\n  (`particules.csv` + `metadata.ini`). Nothing else — vignettes and instrument configuration have\n  their own export types below.\n- `images` → `images/<project_id>/<sample_name>/<sample>_Images.zip`, the vignettes. **UVP6 only**,\n  and only for samples imported with images; a UVP5 sample produces nothing (noted in the task log).\n- `instrument_config` → `instrument_config/<project_id>/<sample_name>/<sample>_meta_conf.zip`, the\n  instrument configuration and the **original acquisition headers** (`config/*`, `meta/uvp5_header_sn*.txt`,\n  plus any `meta/old/` backups present in the source folder). **UVP5 only** — the UVP6 keeps its\n  configuration in the `metadata.ini` shipped with `lpm`.\n- `ctd` → `ctd/<project_id>/<sample_name>.<ext>`, the CTD file as imported (extension of the source\n  file, `.ctd` by default). Samples with no CTD import are skipped.\n- `ecotaxa` → `ecotaxa/<project_id>/ecotaxa_export_<project_id>.zip`, produced by calling EcoTaxa's\n  `/object_set/{project_id}/export/general` API once per linked project. `ecotaxa_exclude_not_living=true`\n  constrains it to the **biota** subtree (`taxo=1&taxochild=Y`). Unlike the skips above, an EcoTaxa\n  API failure **fails the whole task**.\n\nA `README.md` documenting every column is always generated at the root of the archive, from the same\ncolumn constants the TSV writers use, so it cannot drift from the actual file contents.\n\n### Known issues / columns still empty\n- `sample_integration_time`: UVP5 only in the extended meta-header format — empty for the 21-column\n  format shipped by Zooprocess. Filled for the UVP6 (`metadata.ini` `integrationtime`), empty when\n  that value is `nan` (depth-mode samples).\n- `instrument_settings_process_datetime`: always empty — no UVP file carries the Zooprocess date\n  (it is a manual field in legacy EcoPart and EcoPart has no editing screen for it yet).\n- `instrument_settings_depth_offset_m`: not carried by the UVP5 files (set it at project level);\n  on the UVP6 an out-of-range value (`< 0` or `>= 100`) is discarded, as in legacy EcoPart.\n- `instrument_settings_process_gamma` / `instrument_settings_process_vignette_resize_factor`: read from\n  `compute_vignette.txt` inside `<sample>_Images.zip`, so both are empty for UVP6 samples imported\n  without images.\n- `ctd_latitude` / `ctd_longitude`: always empty — position is not part of the CTD data model.\n- **Units are instrument-dependent on two columns**: `sample_max_pressure` is raw (centibar for the\n  UVP5, decibar for the UVP6 — multiply by `instrument_settings_acq_pressure_gain` to normalise) and\n  `instrument_settings_pixel_size_mm` is mm on the UVP5 but µm on the UVP6. `instrument_settings_aa`\n  is likewise 10^6 times larger on the UVP6. See the archive README, column by column.\n- The header values *inside* the copied `lpm` / `instrument_config` artifacts are still the original\n  acquisition values and can disagree with `metadata/samples.tsv` (re-processed lat/long, ISO-normalised\n  dates, serial-number convention).\n- **The project's descent filter is reported but not applied to the exported data.**\n  `metadata/samples.tsv` states its outcome per sample (`filter_last_image_used`,\n  `filter_removed_images_count`, `filter_removed_images_percent`, recomputed at export time), but the\n  copied `lpm` files still contain the ascent images EcoPart discards when it computes its own\n  histograms — so abundances recomputed straight from this archive will differ from EcoPart's unless\n  the consumer re-applies the filter. `filter_last_image` remains the raw header value (often the\n  sentinel 99999999999).\n\nThe endpoint returns the created task immediately; the resulting ZIP is downloadable at\n`/api/tasks/{task_id}/file` once the task reaches the `DONE` status.\n",
+        "description": "Creates an asynchronous task that bundles the requested raw artifacts for the given samples into a single ZIP.\nThe samples may span several projects; the archive is organised per project.\n\n### Pipeline\n1. **Authorization** — the caller must be usable, then must be admin *or* hold a privilege on\n   **every distinct project** the requested samples belong to.\n2. **Resolution** — all `sample_ids` must resolve; any unknown id aborts the whole export (`404`).\n3. **Visual QC gate** — every requested sample must be in visual QC status `VALIDATED`.\n   A single `PENDING` or `REJECTED` sample aborts the export with `409` and the offending\n   sample names in the error message; nothing is exported partially. Pass\n   `skip_not_validated=true` to accept a partial archive instead: the non-validated samples\n   are then excluded and listed in the task log (`409` still applies if none remains).\n4. **Task** — a `EXPORT_RAW` task is created and returned immediately. Because the export can\n   span projects, the task is deliberately **not** tied to a `task_project_id`.\n5. **Background build** — the archive is produced fire-and-forget, one step per requested export\n   type, with progress reported on the task. Per-sample problems that are not fatal (no LPM file\n   on disk, no CTD imported, project not linked to EcoTaxa, sample not imported into EcoTaxa)\n   are **skipped with a warning line in the task log**, not failed.\n\n### Archive contents per export type\n- `metadata` → `metadata/projects.tsv` (one row per distinct project) + `metadata/samples.tsv`\n  (one row per sample, ordered by `(ecopart_project_id, ecopart_sample_id)`). Tab-separated UTF-8,\n  one header row, cells sanitised of tabs/CR/LF, booleans as `true`/`false`, timestamps ISO 8601 UTC.\n- `lpm` → `lpm/<project_id>/<sample_name>/…` the per-sample **particle data**, copied exactly as\n  imported: UVP5 → `<sample>_work.zip` (datfile + HDR + bru); UVP6 → `<sample>_Particule.zip`\n  (`particules.csv` + `metadata.ini`). Nothing else — vignettes and instrument configuration have\n  their own export types below.\n- `images` → `images/<project_id>/<sample_name>/<sample>_Images.zip`, the vignettes. **UVP6 only**,\n  and only for samples imported with images; a UVP5 sample produces nothing (noted in the task log).\n- `instrument_config` → `instrument_config/<project_id>/<sample_name>/<sample>_meta_conf.zip`, the\n  instrument configuration and the **original acquisition headers** (`config/*`, `meta/uvp5_header_sn*.txt`,\n  plus any `meta/old/` backups present in the source folder). **UVP5 only** — the UVP6 keeps its\n  configuration in the `metadata.ini` shipped with `lpm`.\n- `ctd` → `ctd/<project_id>/<sample_name>.<ext>`, the CTD file as imported (extension of the source\n  file, `.ctd` by default). Samples with no CTD import are skipped.\n- `ecotaxa` → `ecotaxa/<project_id>/ecotaxa_export_<project_id>.zip`, produced by calling EcoTaxa's\n  `/object_set/{project_id}/export/general` API once per linked project. `ecotaxa_exclude_not_living=true`\n  constrains it to the **biota** subtree (`taxo=1&taxochild=Y`). Unlike the skips above, an EcoTaxa\n  API failure **fails the whole task**.\n\nA `README.md` documenting every column is always generated at the root of the archive, from the same\ncolumn constants the TSV writers use, so it cannot drift from the actual file contents.\n\n### Known issues / columns still empty\n- `sample_integration_time`: UVP5 only in the extended meta-header format — empty for the 21-column\n  format shipped by Zooprocess. Filled for the UVP6 (`metadata.ini` `integrationtime`), empty when\n  that value is `nan` (depth-mode samples).\n- `instrument_settings_process_datetime`: always empty — no UVP file carries the Zooprocess date\n  (it is a manual field in legacy EcoPart and EcoPart has no editing screen for it yet).\n- `instrument_settings_depth_offset_m`: not carried by the UVP5 files (set it at project level);\n  on the UVP6 an out-of-range value (`< 0` or `>= 100`) is discarded, as in legacy EcoPart.\n- `instrument_settings_process_gamma` / `instrument_settings_process_vignette_resize_factor`: read from\n  `compute_vignette.txt` inside `<sample>_Images.zip`, so both are empty for UVP6 samples imported\n  without images.\n- `ctd_latitude` / `ctd_longitude`: the start position read from the CTD file `LAT`/`LON` columns;\n  empty without an imported CTD or when the file has no position (UVP5 files have none).\n- **Units are instrument-dependent on two columns**: `sample_max_pressure` is raw (centibar for the\n  UVP5, decibar for the UVP6 — multiply by `instrument_settings_acq_pressure_gain` to normalise) and\n  `instrument_settings_pixel_size_mm` is mm on the UVP5 but µm on the UVP6. `instrument_settings_aa`\n  is likewise 10^6 times larger on the UVP6. See the archive README, column by column.\n- The header values *inside* the copied `lpm` / `instrument_config` artifacts are still the original\n  acquisition values and can disagree with `metadata/samples.tsv` (re-processed lat/long, ISO-normalised\n  dates, serial-number convention).\n- **The project's descent filter is reported but not applied to the exported data.**\n  `metadata/samples.tsv` states its outcome per sample (`filter_last_image_used`,\n  `filter_removed_images_count`, `filter_removed_images_percent`, recomputed at export time), but the\n  copied `lpm` files still contain the ascent images EcoPart discards when it computes its own\n  histograms — so abundances recomputed straight from this archive will differ from EcoPart's unless\n  the consumer re-applies the filter. `filter_last_image` remains the raw header value (often the\n  sentinel 99999999999).\n\nThe endpoint returns the created task immediately; the resulting ZIP is downloadable at\n`/api/tasks/{task_id}/file` once the task reaches the `DONE` status.\n",
         "tags": [
           "Exports"
         ],
@@ -4782,7 +4789,7 @@
     "/projects/{project_id}/ctd_samples/import": {
       "post": {
         "summary": "Import CTD samples",
-        "description": "Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous\n**CTD import** task and returns it immediately (poll the task for progress). Requires admin rights\nor a privilege on the project. Unlike sample import, this attaches CTD data to samples that already\nexist in the project — it does **not** trigger a backup.\n\n**Source** — CTD files are read from an instrument-specific folder inside the project source\n(`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named\n`<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is\ntab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth\nsamples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).\n\n**Task pipeline (per requested sample):**\n\n1. **Validation** — every requested name must appear in the project's importable-CTD list (a\n   `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.\n2. **Copy** the `<sample>.ctd` file into the internal sample folder\n   `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).\n3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,\n   `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,\n   `ctd_imported_file_name`, `ctd_importator_user_id`, `ctd_import_task_id` (the id of this task) and\n   `ctd_description`. `ctd_description` lists the custom (non-standard) columns of the file header,\n   numbered in file order, one `NN=<column title>` per line (e.g. `01=pH`), or is null when every column\n   is standard. `ctd_latitude`/`ctd_longitude` stay null (CTD-file coordinate parsing not yet wired).\n",
+        "description": "Import the CTD (hydrological cast) files for the selected samples. Starts an asynchronous\n**CTD import** task and returns it immediately (poll the task for progress). Requires admin rights\nor a privilege on the project. Unlike sample import, this attaches CTD data to samples that already\nexist in the project — it does **not** trigger a backup.\n\n**Source** — CTD files are read from an instrument-specific folder inside the project source\n(`root_folder_path`): `ctd_data_cnv/` for **UVP5**, `CTDdata/` for **UVP6**. Each file is named\n`<sample>.ctd` and is tab-separated; a file is considered valid only if its header row is\ntab-delimited and — depending on the sample type — contains a `pressure … [db]` column (Depth\nsamples) or a `time [yyyymmddhhmmssmmm]` column (Time samples).\n\n**Task pipeline (per requested sample):**\n\n1. **Validation** — every requested name must appear in the project's importable-CTD list (a\n   `<sample>.ctd` file present, valid, and not already imported); otherwise the whole task fails.\n2. **Copy** the `<sample>.ctd` file into the internal sample folder\n   `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).\n3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,\n   `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,\n   `ctd_imported_file_name`, `ctd_importator_user_id`, `ctd_import_task_id` (the id of this task) and\n   `ctd_description`. `ctd_description` lists the custom (non-standard) columns of the file header,\n   numbered in file order, one `NN=<column title>` per line (e.g. `01=pH`), or is null when every column\n   is standard. `ctd_latitude`/`ctd_longitude` are the first data row whose `LAT` and `LON` columns\n   (case-insensitive; also `latitude`, `lon`, `long`, `longitude`) are both valid decimal degrees, i.e. the\n   start position of the cast; null when the file has no such columns or rows (the UVP5 CTD files have none).\n",
         "tags": [
           "CTD Samples"
         ],
@@ -4983,7 +4990,7 @@
       },
       "delete": {
         "summary": "Delete imported CTD samples",
-        "description": "Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples:\n`ctd_imported` is set to false and every other `ctd_*` field (`ctd_station_id`, `ctd_file_extension`,\n`ctd_import_utc_date_time`, `ctd_original_file_name`, `ctd_imported_file_name`, `ctd_importator_user_id`,\n`ctd_import_task_id`, `ctd_description`, `ctd_latitude`, `ctd_longitude`) is reset to null.\n",
+        "description": "Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples:\n`ctd_imported` is set to false and every other `ctd_*` field (`ctd_station_id`, `ctd_file_extension`,\n`ctd_import_utc_date_time`, `ctd_original_file_name`, `ctd_imported_file_name`, `ctd_importator_user_id`,\n`ctd_import_task_id`, `ctd_description`, `ctd_latitude`, `ctd_longitude`) is reset to null, and\n`use_ctd_coordinates` goes back to false (sample coordinates).\n",
         "tags": [
           "CTD Samples"
         ],
@@ -5282,6 +5289,80 @@
           },
           "422": {
             "description": "Validation error."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/samples/{sample_id}/coordinates": {
+      "patch": {
+        "summary": "Select which coordinates are the sample's position",
+        "description": "Sets `use_ctd_coordinates`. By default (false) the sample position is the one read from the\nparticle files (`latitude`/`longitude`); true selects the position read from the imported CTD\nfile (`ctd_latitude`/`ctd_longitude`), which requires both to be set. Allowed for admins or any\nmember of the project. Deleting the sample's CTD resets the selection to false.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sample_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "use_ctd_coordinates"
+                ],
+                "properties": {
+                  "use_ctd_coordinates": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated sample.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSample"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used or cannot update samples in this project."
+          },
+          "404": {
+            "description": "Sample not found or not in the project."
+          },
+          "422": {
+            "description": "Validation error, or CTD coordinates selected on a sample that has none."
           },
           "500": {
             "description": "Internal server error."
