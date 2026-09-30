@@ -73,6 +73,7 @@ import { MigrateEcotaxaProject } from './domain/use-cases/project/migrate-ecotax
 import { GetSampleQcGraphs } from './domain/use-cases/sample/get-sample-qc-graphs'
 import { SetSampleVisualQc } from './domain/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphs } from './domain/use-cases/sample/preview-samples-qc-graphs'
+import { SelectSampleCoordinates } from './domain/use-cases/sample/select-sample-coordinates'
 import { ListImportFolders } from './domain/use-cases/file_system/list-import-folders'
 import { GetImportFolderMetadata } from './domain/use-cases/file_system/get-import-folder-metadata'
 
@@ -310,6 +311,7 @@ async function getSQLiteDS() {
         new GetSampleQcGraphs(user_repo, sample_repo, project_repo, privilege_repo),
         new SetSampleVisualQc(user_repo, sample_repo, privilege_repo),
         new PreviewSamplesQcGraphs(user_repo, sample_repo, project_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
+        new SelectSampleCoordinates(user_repo, sample_repo, privilege_repo),
     )
 
     const taskMiddleWare = TaskRouter(

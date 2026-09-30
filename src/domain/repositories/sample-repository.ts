@@ -6,11 +6,12 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
+import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
 
 
 import * as fs from 'fs'; // For createWriteStream
@@ -215,10 +216,12 @@ export class SampleRepositoryImpl implements SampleRepository {
                 : instrument_model === 'UVP5HD' ? 1
                     : undefined;
 
-        // TODO(marc): UVP5 pressure_gain constant — Marc said "0.1 or 10". Lock the value
-        // and set it here (e.g. 0.1) once confirmed. Left undefined for now so the column
-        // is empty on UVP5 rows rather than wrong.
-        const instrument_settings_acq_pressure_gain: number | undefined = undefined;
+        // UVP5 stores raw pressure in centibar in the data files; UVP6 stores it in decibar.
+        // The "pressure gain" is the multiplicative factor that converts raw → decibar, i.e.
+        // raw_centibar × 0.1 = decibar. UVP6's gain is 1. Either convention (10 or 0.1)
+        // would work as long as the consumer knows which way to apply it; we pick the
+        // multiplicative form for consistency with UVP6's `1`.
+        const instrument_settings_acq_pressure_gain: number = 0.1;
 
         // Construct the sample object
         const sample_to_return: Partial<SampleRequestCreationModel> = {
@@ -241,38 +244,51 @@ export class SampleRepositoryImpl implements SampleRepository {
     async getSampleFromInstallConfig(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromInstallConfigModel> {
         const filePath = 'config/process_install_config.txt';
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseInstallConfig(fileContent);
     }
+    // Reading one file out of a stored per-sample archive. `readFileFromZip` only ever says
+    // "File not found in zip" / "Failed to open zip file", which is unusable when an import fails on
+    // a dataset missing one file among a dozen — so every UVP5 reader below states which file it was
+    // looking for, in which archive. The failure itself is deliberate: a UVP5 dataset without its
+    // configuration file is reported rather than silently imported with empty columns.
+    private async readSampleFile(zipPath: string, description: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
+        try {
+            return await this.readFileFromZip(zipPath, targetFileName, filePathPattern);
+        } catch (error) {
+            throw new Error(`Cannot read ${description} in ${path.basename(zipPath)}: ${(error as Error).message}`);
+        }
+    }
+
     async getSampleFromConfigurationData(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromConfigurationDataModel> {
         const filePath = 'config/uvp5_settings/uvp5_configuration_data.txt';
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseConfigurationData(fileContent);
     }
     async getSampleFromCruiseInfo(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromCruiseInfoModel> {
         const filePath = 'config/cruise_info.txt';
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseCruiseInfo(fileContent);
     }
     async getSampleFromWorkHDR(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkHDRModel> {
         // Construct the file path to match files starting with "HDR" and ending with ".txt"
         const filePathPattern = new RegExp(`^HDR.*\\.txt$`);
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_work.zip");
-        const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
+        const fileContent = await this.readSampleFile(zipPath, "HDR*.txt", undefined, filePathPattern);
         return this.parseWorkHDR(fileContent);
     }
     async getSampleFromWorkDatfile(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromWorkDatfileModel> {
         const filePath = sample_name + '_datfile.txt'; // perle3_003_datfile.txt
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_work.zip");
-        const fileContent = await this.readFileFromZip(zipPath, filePath, undefined);
+        const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseWorkDatfile(fileContent);
     }
     async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
         const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readFileFromZip(zipPath, undefined, filePathPattern);
+        const fileContent = await this.readSampleFile(zipPath, "meta/uvp5_header_sn*.txt", undefined, filePathPattern);
         const fileName = await this.getFileNameFromZip(zipPath, filePathPattern);
 
         return this.parseMetaHeader(fileContent, fileName, sample_name);
@@ -325,8 +341,8 @@ export class SampleRepositoryImpl implements SampleRepository {
         const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw);
         // Compute max_pressure
         const max_pressure = await this.computeMaxPressure(file_system_storage_project_folder, sample_name);
-        // Get instrument_settings_process_gamma
-        const instrument_settings_process_gamma = await this.getInstrumentSettingsProcessGamma(sample_metadata_ini, file_system_storage_project_folder, sample_name);
+        // Get the vignette-processing settings (gamma + resize factor) from compute_vignette.txt
+        const vignette_settings = await this.getVignetteProcessingSettings(sample_metadata_ini, file_system_storage_project_folder, sample_name);
 
         // Construct the sample object
         delete (sample_metadata_ini as any).sampleType;
@@ -340,21 +356,25 @@ export class SampleRepositoryImpl implements SampleRepository {
             latitude: coords.latitude,
             longitude: coords.longitude,
             max_pressure,
-            instrument_settings_process_gamma
+            instrument_settings_process_gamma: vignette_settings.gamma,
+            instrument_settings_process_vignette_resize_factor: vignette_settings.resize_factor
         };
         return sample_to_return;
     }
 
-    async getInstrumentSettingsProcessGamma(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
+    // `compute_vignette.txt` (inside <sample>_Images.zip) carries both the gamma correction and
+    // the `scale` resize factor applied when saving vignettes. No images imported → no file → both
+    // stay empty, which is also why UVP6 rows of image-less samples have no gamma.
+    async getVignetteProcessingSettings(sample: MetadataIniSampleModel, file_system_storage_project_folder: string, sample_name: string): Promise<{ gamma: number | undefined, resize_factor: number | undefined }> {
         if (sample.comment === 'no vignettes generated') {
-            return undefined;
+            return { gamma: undefined, resize_factor: undefined };
         }
         try {
-            const gamma = (await this.readComputeVignettes(file_system_storage_project_folder, sample_name)).gamma;
-            return gamma;
+            const compute_vignettes = await this.readComputeVignettes(file_system_storage_project_folder, sample_name);
+            return { gamma: compute_vignettes.gamma, resize_factor: compute_vignettes.scale };
         } catch {
             // No Images.zip present — treat as no vignettes
-            return undefined;
+            return { gamma: undefined, resize_factor: undefined };
         }
     }
 
@@ -521,7 +541,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     // Method to read and parse the metadata.ini file
     async getSampleFromMetadataIni(file_system_storage_project_folder: string, sample_name: string): Promise<MetadataIniSampleModel> {
         const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
-        const fileContent = await this.readFileFromZip(zipPath, 'metadata.ini', undefined);
+        const fileContent = await this.readSampleFile(zipPath, 'metadata.ini', 'metadata.ini', undefined);
         return this.parseIniContent(fileContent);
     }
 
@@ -614,12 +634,13 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_acq_threshold: parseInt(work_hdr_content['Thresh']),
             instrument_settings_particule_minimum_area_pixels: parseInt(work_hdr_content['SMbase']),
             instrument_settings_vignette_minimum_area_pixels: parseInt(work_hdr_content['SMzoo']),
-            // Marc's spec says these two are likely swapped relative to the HDR fields they
-            // currently read from (acq_shutter_speed should be the UVP5SD code, acq_exposure
-            // should be the UVP5HD/UVP6 shutter in µs). See follow-up #8 in the plan — fixing
-            // the swap requires a backfill and is tracked separately.
-            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['Exposure']) || undefined,
-            instrument_settings_acq_exposure: parseInt(work_hdr_content['ShutterSpeed']) || undefined
+            // Per Marc's spec:
+            //   instrument_settings_acq_shutter_speed = HDR `ShutterSpeed` (UVP5SD code, always 12 = 1/10000 s)
+            //   instrument_settings_acq_exposure      = HDR `Exposure`     (UVP5HD shutter in µs, +60 µs vs UVPdb net)
+            // Previous releases had these two assignments crossed; migration 019 backfills the
+            // already-stored rows by swapping their values.
+            instrument_settings_acq_shutter_speed: parseInt(work_hdr_content['ShutterSpeed']) || undefined,
+            instrument_settings_acq_exposure: parseInt(work_hdr_content['Exposure']) || undefined
         };
         return sample;
     }
@@ -749,9 +770,51 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_aa: parseFloat(row.aa),
             instrument_settings_exp: parseFloat(row.exp),
             instrument_settings_image_volume_l: parseFloat(row.volimage),
+            // `integrationtime` only exists in the extended UVP5 meta-header format. The
+            // 21-column format every current dataset ships has no such column, so the field
+            // stays undefined there instead of NaN — parsed defensively so TIME-mode samples
+            // from an extended header export a real value without a second code change.
+            instrument_settings_integration_time: this.parseOptionalFloat(row.integrationtime),
         };
 
         return sample;
+    }
+
+    // Header columns that only exist in some UVP file-format revisions: return undefined for
+    // a missing/blank/non-numeric cell rather than NaN, which would reach the DB as garbage.
+    // Also covers the UVP6 `nan` placeholders found in metadata.ini / uvp6_header files.
+    private parseOptionalFloat(value: unknown): number | undefined {
+        if (value === undefined || value === null || String(value).trim() === "") return undefined;
+        const parsed = parseFloat(String(value));
+        return Number.isNaN(parsed) ? undefined : parsed;
+    }
+
+    // UVP6 `metadata.ini` `HW_CONF.Pressure_offset`, with legacy EcoPart's sanity range: only
+    // 0 <= offset < 100 m is accepted, otherwise the value is dropped so the project-level
+    // override applies instead (`uvp_sample_import.py` CreateOrUpdateSample).
+    private parseUvp6PressureOffset(value: unknown): number | undefined {
+        const parsed = this.parseOptionalFloat(value);
+        if (parsed === undefined) return undefined;
+        return parsed >= 0 && parsed < 100 ? parsed : undefined;
+    }
+
+    // Area in pixels of the smallest detected/saved object, from its ESD limit.
+    // Port of legacy EcoPart `calcpixelfromesd_aa_exp` (py/part_app/tasks/importcommon.py):
+    //   area_px = floor(round((π / aa) × (esd_mm / 2)² ^ (1 / exp), 3))
+    // `aa` must be in mm²/px: UVP5 files already give it that way (e.g. 0.0014) but the UVP6
+    // `metadata.ini` stores it multiplied by 10^6 (e.g. 2300 for 0.0023), so it is scaled here.
+    // ESD limits in `[ACQ_CONF]` are in µm, hence the /1000 to millimetres.
+    private computeAreaPixelsFromEsdUvp6(esd_um: unknown, aa_e6: unknown, exp: unknown): number | undefined {
+        const esd = this.parseOptionalFloat(esd_um);
+        const aa = this.parseOptionalFloat(aa_e6);
+        const exponent = this.parseOptionalFloat(exp);
+        if (esd === undefined || aa === undefined || exponent === undefined) return undefined;
+        if (aa <= 0 || exponent <= 0) return undefined;
+        const esd_mm = esd / 1000;
+        const aa_mm2 = aa / 1e6;
+        const area_px = Math.pow((Math.PI / aa_mm2) * Math.pow(esd_mm / 2, 2), 1 / exponent);
+        if (!Number.isFinite(area_px)) return undefined;
+        return Math.floor(Math.round(area_px * 1000) / 1000);
     }
 
 
@@ -794,7 +857,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             wind_speed: ini_content.sample_metadata['windspeed'] as number,
             sea_state: ini_content.sample_metadata['seastate'] as string,
             nebulousness: ini_content.sample_metadata['nebuloussness'] as number,
-            bottom_depth: ini_content.sample_metadata['bottom_depth'] as number,
+            bottom_depth: this.parseOptionalFloat(ini_content.sample_metadata['bottomdepth']),
             instrument_operator_email: ini_content.HW_CONF['Operator_email'] as string,
             filename: ini_content.sample_metadata['filename'] as string,
             filter_first_image: ini_content.sample_metadata['firstimage'] as string,
@@ -811,27 +874,40 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_acq_threshold: ini_content.HW_CONF['Threshold'] as number,
             // UVP6 pressure raw data is in decibar; gain to convert to decibar is 1 (per Marc's spec).
             instrument_settings_acq_pressure_gain: 1,
+            // Legacy EcoPart never fills proc_datetime at import either: it is a manual field of
+            // the sample-edit form (`py/part_app/views/sampleedit.py`), no file carries it.
             instrument_settings_process_datetime: undefined,
-            // TODO(marc): pull the scale factor from compute_vignettes.txt — file is parsed
-            // separately for `gamma`; extend that parser to also return the scale value and
-            // wire it here. Plan section "Vignette ratio fields — disambiguation and rename".
+            // Filled by getSampleFromFsStorageUVP6 from `compute_vignette.txt` `scale`, which only
+            // exists inside <sample>_Images.zip (so it stays empty when no images were imported).
             instrument_settings_process_vignette_resize_factor: undefined,
             instrument_settings_images_post_process: "uvpapp",
             instrument_settings_aa: ini_content.HW_CONF['Aa'] as number,
             instrument_settings_exp: ini_content.HW_CONF['Exp'] as number,
             instrument_settings_image_volume_l: ini_content.HW_CONF['Image_volume'] as number,
+            // /!\ `HW_CONF.Pixel_Size` is in MICROMETRE on the UVP6 (73 on real data), while the
+            // UVP5 config file gives millimetre (0.118). Kept raw, as legacy EcoPart does with its
+            // single `acq_pixel` column — the per-instrument unit is documented in the export README.
             instrument_settings_pixel_size_mm: ini_content.HW_CONF['Pixel_Size'] as number,
-            instrument_settings_depth_offset_m: ini_content.HW_CONF['Pressure_offset'] as number,
-            // TODO(marc): parse particule/vignette min ESD from the ACQ_CONF line in data.txt,
-            // convert via Marc's area_px = floor((π × (ESD_mm/2)²) / Aa)^(1/Exp). ACQ_CONF
-            // position indices need confirmation. Plan section "UVP6 data.txt parsing for
-            // area-in-pixels fields".
-            instrument_settings_particule_minimum_area_pixels: undefined,
-            instrument_settings_vignette_minimum_area_pixels: undefined,
+            // Legacy guards this one: an offset is only trusted when 0 <= value < 100
+            // (`uvp_sample_import.py` CreateOrUpdateSample), anything else is left empty so the
+            // project-level offset applies instead.
+            instrument_settings_depth_offset_m: this.parseUvp6PressureOffset(ini_content.HW_CONF['Pressure_offset']),
+            // ESD limits live in `metadata.ini` `[ACQ_CONF]` (in µm), not in a positional field of
+            // data.txt: `Limit_lpm_detection_size` for the LPM/particle limit and
+            // `Vignetting_lower_limit_size` for the vignette limit. Both are converted to an area in
+            // pixels with the same formula legacy uses (`calcpixelfromesd_aa_exp`).
+            instrument_settings_particule_minimum_area_pixels: this.computeAreaPixelsFromEsdUvp6(
+                ini_content.ACQ_CONF['Limit_lpm_detection_size'], ini_content.HW_CONF['Aa'], ini_content.HW_CONF['Exp']),
+            instrument_settings_vignette_minimum_area_pixels: this.computeAreaPixelsFromEsdUvp6(
+                ini_content.ACQ_CONF['Vignetting_lower_limit_size'], ini_content.HW_CONF['Aa'], ini_content.HW_CONF['Exp']),
+            // UVP6 `HW_CONF.Shutter` is the shutter value in µs, i.e. the same quantity the UVP5HD
+            // HDR calls `Exposure` — legacy maps it to `acq_shutterspeed`, we keep the UVP5
+            // convention and expose it as the exposure. `acq_shutter_speed` is a UVP5SD-only code.
             instrument_settings_acq_shutter_speed: undefined,
-            instrument_settings_acq_exposure: undefined,
-            // UVP6 integration_time may or may not exist in metadata.ini — pending Marc's confirmation.
-            instrument_settings_integration_time: undefined,
+            instrument_settings_acq_exposure: this.parseOptionalFloat(ini_content.HW_CONF['Shutter']),
+            // `[sample_metadata] integrationtime` exists in the UVP6 metadata.ini (TIME-mode
+            // samples); it can be `nan` on depth-mode samples, hence the defensive parse.
+            instrument_settings_integration_time: this.parseOptionalFloat(ini_content.sample_metadata['integrationtime']),
 
             // these will be reprocessed
             latitude_raw: ini_content.sample_metadata['latitude'],
@@ -1014,6 +1090,50 @@ export class SampleRepositoryImpl implements SampleRepository {
         return true;
     }
 
+    // Legacy `ctd_desc`: custom (non-standard) columns numbered in file order, "NN=<column title>" per line.
+    buildCTDDescription(file_content: string): string | null {
+        const header_line = file_content.split(/\r\n|\n|\r/).find((line) => line.trim().length > 0) ?? "";
+        const custom_columns = header_line
+            .split("\t")
+            .map((col) => col.trim())
+            .filter((col) => col.length > 0)
+            .filter((col) => {
+                const normalized = this.normalizeHeaderName(col);
+                return !CTD_STANDARD_COLUMNS.has(CTD_COLUMN_ALIASES[normalized] ?? normalized);
+            });
+
+        if (custom_columns.length === 0) {
+            return null;
+        }
+        return custom_columns.map((col, i) => `${String(i + 1).padStart(2, "0")}=${col}`).join("\n");
+    }
+
+    // Start position of the cast: first data row whose LAT and LON are both valid decimal degrees
+    // (the particle-file header position is the same point, rounded). Null without such columns/rows.
+    readCTDCoordinates(file_content: string): { latitude: number, longitude: number } | null {
+        const lines = file_content.split(/\r\n|\n|\r/).filter((line) => line.trim().length > 0);
+        const header_columns = (lines[0] ?? "").split("\t").map((col) => this.normalizeHeaderName(col));
+        const lat_index = header_columns.findIndex((col) => CTD_LATITUDE_COLUMNS.has(col));
+        const lon_index = header_columns.findIndex((col) => CTD_LONGITUDE_COLUMNS.has(col));
+        if (lat_index === -1 || lon_index === -1) {
+            return null;
+        }
+
+        const toDegrees = (raw: string | undefined, max: number): number | null => {
+            const value = raw?.trim() ? Number(raw) : NaN;
+            return Number.isFinite(value) && Math.abs(value) <= max ? value : null;
+        };
+        for (const line of lines.slice(1)) {
+            const fields = line.split("\t");
+            const latitude = toDegrees(fields[lat_index], 90);
+            const longitude = toDegrees(fields[lon_index], 180);
+            if (latitude !== null && longitude !== null) {
+                return { latitude, longitude };
+            }
+        }
+        return null;
+    }
+
     async listImportableCTDSamples(root_folder_path: string, instrument_model: string, project_id: number): Promise<ImportableCTDSampleModel[]> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
@@ -1071,7 +1191,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return importable_samples;
     }
 
-    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number): Promise<void> {
+    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number, import_task_id: number): Promise<void> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
         const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
@@ -1120,6 +1240,9 @@ export class SampleRepositoryImpl implements SampleRepository {
 
             const sample_info = sample_id_by_name.get(sample_name);
             if (sample_info !== undefined) {
+                const file_content = (await fsPromises.readFile(dest_file_path)).toString("latin1");
+                const ctd_description = this.buildCTDDescription(file_content);
+                const ctd_coordinates = this.readCTDCoordinates(file_content);
                 await this.sampleDataSource.updateOne({
                     sample_id: sample_info.sample_id,
                     ctd_imported: true,
@@ -1129,7 +1252,10 @@ export class SampleRepositoryImpl implements SampleRepository {
                     ctd_original_file_name,
                     ctd_imported_file_name,
                     ctd_importator_user_id: importator_user_id,
-                    // ctd_latitude / ctd_longitude stay null until the CTD-file parser is wired (plan follow-up).
+                    ctd_import_task_id: import_task_id,
+                    ctd_description,
+                    ctd_latitude: ctd_coordinates?.latitude ?? null,
+                    ctd_longitude: ctd_coordinates?.longitude ?? null,
                 } as any);
             }
         }
@@ -1647,7 +1773,8 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_utc_date_time"
+            "ctd_import_utc_date_time",
+            "use_ctd_coordinates"
         ];
         const unauthorizedParams: string[] = [];
         const filteredData: Partial<SampleUpdateModel> = {};
@@ -1696,7 +1823,15 @@ export class SampleRepositoryImpl implements SampleRepository {
             "ctd_imported",
             "ctd_station_id",
             "ctd_file_extension",
-            "ctd_import_utc_date_time"
+            "ctd_import_utc_date_time",
+            "ctd_original_file_name",
+            "ctd_imported_file_name",
+            "ctd_importator_user_id",
+            "ctd_latitude",
+            "ctd_longitude",
+            "ctd_import_task_id",
+            "ctd_description",
+            "use_ctd_coordinates"
         ];
         const updated_sample_nb = await this.updateSample(sample, params_restricted)
         return updated_sample_nb
@@ -1778,14 +1913,20 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     // Returns absolute paths of raw LPM artifacts stored per sample after import.
     // Layout differs between UVP5 (work + meta_conf zips) and UVP6 (Particule [+ Images] zips).
-    async listLpmRawFilesForSample(instrument_model: string, project_id: number, sample_name: string): Promise<string[]> {
+    // Absolute paths of the stored artifacts of one sample for one category — see RawFileCategory
+    // for what each category means per instrument. An unknown/absent artifact yields an empty list;
+    // the caller decides whether that is worth a warning (LPM) or expected (images on a sample
+    // imported without them, instrument_config on UVP6).
+    async listRawFilesForSample(instrument_model: string, project_id: number, sample_name: string, category: RawFileCategory): Promise<string[]> {
         const sample_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name);
+        const is_uvp5 = instrument_model.startsWith("UVP5");
         let candidates: string[];
-        if (instrument_model.startsWith("UVP5")) {
-            candidates = [`${sample_name}_work.zip`, `${sample_name}_meta_conf.zip`];
+        if (category === "lpm") {
+            candidates = is_uvp5 ? [`${sample_name}_work.zip`] : [`${sample_name}_Particule.zip`];
+        } else if (category === "images") {
+            candidates = is_uvp5 ? [] : [`${sample_name}_Images.zip`];
         } else {
-            // UVP6 (LP/HF/MHP/MHF) — Particule is mandatory, Images optional
-            candidates = [`${sample_name}_Particule.zip`, `${sample_name}_Images.zip`];
+            candidates = is_uvp5 ? [`${sample_name}_meta_conf.zip`] : [];
         }
         const present: string[] = [];
         for (const file_name of candidates) {
@@ -2359,6 +2500,14 @@ export class SampleRepositoryImpl implements SampleRepository {
                 ctd_station_id: undefined,
                 ctd_file_extension: undefined,
                 ctd_import_utc_date_time: undefined,
+                ctd_original_file_name: undefined,
+                ctd_imported_file_name: undefined,
+                ctd_importator_user_id: undefined,
+                ctd_latitude: undefined,
+                ctd_longitude: undefined,
+                ctd_import_task_id: undefined,
+                ctd_description: undefined,
+                use_ctd_coordinates: false,
             };
             await this.standardUpdateSample(sample_update);
         }

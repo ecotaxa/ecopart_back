@@ -61,6 +61,7 @@ import { MigrateEcotaxaProject } from '../../src/domain/use-cases/project/migrat
 import { GetSampleQcGraphs } from '../../src/domain/use-cases/sample/get-sample-qc-graphs'
 import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
+import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/select-sample-coordinates'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -306,6 +307,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new GetSampleQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo),
             new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
+            new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
         )
 
         const taskMiddleware = TaskRouter(
@@ -620,6 +622,36 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
         }
     })
 
+    test("CTD start position is stored on the sample and can be selected", async () => {
+        const samplesRes = await request(server)
+            .get(`/projects/${capturedProjectId}/samples/?page=1&limit=20`)
+            .set("Cookie", cookieHeader())
+        expect(samplesRes.status).toBe(200)
+
+        // The UVP6 CTD files carry LAT/LON; their first valid row is the header position, unrounded.
+        for (const name of ALL_SAMPLES) {
+            const s = samplesRes.body.samples.find((x: any) => x.sample_name === name)
+            expect(s.ctd_latitude).toBeCloseTo(s.latitude, 3)
+            expect(s.ctd_longitude).toBeCloseTo(s.longitude, 3)
+            expect(s.use_ctd_coordinates).toBe(false)
+        }
+
+        const sample = samplesRes.body.samples.find((x: any) => x.sample_name === SAMPLE_NO_IMAGES)
+        const selectRes = await request(server)
+            .patch(`/projects/${capturedProjectId}/samples/${sample.sample_id}/coordinates`)
+            .set("Cookie", cookieHeader())
+            .send({ use_ctd_coordinates: true })
+        expect(selectRes.status).toBe(200)
+        expect(selectRes.body.use_ctd_coordinates).toBe(true)
+
+        const resetRes = await request(server)
+            .patch(`/projects/${capturedProjectId}/samples/${sample.sample_id}/coordinates`)
+            .set("Cookie", cookieHeader())
+            .send({ use_ctd_coordinates: false })
+        expect(resetRes.status).toBe(200)
+        expect(resetRes.body.use_ctd_coordinates).toBe(false)
+    })
+
     // ─── Phase 8: Import samples to EcoTaxa (only ones with images) ─────
     test("POST /projects/:id/ecotaxa_samples/import should import samples with images to EcoTaxa", async () => {
         const listRes = await request(server)
@@ -689,7 +721,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             .set("Cookie", cookieHeader())
             .send({
                 sample_ids,
-                export_types: ["metadata", "lpm", "ctd", "ecotaxa"],
+                export_types: ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"],
                 ecotaxa_exclude_not_living: true,
             })
         expect(exportRes.status).toBe(200)
@@ -720,13 +752,16 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
         expect(entries).toContain("metadata/projects.tsv")
         expect(entries).toContain("metadata/samples.tsv")
 
-        // LPM: UVP6 raw Particule zip per sample (Images zip only for sample with images)
+        // LPM: particle data only — the Particule zip. Vignettes now land in `images/`, and the
+        // UVP6 has no separate config archive so `instrument_config/` stays empty.
         for (const name of ALL_SAMPLES) {
             expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Particule.zip`)
+            expect(entries).not.toContain(`lpm/${capturedProjectId}/${name}/${name}_Images.zip`)
         }
         for (const name of SAMPLES_WITH_IMAGES) {
-            expect(entries).toContain(`lpm/${capturedProjectId}/${name}/${name}_Images.zip`)
+            expect(entries).toContain(`images/${capturedProjectId}/${name}/${name}_Images.zip`)
         }
+        expect(entries.some(e => e.startsWith("instrument_config/"))).toBe(false)
 
         // CTD: one file per imported sample, as imported (.ctd)
         for (const name of ALL_SAMPLES) {

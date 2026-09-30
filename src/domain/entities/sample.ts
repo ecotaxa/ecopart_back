@@ -75,8 +75,11 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
     ctd_original_file_name: string | null;   // File name as found in the project's CTD folder before copy
     ctd_imported_file_name: string | null;   // File name written under the per-sample storage folder
     ctd_importator_user_id: number | null;   // User who ran the CTD import
-    ctd_latitude: number | null;             // Latitude derived from the CTD file (when different from sample.latitude)
-    ctd_longitude: number | null;            // Longitude derived from the CTD file (when different from sample.longitude)
+    ctd_latitude: number | null;             // Start latitude read from the CTD file LAT column (null when the file has none)
+    ctd_longitude: number | null;            // Start longitude read from the CTD file LON column (null when the file has none)
+    ctd_import_task_id: number | null;       // IMPORT_CTD task that imported the CTD file
+    ctd_description: string | null;          // Custom CTD columns, one "NN=<column title>" per line (legacy ctd_desc)
+    use_ctd_coordinates: boolean;            // Selected position: false = latitude/longitude (default), true = ctd_latitude/ctd_longitude
 
     nb_vignettes: number;                    // Number of vignettes at import time
     nb_black: number;                        // Number of black (lights-off) images at import — noise reference
@@ -115,6 +118,9 @@ export interface SampleUpdateModel {
     ctd_importator_user_id?: number | null;                     // User who ran the CTD import
     ctd_latitude?: number | null;                               // CTD-derived latitude
     ctd_longitude?: number | null;                              // CTD-derived longitude
+    ctd_import_task_id?: number | null;                         // IMPORT_CTD task that imported the CTD file
+    ctd_description?: string | null;                            // Custom CTD columns ("NN=<column title>" lines)
+    use_ctd_coordinates?: boolean;                              // Selected position: false = sample coordinates, true = CTD ones
     nb_black?: number;                                          // Number of black (lights-off) images at import
 }
 
@@ -212,6 +218,16 @@ export interface PublicSampleUpdateModel extends PrivateSampleUpdateModel {
 }
 
 /* COMPUTE VIGNETTES */
+/* RAW EXPORT — categories of per-sample artifact stored at import time.
+ * One category = one folder of the export archive, so that asking for the particle data does not
+ * also ship the vignettes or the instrument configuration:
+ *   - lpm               UVP5 `<sample>_work.zip` (datfile + HDR) / UVP6 `<sample>_Particule.zip`
+ *   - images            UVP6 `<sample>_Images.zip` (vignettes). No UVP5 equivalent stored.
+ *   - instrument_config UVP5 `<sample>_meta_conf.zip` (config/ + meta/ headers). UVP6 ships its
+ *                       configuration inside the Particule archive (metadata.ini), so nothing here.
+ */
+export type RawFileCategory = "lpm" | "images" | "instrument_config";
+
 export interface ComputeVignettesModel {
     gamma: number;              // gamma coefficiant of the gamma correction
     invert: string;             // invert image (black => white) : Values Y/N case insensitive
@@ -313,7 +329,7 @@ export interface MetadataIniSampleModel {
     wind_speed: number;                        // Wind speed (in relevant unit)
     sea_state: string;                         // Description or classification of sea state
     nebulousness: number;                      // Cloud coverage percentage (0-100)
-    bottom_depth: number;                      // Bottom depth (in meters or relevant unit)
+    bottom_depth: number | undefined;          // [sample_metadata] bottomdepth — often `NA` / `nan`, hence optional
     instrument_operator_email: string;                    // Operator's email
     filename: string;                          // source file name
 
@@ -337,10 +353,10 @@ export interface MetadataIniSampleModel {
     instrument_settings_aa: number;
     instrument_settings_exp: number;
     instrument_settings_image_volume_l: number;
-    instrument_settings_pixel_size_mm: number;
-    instrument_settings_depth_offset_m: number;
-    instrument_settings_particule_minimum_area_pixels: number | undefined;   // Renamed; UVP6 will parse from data.txt ACQ_CONF (TODO position)
-    instrument_settings_vignette_minimum_area_pixels: number | undefined;    // Renamed; UVP6 will parse from data.txt ACQ_CONF (TODO position)
+    instrument_settings_pixel_size_mm: number;                               // /!\ UVP6 metadata.ini gives it in µm, not mm
+    instrument_settings_depth_offset_m: number | undefined;                  // dropped unless 0 <= value < 100 (legacy sanity range)
+    instrument_settings_particule_minimum_area_pixels: number | undefined;   // UVP6: from ACQ_CONF.Limit_lpm_detection_size (µm ESD)
+    instrument_settings_vignette_minimum_area_pixels: number | undefined;    // UVP6: from ACQ_CONF.Vignetting_lower_limit_size (µm ESD)
     instrument_settings_acq_shutter_speed: number | undefined;
     instrument_settings_acq_exposure: number | undefined;
     instrument_settings_integration_time?: number;
@@ -375,6 +391,7 @@ export interface SampleFromMetaHeaderModel {
     instrument_settings_aa: number,             // aa
     instrument_settings_exp: number,            // exp
     instrument_settings_image_volume_l: number, // volimage
+    instrument_settings_integration_time?: number, // integrationtime — extended header format only
 
 }
 export interface SampleFromWorkDatfileModel {

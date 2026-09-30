@@ -84,7 +84,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
             this.ensureCTDSamplesAreImportables(importable_samples.map(s => s.sample_name), samples_names_to_import);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/3 CTD sample copy: start");
-            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id);
+            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id, task_id);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 3/3 CTD sample import: done");
             await this.taskRepository.finishTask({ task_id: task_id });

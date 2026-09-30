@@ -18,6 +18,7 @@ import { ListImportableSamplesUseCase } from '../../domain/interfaces/use-cases/
 import { GetSampleQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/get-sample-qc-graphs'
 import { SetSampleVisualQcUseCase } from '../../domain/interfaces/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/preview-samples-qc-graphs'
+import { SelectSampleCoordinatesUseCase } from '../../domain/interfaces/use-cases/sample/select-sample-coordinates'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -62,6 +63,7 @@ export default function ProjectRouter(
     getSampleQcGraphsUseCase: GetSampleQcGraphsUseCase,
     setSampleVisualQcUseCase: SetSampleVisualQcUseCase,
     previewSamplesQcGraphsUseCase: PreviewSamplesQcGraphsUseCase,
+    selectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase,
 ) {
     const router = express.Router()
 
@@ -1329,8 +1331,12 @@ export default function ProjectRouter(
      *          `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/` (copied verbatim, uncompressed).
      *       3. **Update the sample row** in the database: `ctd_imported = true`, plus `ctd_station_id`,
      *          `ctd_file_extension` (e.g. `ctd`), `ctd_import_utc_date_time`, `ctd_original_file_name`,
-     *          `ctd_imported_file_name` and `ctd_importator_user_id`. `ctd_latitude`/`ctd_longitude` stay null
-     *          (CTD-file coordinate parsing not yet wired).
+     *          `ctd_imported_file_name`, `ctd_importator_user_id`, `ctd_import_task_id` (the id of this task) and
+     *          `ctd_description`. `ctd_description` lists the custom (non-standard) columns of the file header,
+     *          numbered in file order, one `NN=<column title>` per line (e.g. `01=pH`), or is null when every column
+     *          is standard. `ctd_latitude`/`ctd_longitude` are the first data row whose `LAT` and `LON` columns
+     *          (case-insensitive; also `latitude`, `lon`, `long`, `longitude`) are both valid decimal degrees, i.e. the
+     *          start position of the cast; null when the file has no such columns or rows (the UVP5 CTD files have none).
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1487,7 +1493,12 @@ export default function ProjectRouter(
      * /projects/{project_id}/ctd_samples:
      *   delete:
      *     summary: Delete imported CTD samples
-     *     description: Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples.
+     *     description: |
+     *       Delete one or more imported CTD files from file system storage and clear CTD import metadata in linked samples:
+     *       `ctd_imported` is set to false and every other `ctd_*` field (`ctd_station_id`, `ctd_file_extension`,
+     *       `ctd_import_utc_date_time`, `ctd_original_file_name`, `ctd_imported_file_name`, `ctd_importator_user_id`,
+     *       `ctd_import_task_id`, `ctd_description`, `ctd_latitude`, `ctd_longitude`) is reset to null, and
+     *       `use_ctd_coordinates` goes back to false (sample coordinates).
      *     tags: [CTD Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1759,6 +1770,71 @@ export default function ProjectRouter(
             else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Visual QC status not found") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot update sample visual QC"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/{sample_id}/coordinates:
+     *   patch:
+     *     summary: Select which coordinates are the sample's position
+     *     description: |
+     *       Sets `use_ctd_coordinates`. By default (false) the sample position is the one read from the
+     *       particle files (`latitude`/`longitude`); true selects the position read from the imported CTD
+     *       file (`ctd_latitude`/`ctd_longitude`), which requires both to be set. Allowed for admins or any
+     *       member of the project. Deleting the sample's CTD resets the selection to false.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [use_ctd_coordinates]
+     *             properties:
+     *               use_ctd_coordinates:
+     *                 type: boolean
+     *     responses:
+     *       200:
+     *         description: The updated sample.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicSample'
+     *       403:
+     *         description: User cannot be used or cannot update samples in this project.
+     *       404:
+     *         description: Sample not found or not in the project.
+     *       422:
+     *         description: Validation error, or CTD coordinates selected on a sample that has none.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.patch('/:project_id/samples/:sample_id/coordinates', middlewareAuth.auth, middlewareSampleValidation.rulesSelectSampleCoordinates, async (req: Request, res: Response) => {
+        try {
+            const updated_sample = await selectSampleCoordinatesUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id), req.body.use_ctd_coordinates);
+            res.status(200).send(updated_sample)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot update samples in this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find updated sample") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample has no CTD coordinates") res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot update sample coordinates selection"] })
         }
     })
 

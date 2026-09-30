@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
 
-const ALLOWED_EXPORT_TYPES = ["metadata", "lpm", "ctd", "ecotaxa"];
+const ALLOWED_EXPORT_TYPES = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
 
 export interface IMiddlewareExportValidation {
     rulesExportRawData: any[];
@@ -19,6 +19,9 @@ export class MiddlewareExportValidation implements IMiddlewareExportValidation {
             .isArray({ min: 1 }).withMessage('export_types must be a non-empty array.'),
         check("export_types.*")
             .isIn(ALLOWED_EXPORT_TYPES).withMessage(`export_types must each be one of: ${ALLOWED_EXPORT_TYPES.join(", ")}.`),
+        check("skip_not_validated")
+            .optional()
+            .isBoolean().withMessage('skip_not_validated must be a boolean.'),
         check("ecotaxa_exclude_not_living")
             .if((_value: any, { req }: any) => Array.isArray(req.body?.export_types) && req.body.export_types.includes("ecotaxa"))
             .exists().withMessage('ecotaxa_exclude_not_living is required when ecotaxa export is selected.')
