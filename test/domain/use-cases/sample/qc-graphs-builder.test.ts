@@ -256,6 +256,24 @@ describe("buildSampleQcGraphs — graphs 2 and 3 only count the selected images"
         expect(depthProfile(res.black_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 3 }]);
     });
 
+    test("OVER_EXPOSED and EMPTY_IMAGE images add no imaged volume, but stay on graph 1 and in the descent filter", () => {
+        const res = buildSampleQcGraphs(input({
+            instrument_model: "UVP6LP",
+            instrument_settings_image_volume_l: 2,
+            records: [
+                rec(0, "a", 0.5, { spectrum_counts: { 1: 10 } }),
+                rec(1, "b", 0.6, { particle_data_flag: "OVER_EXPOSED" }),
+                rec(2, "c", 1.5, { particle_data_flag: "EMPTY_IMAGE" }),
+                rec(3, "d", 1.4, { spectrum_counts: { 1: 20 } }),   // shallower than the EMPTY_IMAGE one
+            ],
+        }));
+
+        expect(depthProfile(res.imaged_volume_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 2 }]);
+        expect(depthProfile(res.particle_lpm_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 10 }]);
+        expect(selection(res)).toEqual([true, true, true, false]);
+        expect(res.image_depth_profile.selected_images).toBe(3);
+    });
+
     test("black_profile stays present, and empty, when no dark frame is selected", () => {
         // The dark frame (1.0 m, after 1.5 m) is dropped by the descent filter.
         const res = buildSampleQcGraphs(input({

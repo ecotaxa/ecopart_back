@@ -7,7 +7,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
 import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
-import { PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
+import { ParticleDataFlag, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
@@ -24,7 +24,9 @@ import archiver from 'archiver';
 import * as fzstd from 'fzstd';
 import * as tar from 'tar';
 
-
+// Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
+// (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
+const PARTICLE_DATA_FLAGS: ParticleDataFlag[] = ["OVER_EXPOSED", "EMPTY_IMAGE"];
 
 
 export class SampleRepositoryImpl implements SampleRepository {
@@ -1991,7 +1993,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                 }
             });
             const image_id = parts[0].trim();
-            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts });
+            const particle_data_flag = PARTICLE_DATA_FLAGS.find((f) => line.slice(line.indexOf(":") + 1).includes(f));
+            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts, particle_data_flag });
         }
         return records;
     }
