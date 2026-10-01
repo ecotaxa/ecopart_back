@@ -32,6 +32,22 @@ describe("parseParticulesCsvRecords (UVP6)", () => {
         expect(records[1].image_index).toBe(1);
         expect(records[1].image_time_ms).toBe(Date.UTC(2024, 5, 12, 0, 39, 7));
         expect(records[1].spectrum_counts).toEqual({ 1: 7, 2: 3 });
+        expect(records[0].particle_data_flag).toBeUndefined();
+    });
+
+    test("flags the OVER_EXPOSED and EMPTY_IMAGE lines, which carry no particle data", () => {
+        const content = [
+            "20210428-134956-1,-0.05,21.38,1:OVER_EXPOSED,22.2%;",
+            "20210428-134957-1,0.10,21.38,1:EMPTY_IMAGE;",
+            "20210428-134958-1,0.20,21.38,0:1,7,29.3,10.5;",
+        ].join("\n");
+
+        const records = repo.parseParticulesCsvRecords(content);
+
+        expect(records.map((r) => r.particle_data_flag)).toEqual(["OVER_EXPOSED", "EMPTY_IMAGE", undefined]);
+        expect(records[0].spectrum_counts).toEqual({});
+        expect(records[1].spectrum_counts).toEqual({});
+        expect(records[0].raw_pressure).toBe(-0.05);
     });
 });
 

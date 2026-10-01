@@ -130,4 +130,9 @@ export interface PerImageRecord {
     image_time_ms: number | null;        // acquisition time (epoch ms UTC, second resolution); null if unreadable
     light_on: boolean;                   // flash/light flag: ON = particles, OFF = black
     spectrum_counts: Record<number, number>;  // pixel-area (px) -> particle count (sparse; absent = 0)
+    // UVP6 only: the firmware wrote this sentinel instead of particle data. The image keeps its
+    // place on the depth profile but adds no imaged volume, like in legacy EcoPart.
+    particle_data_flag?: ParticleDataFlag;
 }
+
+export type ParticleDataFlag = "OVER_EXPOSED" | "EMPTY_IMAGE";

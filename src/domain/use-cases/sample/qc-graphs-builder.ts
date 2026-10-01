@@ -84,8 +84,10 @@ export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponse
         : { kind: "depth", position: (r) => toDepth(r.raw_pressure) };
 
     // Graphs 2 and 3 only count the images the sample actually uses; graph 1 shows them all.
+    // An OVER_EXPOSED / EMPTY_IMAGE line stays on graph 1 and in the descent filter, but legacy
+    // EcoPart gives it no imaged volume.
     const used = records.filter((_, i) => selection.selected[i]);
-    const used_lit = used.filter((r) => r.light_on);
+    const used_lit = used.filter((r) => r.light_on && r.particle_data_flag === undefined);
 
     return {
         sample_id: input.sample_id,
