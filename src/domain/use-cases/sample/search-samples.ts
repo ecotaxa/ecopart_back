@@ -22,18 +22,29 @@ export class SearchSamples implements SearchSamplesUseCase {
         this.instrumentModelRepository = instrumentModelRepository
         this.privilegeRepository = privilegeRepository
     }
-    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id?: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
 
         // Ensure the current user is valid and not deleted
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        await this.ensureUserCanGet(current_user, project_id);
+        const is_cross_project = project_id === undefined || project_id === null;
+        if (!is_cross_project) await this.ensureUserCanGet(current_user, project_id);
 
         // Prepare search options
         let prepared_options: PreparedSearchOptions = this.prepareSearchOptions(options, filters);
 
         // Apply additional filters
         prepared_options = await this.applyAdditionalFilters(current_user, prepared_options, project_id);
+
+        // A cross-project search only covers the projects the user can access
+        if (is_cross_project && !(await this.userRepository.isAdmin(current_user.user_id))) {
+            const granted_project_ids = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
+            // A user without any project gets no sample; do not rely on how the data source handles an empty IN
+            if (granted_project_ids.length === 0) {
+                return { search_info: this.searchRepository.formatSearchInfo({ total: 0, items: [] }, prepared_options), samples: [] };
+            }
+            prepared_options.filter.push({ field: "project_id", operator: "IN", value: granted_project_ids });
+        }
 
         // Fetch samples based on prepared search options
         const result: SearchResult<PublicSampleModel> = await this.sampleRepository.standardGetSamples(prepared_options);

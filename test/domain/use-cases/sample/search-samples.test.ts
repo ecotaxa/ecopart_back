@@ -367,6 +367,75 @@ describe("Search Task Use Case", () => {
             expect(result.samples).toEqual([sampleModel_1])
             expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "=", value: 1 }] }))
         });
+        test("cross-project search by an admin covers every project", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            const options: SearchOptions = {
+                page: 1,
+                limit: 10,
+                sort_by: []
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser")
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            const result = await searchSamplesUseCase.execute(current_user, options, [])
+
+            expect(result.samples).toEqual([sampleModel_1])
+            expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
+            expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
+            expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [] }))
+        });
+        test("cross-project search by a non-admin is limited to the projects they have a privilege on", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            const options: SearchOptions = {
+                page: 1,
+                limit: 10,
+                sort_by: []
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([3, 5])
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            const result = await searchSamplesUseCase.execute(current_user, options, [])
+
+            expect(result.samples).toEqual([sampleModel_1])
+            expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
+            expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledWith({ user_id: 1 })
+            expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [3, 5] }] }))
+        });
+        test("cross-project search by a non-admin without any project returns no sample", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            const options: SearchOptions = {
+                page: 1,
+                limit: 10,
+                sort_by: []
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([])
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples")
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }));
+
+            const result = await searchSamplesUseCase.execute(current_user, options, [])
+
+            expect(result).toEqual({ search_info: { total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }, samples: [] })
+            expect(mockSearchRepository.formatSearchInfo).toBeCalledWith({ total: 0, items: [] }, expect.anything())
+            expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(0)
+        });
         test("search samples with filters visual_qc_status_id ", async () => {
             const current_user: UserUpdateModel = {
                 user_id: 1,
