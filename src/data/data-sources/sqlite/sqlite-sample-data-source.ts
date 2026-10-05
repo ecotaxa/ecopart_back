@@ -72,7 +72,7 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         sample_type_id: row.sample_type_id,
         sample_type_label: row.sample_type_label,
         project_id: row.project_id,
-        ecotaxa_sample_imported: row.ecotaxa_sample_imported,
+        ecotaxa_sample_imported: !!row.ecotaxa_sample_imported,
         ecotaxa_sample_import_utc_date_time: row.ecotaxa_sample_import_utc_date_time,
         ecotaxa_sample_id: row.ecotaxa_sample_id,
         ecotaxa_sample_tsv_file_name: row.ecotaxa_sample_tsv_file_name,
