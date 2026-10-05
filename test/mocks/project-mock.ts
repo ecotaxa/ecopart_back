@@ -13,6 +13,7 @@ import { DeleteSampleUseCase } from "../../src/domain/interfaces/use-cases/sampl
 import { ImportSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/import-samples";
 import { ListImportableSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/list-importable-samples";
 import { SearchSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/search-samples";
+import { GetSampleUseCase } from "../../src/domain/interfaces/use-cases/sample/get-sample";
 import { ListShipsUseCase } from "../../src/domain/interfaces/use-cases/project/list-ships";
 import { SearchEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
 import { DeleteEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
@@ -151,6 +152,11 @@ export class MockDeleteSampleUseCase implements DeleteSampleUseCase {
 export class MockSearchSamplesUseCase implements SearchSamplesUseCase {
     execute(): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for search samples")
+    }
+}
+export class MockGetSampleUseCase implements GetSampleUseCase {
+    execute(): Promise<PublicSampleModel> {
+        throw new Error("Method not implemented for get sample")
     }
 }
 

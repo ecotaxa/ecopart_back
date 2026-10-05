@@ -81,7 +81,7 @@ describe("Project Router", () => {
         mockSearchEcoTaxaSamplesUseCase = new MockSearchEcoTaxaSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, mockSelectSampleCoordinatesUseCase))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, mockSelectSampleCoordinatesUseCase, {} as any))
     })
 
     beforeEach(() => {

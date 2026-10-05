@@ -19,6 +19,7 @@ import { GetSampleQcGraphsUseCase } from '../../domain/interfaces/use-cases/samp
 import { SetSampleVisualQcUseCase } from '../../domain/interfaces/use-cases/sample/set-sample-visual-qc'
 import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/preview-samples-qc-graphs'
 import { SelectSampleCoordinatesUseCase } from '../../domain/interfaces/use-cases/sample/select-sample-coordinates'
+import { GetSampleUseCase } from '../../domain/interfaces/use-cases/sample/get-sample'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -64,6 +65,7 @@ export default function ProjectRouter(
     setSampleVisualQcUseCase: SetSampleVisualQcUseCase,
     previewSamplesQcGraphsUseCase: PreviewSamplesQcGraphsUseCase,
     selectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase,
+    getSampleUseCase: GetSampleUseCase,
 ) {
     const router = express.Router()
 
@@ -1580,7 +1582,7 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples:
      *   get:
      *     summary: List samples
-     *     description: Returns a paginated and sorted list of all samples for the given project.
+     *     description: Returns a paginated and sorted list of all samples for the given project. Allowed for admins or any member of the project.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1608,7 +1610,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used or lacks access to the project.
      *         content:
      *           application/json:
      *             schema:
@@ -1629,11 +1631,12 @@ export default function ProjectRouter(
     // Pagined and sorted list of all samples for the given project
     router.get('/:project_id/samples/', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
-            const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], req.params.project_id as any);
+            const project = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, [], Number(req.params.project_id));
             res.status(200).send(project)
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
@@ -1642,6 +1645,70 @@ export default function ProjectRouter(
             else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get samples"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/{sample_id}:
+     *   get:
+     *     summary: Get sample
+     *     description: |
+     *       Returns one sample of the project, with the same fields as an item of the sample search.
+     *       Allowed for admins or any member of the project.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *       - name: sample_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The sample ID.
+     *     responses:
+     *       200:
+     *         description: The requested sample.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicSample'
+     *       403:
+     *         description: User cannot be used or lacks access to the project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Sample not found or not in the project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:project_id/samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const sample = await getSampleUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), Number(req.params.sample_id));
+            res.status(200).send(sample)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get sample"] })
         }
     })
 
@@ -1908,6 +1975,7 @@ export default function ProjectRouter(
      *     summary: Search samples
      *     description: |
      *       Returns a paginated, sorted, and filtered list of samples for the given project.
+     *       Allowed for admins or any member of the project.
      *
      *       **Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.
      *
@@ -2000,7 +2068,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used or lacks access to the project.
      *         content:
      *           application/json:
      *             schema:
@@ -2021,11 +2089,12 @@ export default function ProjectRouter(
     // Pagined and sorted list of filtered samples for the given project
     router.post('/:project_id/samples/searches', middlewareAuth.auth, middlewareSampleValidation.rulesGetSamples, async (req: Request, res: Response) => {
         try {
-            const samples = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], req.params.project_id as any);
+            const samples = await searchSamplesUseCase.execute((req as CustomRequest).token, { ...req.query } as any, req.body as any[], Number(req.params.project_id));
             res.status(200).send(samples)
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })

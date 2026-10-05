@@ -16,17 +16,18 @@ import { IMiddlewareProjectValidation } from "../../../src/presentation/interfac
 
 import { Request, Response, NextFunction } from "express";
 import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
-import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase, MockListShipsUseCase, MockSearchEcoTaxaSamplesUseCase, MockDeleteEcoTaxaSamplesUseCase, MockImportEcoTaxaSamplesUseCase, MockListImportableEcoTaxaSamplesUseCase, MockListImportableCTDSamplesUseCase, MockImportCTDSamplesUseCase, MockListImportedCTDSamplesUseCase, MockDeleteImportedCTDSamplesUseCase } from "../../mocks/project-mock";
+import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase, MockListShipsUseCase, MockSearchEcoTaxaSamplesUseCase, MockDeleteEcoTaxaSamplesUseCase, MockImportEcoTaxaSamplesUseCase, MockListImportableEcoTaxaSamplesUseCase, MockListImportableCTDSamplesUseCase, MockImportCTDSamplesUseCase, MockListImportedCTDSamplesUseCase, MockDeleteImportedCTDSamplesUseCase, MockGetSampleUseCase } from "../../mocks/project-mock";
 import { BackupProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/backup-project";
 import { ExportBackupedProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/export-backuped-project";
 import { DeleteSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/delete-sample";
 import { ImportSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/import-samples";
 import { ListImportableSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/list-importable-samples";
 import { SearchSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/search-samples";
+import { GetSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/get-sample";
 import { IMiddlewareSampleValidation } from "../../../src/presentation/interfaces/middleware/sample-validation";
 import { TaskResponseModel_1, TaskResponseModel_2 } from "../../entities/task";
 import { PublicHeaderSampleResponseModel } from "../../../src/domain/entities/sample";
-import { SearchSampleResult } from "../../entities/sample";
+import { SearchSampleResult, sampleModel_1 } from "../../entities/sample";
 
 import { ListImportableEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/list-importable-ecotaxa-samples";
 import { ImportEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples";
@@ -113,6 +114,7 @@ describe("Project Router", () => {
     let mockListImportedCTDSamplesUseCase: ListImportedCTDSamplesUseCase;
     let mockDeleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase;
     let mockListShipsUseCase: ListShipsUseCase;
+    let mockGetSampleUseCase: GetSampleUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -138,8 +140,9 @@ describe("Project Router", () => {
         mockListImportedCTDSamplesUseCase = new MockListImportedCTDSamplesUseCase()
         mockDeleteImportedCTDSamplesUseCase = new MockDeleteImportedCTDSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
+        mockGetSampleUseCase = new MockGetSampleUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any, mockGetSampleUseCase))
     })
 
     beforeEach(() => {
@@ -946,6 +949,14 @@ describe("Project Router", () => {
             const response = await request(server).get("/projects/1/samples")
             expect(response.body).toStrictEqual(SearchSampleResult)
             expect(response.status).toBe(200)
+            expect(mockSearchSamplesUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), expect.anything(), expect.anything(), 1)
+        });
+        test("GET /projects/:project_id/samples fail for Logged user cannot access this project should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot access this project"] }
+            jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot access this project")))
+            const response = await request(server).get("/projects/1/samples")
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
         });
         // User cannot be used
         test("GET /projects/:project_id/samples fail for User cannot be used should return 403", async () => {
@@ -1026,6 +1037,14 @@ describe("Project Router", () => {
             const response = await request(server).post("/projects/1/samples/searches")
             expect(response.body).toStrictEqual(SearchSampleResult)
             expect(response.status).toBe(200)
+            expect(mockSearchSamplesUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), expect.anything(), expect.anything(), 1)
+        });
+        test("GET /projects/:project_id/samples/searches fail for Logged user cannot access this project should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot access this project"] }
+            jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot access this project")))
+            const response = await request(server).post("/projects/1/samples/searches")
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
         });
         // User cannot be used
         test("GET /projects/:project_id/samples/searches fail for User cannot be used should return 403", async () => {
@@ -1100,6 +1119,33 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
     });
+    describe("GET /projects/:project_id/samples/:sample_id", () => {
+        test("returns 200 with the sample", async () => {
+            jest.spyOn(mockGetSampleUseCase, "execute").mockImplementation(() => Promise.resolve(sampleModel_1))
+            const response = await request(server).get("/projects/1/samples/2")
+            expect(response.status).toBe(200)
+            expect(mockGetSampleUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), 1, 2)
+            expect(response.body).toStrictEqual(sampleModel_1)
+        });
+        test.each([
+            ["User cannot be used", 403],
+            ["Logged user cannot access this project", 403],
+            ["Cannot find sample", 404],
+            ["Sample does not belong to project", 404],
+        ])("maps '%s' to %i", async (message, status) => {
+            jest.spyOn(mockGetSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).get("/projects/1/samples/2")
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+        test("returns 500 for an unexpected error", async () => {
+            jest.spyOn(mockGetSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("xyz")))
+            const response = await request(server).get("/projects/1/samples/2")
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual({ errors: ["Cannot get sample"] })
+        });
+    });
+
     describe("DELETE /projects/:project_id/samples/:sample_id", () => {
         test("DELETE /projects/:project_id/samples/:sample_id should return 200", async () => {
             jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.resolve())

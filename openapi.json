@@ -5089,7 +5089,7 @@
     "/projects/{project_id}/samples": {
       "get": {
         "summary": "List samples",
-        "description": "Returns a paginated and sorted list of all samples for the given project.",
+        "description": "Returns a paginated and sorted list of all samples for the given project. Allowed for admins or any member of the project.",
         "tags": [
           "Samples"
         ],
@@ -5140,7 +5140,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used or lacks access to the project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5151,6 +5151,166 @@
           },
           "404": {
             "description": "Sample type or visual QC status not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/samples/{sample_id}": {
+      "get": {
+        "summary": "Get sample",
+        "description": "Returns one sample of the project, with the same fields as an item of the sample search.\nAllowed for admins or any member of the project.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          },
+          {
+            "name": "sample_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The sample ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested sample.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSample"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used or lacks access to the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sample not found or not in the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete sample",
+        "description": "Permanently delete a sample from a project.",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          },
+          {
+            "name": "sample_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The sample ID to delete."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sample successfully deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User cannot delete sample or project mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sample not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5435,7 +5595,7 @@
     "/projects/{project_id}/samples/searches": {
       "post": {
         "summary": "Search samples",
-        "description": "Returns a paginated, sorted, and filtered list of samples for the given project.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `sample_id` | number | |\n| `sample_name` | string | |\n| `comment` | string | |\n| `instrument_serial_number` | string | |\n| `max_pressure` | number | |\n| `station_id` | string | |\n| `sampling_utc_date_time` | string (ISO date) | |\n| `latitude` | number | |\n| `longitude` | number | |\n| `wind_direction` | number | |\n| `wind_speed` | number | |\n| `sea_state` | string | |\n| `nebulousness` | number | |\n| `bottom_depth` | number | |\n| `instrument_operator_email` | string | |\n| `filename` | string | |\n| `sample_creation_utc_date_time` | string (ISO timestamp) | |\n| `filter_first_image` | string | |\n| `filter_last_image` | string | |\n| `visual_qc_status_id` | number | |\n| `sample_type_id` | number | |\n| `sample_type_label` | string | Computed — resolved to `sample_type_id` |\n| `visual_qc_status_label` | string | Computed — resolved to `visual_qc_status_id` |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_utc_date_time),asc(sample_id)`.\n",
+        "description": "Returns a paginated, sorted, and filtered list of samples for the given project.\nAllowed for admins or any member of the project.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `sample_id` | number | |\n| `sample_name` | string | |\n| `comment` | string | |\n| `instrument_serial_number` | string | |\n| `max_pressure` | number | |\n| `station_id` | string | |\n| `sampling_utc_date_time` | string (ISO date) | |\n| `latitude` | number | |\n| `longitude` | number | |\n| `wind_direction` | number | |\n| `wind_speed` | number | |\n| `sea_state` | string | |\n| `nebulousness` | number | |\n| `bottom_depth` | number | |\n| `instrument_operator_email` | string | |\n| `filename` | string | |\n| `sample_creation_utc_date_time` | string (ISO timestamp) | |\n| `filter_first_image` | string | |\n| `filter_last_image` | string | |\n| `visual_qc_status_id` | number | |\n| `sample_type_id` | number | |\n| `sample_type_label` | string | Computed — resolved to `sample_type_id` |\n| `visual_qc_status_label` | string | Computed — resolved to `visual_qc_status_id` |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(sampling_utc_date_time),asc(sample_id)`.\n",
         "tags": [
           "Samples"
         ],
@@ -5524,7 +5684,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used or lacks access to the project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5535,92 +5695,6 @@
           },
           "404": {
             "description": "Sample type or visual QC status not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/projects/{project_id}/samples/{sample_id}": {
-      "delete": {
-        "summary": "Delete sample",
-        "description": "Permanently delete a sample from a project.",
-        "tags": [
-          "Samples"
-        ],
-        "security": [
-          {
-            "cookieAccessToken": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The project ID."
-          },
-          {
-            "name": "sample_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The sample ID to delete."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sample successfully deleted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "User cannot delete sample or project mismatch.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "User cannot be used.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Sample not found.",
             "content": {
               "application/json": {
                 "schema": {
