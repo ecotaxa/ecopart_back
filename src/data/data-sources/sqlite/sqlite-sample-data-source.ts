@@ -64,7 +64,7 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         instrument_settings_integration_time: row.instrument_settings_integration_time ?? undefined,
         visual_qc_validator_user_id: row.visual_qc_validator_user_id,
         visual_qc_validator_user: `${qc_first ?? ""} ${qc_last ?? ""} (${qc_email ?? ""})`.trim(),
-        visual_qc_validator_email: qc_email ?? "",
+        visual_qc_validator_email: qc_email ?? null,
         visual_qc_status_id: row.visual_qc_status_id,
         visual_qc_status_label: row.visual_qc_status_label,
         visual_qc_comment: row.visual_qc_comment ?? null,

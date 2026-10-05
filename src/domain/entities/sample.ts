@@ -88,8 +88,8 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
 export interface PublicSampleModel extends PrivateSampleModel {
     sample_type_label: string;                    // Sample type name
     visual_qc_status_label: string;               // Quality check status
-    visual_qc_validator_user: string;             // Quality check validator user name same format as "last_name first_name (email)"}
-    visual_qc_validator_email: string;            // Email of the visual-QC validator (joined from user)
+    visual_qc_validator_user: string;             // Quality check validator user name, format "first_name last_name (email)"
+    visual_qc_validator_email: string | null;     // Email of the visual-QC validator (joined from user)
     ecotaxa_import_status_label: string;          // EcoTaxa import status
     ctd_importator_name: string | null;           // Display name (first + last) of the CTD importer (joined from user)
     ctd_importator_email: string | null;          // Email of the CTD importer (joined from user)

@@ -2031,7 +2031,8 @@
           },
           "visual_qc_validator_email": {
             "type": "string",
-            "description": "Quality check validator email. Empty string when there is no validator."
+            "nullable": true,
+            "description": "Quality check validator email. Null when there is no validator."
           },
           "visual_qc_comment": {
             "type": "string",
