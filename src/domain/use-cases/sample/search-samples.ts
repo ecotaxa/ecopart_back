@@ -22,10 +22,12 @@ export class SearchSamples implements SearchSamplesUseCase {
         this.instrumentModelRepository = instrumentModelRepository
         this.privilegeRepository = privilegeRepository
     }
-    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id?: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
 
         // Ensure the current user is valid and not deleted
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
+
+        await this.ensureUserCanGet(current_user, project_id);
 
         // Prepare search options
         let prepared_options: PreparedSearchOptions = this.prepareSearchOptions(options, filters);
@@ -41,6 +43,14 @@ export class SearchSamples implements SearchSamplesUseCase {
         const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, prepared_options);
 
         return { search_info, samples };
+    }
+
+    private async ensureUserCanGet(current_user: UserUpdateModel, project_id: number): Promise<void> {
+        const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
+        const userHasPrivilege = await this.privilegeRepository.isGranted({ user_id: current_user.user_id, project_id });
+        if (!userIsAdmin && !userHasPrivilege) {
+            throw new Error("Logged user cannot access this project");
+        }
     }
 
 

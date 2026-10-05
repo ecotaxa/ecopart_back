@@ -29,6 +29,9 @@ beforeEach(async () => {
     mockPrivilegeRepository = new MockPrivilegeRepository()
 
     searchSamplesUseCase = new SearchSamples(mockUserRepository, mockSampleRepository, mockSearchRepository, mockInstrumentRepository, mockPrivilegeRepository);
+
+    jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true)
 })
 
 describe("Search Task Use Case", () => {
@@ -53,15 +56,38 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples")
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
+            expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(0)
             expect(mockSearchRepository.formatSortBy).toBeCalledTimes(0)
             expect(mockSampleRepository.getSampleType).toBeCalledTimes(0)
             expect(mockSampleRepository.getVisualQCStatus).toBeCalledTimes(0)
             expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(0)
             expect(mockSearchRepository.formatSearchInfo).toBeCalledTimes(0)
+        });
+
+        test("user who is neither admin nor member of the project should not be able to search for samples", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            const options: SearchOptions = {
+                limit: 10,
+                page: 1,
+                sort_by: []
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false)
+            jest.spyOn(mockSearchRepository, "formatFilters")
+            jest.spyOn(mockSampleRepository, "standardGetSamples")
+
+            await expect(searchSamplesUseCase.execute(current_user, options, [], 1)).rejects.toThrow("Logged user cannot access this project")
+
+            expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: 1, project_id: 1 })
+            expect(mockSearchRepository.formatFilters).toBeCalledTimes(0)
+            expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(0)
         });
 
         test("search options with invalid Filters should not be able to search for tasks", async () => {
@@ -85,7 +111,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples")
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters as any)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters as any, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -118,7 +144,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples")
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters as any)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters as any, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -152,7 +178,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples")
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -185,7 +211,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples")
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -217,7 +243,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples").mockRejectedValue(outputError)
             jest.spyOn(mockSearchRepository, "formatSearchInfo")
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -249,7 +275,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 0, items: [] })
             jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { throw outputError })
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).rejects.toThrow(outputError)
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).rejects.toThrow(outputError)
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -281,7 +307,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 0, items: [] })
             jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }));
 
-            await expect(searchSamplesUseCase.execute(current_user, options, [])).resolves.toEqual({ search_info: { total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }, samples: [] })
+            await expect(searchSamplesUseCase.execute(current_user, options, [], 1)).resolves.toEqual({ search_info: { total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 }, samples: [] })
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(0)
@@ -319,6 +345,28 @@ describe("Search Task Use Case", () => {
             expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(1)
             expect(mockSearchRepository.formatSearchInfo).toBeCalledTimes(1)
         });
+        test("admin can search samples of a project they are not a member of", async () => {
+            const current_user: UserUpdateModel = {
+                user_id: 1,
+            }
+            const options: SearchOptions = {
+                page: 1,
+                limit: 10,
+                sort_by: []
+            }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false)
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            const result = await searchSamplesUseCase.execute(current_user, options, [], 1)
+
+            expect(result.samples).toEqual([sampleModel_1])
+            expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "=", value: 1 }] }))
+        });
         test("search samples with filters visual_qc_status_id ", async () => {
             const current_user: UserUpdateModel = {
                 user_id: 1,
@@ -340,7 +388,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
             jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 0 }));
 
-            await expect(searchSamplesUseCase.execute(current_user, options, filters)).resolves.toEqual({ search_info: { total: 1, limit: 10, total_on_page: 1, page: 1, pages: 0 }, samples: [sampleModel_1] })
+            await expect(searchSamplesUseCase.execute(current_user, options, filters, 1)).resolves.toEqual({ search_info: { total: 1, limit: 10, total_on_page: 1, page: 1, pages: 0 }, samples: [sampleModel_1] })
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
             expect(mockSearchRepository.formatFilters).toBeCalledTimes(1)
@@ -372,7 +420,7 @@ describe("Search Task Use Case", () => {
             jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: largeLimit, items: [sampleModel_1] })
             jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: largeLimit, limit: largeLimit, total_on_page: 1, page: 1, pages: 1 }));
 
-            const result = await searchSamplesUseCase.execute(current_user, options, [])
+            const result = await searchSamplesUseCase.execute(current_user, options, [], 1)
 
             // Response shape unchanged: { search_info, samples } and total stays correct.
             expect(result).toEqual({ search_info: { total: largeLimit, limit: largeLimit, total_on_page: 1, page: 1, pages: 1 }, samples: [sampleModel_1] })

@@ -949,6 +949,14 @@ describe("Project Router", () => {
             const response = await request(server).get("/projects/1/samples")
             expect(response.body).toStrictEqual(SearchSampleResult)
             expect(response.status).toBe(200)
+            expect(mockSearchSamplesUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), expect.anything(), expect.anything(), 1)
+        });
+        test("GET /projects/:project_id/samples fail for Logged user cannot access this project should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot access this project"] }
+            jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot access this project")))
+            const response = await request(server).get("/projects/1/samples")
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
         });
         // User cannot be used
         test("GET /projects/:project_id/samples fail for User cannot be used should return 403", async () => {
@@ -1029,6 +1037,14 @@ describe("Project Router", () => {
             const response = await request(server).post("/projects/1/samples/searches")
             expect(response.body).toStrictEqual(SearchSampleResult)
             expect(response.status).toBe(200)
+            expect(mockSearchSamplesUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), expect.anything(), expect.anything(), 1)
+        });
+        test("GET /projects/:project_id/samples/searches fail for Logged user cannot access this project should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot access this project"] }
+            jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot access this project")))
+            const response = await request(server).post("/projects/1/samples/searches")
+            expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
         });
         // User cannot be used
         test("GET /projects/:project_id/samples/searches fail for User cannot be used should return 403", async () => {
