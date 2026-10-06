@@ -5,7 +5,7 @@ import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 // `frames.csv`, so every computed product reads one format whatever the instrument.
 //
 // Incremented whenever the output changes, so that older pivots get regenerated.
-export const UVP5_PIVOT_CONVERTER_VERSION = "1";
+export const UVP5_PIVOT_CONVERTER_VERSION = "2";
 
 export interface Uvp5PivotInput {
     sample: Uvp5PivotSampleMetadata;
@@ -35,6 +35,9 @@ interface DatfileFrame {
     frame_index: number;
     timestamp: string;
     pressure: string;
+    // 4th value of the sensor block: the instrument's internal temperature in °C (integer), the same
+    // quantity as the UVP6 per-image temperature. Empty when the block has fewer values.
+    temperature: string;
     // Object counts the acquisition wrote next to the sensor block (columns 14 and 17 of a
     // `work/` datfile): their sum equals the frame's .bru rows. Null when the row has no `!` marker.
     nb_objects: number | null;
@@ -102,8 +105,8 @@ export function convertUvp5ToPivot(input: Uvp5PivotInput): Uvp5PivotFiles {
         if (block_texts.length === 0) report.empty_frames++;
         if (frame.nb_objects !== null && frame.nb_objects !== nb_particles) report.integrity_mismatches++;
 
-        // Temperature left empty; flash = 1, a UVP5 never acquires black images.
-        lines.push(`${image_id},${pressure},,1:${block_texts.join(";")}`);
+        // flash = 1: a UVP5 never acquires black images.
+        lines.push(`${image_id},${pressure},${frame.temperature},1:${block_texts.join(";")}`);
         frame_rows.push(`${image_id};${frame.frame_index}`);
         report.frames_written++;
     }
@@ -148,9 +151,10 @@ function parseBruBlocksByFrame(content: string): Map<number, Map<number, AreaBlo
     return by_frame;
 }
 
-// Datfile rows: `frame; timestamp; sensor block…!; counts…`. The sensor block is `;`-separated in
-// work/ and results/, `*`-separated in raw/: its first value is the pressure either way. Rows
-// whose first column is not a frame index (a title line, a blank line) are not frames.
+// Datfile rows: `frame; timestamp; sensor block…!; counts…`. The 12-value sensor block is
+// `;`-separated in work/ and results/, one `*`-separated column in raw/: value 1 is the pressure,
+// value 4 the internal temperature. Rows whose first column is not a frame index (a title line, a
+// blank line) are not frames.
 function parseDatfile(content: string): DatfileFrame[] {
     const frames: DatfileFrame[] = [];
     for (const line of content.split(/\r\n|\n|\r/)) {
@@ -163,10 +167,13 @@ function parseDatfile(content: string): DatfileFrame[] {
             const large = parseInt(cols[marker + 4], 10);
             if (!isNaN(small) && !isNaN(large)) nb_objects = small + large;
         }
+        const sensor = (cols[2].includes("*") ? cols[2].split("*") : cols.slice(2, marker === -1 ? 3 : marker + 1))
+            .map((v) => v.trim().replace(/!$/, ""));
         frames.push({
             frame_index: parseInt(cols[0], 10),
             timestamp: cols[1],
-            pressure: cols[2].split("*")[0].replace(/!$/, ""),
+            pressure: sensor[0],
+            temperature: /^-?\d+$/.test(sensor[3] ?? "") ? String(parseInt(sensor[3], 10)) : "",
             nb_objects,
         });
     }
@@ -218,6 +225,7 @@ function buildMetadataIni(input: Uvp5PivotInput, report: Uvp5PivotReport): strin
         ["converter_version", report.converter_version],
         ["converted_utc", input.converted_utc],
         ["particle_minimum_area_px", formatNumber(toNumber(s.instrument_settings_particule_minimum_area_pixels))],
+        ["temperature_source", "datfile sensor block value 4, internal instrument temperature in degrees Celsius"],
         ["window_applied", `[${s.filter_first_image ?? ""}, ${s.filter_last_image ?? ""}]`],
         ["frames_written", String(report.frames_written)],
         ["frames_outside_window", String(report.frames_outside_window)],

@@ -60,11 +60,25 @@ describe("convertUvp5ToPivot", () => {
         const files = convertUvp5ToPivot(input());
 
         expect(files.particules_csv).toBe([
-            "20200806-221354-586,13.6,,1:2,1,30.0,;3,2,15.5,",
-            "20200806-221354-636,13.7,,1:",
-            "20200806-221354-736,14.0,,1:2,2,45.0,;80,1,100.0,",
+            "20200806-221354-586,13.6,39,1:2,1,30.0,;3,2,15.5,",
+            "20200806-221354-636,13.7,39,1:",
+            "20200806-221354-736,14.0,39,1:2,2,45.0,;80,1,100.0,",
             "",
         ].join("\n"));
+    });
+
+    test("writes the internal temperature, the 4th value of the sensor block, as an integer in °C", () => {
+        const datfile = DATFILE.replace("00137;00182;00182;00039", "00137;00182;00182;00042");
+
+        const lines = convertUvp5ToPivot(input({ datfile_content: datfile })).particules_csv.split("\n");
+
+        expect(lines[1]).toBe("20200806-221354-636,13.7,42,1:");
+    });
+
+    test("leaves the temperature empty when the sensor block has fewer than 4 values", () => {
+        const datfile = "    12;\t20200806221354_586;\t00136;00182!;\t3;\t4;\t12;\t0;\t0;";
+
+        expect(convertUvp5ToPivot(input({ datfile_content: datfile })).particules_csv).toBe("20200806-221354-586,13.6,,1:2,1,30.0,;3,2,15.5,\n");
     });
 
     test("keeps the native frame index of each line in frames.csv, row-aligned with particules.csv", () => {
@@ -114,7 +128,7 @@ describe("convertUvp5ToPivot", () => {
 
         const files = convertUvp5ToPivot(input({ datfile_content: datfile }));
 
-        expect(files.particules_csv).toBe("20200806-221354-586,13.6,,1:2,1,30.0,;3,2,15.5,\n");
+        expect(files.particules_csv).toBe("20200806-221354-586,13.6,39,1:2,1,30.0,;3,2,15.5,\n");
         expect(files.report.integrity_mismatches).toBe(0);
     });
 
@@ -128,6 +142,7 @@ describe("convertUvp5ToPivot", () => {
         expect(ini).toContain(`converter_version=${UVP5_PIVOT_CONVERTER_VERSION}\n`);
         expect(ini).toContain("converted_utc=2026-10-01T00:00:00.000Z\n");
         expect(ini).toContain("particle_minimum_area_px=2\n");
+        expect(ini).toContain("temperature_source=datfile sensor block value 4, internal instrument temperature in degrees Celsius\n");
         expect(ini).toContain("window_applied=[12, 9.9999999999E10]\n");
         expect(ini).toContain("frames_without_pressure=1\n");
     });

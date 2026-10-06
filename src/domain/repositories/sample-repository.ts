@@ -1964,9 +1964,10 @@ export class SampleRepositoryImpl implements SampleRepository {
         return this.parseParticulesCsvRecords(content);
     }
 
-    // particules.csv: each data row is one image — `image_id, pressure, ?, <flash>:<first_class>, <;-separated blocks>`.
-    // Each block is `class_px, nb_particles, mean_grey, std_grey`; block 0's class_px is the
-    // flag's first_class (so its count is field 0), later blocks carry their own class_px.
+    // particules.csv: each data row is one image — `image_id, pressure, internal temperature, <flash>:<first_area>, <;-separated blocks>`.
+    // Each block is `area_px, nb_particles, grey_mean, grey_std`: an exact pixel area (not a size
+    // class), the objects of that area, and the mean and std of the grey of their pixels. Block 0's
+    // area_px is glued to the flag (so its count is field 0), later blocks carry their own area_px.
     parseParticulesCsvRecords(content: string): PerImageRecord[] {
         const records: PerImageRecord[] = [];
         let image_index = 0;
