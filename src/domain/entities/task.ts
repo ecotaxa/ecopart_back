@@ -17,6 +17,7 @@ export enum TaskType {
     Import_CTD = "IMPORT_CTD",
     Import_EcoTaxa = "IMPORT_ECO_TAXA",
     Export_Raw = "EXPORT_RAW",
+    Regenerate_Pivot = "REGENERATE_PIVOT",
 }
 
 export enum TaskAction {

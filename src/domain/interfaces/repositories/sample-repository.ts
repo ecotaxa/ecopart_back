@@ -1,5 +1,6 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
+import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface SampleRepository {
@@ -53,4 +54,11 @@ export interface SampleRepository {
     getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata>;
     // Records a visual-QC decision (status + validator + timestamp + optional comment).
     setSampleVisualQc(sample_id: number, visual_qc_status_id: number, visual_qc_validator_user_id: number, comment: string | null, validated_at: string): Promise<number>;
+
+    // UVP5 → UVP6 pivot
+    // Converts the stored work.zip of a UVP5 sample into <sample>/pivot/<sample>_Particule.zip.
+    // Throws an explicit "Cannot build the UVP5 pivot of sample …" error naming the fix.
+    generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport>;
+    // converter_version recorded in the sample's pivot, null when it has none.
+    getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null>;
 }

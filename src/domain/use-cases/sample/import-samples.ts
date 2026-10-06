@@ -11,6 +11,7 @@ import { ImportSamplesUseCase } from "../../interfaces/use-cases/sample/import-s
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import path from "path";
+import { describeUvp5PivotReport } from "../../utils/uvp5-pivot-converter";
 
 export class ImportSamples implements ImportSamplesUseCase {
     sampleRepository: SampleRepository
@@ -121,12 +122,12 @@ export class ImportSamples implements ImportSamplesUseCase {
             return;
         }
         try {
-            // 3/4 generate qc report by samples
-            //TODO LATER but we can already et the qc flag to un validated
+            // 3/4 Build the UVP5 pivots
+            const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
+            const formated_samples = await this.buildPivots(task_id, project, current_user.user_id, samples_names_to_import, vignette_count_map);
 
             // 4/4 Create samples
-            const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
-            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import, vignette_count_map, validated_samples);
+            await this.importSamples(task_id, project, current_user.user_id, samples_names_to_import, formated_samples, validated_samples);
 
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -195,8 +196,27 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.taskRepository.logMessage(task_file_path.task_log_file_path, "Samples import failed, sources files deleted for samples: " + samples_names_to_import.join(", "));
     }
 
-    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number> = new Map(), validated_samples: string[] = []): Promise<number[]> {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
+    // A UVP5 sample is created only once its UVP6 pivot exists: every computed product reads the
+    // pivot, so a conversion failure fails the import. The pivot needs the sample metadata (window,
+    // aa, exp…), so it is read here; step 4/4 creates the samples from it.
+    async buildPivots(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number> = new Map()): Promise<SampleRequestCreationModel[]> {
+        const is_uvp5 = project.instrument_model.startsWith('UVP5');
+        if (is_uvp5) await this.taskRepository.updateTaskProgress({ task_id: task_id }, 55, "Step 3/4 pivot construction : start");
+        const formated_samples = await this.formatSamplesToImport(project, current_user_id, samples_names_to_import, vignette_count_map);
+        if (!is_uvp5) {
+            await this.taskRepository.updateTaskProgress({ task_id: task_id }, 70, "Step 3/4 pivot construction : skipped, a UVP6 particules.zip is already in the pivot format");
+            return formated_samples;
+        }
+        for (const [i, sample] of formated_samples.entries()) {
+            const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model);
+            const progress = 55 + Math.round(((i + 1) / formated_samples.length) * 15);
+            await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, "Step 3/4 pivot construction : " + describeUvp5PivotReport(report));
+        }
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 70, "Step 3/4 pivot construction : done");
+        return formated_samples;
+    }
+
+    private async formatSamplesToImport(project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number>): Promise<SampleRequestCreationModel[]> {
         // Common sample data
         const base_sample: Partial<SampleRequestCreationModel> = {
             project_id: project.project_id,
@@ -207,8 +227,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         // is always 0 on UVP5 samples by design (not a TODO).
         const fs_storage_project_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
         const is_uvp6 = project.instrument_model.startsWith('UVP6');
-        // Format samples to import
-        const formated_samples: SampleRequestCreationModel[] = await Promise.all(
+        return await Promise.all(
             samples_names_to_import.map(async (sample_name) => {
                 const sample = await this.sampleRepository.formatSampleToImport(
                     { ...base_sample, sample_name: sample_name },
@@ -228,6 +247,11 @@ export class ImportSamples implements ImportSamplesUseCase {
                 return sample;
             })
         );
+    }
+
+    async importSamples(task_id: number, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], formated_samples: SampleRequestCreationModel[], validated_samples: string[] = []): Promise<number[]> {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/4 samples db creation : start");
+
         // Create samples
         const created_samples_ids = await this.sampleRepository.createManySamples(formated_samples);
 

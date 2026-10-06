@@ -1,6 +1,7 @@
 import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
 import { PerImageRecord, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
+import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
 import { SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
 
 export class MockSampleRepository implements SampleRepository {
@@ -99,6 +100,12 @@ export class MockSampleRepository implements SampleRepository {
     }
     setSampleVisualQc(): Promise<number> {
         throw new Error("Method not implemented for setSampleVisualQc");
+    }
+    generateUvp5Pivot(): Promise<Uvp5PivotReport> {
+        throw new Error("Method not implemented for generateUvp5Pivot");
+    }
+    getPivotConverterVersion(): Promise<string | null> {
+        throw new Error("Method not implemented for getPivotConverterVersion");
     }
 }
 

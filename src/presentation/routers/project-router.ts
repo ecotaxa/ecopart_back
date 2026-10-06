@@ -20,6 +20,7 @@ import { SetSampleVisualQcUseCase } from '../../domain/interfaces/use-cases/samp
 import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases/sample/preview-samples-qc-graphs'
 import { SelectSampleCoordinatesUseCase } from '../../domain/interfaces/use-cases/sample/select-sample-coordinates'
 import { GetSampleUseCase } from '../../domain/interfaces/use-cases/sample/get-sample'
+import { RegeneratePivotsUseCase } from '../../domain/interfaces/use-cases/sample/regenerate-pivots'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -66,6 +67,7 @@ export default function ProjectRouter(
     previewSamplesQcGraphsUseCase: PreviewSamplesQcGraphsUseCase,
     selectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase,
     getSampleUseCase: GetSampleUseCase,
+    regeneratePivotsUseCase: RegeneratePivotsUseCase,
 ) {
     const router = express.Router()
 
@@ -1965,6 +1967,82 @@ export default function ProjectRouter(
             else if (err.message.startsWith("Samples not importable")) res.status(422).send({ errors: [err.message] })
             else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot preview sample QC graphs"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples/pivots/regenerate:
+     *   post:
+     *     summary: Regenerate the UVP6 pivot of UVP5 samples
+     *     description: |
+     *       Starts an asynchronous task (returns a Task immediately; poll the task for progress) that
+     *       converts the stored `work.zip` of UVP5 samples into their UVP6 pivot,
+     *       `<sample>/pivot/<sample>_Particule.zip` (`particules.csv` + `metadata.ini` + `frames.csv`).
+     *       The import builds the pivot of every new UVP5 sample; this endpoint covers the samples
+     *       imported before the pivot existed and the pivots written by an older converter version.
+     *
+     *       Without `sample_names`, every sample of the project is considered. A sample whose pivot
+     *       is already at the current converter version is kept, unless `force` is true. A failing
+     *       sample does not stop the others; the task then fails with every error listed.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               sample_names:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: Samples to regenerate. Empty or absent = every sample of the project.
+     *               force:
+     *                 type: boolean
+     *                 default: false
+     *                 description: Also rebuild pivots already at the current converter version.
+     *     responses:
+     *       200:
+     *         description: Regeneration task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: User not authorized for this project.
+     *       403:
+     *         description: User cannot be used.
+     *       404:
+     *         description: Project, samples or task not found.
+     *       422:
+     *         description: Validation error, or the project is not a UVP5 project.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.post('/:project_id/samples/pivots/regenerate', middlewareAuth.auth, middlewareSampleValidation.rulesRegeneratePivots, async (req: Request, res: Response) => {
+        try {
+            const task = await regeneratePivotsUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), { sample_names: req.body.sample_names, force: req.body.force });
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot regenerate pivots in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "No samples in this project") res.status(404).send({ errors: [err.message] })
+            else if (err.message.startsWith("Samples not found in this project")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Pivots only exist for UVP5 projects") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot regenerate pivots"] })
         }
     })
 

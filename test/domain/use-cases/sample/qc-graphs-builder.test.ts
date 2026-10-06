@@ -256,7 +256,7 @@ describe("buildSampleQcGraphs — graphs 2 and 3 only count the selected images"
         expect(depthProfile(res.black_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 3 }]);
     });
 
-    test("OVER_EXPOSED and EMPTY_IMAGE images add no imaged volume, but stay on graph 1 and in the descent filter", () => {
+    test("an OVER_EXPOSED image adds no imaged volume, an EMPTY_IMAGE one does; both stay on graph 1 and in the descent filter", () => {
         const res = buildSampleQcGraphs(input({
             instrument_model: "UVP6LP",
             instrument_settings_image_volume_l: 2,
@@ -268,8 +268,10 @@ describe("buildSampleQcGraphs — graphs 2 and 3 only count the selected images"
             ],
         }));
 
-        expect(depthProfile(res.imaged_volume_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 2 }]);
-        expect(depthProfile(res.particle_lpm_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 10 }]);
+        // EMPTY_IMAGE = a real image in which the UVP found no object: it counts (C. Catalano, 5 Oct 2026).
+        expect(depthProfile(res.imaged_volume_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 2 }, { depth_m: 1.5, value: 2 }]);
+        // Imaged but empty: a counted zero, not a gap.
+        expect(depthProfile(res.particle_lpm_profile).series[0].points).toEqual([{ depth_m: 0.5, value: 10 }, { depth_m: 1.5, value: 0 }]);
         expect(selection(res)).toEqual([true, true, true, false]);
         expect(res.image_depth_profile.selected_images).toBe(3);
     });

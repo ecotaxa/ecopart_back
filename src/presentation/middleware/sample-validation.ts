@@ -67,4 +67,21 @@ export class MiddlewareSampleValidation implements IMiddlewareSampleValidation {
         },
     ];
 
+    rulesRegeneratePivots = [
+        body('sample_names').optional()
+            .isArray().withMessage('sample_names must be an array.'),
+        body('sample_names.*')
+            .isString().withMessage('Each sample name must be a string.'),
+        body('force').optional()
+            .isBoolean({ strict: true }).withMessage('force must be a boolean.').bail()
+            .toBoolean(true),
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
 }

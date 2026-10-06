@@ -63,6 +63,7 @@ import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-
 import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
 import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/select-sample-coordinates'
 import { GetSample } from '../../src/domain/use-cases/sample/get-sample'
+import { RegeneratePivots } from '../../src/domain/use-cases/sample/regenerate-pivots'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -310,6 +311,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
             new GetSample(userRepo, sampleRepo, privilegeRepo),
+            new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
         )
 
         const taskMiddleware = TaskRouter(
