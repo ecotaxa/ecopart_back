@@ -29,6 +29,8 @@ import { SearchEcoTaxaSamplesUseCase } from "../../../src/domain/interfaces/use-
 import { ListShipsUseCase } from "../../../src/domain/interfaces/use-cases/project/list-ships";
 import { SelectSampleCoordinatesUseCase } from "../../../src/domain/interfaces/use-cases/sample/select-sample-coordinates";
 import { sampleModel_1 } from "../../entities/sample";
+import { RegeneratePivotsUseCase } from "../../../src/domain/interfaces/use-cases/sample/regenerate-pivots";
+import { TaskResponseModel_1 } from "../../entities/task";
 export class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
         next()
@@ -59,6 +61,9 @@ describe("Project Router", () => {
     const mockSelectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase = {
         execute(): Promise<any> { throw new Error("Method not implemented for SelectSampleCoordinatesUseCase") }
     };
+    const mockRegeneratePivotsUseCase: RegeneratePivotsUseCase = {
+        execute(): Promise<any> { throw new Error("Method not implemented for RegeneratePivotsUseCase") }
+    };
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -81,7 +86,7 @@ describe("Project Router", () => {
         mockSearchEcoTaxaSamplesUseCase = new MockSearchEcoTaxaSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, mockSelectSampleCoordinatesUseCase, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, mockSelectSampleCoordinatesUseCase, {} as any, mockRegeneratePivotsUseCase))
     })
 
     beforeEach(() => {
@@ -201,6 +206,52 @@ describe("Project Router", () => {
 
             expect(response.status).toBe(422);
             expect(response.body).toStrictEqual({ errors: ["Sample has no CTD coordinates"] });
+        });
+    });
+
+    describe("POST /projects/:project_id/samples/pivots/regenerate", () => {
+        test("starts the task with the requested samples and force flag", async () => {
+            jest.spyOn(mockRegeneratePivotsUseCase, "execute").mockResolvedValue(TaskResponseModel_1);
+
+            const response = await request(server).post("/projects/1/samples/pivots/regenerate").send({ sample_names: ["perle3_001"], force: true });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toStrictEqual(TaskResponseModel_1);
+            expect(mockRegeneratePivotsUseCase.execute).toBeCalledWith(undefined, 1, { sample_names: ["perle3_001"], force: true });
+        });
+
+        test("accepts an empty body: every sample, not forced", async () => {
+            jest.spyOn(mockRegeneratePivotsUseCase, "execute").mockResolvedValue(TaskResponseModel_1);
+
+            const response = await request(server).post("/projects/1/samples/pivots/regenerate");
+
+            expect(response.status).toBe(200);
+            expect(mockRegeneratePivotsUseCase.execute).toBeCalledWith(undefined, 1, { sample_names: undefined, force: undefined });
+        });
+
+        test("rejects a non-boolean force and a non-array sample_names", async () => {
+            const spy = jest.spyOn(mockRegeneratePivotsUseCase, "execute");
+
+            const bad_force = await request(server).post("/projects/1/samples/pivots/regenerate").send({ force: "yes" });
+            const bad_names = await request(server).post("/projects/1/samples/pivots/regenerate").send({ sample_names: "perle3_001" });
+
+            expect(bad_force.status).toBe(422);
+            expect(bad_names.status).toBe(422);
+            expect(spy).not.toBeCalled();
+        });
+
+        test.each([
+            ["Logged user cannot regenerate pivots in this project", 401],
+            ["Cannot find project", 404],
+            ["Samples not found in this project: ghost", 404],
+            ["Pivots only exist for UVP5 projects", 422],
+        ])("maps \"%s\" to %i", async (message, status) => {
+            jest.spyOn(mockRegeneratePivotsUseCase, "execute").mockRejectedValue(new Error(message));
+
+            const response = await request(server).post("/projects/1/samples/pivots/regenerate").send({});
+
+            expect(response.status).toBe(status);
+            expect(response.body).toStrictEqual({ errors: [message] });
         });
     });
 })

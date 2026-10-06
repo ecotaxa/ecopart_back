@@ -7,6 +7,7 @@ export interface IMiddlewareSampleValidation {
     rulesSetVisualQc: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesSelectSampleCoordinates: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesPreviewQcGraphs: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
+    rulesRegeneratePivots: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
 }
 
 

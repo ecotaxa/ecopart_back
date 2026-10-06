@@ -67,6 +67,7 @@ import { SetSampleVisualQc } from '../../src/domain/use-cases/sample/set-sample-
 import { PreviewSamplesQcGraphs } from '../../src/domain/use-cases/sample/preview-samples-qc-graphs'
 import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/select-sample-coordinates'
 import { GetSample } from '../../src/domain/use-cases/sample/get-sample'
+import { RegeneratePivots } from '../../src/domain/use-cases/sample/regenerate-pivots'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
@@ -322,6 +323,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
             new GetSample(userRepo, sampleRepo, privilegeRepo),
+            new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
         )
 
         const taskMiddleware = TaskRouter(
@@ -597,6 +599,13 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             expect(s).toBeDefined()
             expect(s.nb_vignettes).toBeGreaterThan(0)
         }
+
+        // Every UVP5 sample got its UVP6 pivot, under <sample>/pivot/.
+        const fsStorageAbs = path.join(path.resolve(__dirname, '..', '..'), path.relative(path.resolve(__dirname, '..', '..'), tmpDir), "fs_storage")
+        for (const name of ALL_SAMPLES) {
+            const pivotEntries = await listZipEntries(path.join(fsStorageAbs, `${capturedProjectId}`, name, "pivot", `${name}_Particule.zip`))
+            expect(pivotEntries.sort()).toEqual(["frames.csv", "metadata.ini", "particules.csv"])
+        }
     })
 
     // ─── Phase 7: Import CTD samples ─────────────────────────────────────
@@ -809,6 +818,9 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             expect(workEntries).toContain(`${name}_datfile.txt`)
             // At least one HDR*.txt at the archive root
             expect(workEntries.some(e => /^HDR.*\.txt$/.test(e))).toBe(true)
+            // The pivot is built from that normalised work.zip.
+            const pivotEntries = await listZipEntries(path.join(fsStorageAbs, `${capturedProjectId}`, name, "pivot", `${name}_Particule.zip`))
+            expect(pivotEntries.sort()).toEqual(["frames.csv", "metadata.ini", "particules.csv"])
         }
     })
 })

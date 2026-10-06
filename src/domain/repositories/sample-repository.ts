@@ -11,6 +11,8 @@ import { ParticleDataFlag, PerImageRecord, SampleSourceQcMetadata } from "../ent
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
+import { convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
+import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
 
 
@@ -2021,6 +2023,83 @@ export class SampleRepositoryImpl implements SampleRepository {
             light_on: true,
             spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
         }));
+    }
+
+    // ─── UVP5 → UVP6 pivot ───
+    // Written under <sample>/pivot/ rather than next to the acquisition files: legacy EcoPart infers
+    // the instrument from the presence of a `_Particule.zip`, and the archives must never ship it.
+    async generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport> {
+        const sample_name = sample.sample_name;
+        const sample_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name);
+        try {
+            const work_zip = path.join(sample_folder, `${sample_name}_work.zip`);
+            const meta_conf_zip = path.join(sample_folder, `${sample_name}_meta_conf.zip`);
+            const datfile_content = await this.readPivotSource(work_zip, `${sample_name}_datfile.txt`, `${sample_name}_datfile.txt`);
+            const bru_content = await this.readPivotSource(work_zip, `${sample_name}.bru`, `${sample_name}.bru`);
+            const header_content = await this.readPivotSource(meta_conf_zip, "meta/uvp5_header_sn*.txt", undefined, /^meta\/uvp5_header_sn.*\.txt$/);
+            const files = convertUvp5ToPivot({
+                sample,
+                instrument_model,
+                datfile_content,
+                bru_content,
+                header_row: parseUvp5HeaderRow(header_content, sample_name),
+                converted_utc: new Date().toISOString(),
+            });
+            await this.writePivotZip(sample_folder, sample_name, files);
+            return files.report;
+        } catch (error) {
+            throw new Error(`Cannot build the UVP5 pivot of sample ${sample_name}: ${(error as Error).message}`);
+        }
+    }
+
+    // converter_version recorded in the sample's pivot, null when it has none (or an unreadable one).
+    async getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null> {
+        const pivot_zip = this.getPivotZipPath(project_id, sample_name);
+        try {
+            const ini = await this.readFileFromZip(pivot_zip, "metadata.ini", undefined);
+            const match = ini.match(/^converter_version=(.*)$/m);
+            return match ? match[1].trim() : null;
+        } catch {
+            return null;
+        }
+    }
+
+    private getPivotZipPath(project_id: number, sample_name: string): string {
+        return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, "pivot", `${sample_name}_Particule.zip`);
+    }
+
+    private async readPivotSource(zipPath: string, description: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
+        try {
+            return await this.readFileFromZip(zipPath, targetFileName, filePathPattern);
+        } catch (error) {
+            throw new Error(`cannot read ${description} in ${path.basename(zipPath)} (${(error as Error).message}). Check that the file is in the sample folder of the project, then relaunch the import or the pivot regeneration.`);
+        }
+    }
+
+    // Written under a temporary name then renamed: a pivot is either complete or absent.
+    private async writePivotZip(sample_folder: string, sample_name: string, files: Uvp5PivotFiles): Promise<void> {
+        const pivot_folder = path.join(sample_folder, "pivot");
+        const final_path = path.join(pivot_folder, `${sample_name}_Particule.zip`);
+        const tmp_path = `${final_path}.tmp`;
+        await fsPromises.mkdir(pivot_folder, { recursive: true });
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const output = fs.createWriteStream(tmp_path);
+                const archive = archiver('zip', { zlib: { level: 9 } });
+                output.on('close', () => resolve());
+                output.on('error', reject);
+                archive.on('error', reject);
+                archive.pipe(output);
+                archive.append(files.particules_csv, { name: "particules.csv" });
+                archive.append(files.metadata_ini, { name: "metadata.ini" });
+                archive.append(files.frames_csv, { name: "frames.csv" });
+                archive.finalize();
+            });
+            await fsPromises.rename(tmp_path, final_path);
+        } catch (error) {
+            await fsPromises.rm(tmp_path, { force: true });
+            throw new Error(`cannot write ${path.basename(final_path)} (${(error as Error).message}). Check the free space and the write permissions of the storage folder, then relaunch the import or the pivot regeneration.`);
+        }
     }
 
     // ─── Pre-import QC graphs: read raw files straight from the project source folder ───

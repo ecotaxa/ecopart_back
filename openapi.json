@@ -5593,6 +5593,81 @@
         }
       }
     },
+    "/projects/{project_id}/samples/pivots/regenerate": {
+      "post": {
+        "summary": "Regenerate the UVP6 pivot of UVP5 samples",
+        "description": "Starts an asynchronous task (returns a Task immediately; poll the task for progress) that\nconverts the stored `work.zip` of UVP5 samples into their UVP6 pivot,\n`<sample>/pivot/<sample>_Particule.zip` (`particules.csv` + `metadata.ini` + `frames.csv`).\nThe import builds the pivot of every new UVP5 sample; this endpoint covers the samples\nimported before the pivot existed and the pivots written by an older converter version.\n\nWithout `sample_names`, every sample of the project is considered. A sample whose pivot\nis already at the current converter version is kept, unless `force` is true. A failing\nsample does not stop the others; the task then fails with every error listed.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sample_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Samples to regenerate. Empty or absent = every sample of the project."
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also rebuild pivots already at the current converter version."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Regeneration task created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User not authorized for this project."
+          },
+          "403": {
+            "description": "User cannot be used."
+          },
+          "404": {
+            "description": "Project, samples or task not found."
+          },
+          "422": {
+            "description": "Validation error, or the project is not a UVP5 project."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
     "/projects/{project_id}/samples/searches": {
       "post": {
         "summary": "Search samples",
