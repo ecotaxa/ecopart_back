@@ -209,3 +209,21 @@ Ratio=3
         expect(sample.instrument_settings_acq_erase_border).toBe(0);
     });
 });
+
+describe("parseWorkDatfile (UVP5 work/<sample>_datfile.txt)", () => {
+    test("max_pressure is the largest value of the third column", () => {
+        const datfile = [
+            "1;20200806221354_536;12;0;0;21;!;0;0;0;0",
+            "2;20200806221355_036;57;0;0;21;!;0;0;0;0",
+            "3;20200806221355_536;43;0;0;21;!;0;0;0;0",
+        ].join("\n");
+
+        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(57);
+    });
+
+    test("a long profile does not overflow the stack", () => {
+        const datfile = Array.from({ length: 200000 }, (_, i) => `${i + 1};20200806221354_536;${i};0`).join("\n");
+
+        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(199999);
+    });
+});

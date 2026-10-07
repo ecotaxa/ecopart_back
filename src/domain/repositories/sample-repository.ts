@@ -666,8 +666,11 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         });
 
-        // Find the maximum pressure value
-        const maxPressure = Math.max(...pressures);
+        // Not Math.max(...pressures): spreading a long profile's datfile (~110k+ frames) overflows the stack.
+        let maxPressure = -Infinity;
+        for (const pressure of pressures) {
+            if (pressure > maxPressure) maxPressure = pressure;
+        }
 
         // Assign to work_datfile_content
         work_datfile_content.sample_metadata = {
