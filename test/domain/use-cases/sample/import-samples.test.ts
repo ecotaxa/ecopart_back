@@ -599,7 +599,7 @@ describe("Delete Sample Use Case", () => {
                 jest.spyOn(mockTaskRepository, "finishTask");
                 jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder");
                 jest.spyOn(mockTaskRepository, "getTask");
-                jest.spyOn(mockTaskRepository, "logMessage");
+                jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
                 //jest.spyOn(mockTaskRepository, "failedTask");
 
                 await (is as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "TUTU", projectResponseModel, current_user.user_id)
@@ -617,7 +617,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(0);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(3);
             });
             test("should throw an error and deleteSourcesFromProjectFolder if something went wrong during the import", async () => {
                 const current_user: UserUpdateModel = {
@@ -665,7 +665,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(1);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(1);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(1);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(4);
             });
         });
         describe("success senarios", () => {
@@ -713,7 +713,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(0);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(5);
             });
             test("should copy samples to import folder for any uvp6", async () => {
                 const current_user: UserUpdateModel = {
@@ -759,7 +759,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(0);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(7);
             });
         });
     });
@@ -775,6 +775,7 @@ describe("Delete Sample Use Case", () => {
             const generate = jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(pivotReport);
             const create = jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
 
             await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5HD", projectResponseModel, { user_id: 1 });
 
@@ -822,6 +823,57 @@ describe("Delete Sample Use Case", () => {
         });
     });
 
+    describe("task log", () => {
+        const loggedMessages = () => (mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message);
+
+        beforeEach(() => {
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
+            jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+            jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+        });
+
+        test("logs every step of a UVP5 import in the task log file, the copy details with the step 2/4 prefix", async () => {
+            jest.spyOn(mockSampleRepository, "UVP5copySamplesToImportFolder").mockImplementation(async (_source, _dest, _samples, log) => {
+                await log("perle3_001 (1/2) : work source work/perle3_001.zip (1.0 KB)");
+            });
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(pivotReport);
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5HD", projectResponseModel, { user_id: 1 });
+
+            expect(mockTaskRepository.logMessage).toBeCalledWith(TaskResponseModel_1.task_log_file_path, expect.any(String));
+            expect(loggedMessages()).toEqual([
+                "Step 1/4 sample validation : 2 sample(s) to import out of 2 importable",
+                "Step 1/4 sample validation : perle3_001 : raw file 20200313004656, images [2790, 15872], 0 vignettes",
+                "Step 1/4 sample validation : Mooring_0N_23W_201910_850m : raw file 20191012-000000_Merged-020, images [3432, 107843], 0 vignettes",
+                "Step 2/4 sample folders copy : perle3_001 (1/2) : work source work/perle3_001.zip (1.0 KB)",
+                "Step 4/4 samples db creation : perle3_001 created (sample_id 101)",
+                "Step 4/4 samples db creation : Mooring_0N_23W_201910_850m created (sample_id 202)",
+            ]);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+
+        test("logs a warning when the UVP6 black frames cannot be counted, and still imports the sample", async () => {
+            const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M" };
+            jest.spyOn(mockSampleRepository, "UVP6copySamplesToImportFolder").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "countBlackParticulesUvp6")
+                .mockResolvedValueOnce(12)
+                .mockRejectedValueOnce(new Error("particules.csv not found"));
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP6M", uvp6_project, { user_id: 1 });
+
+            expect(loggedMessages()).toContain("Step 3/4 pivot construction : Mooring_0N_23W_201910_850m : WARNING black frames not counted, nb_black set to 0 (particules.csv not found)");
+            expect(loggedMessages().filter((message: string) => message.includes("WARNING"))).toHaveLength(1);
+            expect(mockSampleRepository.createManySamples).toBeCalledTimes(1);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+    });
+
     describe("validate at import", () => {
         test("rejects validated_samples that are not part of the imported set (before any task is created)", async () => {
             const current_user: UserUpdateModel = { user_id: 1 };
@@ -843,6 +895,7 @@ describe("Delete Sample Use Case", () => {
 
         test("flips only the validated samples to VALIDATED after creation, with the audit fields", async () => {
             const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE);
+            const log = jest.fn().mockResolvedValue(undefined);
 
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
             // createManySamples returns ids in the same order as the input names.
@@ -852,6 +905,7 @@ describe("Delete Sample Use Case", () => {
 
             await (is as any).importSamples(
                 TaskResponseModel_1.task_id,
+                log,
                 projectResponseModel,
                 7,
                 ["perle3_001", "Mooring_0N_23W_201910_850m"],
@@ -862,10 +916,16 @@ describe("Delete Sample Use Case", () => {
             expect(getStatus).toBeCalledWith({ visual_qc_status_label: "VALIDATED" });
             expect(setQc).toBeCalledTimes(1);
             expect(setQc).toBeCalledWith(202, 2, 7, "Validated at import (pre-import visual QC)", expect.any(String));
+            expect(log.mock.calls.map(([message]) => message)).toEqual([
+                "Step 4/4 samples db creation : perle3_001 created (sample_id 101)",
+                "Step 4/4 samples db creation : Mooring_0N_23W_201910_850m created (sample_id 202)",
+                "Step 4/4 samples db creation : Mooring_0N_23W_201910_850m (sample_id 202) visual QC set to VALIDATED (pre-import visual QC)",
+            ]);
         });
 
         test("does not touch visual QC when no samples are validated", async () => {
             const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE);
+            const log = jest.fn().mockResolvedValue(undefined);
 
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
             jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
@@ -874,6 +934,7 @@ describe("Delete Sample Use Case", () => {
 
             await (is as any).importSamples(
                 TaskResponseModel_1.task_id,
+                log,
                 projectResponseModel,
                 7,
                 ["perle3_001", "Mooring_0N_23W_201910_850m"],

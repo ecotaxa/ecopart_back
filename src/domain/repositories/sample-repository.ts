@@ -10,6 +10,7 @@ import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, Importa
 import { ParticleDataFlag, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
+import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
@@ -1429,16 +1430,18 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         }
     }
-    async UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+    async UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void> {
 
         // Ensure that none of the samples folder already exists
         await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(this.base_folder, dest_folder));
 
         // Create destination folder
         await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
+        await log(`copying ${samples_names_to_import.length} sample(s) from ${source_folder} to ${dest_folder}`);
 
         // Iterate over each sample name, create the sample folder, copy files, and zip the folder
-        for (const sample of samples_names_to_import) {
+        for (const [i, sample] of samples_names_to_import.entries()) {
+            const log_prefix = `${sample} (${i + 1}/${samples_names_to_import.length})`;
             const sourcePath = path.join(this.base_folder, source_folder);
             const destPath = path.join(this.base_folder, dest_folder, sample);
 
@@ -1469,6 +1472,17 @@ export class SampleRepositoryImpl implements SampleRepository {
                 }
             }
 
+            // Any lower-priority form of the same work data left next to the chosen one is not imported.
+            const workCandidates = [workTarZstSourcePath, workZipSourcePath, workDirPath];
+            const workSourcePath = workIsTarZst ? workTarZstSourcePath : workIsZipped ? workZipSourcePath : workDirPath;
+            const ignoredWorkSources: string[] = [];
+            for (const candidate of workCandidates.slice(workCandidates.indexOf(workSourcePath) + 1)) {
+                if (await this.pathExists(candidate)) ignoredWorkSources.push(this.relativeToBase(candidate));
+            }
+            await log(`${log_prefix} : work source ${await this.describeImportPath(workSourcePath)}`
+                + (ignoredWorkSources.length > 0 ? `, ignored (lower priority): ${ignoredWorkSources.join(", ")}` : ""));
+            let workFilesCount = 0;
+
             if (workIsTarZst) {
                 // The work subdirectory is a zstandard-compressed tarball.
                 // Decompress + untar while stripping any top-level folder prefix, then re-zip —
@@ -1477,6 +1491,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 const workFolderPath = path.join(destPath, `${sample}_work`);
                 try {
                     await this.extractTarZstNormalized(workTarZstSourcePath, workFolderPath);
+                    workFilesCount = (await this.measureFolder(workFolderPath)).files;
                     await this.zipFolder(workFolderPath, workZipFilePath);
                     await fsPromises.rm(workFolderPath, { recursive: true, force: true });
                 } catch (error) {
@@ -1490,6 +1505,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 const workFolderPath = path.join(destPath, `${sample}_work`);
                 try {
                     await this.extractZipNormalized(workZipSourcePath, workFolderPath);
+                    workFilesCount = (await this.measureFolder(workFolderPath)).files;
                     await this.zipFolder(workFolderPath, workZipFilePath);
                     await fsPromises.rm(workFolderPath, { recursive: true, force: true });
                 } catch (error) {
@@ -1505,12 +1521,14 @@ export class SampleRepositoryImpl implements SampleRepository {
                     throw new Error(`Error copying work folder for sample ${sample}: ${error.message}`);
                 }
                 try {
+                    workFilesCount = (await this.measureFolder(workFolderPath)).files;
                     await this.zipFolder(workFolderPath, workZipFilePath);
                     await fsPromises.rm(workFolderPath, { recursive: true, force: true });
                 } catch (error) {
                     throw new Error(`Error zipping work folder for sample ${sample}: ${error.message}`);
                 }
             }
+            await log(`${log_prefix} : work written to ${await this.describeImportPath(workZipFilePath)}, ${workFilesCount} files`);
 
             // ── meta_conf: always copy from meta/ and config/ directories then zip ──
             const metaConfFilesToCopy = [
@@ -1520,6 +1538,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 { source: 'config/process_install_config.txt', dest: `${sample}_meta_conf/config/process_install_config.txt` },
             ];
 
+            const metaConfSources: string[] = [];
             for (const file of metaConfFilesToCopy) {
                 const sourceFilePath = path.join(sourcePath, file.source);
                 const destFilePath = path.join(destPath, file.dest);
@@ -1530,17 +1549,65 @@ export class SampleRepositoryImpl implements SampleRepository {
                 } catch (error) {
                     throw new Error(`Error copying ${file.source} for sample ${sample}: ${error.message}`);
                 }
+                metaConfSources.push(await this.describeImportPath(sourceFilePath));
             }
 
             const metaConfZipFilePath = path.join(destPath, `${sample}_meta_conf.zip`);
             const metaConfFolderPath = path.join(destPath, `${sample}_meta_conf`);
+            let metaConfFilesCount: number;
             try {
+                metaConfFilesCount = (await this.measureFolder(metaConfFolderPath)).files;
                 await this.zipFolder(metaConfFolderPath, metaConfZipFilePath);
                 await fsPromises.rm(metaConfFolderPath, { recursive: true, force: true });
             } catch (error) {
                 throw new Error(`Error zipping meta_conf folder for sample ${sample}: ${error.message}`);
             }
+            await log(`${log_prefix} : meta_conf written to ${await this.describeImportPath(metaConfZipFilePath)}, ${metaConfFilesCount} files, from ${metaConfSources.join(", ")}`);
         }
+    }
+
+    private relativeToBase(absolute_path: string): string {
+        return path.relative(this.base_folder, absolute_path);
+    }
+
+    // Task logs show paths relative to base_folder: they are readable by the user and must not expose the server layout.
+    private async describeImportPath(absolute_path: string): Promise<string> {
+        const relative_path = this.relativeToBase(absolute_path);
+        // A missing source is reported here and left to the copy, which fails with its usual error.
+        if (!(await this.pathExists(absolute_path))) return `${relative_path} (not found)`;
+        const stat = await fsPromises.stat(absolute_path);
+        if (!stat.isDirectory()) return `${relative_path} (${this.formatFileSize(stat.size)})`;
+        const { files, bytes } = await this.measureFolder(absolute_path);
+        return `${relative_path}/ (${files} files, ${this.formatFileSize(bytes)})`;
+    }
+
+    private async measureFolder(folder: string): Promise<{ files: number, bytes: number }> {
+        let files = 0;
+        let bytes = 0;
+        for (const entry of await fsPromises.readdir(folder, { withFileTypes: true })) {
+            const entry_path = path.join(folder, entry.name);
+            if (entry.isDirectory()) {
+                const sub_folder = await this.measureFolder(entry_path);
+                files += sub_folder.files;
+                bytes += sub_folder.bytes;
+            } else {
+                files++;
+                bytes += (await fsPromises.stat(entry_path)).size;
+            }
+        }
+        return { files, bytes };
+    }
+
+    private formatFileSize(bytes: number): string {
+        if (bytes < 1024) return `${bytes} B`;
+        const units = ["KB", "MB", "GB", "TB"];
+        let value = bytes / 1024;
+        let unit = 0;
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024;
+            unit++;
+        }
+        return `${value.toFixed(1)} ${units[unit]}`;
     }
 
     /**
@@ -1695,20 +1762,24 @@ export class SampleRepositoryImpl implements SampleRepository {
         });
     }
 
-    async UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+    async UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void> {
         // Ensure that non of the samples folder already exists
         await this.ensureSampleFolderDoNotExists(samples_names_to_import, path.join(this.base_folder, dest_folder));
 
         // Ensure destination folder exists
         await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
+        await log(`copying ${samples_names_to_import.length} sample(s) from ${source_folder} to ${dest_folder}`);
 
         // Iterate over each sample name and copy .zip files only
-        for (const sample of samples_names_to_import) {
+        for (const [i, sample] of samples_names_to_import.entries()) {
+            const log_prefix = `${sample} (${i + 1}/${samples_names_to_import.length})`;
             const sourcePath = path.join(this.base_folder, source_folder, sample);
             const destPath = path.join(this.base_folder, dest_folder, sample);
 
             // Check if the sample directory exists and list files
             const files = await fsPromises.readdir(sourcePath);
+            const copied: string[] = [];
+            const ignored: string[] = [];
 
             // Filter and copy only .zip files with _Particule or _Images in the name
             for (const file of files) {
@@ -1719,7 +1790,23 @@ export class SampleRepositoryImpl implements SampleRepository {
                     // Ensure destination subfolder exists
                     await fsPromises.mkdir(destPath, { recursive: true });
                     await fsPromises.copyFile(sourceFilePath, destFilePath);
+                    copied.push(await this.describeImportPath(destFilePath));
+                } else {
+                    ignored.push(file);
                 }
+            }
+
+            const source_label = this.relativeToBase(sourcePath) + "/";
+            if (copied.length === 0) {
+                await log(`${log_prefix} : WARNING no _Particule or _Images zip found in ${source_label}, nothing copied`);
+            } else {
+                await log(`${log_prefix} : copied from ${source_label} : ${copied.join(", ")}`);
+                if (!files.some(file => path.extname(file) === '.zip' && file.includes('_Particule'))) {
+                    await log(`${log_prefix} : WARNING no _Particule zip found in ${source_label}`);
+                }
+            }
+            if (ignored.length > 0) {
+                await log(`${log_prefix} : not copied from ${source_label} : ${ignored.join(", ")}`);
             }
         }
     }
