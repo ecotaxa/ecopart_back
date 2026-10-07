@@ -226,4 +226,37 @@ describe("parseWorkDatfile (UVP5 work/<sample>_datfile.txt)", () => {
 
         expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(199999);
     });
+
+    test("max_pressure is null, not -Infinity, when no line has a readable pressure", () => {
+        const datfile = [
+            "1;20200806221354_536;NaN;0",
+            "2;20200806221355_036;;0",
+        ].join("\n");
+
+        expect(repo.parseWorkDatfile(datfile).max_pressure).toBeNull();
+        expect(repo.parseWorkDatfile("").max_pressure).toBeNull();
+    });
+});
+
+describe("max pressure of a UVP6 particules.csv", () => {
+    test("is the largest readable pressure, NaN rows ignored", () => {
+        const content = [
+            "HW_CONF,000112LP,2,UNDEFINED,40",
+            "20210506-083733-1,NaN,23.19,1:1,10,30.8,8.8;",
+            "20210506-083734-1,12.5,23.19,1:1,10,30.8,8.8;",
+            "20210506-083735-1,8.0,23.19,1:1,10,30.8,8.8;",
+        ].join("\n");
+
+        expect(repo.getMaxPressure(repo.extractPressures(content))).toBe(12.5);
+    });
+
+    test("is null when every row has a NaN pressure (drifting time series without pressure)", () => {
+        const content = [
+            "HW_CONF,000112LP,2,UNDEFINED,40",
+            "20210506-083733-1,NaN,23.19,1:1,10,30.8,8.8;",
+            "20210506-083734-1,NaN,23.19,0:1,10,30.8,8.8;",
+        ].join("\n");
+
+        expect(repo.getMaxPressure(repo.extractPressures(content))).toBeNull();
+    });
 });

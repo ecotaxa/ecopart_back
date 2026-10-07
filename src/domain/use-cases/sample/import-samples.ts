@@ -114,7 +114,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             // 1/4 Do validation before importing
             importable_samples = await this.listImportableSamples(project);
             // Check that asked samples are in the importable list of samples
-            await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id, log);
+            await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id, log, project);
 
             // 2/4 Copy source files to hiden project folder 
             await this.copySourcesToProjectFolder(task_id, log, samples_names_to_import, instrument_model, project);
@@ -137,10 +137,11 @@ export class ImportSamples implements ImportSamplesUseCase {
             this.taskRepository.failedTask(task_id, error);
         }
     }
-    async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number, log: TaskLogger) {
+    async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number, log: TaskLogger, project: ProjectResponseModel) {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/4 sample validation : start");
         this.ensureSamplesAreBothInHeadersAndInDataFolder(samples, samples_names_to_import);
         this.ensureSamplesPassQcLvl1(samples, samples_names_to_import);
+        await this.ensureDepthProfilesHavePressure(project, samples_names_to_import);
         //TODO LATER add more validation
         await log(`Step 1/4 sample validation : ${samples_names_to_import.length} sample(s) to import out of ${samples.length} importable`);
         const samples_by_name = new Map(samples.map(sample => [sample.sample_name, sample]));
@@ -171,6 +172,21 @@ export class ImportSamples implements ImportSamplesUseCase {
         });
         if (failing_samples.length > 0) {
             throw new Error("Samples failed QC level 1 (source data missing): " + failing_samples.join(", "));
+        }
+    }
+
+    // A particle file without any readable pressure gives a NULL max_pressure. A time series is
+    // still placed by its time, a depth profile cannot be placed at all: refuse it before the copy.
+    async ensureDepthProfilesHavePressure(project: ProjectResponseModel, samples_names_to_import: string[]): Promise<void> {
+        const without_pressure: string[] = [];
+        for (const sample_name of samples_names_to_import) {
+            const { sample_type_label } = await this.sampleRepository.getSourceFilterMetadata(project.root_folder_path, sample_name, project.instrument_model);
+            if (sample_type_label !== "Depth") continue;
+            const max_pressure = await this.sampleRepository.getSourceMaxPressure(project.root_folder_path, sample_name, project.instrument_model);
+            if (max_pressure === null) without_pressure.push(sample_name);
+        }
+        if (without_pressure.length > 0) {
+            throw new Error("Depth profiles without any readable pressure: " + without_pressure.join(", ") + ". Check the pressure column of their particle file (UVP6 particules.csv, UVP5 datfile), or declare them as time series.");
         }
     }
 

@@ -194,7 +194,7 @@ describe("pivot read back by the UVP6 reader", () => {
             const frame = native_frames[i];
             expect(record.spectrum_counts).toEqual(native_spectra.get(frame.frame_idx) ?? {});
             // Already in decibar: a reader must not apply the UVP5 gain (0.1) a second time.
-            expect(record.raw_pressure).toBeCloseTo(frame.raw_pressure * 0.1, 9);
+            expect(record.raw_pressure).toBeCloseTo((frame.raw_pressure as number) * 0.1, 9);
             expect(record.image_time_ms).toBe(frame.time_ms);
             expect(record.light_on).toBe(true);
         });

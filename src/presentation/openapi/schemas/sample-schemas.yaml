@@ -25,7 +25,8 @@ components:
           example: "000002LP"
         max_pressure:
           type: number
-          description: Maximum pressure recorded.
+          nullable: true
+          description: Maximum pressure recorded. Null when the particle file has no readable pressure (e.g. a time series acquired without pressure).
         station_id:
           type: string
           description: Station identifier.

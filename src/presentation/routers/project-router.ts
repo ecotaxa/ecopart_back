@@ -1030,7 +1030,9 @@ export default function ProjectRouter(
      *
      *       1. **Validation** — the sample must appear both in the instrument header (`meta/`) and in the source
      *          data folder, and must pass QC level 1 (its source acquisition files are present). Any sample
-     *          missing, unknown, or failing QC aborts the whole task (nothing is imported). `validated_samples`
+     *          missing, unknown, or failing QC aborts the whole task (nothing is imported). A depth sample must
+     *          also have at least one readable pressure in its particle file (UVP6 `particules.csv`, UVP5
+     *          datfile); a time sample may have none, its `max_pressure` is then null. `validated_samples`
      *          must be a subset of `samples`.
      *       2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:
      *          - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or
@@ -1730,6 +1732,8 @@ export default function ProjectRouter(
      *         1 m bins (`depth_m`); `time` for time-series samples — hours since
      *         `time_origin_utc_date_time` (UTC hour of the first image), 1 h bins (`time_h`).
      *         Each binned profile repeats its `axis`; graph-1 points carry both `depth_m` and `time_h`.
+     *       - **Images without pressure** (NaN in the particle file): a time sample keeps them, placed by
+     *         time, with a null `depth_m`; a depth sample leaves them out of every graph and of the counts.
      *       - **Selection** (`is_selected`): an image is used when it lies inside the header window
      *         `[firstimage, endimg]` (UVP5: frame indices; UVP6: ranks, row k of `particules.csv`
      *         being rank `firstimage + k`) and, on a depth sample whose project enables the descent

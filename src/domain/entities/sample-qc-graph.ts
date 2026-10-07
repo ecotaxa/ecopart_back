@@ -27,7 +27,7 @@ export type VerticalAxis = "depth" | "time";
 export interface ImageDepthPoint {
     image_index: number;     // order of the image/frame in the raw file (0-based)
     image_id: string;        // raw id (UVP6 "20240612-003906-1" / UVP5 datfile frame index)
-    depth_m: number;         // metres
+    depth_m: number | null;  // metres; null when the image has no readable pressure (time series only)
     time_h: number | null;   // hours since time_origin_utc_date_time; null when the image time is unreadable
     is_selected: boolean;    // inside the operator window [first_image .. last_image] AND kept by the descent filter
 }
@@ -126,7 +126,7 @@ export interface SampleSourceQcMetadata {
 export interface PerImageRecord {
     image_index: number;                 // frame order (0-based)
     image_id: string;                    // raw id
-    raw_pressure: number;                // pre-gain value read from the file
+    raw_pressure: number | null;         // pre-gain value read from the file; null when unreadable (NaN)
     image_time_ms: number | null;        // acquisition time (epoch ms UTC, second resolution); null if unreadable
     light_on: boolean;                   // flash/light flag: ON = particles, OFF = black
     spectrum_counts: Record<number, number>;  // pixel-area (px) -> particle count (sparse; absent = 0)

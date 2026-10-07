@@ -426,7 +426,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    async computeMaxPressure(file_system_storage_project_folder: string, sample_name: string): Promise<number | undefined> {
+    async computeMaxPressure(file_system_storage_project_folder: string, sample_name: string): Promise<number | null> {
         // Read the pressure file
         const pressures = await this.getPressuresFromParticulesCsv(file_system_storage_project_folder, sample_name);
         // Compute the max pressure
@@ -434,13 +434,13 @@ export class SampleRepositoryImpl implements SampleRepository {
         return max_pressure;
     }
 
-    getMaxPressure(pressures: (number | "NaN")[]): number | undefined {
+    getMaxPressure(pressures: (number | "NaN")[]): number | null {
         // Filter out "NaN" values and ensure only numbers are considered
         const numericPressures = pressures.filter((value): value is number => value !== "NaN");
 
-        // If the array is empty, return undefined to indicate no valid pressures
+        // No readable pressure (e.g. a drifting time series without pressure): no max_pressure
         if (numericPressures.length === 0) {
-            return undefined;
+            return null;
         }
 
         const arrayMinMax = (arr: number[]): [number, number] =>
@@ -668,9 +668,10 @@ export class SampleRepositoryImpl implements SampleRepository {
         });
 
         // Not Math.max(...pressures): spreading a long profile's datfile (~110k+ frames) overflows the stack.
-        let maxPressure = -Infinity;
+        // No readable pressure: no max_pressure (null), never -Infinity.
+        let maxPressure: number | null = null;
         for (const pressure of pressures) {
-            if (pressure > maxPressure) maxPressure = pressure;
+            if (maxPressure === null || pressure > maxPressure) maxPressure = pressure;
         }
 
         // Assign to work_datfile_content
@@ -2066,8 +2067,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             if (!/^\d{8}/.test(line)) continue;
             const parts = line.split(",");
             if (parts.length < 4) continue;
-            const raw_pressure = parseFloat(parts[1]);
-            if (isNaN(raw_pressure)) continue;
+            // A NaN pressure stays: a time series without pressure is still placed by its time.
+            const pressure = parseFloat(parts[1]);
+            const raw_pressure = isNaN(pressure) ? null : pressure;
             const flag = parts[3].trim().split(":");        // "<light>:<first_class>"
             const light_on = flag[0] === "1";
             const first_class = parseInt(flag[1], 10);
@@ -2244,14 +2246,23 @@ export class SampleRepositoryImpl implements SampleRepository {
         return null;
     }
 
+    async getSourceMaxPressure(root_folder_path: string, sample_name: string, instrument_model: string): Promise<number | null> {
+        const root_abs = path.join(this.base_folder, root_folder_path);
+        if (instrument_model.startsWith("UVP6")) {
+            return this.computeMaxPressure(path.join(root_abs, "ecodata"), sample_name);
+        } else if (instrument_model.startsWith("UVP5")) {
+            return this.parseWorkDatfile(await this.readSourceDatfile(root_abs, sample_name)).max_pressure;
+        }
+        throw new Error("Unknown instrument model");
+    }
+
     // UVP5 source: read the datfile + .bru from the work archive (tar.zst > zip > folder),
     // matching by path so a top-level folder prefix inside the archive is tolerated.
     private async getPerImageRecordsUVP5FromSource(root_abs: string, sample_name: string): Promise<PerImageRecord[]> {
         const esc = sample_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const datfilePattern = new RegExp(`(^|/)${esc}_datfile\\.txt$`);
         const bruPattern = new RegExp(`(^|/)${esc}\\.bru$`);
 
-        const datfileContent = await this.readWorkSourceFile(root_abs, sample_name, `${sample_name}_datfile.txt`, datfilePattern);
+        const datfileContent = await this.readSourceDatfile(root_abs, sample_name);
         const frames = this.parseDatfileFrames(datfileContent);
 
         let spectraByFrame = new Map<number, Record<number, number>>();
@@ -2270,6 +2281,12 @@ export class SampleRepositoryImpl implements SampleRepository {
             light_on: true,
             spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
         }));
+    }
+
+    private async readSourceDatfile(root_abs: string, sample_name: string): Promise<string> {
+        const esc = sample_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const datfilePattern = new RegExp(`(^|/)${esc}_datfile\\.txt$`);
+        return this.readWorkSourceFile(root_abs, sample_name, `${sample_name}_datfile.txt`, datfilePattern);
     }
 
     // Read one file from the UVP5 source work entry, whatever its on-disk form.
@@ -2310,15 +2327,16 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // datfile rows are `frame_idx; timestamp; pressure; …` (semicolon-separated).
-    parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number; time_ms: number | null }[] {
-        const frames: { frame_idx: number; raw_pressure: number; time_ms: number | null }[] = [];
+    parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number | null; time_ms: number | null }[] {
+        const frames: { frame_idx: number; raw_pressure: number | null; time_ms: number | null }[] = [];
         for (const line of content.split(/\r\n|\n|\r/)) {
             const cols = line.split(";").map((c) => c.trim());
             if (cols.length < 3) continue;
             const frame_idx = parseInt(cols[0], 10);
-            const raw_pressure = parseInt(cols[2], 10);
-            if (isNaN(frame_idx) || isNaN(raw_pressure)) continue;
-            frames.push({ frame_idx, raw_pressure, time_ms: this.parseUvpTimestampMs(cols[1]) });
+            if (isNaN(frame_idx)) continue;
+            // A frame without readable pressure stays: a time series is placed by its time.
+            const pressure = parseInt(cols[2], 10);
+            frames.push({ frame_idx, raw_pressure: isNaN(pressure) ? null : pressure, time_ms: this.parseUvpTimestampMs(cols[1]) });
         }
         return frames;
     }

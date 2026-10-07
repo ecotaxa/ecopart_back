@@ -4,7 +4,7 @@ export interface SampleRequestCreationModel {
     sample_name: string;                       // Sample name
     comment: string;                           // Optional comment
     instrument_serial_number: string;          // Instrument serial number
-    max_pressure: number;                      // Maximum pressure (in relevant unit)
+    max_pressure: number | null;               // Maximum pressure (in relevant unit); null when the particle file has no readable pressure
     station_id: string;                        // Station identifier
     sampling_utc_date_time: string;                     // Sampling date in ISO format
     latitude: number;                          // Latitude (in decimal degrees) [DD.DDDD] (- for South)
@@ -395,7 +395,7 @@ export interface SampleFromMetaHeaderModel {
 
 }
 export interface SampleFromWorkDatfileModel {
-    max_pressure: number,                       // maxpressure work/profileid/profileid_datfile.txt : 9;        20120520080214_203;        ***00150***;00356;003
+    max_pressure: number | null,                // null when no datfile line has a readable pressure. maxpressure work/profileid/profileid_datfile.txt : 9;        20120520080214_203;        ***00150***;00356;003
 }
 export interface SampleFromWorkHDRModel {
     instrument_settings_acq_gain: number,                                       // Gain
