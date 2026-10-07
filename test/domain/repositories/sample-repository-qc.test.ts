@@ -49,6 +49,19 @@ describe("parseParticulesCsvRecords (UVP6)", () => {
         expect(records[1].spectrum_counts).toEqual({});
         expect(records[0].raw_pressure).toBe(-0.05);
     });
+
+    test("keeps a row whose pressure is NaN, with a null pressure, so a time series still places it by time", () => {
+        const content = [
+            "20210506-083733-1,NaN,23.19,1:1,10,30.8,8.8;",
+            "20210506-083734-1,4.5,23.19,1:1,10,30.8,8.8;",
+        ].join("\n");
+
+        const records = repo.parseParticulesCsvRecords(content);
+
+        expect(records.map((r) => [r.image_index, r.raw_pressure])).toEqual([[0, null], [1, 4.5]]);
+        expect(records[0].image_time_ms).toBe(Date.UTC(2021, 4, 6, 8, 37, 33));
+        expect(records[0].spectrum_counts).toEqual({ 1: 10 });
+    });
 });
 
 describe("parseDatfileFrames (UVP5)", () => {
@@ -71,6 +84,12 @@ describe("parseDatfileFrames (UVP5)", () => {
         const frames = repo.parseDatfileFrames("    11;\tnot-a-date;\t00152;00356;");
 
         expect(frames).toEqual([{ frame_idx: 11, raw_pressure: 152, time_ms: null }]);
+    });
+
+    test("an unreadable pressure leaves the frame without a pressure, the frame is still kept", () => {
+        const frames = repo.parseDatfileFrames("    12;\t20120520080216_203;\tNaN;00356;");
+
+        expect(frames).toEqual([{ frame_idx: 12, raw_pressure: null, time_ms: Date.UTC(2012, 4, 20, 8, 2, 16) }]);
     });
 });
 

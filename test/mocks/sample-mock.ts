@@ -98,6 +98,9 @@ export class MockSampleRepository implements SampleRepository {
     getSourceFilterMetadata(): Promise<SampleSourceQcMetadata> {
         throw new Error("Method not implemented for getSourceFilterMetadata");
     }
+    getSourceMaxPressure(): Promise<number | null> {
+        throw new Error("Method not implemented for getSourceMaxPressure");
+    }
     setSampleVisualQc(): Promise<number> {
         throw new Error("Method not implemented for setSampleVisualQc");
     }

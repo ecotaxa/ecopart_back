@@ -19,7 +19,7 @@ function input(overrides: Partial<QcGraphInput>): QcGraphInput {
 }
 
 // One lit image with no particles and no readable time, unless the test says otherwise.
-function rec(image_index: number, image_id: string, raw_pressure: number, overrides: Partial<PerImageRecord> = {}): PerImageRecord {
+function rec(image_index: number, image_id: string, raw_pressure: number | null, overrides: Partial<PerImageRecord> = {}): PerImageRecord {
     return { image_index, image_id, raw_pressure, image_time_ms: null, light_on: true, spectrum_counts: {}, ...overrides };
 }
 
@@ -348,5 +348,49 @@ describe("buildSampleQcGraphs — vertical axis", () => {
         expect(res.time_origin_utc_date_time).toBeNull();
         expect(res.image_depth_profile.points[0].time_h).toBeNull();
         expect(depthProfile(res.imaged_volume_profile).bin_size_m).toBe(1);
+    });
+});
+
+describe("buildSampleQcGraphs — images without pressure", () => {
+    const at = (h: number, m: number, s: number): number => Date.UTC(2021, 4, 6, h, m, s);
+
+    test("a time series without any pressure is placed by time: every image counts, with no depth", () => {
+        const res = buildSampleQcGraphs(input({
+            instrument_model: "UVP6LP",
+            is_depth_profile: false,
+            filter_first_image: "0",
+            filter_last_image: "2",
+            records: [
+                rec(0, "20210506-083733-1", null, { image_time_ms: at(8, 37, 33), spectrum_counts: { 1: 4 } }),
+                rec(1, "20210506-093733-1", null, { image_time_ms: at(9, 37, 33), spectrum_counts: { 1: 6 } }),
+                rec(2, "20210506-093734-1", null, { image_time_ms: at(9, 37, 34), light_on: false, spectrum_counts: { 1: 1 } }),
+            ],
+        }));
+
+        expect(res.vertical_axis).toBe("time");
+        expect(res.image_depth_profile.points.map((p) => p.depth_m)).toEqual([null, null, null]);
+        expect(res.image_depth_profile.total_images).toBe(3);
+        expect(res.image_depth_profile.selected_images).toBe(3);
+        expect(timeProfile(res.imaged_volume_profile).series[0].points).toEqual([{ time_h: 0.5, value: 1 }, { time_h: 1.5, value: 1 }]);
+        expect(timeProfile(res.particle_lpm_profile).series[0].points).toEqual([{ time_h: 0.5, value: 4 }, { time_h: 1.5, value: 6 }]);
+        expect(timeProfile(res.black_profile).series[0].points).toEqual([{ time_h: 1.5, value: 1 }]);
+        expect(res.image_filtering.removed_images.count).toBe(0);
+    });
+
+    test("a depth profile leaves out an image without pressure, which still holds its UVP6 rank", () => {
+        // Window = ranks 0..2: rank 1 has no pressure, rank 3 lies past endimg.
+        const res = buildSampleQcGraphs(input({
+            instrument_model: "UVP6LP",
+            filter_first_image: "0",
+            filter_last_image: "2",
+            records: [rec(0, "a", 1), rec(1, "b", null), rec(2, "c", 3), rec(3, "d", 4)],
+        }));
+
+        expect(res.image_depth_profile.points.map((p) => p.image_id)).toEqual(["a", "c", "d"]);
+        expect(selection(res)).toEqual([true, true, false]);
+        expect(res.image_depth_profile.total_images).toBe(3);
+        expect(res.image_filtering.removed_images.count).toBe(0);
+        expect(res.image_filtering.last_image_used).toBe("c");
+        expect(depthProfile(res.imaged_volume_profile).series[0].points.map((p) => p.depth_m)).toEqual([1.5, 3.5]);
     });
 });

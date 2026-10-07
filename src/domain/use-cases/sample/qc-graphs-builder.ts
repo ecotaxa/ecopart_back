@@ -51,11 +51,17 @@ interface ImageSelection {
     last_used: PerImageRecord | null;    // deepest kept image (depth profile) or last image of the window
 }
 
-// depth (m) = raw_pressure * gain + depth_offset (UVP5 gain 0.1, UVP6 gain 1).
-function depthConverter(input: QcGraphInput): (raw_pressure: number) => number {
+// depth (m) = raw_pressure * gain + depth_offset (UVP5 gain 0.1, UVP6 gain 1); null without pressure.
+function depthConverter(input: QcGraphInput): (raw_pressure: number | null) => number | null {
     const gain = input.instrument_model.startsWith("UVP5") ? 0.1 : 1;
     const depth_offset = input.instrument_settings_depth_offset_m ?? 0;
-    return (raw_pressure: number): number => raw_pressure * gain + depth_offset;
+    return (raw_pressure: number | null): number | null => raw_pressure === null ? null : raw_pressure * gain + depth_offset;
+}
+
+// A depth profile cannot place an image without pressure, so it leaves it out like legacy EcoPart;
+// a time series keeps it, placed by its time.
+function isPlaceable(input: QcGraphInput, r: PerImageRecord): boolean {
+    return !input.is_depth_profile || r.raw_pressure !== null;
 }
 
 // Descent-filter outcome alone, for callers that need the metadata without the three profiles
@@ -89,6 +95,13 @@ export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponse
     // unlike legacy EcoPart, it counts in the imaged volume.
     const used = records.filter((_, i) => selection.selected[i]);
     const used_lit = used.filter((r) => r.light_on && r.particle_data_flag !== "OVER_EXPOSED");
+    const points = records.flatMap((r, i) => isPlaceable(input, r) ? [{
+        image_index: r.image_index,
+        image_id: r.image_id,
+        depth_m: toDepth(r.raw_pressure),
+        time_h: toHours(r),
+        is_selected: selection.selected[i],
+    }] : []);
 
     return {
         sample_id: input.sample_id,
@@ -99,16 +112,10 @@ export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponse
         time_origin_utc_date_time: time_origin_ms !== null ? new Date(time_origin_ms).toISOString() : null,
         visual_qc_status_label: input.visual_qc_status_label,
         image_depth_profile: {
-            points: records.map((r, i) => ({
-                image_index: r.image_index,
-                image_id: r.image_id,
-                depth_m: toDepth(r.raw_pressure),
-                time_h: toHours(r),
-                is_selected: selection.selected[i],
-            })),
+            points,
             filter_first_image: first,
             filter_last_image: last,
-            total_images: records.length,
+            total_images: points.length,
             selected_images: used.length,
         },
         // Lit images only: legacy EcoPart derives the imaged volume from the flash-on raw histogram,
@@ -215,7 +222,7 @@ function buildImageFiltering(first_image: string | null, last_image: string | nu
 // An image is used when it lies inside the operator window and, on a depth profile whose project
 // enables it, the descent filter keeps it: depth >= the deepest kept so far. The filter is
 // depth-only (per Marc), so a time series keeps every image of its window.
-function selectImages(input: QcGraphInput, first: string | null, last: string | null, toDepth: (p: number) => number): ImageSelection {
+function selectImages(input: QcGraphInput, first: string | null, last: string | null, toDepth: (p: number | null) => number | null): ImageSelection {
     const records = input.records;
     const in_window = operatorWindow(input.instrument_model, records, first, last);
     const apply_descent_filter = input.is_depth_profile && input.descent_filter_enabled !== false;
@@ -226,10 +233,10 @@ function selectImages(input: QcGraphInput, first: string | null, last: string | 
     let last_used: PerImageRecord | null = null;
     let deepest = -Infinity;
     for (let i = 0; i < records.length; i++) {
-        if (!in_window[i]) continue;
+        if (!in_window[i] || !isPlaceable(input, records[i])) continue;
         window_size++;
-        if (apply_descent_filter) {
-            const depth = toDepth(records[i].raw_pressure);
+        const depth = toDepth(records[i].raw_pressure);
+        if (apply_descent_filter && depth !== null) {
             if (depth < deepest) continue;
             deepest = depth;
         }

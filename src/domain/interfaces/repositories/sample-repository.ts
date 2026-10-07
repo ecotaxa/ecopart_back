@@ -53,6 +53,9 @@ export interface SampleRepository {
     // Pre-import variant: reads the filtering/settings metadata (kept range, image volume, depth
     // offset) straight from the project source folder for a not-yet-imported sample.
     getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata>;
+    // Pre-import variant: max raw pressure of the particle file in the project source folder, null
+    // when no line has a readable pressure.
+    getSourceMaxPressure(root_folder_path: string, sample_name: string, instrument_model: string): Promise<number | null>;
     // Records a visual-QC decision (status + validator + timestamp + optional comment).
     setSampleVisualQc(sample_id: number, visual_qc_status_id: number, visual_qc_validator_user_id: number, comment: string | null, validated_at: string): Promise<number>;
 

@@ -14,6 +14,7 @@ import { projectResponseModel } from "../../../entities/project";
 import { TaskResponseModel_1 } from "../../../entities/task";
 import { listImportableSamplesResult, sampleRequestCreationModel_1 } from "../../../entities/sample";
 import { Uvp5PivotReport } from "../../../../src/domain/entities/pivot";
+import { SampleSourceQcMetadata } from "../../../../src/domain/entities/sample-qc-graph";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
@@ -34,6 +35,14 @@ const pivotReport: Uvp5PivotReport = {
     integrity_mismatches: 0,
 };
 
+const sourceMetadata = (sample_type_label: string): SampleSourceQcMetadata => ({
+    filter_first_image: "1",
+    filter_last_image: "999",
+    instrument_settings_image_volume_l: 1,
+    instrument_settings_depth_offset_m: null,
+    sample_type_label,
+});
+
 beforeEach(async () => {
     jest.clearAllMocks();
     mockSampleRepository = new MockSampleRepository()
@@ -44,6 +53,10 @@ beforeEach(async () => {
     DATA_STORAGE_FS_STORAGE = "data_storage/files_system_storage/"
 
     importSamplesUseCase = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE)
+
+    // Step 1/4 reads the sample type and the max pressure of every sample from the source folder.
+    jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(sourceMetadata("Depth"));
+    jest.spyOn(mockSampleRepository, "getSourceMaxPressure").mockResolvedValue(150);
 })
 
 
@@ -870,6 +883,52 @@ describe("Delete Sample Use Case", () => {
             expect(loggedMessages()).toContain("Step 3/4 pivot construction : Mooring_0N_23W_201910_850m : WARNING black frames not counted, nb_black set to 0 (particules.csv not found)");
             expect(loggedMessages().filter((message: string) => message.includes("WARNING"))).toHaveLength(1);
             expect(mockSampleRepository.createManySamples).toBeCalledTimes(1);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+    });
+
+    describe("samples without pressure", () => {
+        beforeEach(() => {
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "UVP6copySamplesToImportFolder").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue({ ...sampleRequestCreationModel_1, max_pressure: null });
+            jest.spyOn(mockSampleRepository, "countBlackParticulesUvp6").mockResolvedValue(0);
+            jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+            jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+        });
+        const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M" };
+        const samples = ["perle3_001", "Mooring_0N_23W_201910_850m"];
+
+        test("refuses at step 1/4 a depth profile whose particle file has no readable pressure, before any copy", async () => {
+            jest.spyOn(mockSampleRepository, "getSourceMaxPressure").mockResolvedValueOnce(150).mockResolvedValueOnce(null);
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+            expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledWith(uvp6_project.root_folder_path, "Mooring_0N_23W_201910_850m", "UVP6M");
+            expect(mockSampleRepository.getSourceMaxPressure).toBeCalledWith(uvp6_project.root_folder_path, "Mooring_0N_23W_201910_850m", "UVP6M");
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error("Depth profiles without any readable pressure: Mooring_0N_23W_201910_850m. Check the pressure column of their particle file (UVP6 particules.csv, UVP5 datfile), or declare them as time series."));
+            expect(mockTaskRepository.updateTaskProgress).not.toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 20, "Step 1/4 sample validation : done");
+            expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
+            expect(mockSampleRepository.createManySamples).toBeCalledTimes(0);
+        });
+
+        test("imports a time series without pressure, with a NULL max_pressure, without reading its pressure at step 1/4", async () => {
+            jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(sourceMetadata("Time"));
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+            expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledTimes(2);
+            expect(mockSampleRepository.getSourceMaxPressure).toBeCalledTimes(0);
+            expect(mockSampleRepository.createManySamples).toBeCalledWith([
+                expect.objectContaining({ max_pressure: null }),
+                expect.objectContaining({ max_pressure: null }),
+            ]);
+            expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
         });
     });
