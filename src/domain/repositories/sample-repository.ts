@@ -1241,9 +1241,14 @@ export class SampleRepositoryImpl implements SampleRepository {
                 throw new Error(`Failed to create destination folder for sample '${sample_name}' at '${sample_storage_folder}': ${err.message}`);
             }
 
+            // Copied under a temporary name then renamed: an interrupted import never replaces a
+            // previously imported CTD file with a truncated one.
+            const tmp_file_path = `${dest_file_path}.partial`;
             try {
-                await fsPromises.copyFile(source_file_path, dest_file_path);
+                await fsPromises.copyFile(source_file_path, tmp_file_path);
+                await fsPromises.rename(tmp_file_path, dest_file_path);
             } catch (err) {
+                await fsPromises.rm(tmp_file_path, { force: true }).catch(() => undefined);
                 throw new Error(`Failed to copy CTD file for sample '${sample_name}' to '${dest_file_path}': ${err.message}`);
             }
 
@@ -1749,18 +1754,33 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
+    // Written to a temporary file and renamed on success: an interrupted run never leaves a truncated
+    // zip where a complete one is expected, and only its own temporary file to remove. Listening on the
+    // output stream matters as much: without it a write error leaves the promise pending for ever, and
+    // the task would never reach its own error handling.
     async zipFolder(folderPath: string, zipFilePath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const output = fs.createWriteStream(zipFilePath);
-            const archive = archiver('zip', { zlib: { level: 9 } }); // High compression level
+        const tmpZipFilePath = `${zipFilePath}.partial`;
+        await fsPromises.rm(tmpZipFilePath, { force: true });
 
-            output.on('close', resolve);
-            archive.on('error', reject);
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const output = fs.createWriteStream(tmpZipFilePath);
+                const archive = archiver('zip', { zlib: { level: 9 } }); // High compression level
 
-            archive.pipe(output);
-            archive.directory(folderPath, false); // Add folder contents
-            archive.finalize();
-        });
+                output.on('close', () => resolve());
+                output.on('error', reject);
+                archive.on('error', reject);
+
+                archive.pipe(output);
+                archive.directory(folderPath, false); // Add folder contents
+                archive.finalize().catch(reject);
+            });
+        } catch (error) {
+            await fsPromises.rm(tmpZipFilePath, { force: true }).catch(() => undefined);
+            throw error;
+        }
+
+        await fsPromises.rename(tmpZipFilePath, zipFilePath);
     }
 
     async UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void> {
