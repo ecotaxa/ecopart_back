@@ -389,28 +389,33 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             throw new Error(`Destination path is a directory: ${destZipFile}`);
         }
 
-        // Create a writable stream for the zip file
-        const output = fs.createWriteStream(destZipFile);
+        // Written under a temporary name then renamed: the destination is either a complete archive
+        // or the one that was already there, never a truncated file. Nothing pre-existing is removed,
+        // and a failed run deletes only its own temporary file.
+        const tmpZipFile = `${destZipFile}.partial`;
+        await fsPromises.rm(tmpZipFile, { force: true });
 
-        // Create a new Archiver instance
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const output = fs.createWriteStream(tmpZipFile);
+                const archive = archiver('zip', { zlib: { level: 9 } });
 
-        // Handle events
-        output.on('close', () => {
-        });
+                // Resolve on 'close' and not on finalize(): finalize only marks the end of the input,
+                // the file is complete once the write stream has flushed and closed.
+                output.on('close', () => resolve());
+                output.on('error', reject);
+                archive.on('error', reject);
 
-        archive.on('error', (err) => {
-            throw err;
-        });
+                archive.pipe(output);
+                archive.directory(sourceFolder, false);
+                archive.finalize().catch(reject);
+            });
+        } catch (error) {
+            await fsPromises.rm(tmpZipFile, { force: true }).catch(() => undefined);
+            throw error;
+        }
 
-        // Pipe the archive data to the file
-        archive.pipe(output);
-
-        // Append the folder to the archive
-        archive.directory(sourceFolder, false);
-
-        // Finalize the archive
-        await archive.finalize();
+        await fsPromises.rename(tmpZipFile, destZipFile);
     }
     async copyNewL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
         const sourcePath = path.join(base_folder, source_folder, 'raw');

@@ -275,6 +275,16 @@ export class ExportRawData implements ExportRawDataUseCase {
         skipped_not_validated: string[],
     ): Promise<void> {
         const task_id = task.task_id;
+
+        // Computed before the try so the failure path can remove exactly what this task produced.
+        const base_folder = path.join(__dirname, "..", "..", "..", "..");
+        const task_folder = path.join(base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${task_id}`);
+        const work_folder = path.join(task_folder, "raw_export");
+        const zip_path = path.join(task_folder, `ecopart_export_raw_${task_id}.zip`);
+        // Only a folder this run actually created may be removed on failure: the paths above are
+        // computed, not observed, and must never drive a deletion on their own.
+        let work_folder_created = false;
+
         try {
             await this.taskRepository.startTask({ task_id });
 
@@ -285,10 +295,8 @@ export class ExportRawData implements ExportRawDataUseCase {
                     `QC: ${skipped_not_validated.length} sample(s) excluded from this export because they are not VALIDATED: ${skipped_not_validated.join(", ")}`);
             }
 
-            const base_folder = path.join(__dirname, "..", "..", "..", "..");
-            const task_folder = path.join(base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${task_id}`);
-            const work_folder = path.join(task_folder, "raw_export");
             await fsPromises.mkdir(work_folder, { recursive: true });
+            work_folder_created = true;
 
             const step_count = export_types.length;
             let step_index = 0;
@@ -315,8 +323,6 @@ export class ExportRawData implements ExportRawDataUseCase {
             // emitters use — so the README can't drift from the actual file contents.
             await fsPromises.writeFile(path.join(work_folder, "README.md"), renderReadme(export_types));
 
-            const zip_file_name = `ecopart_export_raw_${task_id}.zip`;
-            const zip_path = path.join(task_folder, zip_file_name);
             await this.zipFolder(work_folder, zip_path);
             await fsPromises.rm(work_folder, { recursive: true, force: true });
 
@@ -325,7 +331,23 @@ export class ExportRawData implements ExportRawDataUseCase {
             await this.taskRepository.logMessage(task.task_log_file_path, `Download link: ${download_link}`);
             await this.taskRepository.finishTask({ task_id }, download_link);
         } catch (error) {
+            if (work_folder_created) await this.removeWorkFolder(task, work_folder);
             await this.taskRepository.failedTask(task_id, error as Error);
+        }
+    }
+
+    // The intermediate folder is the only thing a failed export leaves behind: this task created it,
+    // it is named after the task, and it holds nothing but copies. The archive needs no cleaning
+    // because zipFolder writes to a temporary file and renames only on success. The task folder itself
+    // is kept, it holds the log failedTask is about to write to.
+    private async removeWorkFolder(task: TaskResponseModel, work_folder: string): Promise<void> {
+        try {
+            await fsPromises.rm(work_folder, { recursive: true, force: true });
+        } catch (cleanup_error) {
+            // Never mask the original failure: report and move on.
+            await this.taskRepository
+                .logMessage(task.task_log_file_path, `Cleanup after failure left files behind: ${(cleanup_error as Error).message}`)
+                .catch(() => undefined);
         }
     }
 
@@ -656,15 +678,28 @@ export class ExportRawData implements ExportRawDataUseCase {
         }
     }
 
-    private zipFolder(folder_path: string, zip_file_path: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const output = fs.createWriteStream(zip_file_path);
-            const archive = archiver("zip", { zlib: { level: 9 } });
-            output.on("close", () => resolve());
-            archive.on("error", reject);
-            archive.pipe(output);
-            archive.directory(folder_path, false);
-            archive.finalize();
-        });
+    // Written to a temporary file and renamed on success: a failed or interrupted export never leaves
+    // a truncated archive where a complete one is expected, and only its own temporary file to remove.
+    private async zipFolder(folder_path: string, zip_file_path: string): Promise<void> {
+        const tmp_path = `${zip_file_path}.partial`;
+        await fsPromises.rm(tmp_path, { force: true });
+
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const output = fs.createWriteStream(tmp_path);
+                const archive = archiver("zip", { zlib: { level: 9 } });
+                output.on("close", () => resolve());
+                output.on("error", reject);
+                archive.on("error", reject);
+                archive.pipe(output);
+                archive.directory(folder_path, false);
+                archive.finalize().catch(reject);
+            });
+        } catch (error) {
+            await fsPromises.rm(tmp_path, { force: true }).catch(() => undefined);
+            throw error;
+        }
+
+        await fsPromises.rename(tmp_path, zip_file_path);
     }
 }
