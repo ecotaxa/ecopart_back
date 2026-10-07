@@ -7,6 +7,9 @@ import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { PublicTaskRequestCreationModel, PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel, PublicTaskRequestModel } from "../../entities/task";
 import { UserRequestModel } from "../../entities/user";
 
+// Appends one line to a task log file (see TaskRepository.logMessage).
+export type TaskLogger = (message: string) => Promise<void>;
+
 export interface TaskRepository {
     getOneTask(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null>;
     startTask(task: PublicTaskRequestModel): Promise<void>;

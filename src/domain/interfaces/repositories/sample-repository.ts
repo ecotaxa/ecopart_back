@@ -2,6 +2,7 @@ import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestMod
 import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
+import { TaskLogger } from "./task-repository";
 
 export interface SampleRepository {
     deleteEcoTaxaSamplesFromDb(samples: SampleIdModel[]): Promise<number>;
@@ -10,8 +11,8 @@ export interface SampleRepository {
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
     listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]>;
-    UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>
-    UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[]): Promise<void>
+    UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
+    UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
     deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>
     getSample(sample: SampleRequestModel): Promise<PublicSampleModel | null>;
     deleteSample(sample: SampleIdModel): Promise<number>;
