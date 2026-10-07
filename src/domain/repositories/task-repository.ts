@@ -377,15 +377,14 @@ export class TaskRepositoryImpl implements TaskRepository {
     }
 
     async failedTask(task_id: number, error: Error): Promise<void> {
-        this.getTask({ task_id: task_id }).then(async task => {
-            if (!task) throw new Error("Task not found")
+        const task = await this.getTask({ task_id: task_id })
+        if (!task) throw new Error("Task not found")
 
-            // log error in log file
-            await this.logMessage(task.task_log_file_path, `Task failed with error: ${error.message}`);
+        // log error in log file
+        await this.logMessage(task.task_log_file_path, `Task failed with error: ${error.message}`);
 
-            // internally failed task
-            await this.internalFailedTask(task_id, error)
-        })
+        // internally failed task
+        await this.internalFailedTask(task_id, error)
     }
 
     async internalFailedTask(task_id: number, error: Error): Promise<void> {
@@ -405,9 +404,9 @@ export class TaskRepositoryImpl implements TaskRepository {
     }
     // Define allowed transitions between statuses
     private allowedTransitions: { [key in TasksStatus]: TasksStatus[] } = {
-        [TasksStatus.Pending]: [TasksStatus.Running],
+        [TasksStatus.Pending]: [TasksStatus.Running, TasksStatus.Error],
         [TasksStatus.Running]: [TasksStatus.Waiting_for_response, TasksStatus.Done, TasksStatus.Error],
-        [TasksStatus.Waiting_for_response]: [TasksStatus.Running],
+        [TasksStatus.Waiting_for_response]: [TasksStatus.Running, TasksStatus.Error],
         [TasksStatus.Done]: [],
         [TasksStatus.Error]: [],
     };
