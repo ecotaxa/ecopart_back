@@ -134,7 +134,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             await this.taskRepository.finishTask({ task_id: task_id });
         } catch (error) {
             await this.deleteSourcesFromProjectFolder(task_id, samples_names_to_import, project);
-            this.taskRepository.failedTask(task_id, error);
+            await this.taskRepository.failedTask(task_id, error);
         }
     }
     async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number, log: TaskLogger, project: ProjectResponseModel) {
