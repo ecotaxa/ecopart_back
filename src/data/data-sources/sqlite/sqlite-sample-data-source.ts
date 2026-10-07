@@ -168,105 +168,38 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         })
     }
 
+    // The connection is shared by the whole app and SQLite cannot nest transactions: a second
+    // createMany issuing BEGIN while one is open fails with "cannot start a transaction within a
+    // transaction". Transactions are therefore chained, one at a time.
+    private transaction_queue: Promise<unknown> = Promise.resolve()
+
     async createMany(samples: SampleRequestCreationModel[]): Promise<number[]> {
-        return new Promise((resolve, reject) => {
+        const result = this.transaction_queue.then(() => this.createManyInTransaction(samples));
+        this.transaction_queue = result.catch(() => undefined);
+        return result;
+    }
+
+    private async createManyInTransaction(samples: SampleRequestCreationModel[]): Promise<number[]> {
+        await this.runStatement('BEGIN TRANSACTION', "Failed to begin transaction: ");
+        try {
+            // Sequential inserts: no statement of the batch can still be pending when ROLLBACK runs.
             const insertedIds: number[] = [];
-            // Begin transaction
-            this.db.run('BEGIN TRANSACTION', (beginErr: Error) => {
-                if (beginErr) {
-                    return reject(new Error("Failed to begin transaction: " + beginErr));
-                }
+            for (const sample of samples) {
+                insertedIds.push(await this.createOne(sample).catch((err) => { throw new Error("Failed to insert sample: " + err) }));
+            }
+            await this.runStatement('COMMIT', "Failed to commit transaction: ");
+            return insertedIds;
+        } catch (error) {
+            // A failed COMMIT leaves the transaction open too: always close it, otherwise every
+            // later BEGIN fails and every later write on the connection stays uncommitted.
+            await this.runStatement('ROLLBACK', "Failed to rollback transaction: ");
+            throw new Error("Transaction rolled back due to error: " + error);
+        }
+    }
 
-                const insertPromises = samples.map((sample) => {
-                    return new Promise<number>((resolveInsert, rejectInsert) => {
-                        const params = [
-                            sample.sample_name, sample.comment, sample.instrument_serial_number,
-                            sample.max_pressure, sample.station_id,
-                            sample.sampling_utc_date_time, sample.latitude, sample.longitude, sample.wind_direction,
-                            sample.wind_speed, sample.sea_state, sample.nebulousness, sample.bottom_depth,
-                            sample.instrument_operator_email, sample.filename, sample.filter_first_image,
-                            sample.filter_last_image,
-                            sample.instrument_settings_acq_gain, sample.instrument_settings_acq_description,
-                            sample.instrument_settings_acq_task_type, sample.instrument_settings_acq_choice,
-                            sample.instrument_settings_acq_disk_type,
-                            sample.instrument_settings_acq_vignette_roi_enlargement_ratio,
-                            sample.instrument_settings_acq_x_size, sample.instrument_settings_acq_y_size,
-                            sample.instrument_settings_acq_erase_border, sample.instrument_settings_acq_threshold,
-                            sample.instrument_settings_acq_pressure_gain,
-                            sample.instrument_settings_process_datetime,
-                            sample.instrument_settings_process_gamma,
-                            sample.instrument_settings_process_vignette_resize_factor,
-                            sample.instrument_settings_images_post_process,
-                            sample.instrument_settings_aa, sample.instrument_settings_exp,
-                            sample.instrument_settings_image_volume_l, sample.instrument_settings_pixel_size_mm,
-                            sample.instrument_settings_depth_offset_m,
-                            sample.instrument_settings_particule_minimum_area_pixels,
-                            sample.instrument_settings_vignette_minimum_area_pixels,
-                            sample.instrument_settings_acq_shutter_speed, sample.instrument_settings_acq_exposure,
-                            sample.instrument_settings_integration_time,
-                            sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
-                            sample.nb_vignettes, sample.nb_black,
-                            // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time.
-                            new Date().toISOString(),
-                        ];
-
-                        const placeholders = params.map(() => '?').join(', ');
-                        const sql = `INSERT INTO sample (
-                            sample_name, comment, instrument_serial_number,
-                            max_pressure, station_id, sampling_utc_date_time, latitude, longitude, wind_direction, wind_speed, sea_state,
-                            nebulousness, bottom_depth, instrument_operator_email, filename, filter_first_image, filter_last_image,
-                            instrument_settings_acq_gain, instrument_settings_acq_description, instrument_settings_acq_task_type,
-                            instrument_settings_acq_choice, instrument_settings_acq_disk_type,
-                            instrument_settings_acq_vignette_roi_enlargement_ratio,
-                            instrument_settings_acq_x_size, instrument_settings_acq_y_size, instrument_settings_acq_erase_border,
-                            instrument_settings_acq_threshold, instrument_settings_acq_pressure_gain,
-                            instrument_settings_process_datetime, instrument_settings_process_gamma,
-                            instrument_settings_process_vignette_resize_factor,
-                            instrument_settings_images_post_process,
-                            instrument_settings_aa, instrument_settings_exp, instrument_settings_image_volume_l,
-                            instrument_settings_pixel_size_mm, instrument_settings_depth_offset_m,
-                            instrument_settings_particule_minimum_area_pixels,
-                            instrument_settings_vignette_minimum_area_pixels,
-                            instrument_settings_acq_shutter_speed, instrument_settings_acq_exposure,
-                            instrument_settings_integration_time,
-                            visual_qc_validator_user_id, sample_type_id, project_id,
-                            nb_vignettes, nb_black,
-                            sample_creation_utc_date_time
-                        ) VALUES (${placeholders})`;
-
-                        this.db.run(sql, params, function (err) {
-                            if (err) {
-                                rejectInsert(new Error("Failed to insert sample: " + err));
-                            } else {
-                                insertedIds.push(this.lastID);
-                                resolveInsert(this.lastID);
-                            }
-                        });
-                    });
-                });
-
-                Promise.all(insertPromises)
-                    .then(() => {
-                        // Commit transaction if all inserts are successful
-                        this.db.run('COMMIT', (commitErr: Error) => {
-                            if (commitErr) {
-                                return reject(new Error("Failed to commit transaction: " + commitErr));
-                            }
-                            resolve(insertedIds);
-                        });
-                    })
-                    .catch((error) => {
-                        // Rollback transaction if any insert fails
-                        this.db.run('ROLLBACK', (rollbackErr: Error) => {
-                            if (rollbackErr) {
-                                reject(new Error("Failed to rollback transaction: " + rollbackErr));
-                            } else {
-                                reject(new Error("Transaction rolled back due to error: " + error));
-                            }
-
-                        });
-                    });
-            });
+    private runStatement(sql: string, error_prefix: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.db.run(sql, [], (err) => err ? reject(new Error(error_prefix + err)) : resolve());
         });
     }
 

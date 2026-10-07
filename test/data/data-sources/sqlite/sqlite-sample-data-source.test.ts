@@ -50,4 +50,55 @@ describe('SQLiteSampleDataSource', () => {
             expect(all.items[0].ecotaxa_sample_imported).toBe(true)
         })
     })
+
+    describe('createMany transaction', () => {
+        const named = (sample_name: string) => ({ ...sampleRequestCreationModel_1, sample_name })
+        const countByName = async (names: string[]): Promise<number> => new Promise((resolve, reject) =>
+            db.get(`SELECT COUNT(*) AS n FROM sample WHERE sample_name IN (${names.map(() => '?').join(',')})`, names,
+                (e, row: any) => e ? reject(e) : resolve(row.n)))
+
+        test('concurrent calls are queued instead of failing to begin a nested transaction', async () => {
+            const [ids_a, ids_b] = await Promise.all([
+                dataSource.createMany([named('concurrent_a1'), named('concurrent_a2')]),
+                dataSource.createMany([named('concurrent_b1')]),
+            ])
+
+            expect(ids_a).toHaveLength(2)
+            expect(ids_b).toHaveLength(1)
+            expect(await countByName(['concurrent_a1', 'concurrent_a2', 'concurrent_b1'])).toBe(3)
+        })
+
+        test('a failing insert rolls the whole batch back and leaves no open transaction', async () => {
+            const invalid = { ...named('rolled_back_2'), sample_name: null } as any
+
+            await expect(dataSource.createMany([named('rolled_back_1'), invalid])).rejects.toThrow('Transaction rolled back due to error')
+
+            expect(await countByName(['rolled_back_1'])).toBe(0)
+            await expect(dataSource.createMany([named('after_rollback')])).resolves.toHaveLength(1)
+        })
+
+        test('a failing COMMIT is rolled back so the next call can begin a transaction', async () => {
+            let fail_next_commit = true
+            const flakyDb = {
+                run(sql: string, params: any, callback?: any) {
+                    if (sql === 'COMMIT' && fail_next_commit) {
+                        fail_next_commit = false
+                        const cb = typeof params === 'function' ? params : callback
+                        cb.call({}, new Error('SQLITE_BUSY: database is locked'))
+                        return this
+                    }
+                    db.run(sql, params, callback)
+                    return this
+                },
+                get: db.get.bind(db),
+                all: db.all.bind(db),
+            }
+            const flakyDataSource = new SQLiteSampleDataSource(flakyDb)
+
+            await expect(flakyDataSource.createMany([named('commit_failed')])).rejects.toThrow('Failed to commit transaction')
+
+            expect(await countByName(['commit_failed'])).toBe(0)
+            await expect(flakyDataSource.createMany([named('after_commit_failure')])).resolves.toHaveLength(1)
+        })
+    })
 })
