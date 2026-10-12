@@ -365,11 +365,11 @@ components:
       type: object
       description: Request body for exporting a project backup.
       properties:
-        out_to_ftp:
+        ftp_export:
           type: boolean
           description: >-
             FTP export toggle. The export archive is always written to the task folder and downloadable
-            via `GET /tasks/{task_id}/export`. When `true`, the same archive is additionally written to
+            via `GET /tasks/{task_id}/file`. When `true`, the same archive is additionally written to
             the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and both paths are returned.
           example: false
 

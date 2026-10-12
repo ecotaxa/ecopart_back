@@ -853,8 +853,8 @@ export default function ProjectRouter(
      *       **Destination(s):**
      *
      *       - Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via
-     *         `GET /tasks/{task_id}/export`.
-     *       - **Option `out_to_ftp`:** when `true`, the same archive is additionally written to the FTP export
+     *         `GET /tasks/{task_id}/file`.
+     *       - **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export
      *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the
      *         download link; when `false`, only the download link is returned.
      *     tags: [Projects]
@@ -914,7 +914,7 @@ export default function ProjectRouter(
     // L0-b project backup export
     router.post('/:project_id/backup/export', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackup, async (req: Request, res: Response) => {
         try {
-            const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.out_to_ftp);
+            const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.ftp_export === true);
             res.status(200).send(task)
         } catch (err) {
             console.log(new Date().toISOString(), err)

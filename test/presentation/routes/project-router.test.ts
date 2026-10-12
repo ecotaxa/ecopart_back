@@ -599,6 +599,19 @@ describe("Project Router", () => {
     });
 
     describe("POST /projects/:project_id/export", () => {
+        test("POST /projects/:project_id/export forwards the ftp_export option sent by the front", async () => {
+            jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+
+            await request(server).post("/projects/1/backup/export").send({ ftp_export: true })
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", true)
+
+            await request(server).post("/projects/1/backup/export").send({ ftp_export: false })
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", false)
+
+            // Absent option: no FTP copy
+            await request(server).post("/projects/1/backup/export").send({})
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", false)
+        });
         test("POST /projects/:project_id/export", async () => {
             const expectedResponse = TaskResponseModel_1
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(expectedResponse))
