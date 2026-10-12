@@ -34,6 +34,9 @@ export class MockProjectRepository implements ProjectRepository {
     copyL0bToProjectFolder(): Promise<void> {
         throw new Error("Method not implemented for copyL0bToProjectFolder");
     }
+    removeInterruptedWriteLeftovers(): Promise<string[]> {
+        throw new Error("Method not implemented for removeInterruptedWriteLeftovers");
+    }
     ensureBackupExist(): Promise<void> {
         throw new Error("Method not implemented for ensureBackupExist");
     }

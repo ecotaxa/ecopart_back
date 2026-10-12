@@ -140,7 +140,7 @@ components:
             $ref: "#/components/schemas/LabelCount"
         by_status:
           type: array
-          description: "Task counts grouped by status label (one of: PENDING, VALIDATING, RUNNING, WAITING_FOR_RESPONSE, DONE, ERROR), sorted by count desc."
+          description: "Task counts grouped by status label (one of: PENDING, RUNNING, CANCELLING, DONE, ERROR, CANCELLED), sorted by count desc."
           items:
             $ref: "#/components/schemas/LabelCount"
       required:

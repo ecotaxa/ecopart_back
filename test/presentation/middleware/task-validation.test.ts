@@ -4,7 +4,7 @@ import server from '../../../src/server'
 import TaskRouter from "../../../src/presentation/routers/tasks-router";
 
 import { MockMiddlewareAuth } from "./project-validation.test";
-import { MockDeleteTaskUseCase, MockGetOneTaskUseCase, MockGetLogFileTaskUseCase, MockStreamZipFileUseCase, MockSearchTaskUseCase } from "../../mocks/task-mock";
+import { MockDeleteTaskUseCase, MockGetOneTaskUseCase, MockGetLogFileTaskUseCase, MockStreamZipFileUseCase, MockSearchTaskUseCase, MockCancelTaskUseCase } from "../../mocks/task-mock";
 import { IMiddlewareTaskValidation } from "../../../src/presentation/interfaces/middleware/task-validation";
 import { MiddlewareTaskValidation } from "../../../src/presentation/middleware/task-validation";
 import { DeleteTaskUseCase } from "../../../src/domain/interfaces/use-cases/task/delete-task";
@@ -34,7 +34,7 @@ describe("Instrument model Router", () => {
         mockStreamZipFileUseCase = new MockStreamZipFileUseCase()
         mockSearchTaskUseCase = new MockSearchTaskUseCase()
 
-        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, mockDeleteTaskUseCase, mockGetOneTaskUseCase, mockGetLogFileTaskUseCase, mockStreamZipFileUseCase, mockSearchTaskUseCase))
+        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, mockDeleteTaskUseCase, mockGetOneTaskUseCase, mockGetLogFileTaskUseCase, mockStreamZipFileUseCase, mockSearchTaskUseCase, new MockCancelTaskUseCase()))
     })
 
     beforeEach(() => {

@@ -373,8 +373,50 @@ export class ProjectRepositoryImpl implements ProjectRepository {
                 // Raw subfolder is already zipped — copy it directly
                 const sourceZipFile = path.join(sourcePath, entry.name);
                 const destZipFile = path.join(destPath, entry.name);
-                await fsPromises.copyFile(sourceZipFile, destZipFile);
+                await this.copyFileAtomic(sourceZipFile, destZipFile);
             }
+        }
+    }
+
+    // Temporary files of writes cut short by a server stop, in the project's storage: the `.partial`
+    // copies and archives, the `.staging` folders of the backup metadata swap, and the `.tmp` pivots.
+    // Only called at startup, when no task can be writing them. Returns their relative paths.
+    async removeInterruptedWriteLeftovers(project_id: number): Promise<string[]> {
+        const project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+        const removed: string[] = [];
+        const visit = async (folder: string): Promise<void> => {
+            let entries: fs.Dirent[];
+            try {
+                entries = await fsPromises.readdir(folder, { withFileTypes: true });
+            } catch {
+                return;
+            }
+            for (const entry of entries) {
+                const entry_path = path.join(folder, entry.name);
+                const is_leftover = entry.name.endsWith(".partial") || entry.name.endsWith(".staging")
+                    || (entry.isFile() && entry.name.endsWith(".tmp") && path.basename(folder) === "pivot");
+                if (is_leftover) {
+                    await fsPromises.rm(entry_path, { recursive: true, force: true });
+                    removed.push(path.relative(project_folder, entry_path));
+                } else if (entry.isDirectory()) {
+                    await visit(entry_path);
+                }
+            }
+        };
+        await visit(project_folder);
+        return removed;
+    }
+
+    // Copied under a temporary name then renamed, like zipFolder: an interrupted copy never leaves a
+    // truncated archive that a later "skip already imported" backup would take for a complete one.
+    async copyFileAtomic(source_file: string, dest_file: string): Promise<void> {
+        const tmp_file = `${dest_file}.partial`;
+        try {
+            await fsPromises.copyFile(source_file, tmp_file);
+            await fsPromises.rename(tmp_file, dest_file);
+        } catch (error) {
+            await fsPromises.rm(tmp_file, { force: true }).catch(() => undefined);
+            throw error;
         }
     }
 
@@ -448,7 +490,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
                 const destZipFile = path.join(destPath, entry.name);
                 const alreadyBacked = await this.checkFileExists(destZipFile);
                 if (!alreadyBacked) {
-                    await fsPromises.copyFile(sourceZipFile, destZipFile);
+                    await this.copyFileAtomic(sourceZipFile, destZipFile);
                 }
             }
         }

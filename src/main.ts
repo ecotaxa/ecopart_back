@@ -47,6 +47,8 @@ import { SearchTask } from './domain/use-cases/task/search-tasks'
 import { GetOneTask } from './domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
+import { CancelTask } from './domain/use-cases/task/cancel-task'
+import { RecoverInterruptedTasks } from './domain/use-cases/task/recover-interrupted-tasks'
 
 import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
 import { ImportSamples } from './domain/use-cases/sample/import-samples'
@@ -249,6 +251,10 @@ async function getSQLiteDS() {
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
+
+    // Before any route exists: a task still active now lost its work when the server stopped
+    const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
+    if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT)
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
@@ -325,7 +331,8 @@ async function getSQLiteDS() {
         new GetOneTask(task_repo, user_repo, privilege_repo),
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
         new StreamZipFile(task_repo, user_repo, privilege_repo),
-        new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo)
+        new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo),
+        new CancelTask(task_repo, user_repo)
     )
 
     server.use("/users", userMiddleWare)

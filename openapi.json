@@ -245,7 +245,7 @@
           },
           "by_status": {
             "type": "array",
-            "description": "Task counts grouped by status label (one of: PENDING, VALIDATING, RUNNING, WAITING_FOR_RESPONSE, DONE, ERROR), sorted by count desc.",
+            "description": "Task counts grouped by status label (one of: PENDING, RUNNING, CANCELLING, DONE, ERROR, CANCELLED), sorted by count desc.",
             "items": {
               "$ref": "#/components/schemas/LabelCount"
             }
@@ -1643,9 +1643,9 @@
         "type": "object",
         "description": "Request body for exporting a project backup.",
         "properties": {
-          "out_to_ftp": {
+          "ftp_export": {
             "type": "boolean",
-            "description": "FTP export toggle. The export archive is always written to the task folder and downloadable via `GET /tasks/{task_id}/export`. When `true`, the same archive is additionally written to the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and both paths are returned.",
+            "description": "FTP export toggle. The export archive is always written to the task folder and downloadable via `GET /tasks/{task_id}/file`. When `true`, the same archive is additionally written to the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and both paths are returned.",
             "example": false
           }
         }
@@ -2209,13 +2209,13 @@
             "description": "Task type label.",
             "enum": [
               "EXPORT",
-              "DELETE",
-              "UPDATE",
               "IMPORT",
               "IMPORT_BACKUP",
               "EXPORT_BACKUP",
               "IMPORT_CTD",
-              "IMPORT_ECO_TAXA"
+              "IMPORT_ECO_TAXA",
+              "EXPORT_RAW",
+              "REGENERATE_PIVOT"
             ],
             "example": "IMPORT"
           },
@@ -2225,13 +2225,14 @@
           },
           "task_status": {
             "type": "string",
-            "description": "Task status label.",
+            "description": "Task status label. CANCELLING means a cancellation was requested on a running task, which stops at its next checkpoint.",
             "enum": [
               "PENDING",
               "RUNNING",
-              "WAITING_FOR_RESPONSE",
+              "CANCELLING",
               "DONE",
-              "ERROR"
+              "ERROR",
+              "CANCELLED"
             ],
             "example": "DONE"
           },
@@ -2251,22 +2252,18 @@
             "type": "object",
             "description": "Task-specific parameters."
           },
-          "task_creation_date": {
+          "task_creation_utc_date_time": {
             "type": "string",
-            "description": "Task creation date.",
+            "description": "Task creation date (ISO 8601 UTC).",
             "example": "2024-01-15T10:30:00.000Z"
           },
-          "task_start_date": {
+          "task_start_utc_date_time": {
             "type": "string",
-            "description": "Task start date."
+            "description": "Date the task started running (ISO 8601 UTC)."
           },
-          "task_end_date": {
+          "task_end_utc_date_time": {
             "type": "string",
-            "description": "Task end date."
-          },
-          "task_log_file_path": {
-            "type": "string",
-            "description": "Path to the task log file."
+            "description": "Date the task reached DONE, ERROR or CANCELLED (ISO 8601 UTC)."
           },
           "task_progress_pct": {
             "type": "number",
@@ -2286,18 +2283,6 @@
           "task_error": {
             "type": "string",
             "description": "Task error message if failed."
-          },
-          "task_question": {
-            "type": "string",
-            "description": "Question to user (for WAITING_FOR_RESPONSE status)."
-          },
-          "task_reply": {
-            "type": "string",
-            "description": "User reply to the question."
-          },
-          "task_step": {
-            "type": "string",
-            "description": "Current task step identifier."
           }
         }
       },
@@ -4318,7 +4303,7 @@
             }
           },
           "401": {
-            "description": "User not authorized for this project or backup already running.",
+            "description": "User not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4339,6 +4324,16 @@
           },
           "404": {
             "description": "Project, task type/status, or folder not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A backup task (import or export) is already running for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4447,7 +4442,7 @@
     "/projects/{project_id}/backup/export": {
       "post": {
         "summary": "Export project backup",
-        "description": "Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).\nRequires a prior successful backup — fails if `l0b_backup/` does not exist for the project.\n\nThe whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and\n`config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)\nis compressed into a single archive named\n`ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).\n\nThis export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains\nthe `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the\n`<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.\n\n**Destination(s):**\n\n- Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via\n  `GET /tasks/{task_id}/export`.\n- **Option `out_to_ftp`:** when `true`, the same archive is additionally written to the FTP export\n  folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the\n  download link; when `false`, only the download link is returned.\n",
+        "description": "Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).\nRequires a prior successful backup — fails if `l0b_backup/` does not exist for the project.\n\nThe whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and\n`config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)\nis compressed into a single archive named\n`ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).\n\nThis export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains\nthe `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the\n`<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.\n\n**Destination(s):**\n\n- Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via\n  `GET /tasks/{task_id}/file`.\n- **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export\n  folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the\n  download link; when `false`, only the download link is returned.\n",
         "tags": [
           "Projects"
         ],
@@ -4510,6 +4505,16 @@
           },
           "404": {
             "description": "Project, backup folder, or task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A backup task (import or export) is already running for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6348,7 +6353,7 @@
     "/tasks/searches": {
       "post": {
         "summary": "Search tasks",
-        "description": "Returns a paginated, sorted, and filtered list of tasks.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `task_id` | number | |\n| `task_type_id` | number | |\n| `task_status_id` | number | |\n| `task_owner_id` | number | |\n| `task_project_id` | number or null | |\n| `task_progress_pct` | number | |\n| `task_progress_msg` | string | |\n| `task_step` | number | |\n| `task_creation_utc_date_time` | string (ISO timestamp) | |\n| `task_start_utc_date_time` | string (ISO timestamp) or null | |\n| `task_end_utc_date_time` | string (ISO timestamp) or null | |\n| `task_type` | string | Computed — matched against the task type **label** (e.g. `LIKE \"%import%\"`), resolved to `task_type_id` |\n| `task_status` | string | Computed — matched against the task status **label** (e.g. `LIKE \"%done%\"`), resolved to `task_status_id` |\n| `task_owner` | string | Computed — matched against the owner display string `First Last (email)` via the joined user row |\n| `for_managing` | boolean | Computed — restricts to tasks owned by or related to current user |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.\n",
+        "description": "Returns a paginated, sorted, and filtered list of tasks.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `task_id` | number | |\n| `task_type_id` | number | |\n| `task_status_id` | number | |\n| `task_owner_id` | number | |\n| `task_project_id` | number or null | |\n| `task_progress_pct` | number | |\n| `task_progress_msg` | string | |\n| `task_creation_utc_date_time` | string (ISO timestamp) | |\n| `task_start_utc_date_time` | string (ISO timestamp) or null | |\n| `task_end_utc_date_time` | string (ISO timestamp) or null | |\n| `task_type` | string | Computed — matched against the task type **label** (e.g. `LIKE \"%import%\"`), resolved to `task_type_id` |\n| `task_status` | string | Computed — matched against the task status **label** (e.g. `LIKE \"%done%\"`), resolved to `task_status_id` |\n| `task_owner` | string | Computed — matched against the owner display string `First Last (email)` via the joined user row |\n| `for_managing` | boolean | Computed — restricts to tasks owned by or related to current user |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.\n",
         "tags": [
           "Tasks"
         ],
@@ -6553,6 +6558,83 @@
           },
           "404": {
             "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}/cancel": {
+      "post": {
+        "summary": "Cancel task",
+        "description": "Cancel a task (task owner or admin).\n\nA `PENDING` task becomes `CANCELLED` at once. A `RUNNING` task becomes `CANCELLING`: its work\nstops at its next checkpoint, removes what it produced, and the task ends `CANCELLED`. A task that\nreaches its end before a checkpoint still ends `DONE` or `ERROR`.\n",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The task ID to cancel."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The task after the cancellation request (`CANCELLED` or `CANCELLING`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used or cannot cancel this task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task is already finished or already being cancelled.",
             "content": {
               "application/json": {
                 "schema": {

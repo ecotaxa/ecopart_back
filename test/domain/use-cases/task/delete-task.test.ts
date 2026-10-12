@@ -38,10 +38,11 @@ describe("Delete Task Use Case", () => {
 
         await deleteTaskUseCase.execute(current_user, TaskResponseModel_1);
 
-        expect(mockTaskRepository.getTask).toBeCalledWith(TaskResponseModel_1);
+        // Only the id reaches the repository, whatever other keys the caller sent
+        expect(mockTaskRepository.getTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
-        expect(mockTaskRepository.deleteTask).toBeCalledWith(TaskResponseModel_1);
+        expect(mockTaskRepository.deleteTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
     });
 
     test("Logged user is not admin : delete a task : ko", async () => {
@@ -55,7 +56,7 @@ describe("Delete Task Use Case", () => {
 
         await expect(deleteTaskUseCase.execute(current_user, TaskResponseModel_1)).rejects.toThrowError("Logged user cannot delete this task");
 
-        expect(mockTaskRepository.getTask).toBeCalledWith(TaskResponseModel_1);
+        expect(mockTaskRepository.getTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
     });
@@ -70,7 +71,7 @@ describe("Delete Task Use Case", () => {
 
         await expect(deleteTaskUseCase.execute(current_user, TaskResponseModel_1)).rejects.toThrowError("Cannot find task to delete");
 
-        expect(mockTaskRepository.getTask).toBeCalledWith(TaskResponseModel_1);
+        expect(mockTaskRepository.getTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
     });
 
@@ -86,9 +87,9 @@ describe("Delete Task Use Case", () => {
 
         await expect(deleteTaskUseCase.execute(current_user, TaskResponseModel_1)).rejects.toThrowError("Cannot delete task");
 
-        expect(mockTaskRepository.getTask).toBeCalledWith(TaskResponseModel_1);
+        expect(mockTaskRepository.getTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
-        expect(mockTaskRepository.deleteTask).toBeCalledWith(TaskResponseModel_1);
+        expect(mockTaskRepository.deleteTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
     });
 });

@@ -20,6 +20,9 @@ export class DeleteTask implements DeleteTaskUseCase {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
+        // The task is identified by its id alone: any other key would end up in the SQL WHERE clause
+        task_to_delete = { task_id: task_to_delete.task_id };
+
         // Ensure the task to delete exists
         await this.ensureTaskExists(task_to_delete);
 

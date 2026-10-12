@@ -1,4 +1,4 @@
-import { TaskResponseModel } from "../../../entities/task";
+import { PublicTaskResponseModel } from "../../../entities/task";
 import { UserUpdateModel } from "../../../entities/user";
 
 // One value per folder of the produced archive. `lpm`, `images` and `instrument_config` each map
@@ -16,5 +16,5 @@ export interface ExportRawDataRequestModel {
 }
 
 export interface ExportRawDataUseCase {
-    execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<TaskResponseModel>;
+    execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<PublicTaskResponseModel>;
 }

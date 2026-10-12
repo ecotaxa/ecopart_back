@@ -635,7 +635,8 @@ export default function ProjectRouter(
      */
     router.delete('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
+            // Only the id: the data source builds its WHERE clause from the keys it receives
+            await deleteProjectUseCase.execute((req as CustomRequest).token, { project_id: req.params.project_id as any })
             res.status(200).send({ message: "Project successfully deleted" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
@@ -713,7 +714,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User not authorized for this project or backup already running.
+     *         description: User not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -726,6 +727,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project, task type/status, or folder not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: A backup task (import or export) is already running for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -752,7 +759,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "An export backup is already running for this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "A backup task is already running for this project") res.status(409).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot backup project"] })
         }
@@ -846,8 +853,8 @@ export default function ProjectRouter(
      *       **Destination(s):**
      *
      *       - Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via
-     *         `GET /tasks/{task_id}/export`.
-     *       - **Option `out_to_ftp`:** when `true`, the same archive is additionally written to the FTP export
+     *         `GET /tasks/{task_id}/file`.
+     *       - **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export
      *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the
      *         download link; when `false`, only the download link is returned.
      *     tags: [Projects]
@@ -891,6 +898,12 @@ export default function ProjectRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: A backup task (import or export) is already running for this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       500:
      *         description: Internal server error.
      *         content:
@@ -901,7 +914,7 @@ export default function ProjectRouter(
     // L0-b project backup export
     router.post('/:project_id/backup/export', middlewareAuth.auth, middlewareProjectValidation.rulesProjectBackup, async (req: Request, res: Response) => {
         try {
-            const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.out_to_ftp);
+            const task = await exportBackupProjectUseCase.execute((req as CustomRequest).token, req.params.project_id as any, req.body.ftp_export === true);
             res.status(200).send(task)
         } catch (err) {
             console.log(new Date().toISOString(), err)
@@ -913,6 +926,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Backup folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "A backup task is already running for this project") res.status(409).send({ errors: [err.message] })
             else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot export backuped project"] })
         }
@@ -996,7 +1010,6 @@ export default function ProjectRouter(
             "Task is already in this status": { status: 500, message: err.message },
             "Cannot change status from": { status: 500, message: err.message },
             "Cannot find task": { status: 404, message: err.message },
-            "An export backup is already running for this project": { status: 401, message: err.message },
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
@@ -2335,7 +2348,6 @@ export default function ProjectRouter(
             "Task is already in this status": { status: 500, message: err.message },
             "Cannot change status from": { status: 500, message: err.message },
             "Cannot find task": { status: 404, message: err.message },
-            "An export backup is already running for this project": { status: 401, message: err.message },
             "Folder does not exist at path": { status: 404, message: err.message },
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },

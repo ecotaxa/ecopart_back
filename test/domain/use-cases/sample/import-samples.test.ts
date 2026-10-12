@@ -11,7 +11,8 @@ import { ImportSamples } from "../../../../src/domain/use-cases/sample/import-sa
 import { TaskRepository } from "../../../../src/domain/interfaces/repositories/task-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { projectResponseModel } from "../../../entities/project";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 import { listImportableSamplesResult, sampleRequestCreationModel_1 } from "../../../entities/sample";
 import { Uvp5PivotReport } from "../../../../src/domain/entities/pivot";
 import { SampleSourceQcMetadata } from "../../../../src/domain/entities/sample-qc-graph";
@@ -53,6 +54,9 @@ beforeEach(async () => {
     DATA_STORAGE_FS_STORAGE = "data_storage/files_system_storage/"
 
     importSamplesUseCase = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE)
+    // Defaults: a task that is never cancelled, returned without its log file path
+    jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask);
 
     // Step 1/4 reads the sample type and the max pressure of every sample from the source folder.
     jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(sourceMetadata("Depth"));
@@ -389,7 +393,7 @@ describe("Delete Sample Use Case", () => {
                 jest.spyOn(mockTaskRepository, "logMessage").mockImplementation(() => Promise.resolve());
                 //jest.spyOn(mockTaskRepository, "failedTask");
 
-                await expect(importSamplesUseCase.execute(current_user, 1, ["sample1", "sample2"])).resolves.toEqual(TaskResponseModel_1);
+                await expect(importSamplesUseCase.execute(current_user, 1, ["sample1", "sample2"])).resolves.toEqual(toPublicTask(TaskResponseModel_1));
 
                 expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
                 expect(mockUserRepository.isAdmin).toBeCalledTimes(1);
@@ -684,6 +688,51 @@ describe("Delete Sample Use Case", () => {
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(1);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(1);
                 expect(mockTaskRepository.logMessage).toBeCalledTimes(4);
+            });
+        });
+        describe("cancellation", () => {
+            const arrangeUvp5Import = () => {
+                jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
+                jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
+                jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+                jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+                jest.spyOn(mockSampleRepository, "UVP5copySamplesToImportFolder").mockResolvedValue();
+                jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
+                jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(pivotReport);
+                jest.spyOn(mockSampleRepository, "createManySamples");
+                jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder").mockResolvedValue();
+                jest.spyOn(mockTaskRepository, "getTask").mockResolvedValue(TaskResponseModel_1);
+                jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+                jest.spyOn(mockTaskRepository, "finishTask");
+                jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+            }
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+
+            test("cancelled during the validation : nothing is copied, nothing to clean", async () => {
+                arrangeUvp5Import();
+                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockRejectedValue(cancelled);
+
+                await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5SD", projectResponseModel, { user_id: 1 })
+
+                expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
+                expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
+                expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
+                expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled);
+            });
+
+            test("cancelled during the pivot construction : the copied sources are removed and no sample is created", async () => {
+                arrangeUvp5Import();
+                // before the copy, after the copy, then before the first pivot
+                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
+
+                await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5SD", projectResponseModel, { user_id: 1 })
+
+                expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(1);
+                expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(0);
+                expect(mockSampleRepository.createManySamples).toBeCalledTimes(0);
+                expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledWith(expect.any(String), ["perle3_001", "Mooring_0N_23W_201910_850m"]);
+                expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
+                expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled);
             });
         });
         describe("success senarios", () => {

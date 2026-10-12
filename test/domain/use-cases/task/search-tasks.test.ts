@@ -11,6 +11,7 @@ import { FilterSearchOptions, SearchOptions } from "../../../../src/domain/entit
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
+import { TaskResponseModel_1, TaskResponseModel_2, toPublicTask } from "../../../entities/task";
 
 let mockUserRepository: UserRepository;
 let mockTaskRepository: TaskRepository;
@@ -28,6 +29,7 @@ beforeEach(() => {
     mockProjectRepository = new MockProjectRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
     searchTasksUseCase = new SearchTask(mockUserRepository, mockTaskRepository, mockSearchRepository, mockProjectRepository, mockPrivilegeRepository)
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask)
 })
 describe("Search Task Use Case", () => {
     describe("error cases", () => {
@@ -293,7 +295,7 @@ describe("Search Task Use Case", () => {
             expect(mockSearchRepository.formatSortBy).toBeCalledTimes(1)
             expect(mockTaskRepository.standardGetTaskStatus).toBeCalledTimes(0)
             expect(mockTaskRepository.standardGetTaskType).toBeCalledTimes(0)
-            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(1)
+            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(0)
             expect(mockUserRepository.isAdmin).toBeCalledTimes(1)
             expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
             expect(mockTaskRepository.standardGetTasks).toBeCalledTimes(1)
@@ -330,7 +332,7 @@ describe("Search Task Use Case", () => {
             expect(mockSearchRepository.formatSortBy).toBeCalledTimes(1)
             expect(mockTaskRepository.standardGetTaskStatus).toBeCalledTimes(0)
             expect(mockTaskRepository.standardGetTaskType).toBeCalledTimes(0)
-            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(1)
+            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(0)
             expect(mockUserRepository.isAdmin).toBeCalledTimes(1)
             expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
             expect(mockTaskRepository.standardGetTasks).toBeCalledTimes(1)
@@ -400,11 +402,55 @@ describe("Search Task Use Case", () => {
             expect(mockSearchRepository.formatSortBy).toBeCalledTimes(1)
             expect(mockTaskRepository.standardGetTaskStatus).toBeCalledTimes(1)
             expect(mockTaskRepository.standardGetTaskType).toBeCalledTimes(1)
-            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(1)
+            // for_managing is an owner filter, not a list of task ids
+            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(0)
             expect(mockUserRepository.isAdmin).toBeCalledTimes(1)
             expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(1)
+            expect(mockTaskRepository.standardGetTasks).toBeCalledWith(
+                expect.objectContaining({ filter: expect.arrayContaining([{ field: "task_owner_id", operator: "=", value: 1 }]) }),
+                { user_id: 1, project_ids: [] })
             expect(mockTaskRepository.standardGetTasks).toBeCalledTimes(1)
             expect(mockSearchRepository.formatSearchInfo).toBeCalledTimes(1)
+        });
+
+        test("not an admin sees the tasks they own OR the tasks of their projects", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 }
+            const options: SearchOptions = { page: 1, limit: 10, sort_by: "asc(task_id)" }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [{ sort_by: "task_id", order_by: "asc" }])
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
+            jest.spyOn(mockTaskRepository, "getTasksByUser")
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([5, 7])
+            jest.spyOn(mockTaskRepository, "standardGetTasks").mockResolvedValue({ total: 2, items: [TaskResponseModel_1, TaskResponseModel_2] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 2, limit: 10, total_on_page: 2, page: 1, pages: 1 }));
+
+            const result = await searchTasksUseCase.execute(current_user, options, [])
+
+            expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledWith({ user_id: 1 })
+            // The OR between owner and projects is passed to the repository, never as a list of task ids
+            expect(mockTaskRepository.getTasksByUser).toBeCalledTimes(0)
+            expect(mockTaskRepository.standardGetTasks).toBeCalledWith(expect.objectContaining({ filter: [] }), { user_id: 1, project_ids: [5, 7] })
+            // The server path of the log file is not part of the result
+            expect(result.tasks).toStrictEqual([toPublicTask(TaskResponseModel_1), toPublicTask(TaskResponseModel_2)])
+            expect(result.tasks[0]).not.toHaveProperty("task_log_file_path")
+        });
+
+        test("an admin sees every task, no visibility filter is added", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 }
+            const options: SearchOptions = { page: 1, limit: 10, sort_by: "asc(task_id)" }
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [{ sort_by: "task_id", order_by: "asc" }])
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser")
+            jest.spyOn(mockTaskRepository, "standardGetTasks").mockResolvedValue({ total: 1, items: [TaskResponseModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            await searchTasksUseCase.execute(current_user, options, [])
+
+            expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
+            expect(mockTaskRepository.standardGetTasks).toBeCalledWith(expect.objectContaining({ filter: [] }), undefined)
         });
     });
 });

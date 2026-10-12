@@ -451,6 +451,14 @@ describe("Project Router", () => {
 
 
     describe("DELETE /projects/:project_id", () => {
+        test("DELETE /projects forwards the project id only, never the keys of the request body", async () => {
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).delete("/projects/1").send({ "project_id = 2 OR 1": 1, root_folder_path: "/other" })
+
+            expect(response.status).toBe(200)
+            expect(mockDeleteProjectUseCase.execute).toBeCalledWith(expect.anything(), { project_id: "1" })
+        });
 
         test("DELETE /projects", async () => {
             const expectedResponse = { message: "Project successfully deleted" }
@@ -564,12 +572,12 @@ describe("Project Router", () => {
             expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        // An export backup is already running for this project
-        test("POST /projects/:project_id/backup fail for An export backup is already running for this project should return 401", async () => {
-            const expectedResponse = { errors: ["An export backup is already running for this project"] }
-            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("An export backup is already running for this project")))
+        // A backup task is already running for this project
+        test("POST /projects/:project_id/backup fail for A backup task is already running for this project should return 409", async () => {
+            const expectedResponse = { errors: ["A backup task is already running for this project"] }
+            jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("A backup task is already running for this project")))
             const response = await request(server).post("/projects/1/backup")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(409)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Folder does not exist at path
@@ -591,6 +599,19 @@ describe("Project Router", () => {
     });
 
     describe("POST /projects/:project_id/export", () => {
+        test("POST /projects/:project_id/export forwards the ftp_export option sent by the front", async () => {
+            jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+
+            await request(server).post("/projects/1/backup/export").send({ ftp_export: true })
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", true)
+
+            await request(server).post("/projects/1/backup/export").send({ ftp_export: false })
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", false)
+
+            // Absent option: no FTP copy
+            await request(server).post("/projects/1/backup/export").send({})
+            expect(mockExportBackupProjectUseCase.execute).toHaveBeenLastCalledWith(expect.anything(), "1", false)
+        });
         test("POST /projects/:project_id/export", async () => {
             const expectedResponse = TaskResponseModel_1
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.resolve(expectedResponse))
@@ -649,6 +670,14 @@ describe("Project Router", () => {
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find task")))
             const response = await request(server).post("/projects/1/backup/export")
             expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        // A backup task is already running for this project
+        test("POST /projects/:project_id/export fail for A backup task is already running for this project should return 409", async () => {
+            const expectedResponse = { errors: ["A backup task is already running for this project"] }
+            jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("A backup task is already running for this project")))
+            const response = await request(server).post("/projects/1/backup/export")
+            expect(response.status).toBe(409)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         //Backup folder does not exist at path
@@ -862,19 +891,6 @@ describe("Project Router", () => {
             jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find task")))
             const response = await request(server).post("/projects/1/samples/import")
             expect(response.status).toBe(404)
-            expect(response.body).toStrictEqual(expectedResponse)
-        });
-        // An export backup is already running for this project 401
-        test("POST /projects/:project_id/samples/import fail for An export backup is already running for this proje and should return error 401", async () => {
-            const expectedResponse = {
-                success: false,
-                errors: {
-                    import: ["An export backup is already running for this project"]
-                }
-            }
-            jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("An export backup is already running for this project")))
-            const response = await request(server).post("/projects/1/samples/import")
-            expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Folder does not exist at path 404

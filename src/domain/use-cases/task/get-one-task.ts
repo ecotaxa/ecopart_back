@@ -1,4 +1,4 @@
-import { TaskResponseModel } from "../../entities/task";
+import { PublicTaskResponseModel } from "../../entities/task";
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
@@ -16,7 +16,7 @@ export class GetOneTask implements GetOneTaskUseCase {
         this.privilegeRepository = privilegeRepository
     }
 
-    async execute(current_user: UserUpdateModel, task_id: number): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, task_id: number): Promise<PublicTaskResponseModel> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -28,7 +28,7 @@ export class GetOneTask implements GetOneTaskUseCase {
         // Ensure the current user has permission to get the task
         await this.ensureUserCanGet(current_user, task.task_owner_id, task.task_project_id);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     private async ensureUserCanGet(current_user: UserUpdateModel, owner_id: number, project_id?: number): Promise<void> {

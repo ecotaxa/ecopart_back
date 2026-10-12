@@ -7,8 +7,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 
 import { BackupProjectUseCase } from "../../interfaces/use-cases/project/backup-project";
 import { ProjectResponseModel } from "../../entities/project";
-import { PrivateTaskRequestModel, PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
-import { PreparedSearchOptions } from "../../entities/search";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import path from "path";
 
 export class BackupProject implements BackupProjectUseCase {
@@ -26,7 +25,7 @@ export class BackupProject implements BackupProjectUseCase {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, skip_already_imported: boolean): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, skip_already_imported: boolean): Promise<PublicTaskResponseModel> {
 
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
@@ -49,7 +48,7 @@ export class BackupProject implements BackupProjectUseCase {
         // start the task
         this.startBackupProjectTask(task, project, skip_already_imported);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     async createBackupProjectTask(current_user: UserUpdateModel, project: ProjectResponseModel, skip_already_imported: boolean): Promise<number> {
@@ -64,7 +63,12 @@ export class BackupProject implements BackupProjectUseCase {
             }
         }
 
-        return await this.taskRepository.createTask(task);
+        // Import and export of the L0-b backup both work on the project's l0b_backup folder: only one
+        // backup task, of either type, may be active on a project at a time. Refused before any task
+        // exists, so the caller gets the conflict as an HTTP error.
+        const task_id = await this.taskRepository.createTaskUnlessActive(task, [TaskType.Import_Backup, TaskType.Export_Backup]);
+        if (task_id === null) throw new Error("A backup task is already running for this project");
+        return task_id;
     }
 
 
@@ -92,12 +96,13 @@ export class BackupProject implements BackupProjectUseCase {
         try {
             await this.taskRepository.startTask({ task_id: task_id });
 
-            // 1/3 Do validation before importing 0->15%
-            await this.ensureNoExportBackupIsRunning(project, task_id);
-            // 2/3 Do validation before importing 15->25%
+            // 1/2 Do validation before importing 0->25%
             await this.ensureFolderStructureForBackup(project.root_folder_path, task_id);
 
-            // 3/3 Copy source files to hiden project folder 25->100%
+            // Last point where a cancellation leaves nothing behind
+            await this.taskRepository.throwIfCancelled(task_id);
+
+            // 2/2 Copy source files to hiden project folder 25->100%
             await this.copySourcesToBackupProjectFolder(task_id, project, skip_already_imported);
 
             // Record the backup date on the project
@@ -111,54 +116,20 @@ export class BackupProject implements BackupProjectUseCase {
         }
     }
     async ensureFolderStructureForBackup(root_folder_path: string, task_id: number) {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 15, "Step 2/3 Validation, ensure folder structure is correct: start");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 0, "Step 1/2 Validation, ensure folder structure is correct: start");
         await this.projectRepository.ensureFolderStructureForBackup(root_folder_path);
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/3 Validation, ensure folder structure is correct: done");
-    }
-
-    async ensureNoExportBackupIsRunning(project: ProjectResponseModel, task_id: number) {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 0, "Step 1/3 Validation, no backup is running: start");
-
-        const options_type: PreparedSearchOptions = {
-            filter: [
-                { field: 'task_type_label', operator: '=', value: TaskType.Export_Backup }
-            ],
-            sort_by: [],
-            page: 1,
-            limit: 1
-        }
-        const option_status: PreparedSearchOptions = {
-            filter: [
-                { field: 'task_status_label', operator: '=', value: TasksStatus.Running }
-            ],
-            sort_by: [],
-            page: 1,
-            limit: 1
-        }
-        const task_type_id = (await this.taskRepository.standardGetTaskType(options_type)).items[0].task_type_id;
-        const task_status_id = (await this.taskRepository.standardGetTaskStatus(option_status)).items[0].task_status_id;
-
-        const options_project: PrivateTaskRequestModel = {
-            task_type_id,
-            task_status_id,
-            task_project_id: project.project_id
-        }
-        const task = await this.taskRepository.getOneTask(options_project);
-        if (task) {
-            throw new Error("An export backup is already running for this project");
-        }
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 15, "Step 1/3 Validation, no backup is running: done");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 1/2 Validation, ensure folder structure is correct: done");
     }
 
     async copySourcesToBackupProjectFolder(task_id: number, project: ProjectResponseModel, skip_already_imported: boolean) {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 3/3 L0-b backup folders copy : start");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/2 L0-b backup folders copy : start");
 
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`, "l0b_backup");
         const root_folder_path = project.root_folder_path;
 
         // Copy sources files to project folder
         await this.projectRepository.copyL0bToProjectFolder(root_folder_path, dest_folder, skip_already_imported);
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 99, "Step 3/3 L0-b backup folders copy : done");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 99, "Step 2/2 L0-b backup folders copy : done");
     }
 
     async getLastBackupDate(current_user: UserUpdateModel, project_id: number): Promise<string | null> {

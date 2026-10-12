@@ -102,6 +102,12 @@ root). There is no DI container.
   progress via `taskRepository.startTask/updateTaskProgress/finishTask/failedTask/logMessage`.
   Results (e.g. ZIPs) are written under `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and streamed
   back via `GET /tasks/:task_id/file`. Mirror `export-backuped-project.ts` / `export-raw-data.ts`.
+  Return `taskRepository.toPublicTask(task)` (never the log file path). Call
+  `taskRepository.throwIfCancelled(task_id)` between steps, only where the catch path removes what
+  the task produced so far (never after irreversible writes such as created samples); `failedTask`
+  turns that error into `CANCELLED`. Interrupted tasks are recovered at startup (`RecoverInterruptedTasks`),
+  which also removes what they left: write files under a temporary name (`.partial`, pivot `.tmp`,
+  `.staging` folder) then rename, so a cut-short write is recognisable and never mistaken for a complete one.
 - **Authorization** lives in the use case: `userRepository.ensureUserCanBeUsed(user_id)` then
   admin-or-privilege via `userRepository.isAdmin` / `privilegeRepository.isGranted`.
 - **Error handling**: use cases `throw new Error("<stable message>")`; routers match on

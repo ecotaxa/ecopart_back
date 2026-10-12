@@ -18,7 +18,7 @@ import { ExportRawDataUseCase, RawExportType } from "../../../../src/domain/inte
 
 import { sampleModel_1, sampleModel_2 } from "../../../entities/sample";
 import { private_projectResponseModel } from "../../../entities/project";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 
 let mockUserRepository: UserRepository;
 let mockPrivilegeRepository: MockPrivilegeRepository;
@@ -68,6 +68,9 @@ beforeEach(() => {
         "data_storage/",
         "http://localhost:3000",
     );
+    // Defaults: a task that is never cancelled, returned without its log file path
+    jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask);
 });
 
 describe("ExportRawDataUseCase", () => {
@@ -116,7 +119,7 @@ describe("ExportRawDataUseCase", () => {
 
             const task = await exportRawDataUseCase.execute(current_user, { sample_ids: [1], export_types: ["metadata"] });
 
-            expect(task).toStrictEqual(TaskResponseModel_1);
+            expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
             expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0);
         });
 
@@ -287,7 +290,7 @@ describe("ExportRawDataUseCase", () => {
                 const task = await exportRawDataUseCase.execute(current_user,
                     { sample_ids: [1, 2], export_types: ["metadata"], skip_not_validated: true });
 
-                expect(task).toStrictEqual(TaskResponseModel_1);
+                expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
                 expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
                     task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true },
                 }));
@@ -339,7 +342,7 @@ describe("ExportRawDataUseCase", () => {
                 ecotaxa_exclude_not_living: true,
             });
 
-            expect(task).toStrictEqual(TaskResponseModel_1);
+            expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
             expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
                 task_type: "EXPORT_RAW",
                 task_status: "PENDING",

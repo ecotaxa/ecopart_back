@@ -1,8 +1,19 @@
 import { TaskDataSource } from "../../interfaces/data-sources/task-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel } from "../../../domain/entities/task";
+import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel, TaskVisibilityModel } from "../../../domain/entities/task";
 import { UserRequestModel } from "../../../domain/entities/user";
+
+// SQL for `column IN (values)`, pushing the bound values onto `params`. A null or undefined value
+// matches NULL (which `IN` alone never does), and an empty list matches nothing.
+function inClause(column: string, values: unknown[], params: unknown[]): string {
+    const non_null = values.filter(value => value !== null && value !== undefined);
+    const matches_null = non_null.length < values.length;
+    if (non_null.length === 0) return matches_null ? `${column} IS NULL` : `1 = 0`;
+    params.push(...non_null);
+    const in_sql = `${column} IN (` + non_null.map(() => '(?)').join(',') + `)`;
+    return matches_null ? `(${in_sql} OR ${column} IS NULL)` : in_sql;
+}
 
 export class SQLiteTaskDataSource implements TaskDataSource {
 
@@ -79,7 +90,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         })
     }
 
-    async getAll(options: PreparedSearchOptions): Promise<SearchResult<TaskResponseModel>> {
+    async getAll(options: PreparedSearchOptions, visible_to?: TaskVisibilityModel): Promise<SearchResult<TaskResponseModel>> {
         // options folllow be PrivateTaskRequestModel
 
         // The three LEFT JOINs are needed both by the outer SELECT and by the COUNT(*)
@@ -107,13 +118,8 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
                 const column = resolveFilterColumn(filter.field);
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
-                    // if array do not contains null or undefined
-                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
-                        // for eatch value in filter.value, add to filtering_sql and params_filtering
-                        filtering_sql += column + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
-                        params_filtering.push(...filter.value)
-                    }
+                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                    filtering_sql += inClause(column, filter.value, params_filtering)
                 }
                 // If value is true or false, set to 1 or 0
                 else if (filter.value == true || filter.value == "true") {
@@ -139,6 +145,12 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             }
             // remove last AND
             filtering_sql = filtering_sql.slice(0, -4);
+        }
+        // Visibility of a non-admin: an OR between owner and projects, which search filters (ANDed)
+        // cannot express. Bound values are the user and their projects, never a list of task ids.
+        if (visible_to) {
+            params_filtering.push(visible_to.user_id)
+            filtering_sql += (filtering_sql ? ` AND ` : ` WHERE `) + `(task.task_owner_id = (?) OR ` + inClause("task.task_project_id", visible_to.project_ids, params_filtering) + `)`
         }
         // Add filtering_sql to sql
         sql += filtering_sql
@@ -198,9 +210,6 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_params: row.task_params,
                             task_result: row.task_result,
                             task_error: row.task_error,
-                            task_question: row.task_question,
-                            task_reply: row.task_reply,
-                            task_step: row.task_step,
                         })),
                         total: rows[0]?.total_count || 0
                     };
@@ -265,9 +274,6 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_params: row.task_params,
                             task_result: row.task_result,
                             task_error: row.task_error,
-                            task_question: row.task_question,
-                            task_reply: row.task_reply,
-                            task_step: row.task_step,
                         };
                         resolve(result);
                     }
@@ -286,13 +292,8 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
-                    // if array do not contains null or undefined
-                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
-                        // for eatch value in filter.value, add to filtering_sql and params_filtering
-                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
-                        params_filtering.push(...filter.value)
-                    }
+                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                    filtering_sql += inClause(filter.field, filter.value, params_filtering)
                 }
                 // If value is true or false, set to 1 or 0
                 else if (filter.value == true || filter.value == "true") {
@@ -380,13 +381,8 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
-                    // if array do not contains null or undefined
-                    if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
-                        // for eatch value in filter.value, add to filtering_sql and params_filtering
-                        filtering_sql += filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `
-                        params_filtering.push(...filter.value)
-                    }
+                if (filter.operator == "IN" && Array.isArray(filter.value)) {
+                    filtering_sql += inClause(filter.field, filter.value, params_filtering)
                 }
                 // If value is true or false, set to 1 or 0
                 else if (filter.value == true || filter.value == "true") {
@@ -465,8 +461,9 @@ export class SQLiteTaskDataSource implements TaskDataSource {
     }
 
     // Update One task
-    // Returns the number of lines updates
-    async updateOne(task: PrivateTaskUpdateModel): Promise<number> {
+    // Returns the number of lines updates. With expected_status_id, the row is only updated while the
+    // task is still in that status, so a concurrent status change makes the update a no-op (0).
+    async updateOne(task: PrivateTaskUpdateModel, expected_status_id?: number): Promise<number> {
         const { task_id, ...taskData } = task; // Destructure the project object
         const params: any[] = []
         let placeholders: string = ""
@@ -479,9 +476,14 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         placeholders = placeholders.slice(0, -1);
         // add task_id to params
         params.push(task_id)
+        let where = `task_id=(?)`
+        if (expected_status_id !== undefined) {
+            where += ` AND task_status_id=(?)`
+            params.push(expected_status_id)
+        }
 
         // form final sql
-        const sql = `UPDATE task SET ` + placeholders + ` WHERE task_id=(?);`;
+        const sql = `UPDATE task SET ` + placeholders + ` WHERE ` + where + `;`;
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
                 if (err) {
