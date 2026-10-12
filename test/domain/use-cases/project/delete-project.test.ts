@@ -110,6 +110,28 @@ describe("Delete Project Use Case", () => {
         expect(mockProjectRepository.deleteProject).not.toBeCalled();
     });
 
+    test("Only the project id reaches the repositories, whatever other keys the caller sent", async () => {
+        const current_user: UserUpdateModel = {
+            user_id: 1
+        }
+        // Extra keys would be ANDed into the WHERE clause and could select another project
+        const project_to_delete = { project_id: 1, root_folder_path: "/another/project" } as ProjectUpdateModel
+
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+        jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
+        jest.spyOn(mockProjectRepository, "deleteProject").mockImplementation(() => Promise.resolve(1))
+        jest.spyOn(mockSampleRepository, "standardGetSamples").mockImplementation(() => Promise.resolve({ items: [], total: 0 }))
+
+        const deleteProjectUseCase = new DeleteProject(mockUserRepository, mockProjectRepository, mockPrivilegeRepository, mockSampleRepository, mockEcotaxaAccountRepository)
+        await deleteProjectUseCase.execute(current_user, project_to_delete);
+
+        expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: 1 });
+        expect(mockPrivilegeRepository.isManager).toBeCalledWith({ user_id: 1, project_id: 1 });
+        expect(mockProjectRepository.deleteProject).toBeCalledWith({ project_id: 1 });
+    });
+
     test("Cannot find project to delete", async () => {
         const current_user: UserUpdateModel = {
             user_id: 1

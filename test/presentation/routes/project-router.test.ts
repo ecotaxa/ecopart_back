@@ -451,6 +451,14 @@ describe("Project Router", () => {
 
 
     describe("DELETE /projects/:project_id", () => {
+        test("DELETE /projects forwards the project id only, never the keys of the request body", async () => {
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve())
+
+            const response = await request(server).delete("/projects/1").send({ "project_id = 2 OR 1": 1, root_folder_path: "/other" })
+
+            expect(response.status).toBe(200)
+            expect(mockDeleteProjectUseCase.execute).toBeCalledWith(expect.anything(), { project_id: "1" })
+        });
 
         test("DELETE /projects", async () => {
             const expectedResponse = { message: "Project successfully deleted" }

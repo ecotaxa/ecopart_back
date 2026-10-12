@@ -27,6 +27,10 @@ export class DeleteProject implements DeleteProjectUseCase {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
+        // The project is identified by its id alone: any other key would end up in the SQL WHERE
+        // clause, and could select another project whose samples would then be deleted
+        project_to_delete = { project_id: project_to_delete.project_id };
+
         // Ensure the project to delete exists
         const project = await this.ensureProjectExists(project_to_delete);
 

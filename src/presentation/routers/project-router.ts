@@ -635,7 +635,8 @@ export default function ProjectRouter(
      */
     router.delete('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteProjectUseCase.execute((req as CustomRequest).token, { ...req.body, project_id: req.params.project_id })
+            // Only the id: the data source builds its WHERE clause from the keys it receives
+            await deleteProjectUseCase.execute((req as CustomRequest).token, { project_id: req.params.project_id as any })
             res.status(200).send({ message: "Project successfully deleted" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
