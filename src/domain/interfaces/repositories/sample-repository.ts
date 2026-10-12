@@ -11,6 +11,8 @@ export interface SampleRepository {
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
     listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]>;
+    // Reason, per sample name, why listImportableSamples leaves it out.
+    explainNotImportableSamples(root_folder_path: string, dest_folder: string, project_id: number, samples_names: string[]): Promise<Map<string, string>>;
     UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
     UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
     deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>

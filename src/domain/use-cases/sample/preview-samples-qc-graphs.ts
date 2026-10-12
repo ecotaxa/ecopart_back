@@ -43,7 +43,10 @@ export class PreviewSamplesQcGraphs implements PreviewSamplesQcGraphsUseCase {
         const importable = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
         const importable_names = new Set(importable.map((s) => s.sample_name));
         const not_importable = sample_names.filter((name) => !importable_names.has(name));
-        if (not_importable.length > 0) throw new Error("Samples not importable: " + not_importable.join(", "));
+        if (not_importable.length > 0) {
+            const reasons = await this.sampleRepository.explainNotImportableSamples(project.root_folder_path, dest_folder, project.project_id, not_importable);
+            throw new Error("Samples not importable: " + not_importable.map((name) => `${name} (${reasons.get(name)})`).join(", "));
+        }
 
         // Read sequentially: the UVP5 .bru can be ~100 MB, so we avoid holding several in memory.
         const results: SampleQcGraphsResponseModel[] = [];

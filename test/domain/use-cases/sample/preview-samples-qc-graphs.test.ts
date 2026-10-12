@@ -89,8 +89,10 @@ describe("PreviewSamplesQcGraphs", () => {
         expect(unfiltered.image_depth_profile.points.map((p) => p.is_selected)).toEqual([true, true]);
     });
 
-    test("rejects a requested name that is not importable, before any file read", async () => {
-        await expect(useCase.execute(current_user, 1, ["s1", "sX"])).rejects.toThrow("Samples not importable: sX");
+    test("rejects a requested name that is not importable with its reason, before any file read", async () => {
+        jest.spyOn(mockSampleRepository, "explainNotImportableSamples").mockResolvedValue(new Map([["sX", "already imported in this project"]]));
+        await expect(useCase.execute(current_user, 1, ["s1", "sX"])).rejects.toThrow("Samples not importable: sX (already imported in this project)");
+        expect(mockSampleRepository.explainNotImportableSamples).toBeCalledWith("root/path", "data_storage/fss/1", 1, ["sX"]);
         expect(mockSampleRepository.getPerImageRecordsFromSource).toBeCalledTimes(0);
         expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledTimes(0);
     });

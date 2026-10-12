@@ -20,6 +20,9 @@ export class MockSampleRepository implements SampleRepository {
     listImportableSamples(): Promise<PublicHeaderSampleResponseModel[]> {
         throw new Error("Method not implemented for listImportableSamples");
     }
+    explainNotImportableSamples(): Promise<Map<string, string>> {
+        throw new Error("Method not implemented for explainNotImportableSamples");
+    }
     UVP6copySamplesToImportFolder(): Promise<void> {
         throw new Error("Method not implemented for UVP6copySamplesToImportFolder");
     }

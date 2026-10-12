@@ -139,7 +139,7 @@ export class ImportSamples implements ImportSamplesUseCase {
     }
     async ensureSamplesAreImportables(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], task_id: number, log: TaskLogger, project: ProjectResponseModel) {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/4 sample validation : start");
-        this.ensureSamplesAreBothInHeadersAndInDataFolder(samples, samples_names_to_import);
+        await this.ensureSamplesAreBothInHeadersAndInDataFolder(samples, samples_names_to_import, project);
         this.ensureSamplesPassQcLvl1(samples, samples_names_to_import);
         await this.ensureDepthProfilesHavePressure(project, samples_names_to_import);
         //TODO LATER add more validation
@@ -154,13 +154,15 @@ export class ImportSamples implements ImportSamplesUseCase {
 
     }
 
-    ensureSamplesAreBothInHeadersAndInDataFolder(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[]) {
+    async ensureSamplesAreBothInHeadersAndInDataFolder(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[], project: ProjectResponseModel) {
         const samples_names_set = new Set(samples.map(sample => sample.sample_name));
 
         const missing_samples = samples_names_to_import.filter(sample_id => !samples_names_set.has(sample_id));
 
         if (missing_samples.length > 0) {
-            throw new Error("Samples not importable: " + missing_samples.join(", "));
+            const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
+            const reasons = await this.sampleRepository.explainNotImportableSamples(project.root_folder_path, dest_folder, project.project_id, missing_samples);
+            throw new Error("Samples not importable: " + missing_samples.map(name => `${name} (${reasons.get(name)})`).join(", "));
         }
     }
 

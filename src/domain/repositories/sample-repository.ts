@@ -982,18 +982,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
 
         // Filter samples that are not already in the database 
-        const options: PreparedSearchOptions = {
-            filter: [
-                { field: 'project_id', operator: '=', value: project_id }
-            ],
-            sort_by: [
-
-            ],
-            page: 1,
-            limit: 10000000
-        }
-
-        const db_imported_samples_name = (await this.sampleDataSource.getAll(options)).items.map(sample => sample.sample_name);
+        const db_imported_samples_name = await this.getProjectSampleNames(project_id);
 
         const db_fs_filtered_samples = fs_filtered_samples.filter(sample => {
             const existingSample = db_imported_samples_name.includes(sample.sample_name);
@@ -1001,6 +990,41 @@ export class SampleRepositoryImpl implements SampleRepository {
         });
 
         return db_fs_filtered_samples;
+    }
+
+    // Why each sample is left out of listImportableSamples. Skips the vignette counts, which read
+    // one archive per sample and make the listing slow.
+    async explainNotImportableSamples(root_folder_path: string, dest_folder: string, project_id: number, samples_names: string[]): Promise<Map<string, string>> {
+        const folderPath = path.join(this.base_folder, root_folder_path);
+        const header_samples_names = (await this.getSamplesFromHeaders(folderPath)).map(sample => sample.profileId);
+        const fs_imported_samples_name = await this.getSamplesFromFsStorage(dest_folder);
+        const db_imported_samples_name = await this.getProjectSampleNames(project_id);
+
+        const reasons = new Map<string, string>();
+        for (const sample_name of samples_names) {
+            if (db_imported_samples_name.includes(sample_name)) {
+                reasons.set(sample_name, "already imported in this project");
+            } else if (fs_imported_samples_name.includes(sample_name)) {
+                reasons.set(sample_name, "a folder with this name already exists in the project storage but the sample is not in the database");
+            } else if (!header_samples_names.includes(sample_name)) {
+                reasons.set(sample_name, "not listed in the meta header file");
+            } else {
+                reasons.set(sample_name, "unknown reason");
+            }
+        }
+        return reasons;
+    }
+
+    private async getProjectSampleNames(project_id: number): Promise<string[]> {
+        const options: PreparedSearchOptions = {
+            filter: [
+                { field: 'project_id', operator: '=', value: project_id }
+            ],
+            sort_by: [],
+            page: 1,
+            limit: 10000000
+        }
+        return (await this.sampleDataSource.getAll(options)).items.map(sample => sample.sample_name);
     }
 
     private async getImportableSamplesImagesCount(folderPath: string, instrument_model: string, samples: HeaderSampleModel[]): Promise<Map<string, number>> {

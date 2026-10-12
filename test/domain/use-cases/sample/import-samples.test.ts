@@ -546,11 +546,15 @@ describe("Delete Sample Use Case", () => {
                 };
                 const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE)
 
-                const errorOutput = new Error("Samples not importable: sample1, sample2");
+                const errorOutput = new Error("Samples not importable: sample1 (already imported in this project), sample2 (not listed in the meta header file)");
 
                 jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
                 jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
                 jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+                jest.spyOn(mockSampleRepository, "explainNotImportableSamples").mockResolvedValue(new Map([
+                    ["sample1", "already imported in this project"],
+                    ["sample2", "not listed in the meta header file"],
+                ]));
                 jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
                 //ensureSamplesAreBothInHeadersAndInRawData
                 //jest.spyOn(mockTaskRepository, "updateTaskProgress");
@@ -574,6 +578,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
+                expect(mockSampleRepository.explainNotImportableSamples).toBeCalledWith(projectResponseModel.root_folder_path, "data_storage/files_system_storage/1", projectResponseModel.project_id, ["sample1", "sample2"]);
                 expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(1);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
                 expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
