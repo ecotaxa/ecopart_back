@@ -5,7 +5,7 @@ import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositor
 import { MockUserRepository } from "../../../mocks/user-mock";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { GetOneTask } from "../../../../src/domain/use-cases/task/get-one-task";
 
 let mockUserRepository: UserRepository;
@@ -21,6 +21,7 @@ beforeEach(async () => {
     mockPrivilegeRepository = new MockPrivilegeRepository()
 
     getOneTaskUseCase = new GetOneTask(mockTaskRepository, mockUserRepository, mockPrivilegeRepository)
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask)
 })
 
 
@@ -87,8 +88,12 @@ describe("Get One Task Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockPrivilegeRepository, "isGranted")
 
-        await getOneTaskUseCase.execute(current_user, 1);
+        const task = await getOneTaskUseCase.execute(current_user, 1);
 
+        // The server path of the log file never leaves the domain
+        expect(task).not.toHaveProperty("task_log_file_path");
+        expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
+        expect(mockTaskRepository.toPublicTask).toBeCalledWith(TaskResponseModel_1);
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockTaskRepository.getOneTask).toBeCalledWith({ task_id: 1 });
         expect(mockUserRepository.isAdmin).toBeCalledTimes(0);

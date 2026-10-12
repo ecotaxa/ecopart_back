@@ -7,7 +7,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 
 import { ExportBackupedProjectUseCase } from "../../interfaces/use-cases/project/export-backuped-project";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 export class ExportBackupedProject implements ExportBackupedProjectUseCase {
     userRepository: UserRepository
@@ -28,7 +28,7 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
         this.base_url_path = base_url_path
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, out_to_ftp: boolean): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, out_to_ftp: boolean): Promise<PublicTaskResponseModel> {
 
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
@@ -51,7 +51,7 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
         // start the task
         this.startExportBackupedProjectTask(task, project, out_to_ftp);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     async createExportBackupedProjectTask(current_user: UserUpdateModel, project: ProjectResponseModel, out_to_ftp: boolean): Promise<number> {
@@ -64,7 +64,12 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
                 out_to_ftp: out_to_ftp
             }
         }
-        return await this.taskRepository.createTask(task);
+        // Import and export of the L0-b backup both work on the project's l0b_backup folder: only one
+        // backup task, of either type, may be active on a project at a time. Refused before any task
+        // exists, so the caller gets the conflict as an HTTP error.
+        const task_id = await this.taskRepository.createTaskUnlessActive(task, [TaskType.Import_Backup, TaskType.Export_Backup]);
+        if (task_id === null) throw new Error("A backup task is already running for this project");
+        return task_id;
     }
 
 
@@ -95,6 +100,9 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
             // 1/3 Do validation before importing 0->25%
             await this.ensureBackupExist(project.project_id, task_id);
 
+            // Last point where a cancellation leaves nothing behind
+            await this.taskRepository.throwIfCancelled(task_id);
+
             // 2/3 Export backuped project 25->99%
             const result = await this.exportBackupedProject(task, project, out_to_ftp);
             // finish task
@@ -111,7 +119,7 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
         // log dl link in task
         await this.taskRepository.logMessage(task.task_log_file_path, "Exported at : " + dl_link);
         // update task with download link ex :
-        const download_link = this.base_url_path + "/api/tasks/" + task.task_id + "/export";
+        const download_link = this.base_url_path + "/api/tasks/" + task.task_id + "/file";
         if (out_to_ftp) {
             await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 60, "Step 2/3 Export backuped project, export to fs : done");
             await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 60, "Step 2/3 Export backuped project, export to ftp : start");

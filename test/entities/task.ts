@@ -1,5 +1,12 @@
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
-import { PrivateTaskRequestCreationModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../../src/domain/entities/task";
+import { PrivateTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../../src/domain/entities/task";
+
+// Same mapping as TaskRepositoryImpl.toPublicTask, for use cases tested against MockTaskRepository.
+export function toPublicTask(task: TaskResponseModel): PublicTaskResponseModel {
+    const public_task: Partial<TaskResponseModel> = { ...task };
+    delete public_task.task_log_file_path;
+    return public_task as PublicTaskResponseModel;
+}
 
 export const TaskResponseModel_1: TaskResponseModel = {
     task_type_id: 4,
@@ -15,9 +22,6 @@ export const TaskResponseModel_1: TaskResponseModel = {
     task_params: { "samples": ["perle3_003"] },
     task_result: "",
     task_error: "",
-    task_question: "",
-    task_reply: "",
-    task_step: "0",
     task_id: 1,
     task_creation_utc_date_time: "2024-11-20 16:35:09",
     task_start_utc_date_time: "",
@@ -37,9 +41,6 @@ export const TaskResponseModel_2: TaskResponseModel = {
     task_params: { "samples": ["Mooring_0N_23W_201910_850m"] },
     task_result: "",
     task_error: "Samples not importable: Mooring_0N_23W_201910_850m",
-    task_question: "",
-    task_reply: "",
-    task_step: "0",
     task_id: 2,
     task_creation_utc_date_time: "2024-11-20 16:40:30",
     task_start_utc_date_time: "",
@@ -60,9 +61,6 @@ export const TaskResponseModel_3: TaskResponseModel = {
     task_params: { "samples": ["Mooring_0N_23W_201910_850m"] },
     task_result: "",
     task_error: "",
-    task_question: "",
-    task_reply: "",
-    task_step: "0",
     task_id: 3,
     task_creation_utc_date_time: "2024-11-20 16:40:37",
     task_start_utc_date_time: "",

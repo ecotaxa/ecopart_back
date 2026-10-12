@@ -11,7 +11,7 @@ import { ImportEcoTaxaSamplesUseCase } from "../../interfaces/use-cases/ecotaxa_
 import { PublicImportableEcoTaxaSampleResponseModel, SampleUpdateModel } from "../../entities/sample";
 import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 import path from "path";
 import { PreparedSearchOptions } from "../../entities/search";
@@ -36,7 +36,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<PublicTaskResponseModel> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -57,7 +57,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         // start the task
         this.startImportEcoTaxaSamplesTask(task, samples_names_to_import, project.instrument_model, project);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     async createImportEcoTaxaSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]): Promise<number> {
@@ -102,6 +102,9 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
             await this.ensureEcoTaxaSamplesAreImportables(importable_samples, samples_names_to_import, task_id);
             // QC gate: only visual-QC-validated samples may be sent to EcoTaxa
             await this.ensureSamplesAreVisualQcValidated(importable_samples, samples_names_to_import);
+
+            // Only checkpoint: the rollback of step 4/5 does not reliably undo the rows it flags
+            await this.taskRepository.throwIfCancelled(task_id);
         } catch (error) {
             await this.taskRepository.failedTask(task_id, error);
             return;

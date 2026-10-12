@@ -10,7 +10,8 @@ import { ExportBackupedProject } from "../../../../src/domain/use-cases/project/
 import { TaskRepository } from "../../../../src/domain/interfaces/repositories/task-repository";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { private_projectResponseModel } from "../../../entities/project";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 // import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 // import { private_projectResponseModel } from "../../../entities/project";
 // import { task_status_1_search_result, task_type_1_search_result, TaskResponseModel_1 } from "../../../entities/task";
@@ -35,9 +36,25 @@ beforeEach(() => {
     base_url_path = "http://localhost:3000"
 
     backupProjectUseCase = new ExportBackupedProject(mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, base_url_path)
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask)
+    jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue()
 })
 describe("ExportBackupedProjectUseCase", () => {
     describe("befor fier and forgot steps", () => {
+        test("user should not be able to export the backup while a backup task is active on the project : refused before any task is created", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 }
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true)
+            jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(private_projectResponseModel)
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive").mockResolvedValue(null)
+            jest.spyOn(mockTaskRepository, "getOneTask")
+
+            await expect(backupProjectUseCase.execute(current_user, 1, false)).rejects.toThrow("A backup task is already running for this project")
+
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledWith(expect.objectContaining({ task_project_id: private_projectResponseModel.project_id }), ["IMPORT_BACKUP", "EXPORT_BACKUP"])
+            expect(mockTaskRepository.getOneTask).toBeCalledTimes(0)
+        });
         test("deleted or invalid user should not be able to perform export backup on a project", async () => {
             const current_user: UserUpdateModel = {
                 user_id: 1,
@@ -51,7 +68,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin")
             jest.spyOn(mockPrivilegeRepository, "isGranted")
             jest.spyOn(mockProjectRepository, "getProject")
-            jest.spyOn(mockTaskRepository, "createTask")
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive")
             jest.spyOn(mockTaskRepository, "getOneTask")
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask")
@@ -77,7 +94,7 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockUserRepository.isAdmin).toBeCalledTimes(0)
             expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
             expect(mockProjectRepository.getProject).toBeCalledTimes(0)
-            expect(mockTaskRepository.createTask).toBeCalledTimes(0)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(0)
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(0)
             // fier and forgot steps
             expect(mockTaskRepository.startTask).toBeCalledTimes(0)
@@ -102,7 +119,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockProjectRepository, "getProject")
-            jest.spyOn(mockTaskRepository, "createTask")
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive")
             jest.spyOn(mockTaskRepository, "getOneTask")
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask")
@@ -130,7 +147,7 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(1)
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: project_id })
             expect(mockProjectRepository.getProject).toBeCalledTimes(0)
-            expect(mockTaskRepository.createTask).toBeCalledTimes(0)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(0)
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(0)
             // fier and forgot steps
             expect(mockTaskRepository.startTask).toBeCalledTimes(0)
@@ -156,7 +173,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(null))
-            jest.spyOn(mockTaskRepository, "createTask")
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive")
             jest.spyOn(mockTaskRepository, "getOneTask")
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask")
@@ -185,7 +202,7 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: project_id })
             expect(mockProjectRepository.getProject).toBeCalledTimes(1)
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: project_id })
-            expect(mockTaskRepository.createTask).toBeCalledTimes(0)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(0)
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(0)
             // fier and forgot steps
             expect(mockTaskRepository.startTask).toBeCalledTimes(0)
@@ -210,7 +227,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel))
-            jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.reject(outputError))
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive").mockImplementation(() => Promise.reject(outputError))
             jest.spyOn(mockTaskRepository, "getOneTask")
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask")
@@ -239,8 +256,8 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: project_id })
             expect(mockProjectRepository.getProject).toBeCalledTimes(1)
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: project_id })
-            expect(mockTaskRepository.createTask).toBeCalledTimes(1)
-            expect(mockTaskRepository.createTask).toBeCalledWith({
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(1)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledWith({
                 task_type: "EXPORT_BACKUP",
                 task_status: "PENDING",
                 task_owner_id: current_user.user_id,
@@ -248,7 +265,7 @@ describe("ExportBackupedProjectUseCase", () => {
                 task_params: {
                     out_to_ftp
                 }
-            })
+            }, ["IMPORT_BACKUP", "EXPORT_BACKUP"])
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(0)
             // fier and forgot steps
             expect(mockTaskRepository.startTask).toBeCalledTimes(0)
@@ -273,7 +290,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel))
-            jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.resolve(1))
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive").mockImplementation(() => Promise.resolve(1))
             jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(null))
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask")
@@ -302,8 +319,8 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: project_id })
             expect(mockProjectRepository.getProject).toBeCalledTimes(1)
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: project_id })
-            expect(mockTaskRepository.createTask).toBeCalledTimes(1)
-            expect(mockTaskRepository.createTask).toBeCalledWith({
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(1)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledWith({
                 task_type: "EXPORT_BACKUP",
                 task_status: "PENDING",
                 task_owner_id: current_user.user_id,
@@ -311,7 +328,7 @@ describe("ExportBackupedProjectUseCase", () => {
                 task_params: {
                     out_to_ftp
                 }
-            })
+            }, ["IMPORT_BACKUP", "EXPORT_BACKUP"])
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(1)
             expect(mockTaskRepository.getOneTask).toBeCalledWith({ task_id: 1 })
             // fier and forgot steps
@@ -335,7 +352,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel))
-            jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.resolve(1))
+            jest.spyOn(mockTaskRepository, "createTaskUnlessActive").mockImplementation(() => Promise.resolve(1))
             jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
             // fier and forgot steps
             jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue()
@@ -354,7 +371,8 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockTaskRepository, "failedTask")
 
 
-            await expect(backupProjectUseCase.execute(current_user, project_id, out_to_ftp)).resolves.toBe(TaskResponseModel_1)
+            // The server path of the log file is not returned
+            await expect(backupProjectUseCase.execute(current_user, project_id, out_to_ftp)).resolves.toStrictEqual(toPublicTask(TaskResponseModel_1))
 
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(1)
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id)
@@ -364,8 +382,8 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: project_id })
             expect(mockProjectRepository.getProject).toBeCalledTimes(1)
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: project_id })
-            expect(mockTaskRepository.createTask).toBeCalledTimes(1)
-            expect(mockTaskRepository.createTask).toBeCalledWith({
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledTimes(1)
+            expect(mockTaskRepository.createTaskUnlessActive).toBeCalledWith({
                 task_type: "EXPORT_BACKUP",
                 task_status: "PENDING",
                 task_owner_id: current_user.user_id,
@@ -373,7 +391,7 @@ describe("ExportBackupedProjectUseCase", () => {
                 task_params: {
                     out_to_ftp
                 }
-            })
+            }, ["IMPORT_BACKUP", "EXPORT_BACKUP"])
             expect(mockTaskRepository.getOneTask).toBeCalledTimes(1)
         });
     });
@@ -408,6 +426,8 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockTaskRepository.logMessage).toBeCalledTimes(1)
             expect(mockProjectRepository.exportBackupedProjectToFtp).toBeCalledTimes(0)
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1)
+            // The download link points to the route that serves the task's archive
+            expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, "http://localhost:3000/api/tasks/1/file")
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0)
         });
         test("user should be able to backup project, runs all fier and forgot steps sucessfully : more over export to FTP", async () => {
@@ -440,7 +460,25 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockTaskRepository.logMessage).toBeCalledTimes(1)
             expect(mockProjectRepository.exportBackupedProjectToFtp).toBeCalledTimes(1)
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1)
+            expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, "path/to/backup http://localhost:3000/api/tasks/1/file")
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0)
+        });
+        test("a cancellation requested during the validation stops the export before the archive is built", async () => {
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE)
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue()
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue()
+            jest.spyOn(mockProjectRepository, "ensureBackupExist").mockResolvedValue()
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockRejectedValue(cancelled)
+            jest.spyOn(mockProjectRepository, "exportBackupedProjectToFs")
+            jest.spyOn(mockTaskRepository, "finishTask")
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue()
+
+            const bp = new ExportBackupedProject(mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_EXPORT, base_url_path)
+            await (bp as any).startExportBackupedProjectTask(TaskResponseModel_1, private_projectResponseModel, false);
+
+            expect(mockProjectRepository.exportBackupedProjectToFs).toBeCalledTimes(0)
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(0)
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled)
         });
         test("user should not be able to export backup if no backup exist for this project", async () => {
             const out_to_ftp = true

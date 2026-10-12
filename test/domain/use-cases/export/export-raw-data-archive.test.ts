@@ -19,7 +19,8 @@ import { RawExportType } from "../../../../src/domain/interfaces/use-cases/expor
 
 import { sampleModel_1, sampleModel_2 } from "../../../entities/sample";
 import { private_projectResponseModel } from "../../../entities/project";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 
 /*
  * Tests of the *background* half of the use case: the archive `runExport` actually produces.
@@ -131,6 +132,9 @@ describe("ExportRawData — produced archive", () => {
             rel_storage_folder,
             "http://localhost:3000",
         );
+        // Defaults: a task that is never cancelled, returned without its log file path
+        jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
+        jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask as any);
 
         // ── common happy-path stubs ──
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve());
@@ -193,6 +197,20 @@ describe("ExportRawData — produced archive", () => {
         await exportRawDataUseCase.execute(current_user, { sample_ids: samples.map(s => s.sample_id), export_types, ecotaxa_exclude_not_living: false, ...extra });
         return task_finished;
     }
+
+    describe("cancellation", () => {
+        test("a cancellation before the archive removes the working folder and leaves no archive", async () => {
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+            // before the metadata step, then before the archive
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockRejectedValue(cancelled);
+
+            const outcome = await runExport([validated(sampleModel_1, { sample_id: 7, project_id: 1 })], ["metadata"], [project({ project_id: 1 })]);
+
+            expect(outcome).toEqual({ outcome: "failed", detail: cancelled });
+            expect(fs.existsSync(zip_path())).toBe(false);
+            expect(fs.existsSync(path.join(path.dirname(zip_path()), "raw_export"))).toBe(false);
+        });
+    });
 
     describe("metadata step", () => {
         const samples = [

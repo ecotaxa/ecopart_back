@@ -4,7 +4,7 @@
 // import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
-import { PublicTaskRequestCreationModel, PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel, PublicTaskRequestModel } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel, PublicTaskRequestModel, PublicTaskResponseModel, TaskType, TaskVisibilityModel } from "../../entities/task";
 import { UserRequestModel } from "../../entities/user";
 
 // Appends one line to a task log file (see TaskRepository.logMessage).
@@ -20,10 +20,16 @@ export interface TaskRepository {
     createTask(task: PublicTaskRequestCreationModel): Promise<number>;
     getTask(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null>;
     deleteTask(task: PrivateTaskRequestModel): Promise<number>;
-    standardGetTasks(options: PreparedSearchOptions): Promise<SearchResult<TaskResponseModel>>;
+    standardGetTasks(options: PreparedSearchOptions, visible_to?: TaskVisibilityModel): Promise<SearchResult<TaskResponseModel>>;
     standardGetTaskType(options: PreparedSearchOptions): Promise<SearchResult<TaskTypeResponseModel>>
     standardGetTaskStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>>;
     getTasksByUser(user: UserRequestModel): Promise<number[]>;
+    toPublicTask(task: TaskResponseModel): PublicTaskResponseModel;
+    cancelTask(task_id: number): Promise<void>;
+    throwIfCancelled(task_id: number): Promise<void>;
+    createTaskUnlessActive(task: PublicTaskRequestCreationModel, conflicting_types: TaskType[]): Promise<number | null>;
+    getActiveTasks(): Promise<TaskResponseModel[]>;
+    removeTaskWorkFiles(task_id: number): Promise<string[]>;
     getLogFileTask(task_id: number): Promise<string>;
     getZipFilePath(task_id: number): Promise<string>;
     failedTask(task_id: number, error: Error): Promise<void>;

@@ -3,12 +3,13 @@ import { MiddlewareAuth } from "../../src/presentation/interfaces/middleware/aut
 import { Request, Response, NextFunction } from "express";
 import { TaskRepository } from "../../src/domain/interfaces/repositories/task-repository";
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
-import { TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel } from "../../src/domain/entities/task";
+import { TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PublicTaskResponseModel } from "../../src/domain/entities/task";
 import { DeleteTaskUseCase } from "../../src/domain/interfaces/use-cases/task/delete-task";
 import { GetOneTaskUseCase } from "../../src/domain/interfaces/use-cases/task/get-one-task";
 import { SearchTasksUseCase } from "../../src/domain/interfaces/use-cases/task/search-task";
 import { StreamZipFileUseCase } from "../../src/domain/interfaces/use-cases/task/stream-zip-file";
 import { GetLogFileTaskUseCase } from "../../src/domain/interfaces/use-cases/task/get-log-file-task";
+import { CancelTaskUseCase } from "../../src/domain/interfaces/use-cases/task/cancel-task";
 
 export class MockTaskRepository implements TaskRepository {
     getOneTask(): Promise<TaskResponseModel | null> {
@@ -44,6 +45,24 @@ export class MockTaskRepository implements TaskRepository {
     getTasksByUser(): Promise<number[]> {
         throw new Error("Method not implemented for getTasksByUser");
     }
+    toPublicTask(): PublicTaskResponseModel {
+        throw new Error("Method not implemented for toPublicTask");
+    }
+    cancelTask(): Promise<void> {
+        throw new Error("Method not implemented for cancelTask");
+    }
+    throwIfCancelled(): Promise<void> {
+        throw new Error("Method not implemented for throwIfCancelled");
+    }
+    createTaskUnlessActive(): Promise<number | null> {
+        throw new Error("Method not implemented for createTaskUnlessActive");
+    }
+    getActiveTasks(): Promise<TaskResponseModel[]> {
+        throw new Error("Method not implemented for getActiveTasks");
+    }
+    removeTaskWorkFiles(): Promise<string[]> {
+        throw new Error("Method not implemented for removeTaskWorkFiles");
+    }
     getLogFileTask(): Promise<string> {
         throw new Error("Method not implemented for getLogFileTask");
     }
@@ -75,7 +94,7 @@ export class MockDeleteTaskUseCase implements DeleteTaskUseCase {
     }
 }
 export class MockGetOneTaskUseCase implements GetOneTaskUseCase {
-    execute(): Promise<TaskResponseModel> {
+    execute(): Promise<PublicTaskResponseModel> {
         throw new Error("Method not implemented for GetOneTaskUseCase");
     }
 }
@@ -90,7 +109,7 @@ export class MockStreamZipFileUseCase implements StreamZipFileUseCase {
     }
 }
 export class MockSearchTasksUseCase implements SearchTasksUseCase {
-    execute(): Promise<{ tasks: TaskResponseModel[], search_info: SearchInfo }> {
+    execute(): Promise<{ tasks: PublicTaskResponseModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for SearchTasksUseCase");
     }
 }
@@ -102,7 +121,13 @@ export class MockGetLogFileTaskUseCase implements GetLogFileTaskUseCase {
 }
 
 export class MockSearchTaskUseCase implements SearchTasksUseCase {
-    execute(): Promise<{ tasks: TaskResponseModel[], search_info: SearchInfo }> {
+    execute(): Promise<{ tasks: PublicTaskResponseModel[], search_info: SearchInfo }> {
         throw new Error("Method not implemented for MockSearchTaskUseCase");
+    }
+}
+
+export class MockCancelTaskUseCase implements CancelTaskUseCase {
+    execute(): Promise<PublicTaskResponseModel> {
+        throw new Error("Method not implemented for CancelTaskUseCase");
     }
 }

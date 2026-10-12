@@ -2,15 +2,16 @@
 export enum TasksStatus {
     Pending = "PENDING",
     Running = "RUNNING",
-    Waiting_for_response = "WAITING_FOR_RESPONSE",
+    // Cancellation requested on a running task: the task stops at its next checkpoint.
+    Cancelling = "CANCELLING",
     Done = "DONE",
     Error = "ERROR",
+    Cancelled = "CANCELLED",
 }
 
 export enum TaskType {
+    // Reserved for the binned export, not triggered yet.
     Export = "EXPORT",
-    Delete = "DELETE",
-    Update = "UPDATE",
     Import = "IMPORT",
     Import_Backup = "IMPORT_BACKUP",
     Export_Backup = "EXPORT_BACKUP",
@@ -18,13 +19,6 @@ export enum TaskType {
     Import_EcoTaxa = "IMPORT_ECO_TAXA",
     Export_Raw = "EXPORT_RAW",
     Regenerate_Pivot = "REGENERATE_PIVOT",
-}
-
-export enum TaskAction {
-    Start = "START",
-    Restart = "RESTART", //create new task with same parameters
-    Cancel = "CANCEL",
-    Answer = "ANSWER",
 }
 
 /* CREATION */
@@ -64,9 +58,6 @@ export interface PrivateTaskResponseModel extends PrivateTaskRequestCreationMode
     task_progress_msg?: string;
     task_result?: string;
     task_error?: string;
-    task_question?: string;
-    task_reply?: string;
-    task_step?: number;
 }
 
 export interface TaskResponseModel {
@@ -88,18 +79,17 @@ export interface TaskResponseModel {
     task_progress_msg?: string;
     task_result?: string;
     task_error?: string;
-    task_question?: string;
-    task_reply?: string;
-    task_step?: string;
 }
 
-/* REQUEST //TODO task_progress_pct: number;
-    task_progress_msg?: string;
-    task_result?: string;
-    task_error?: string;
-    task_question?: string;
-    task_reply?: string;
-    task_step?: number;*/
+// Restricts a task search to the tasks a user may view: the ones they own, or the ones attached to
+// a project they have a privilege on.
+export interface TaskVisibilityModel {
+    user_id: number;
+    project_ids: number[];
+}
+
+// API-facing task: the log file path is a server path, the log itself is served by GET /tasks/:id/log.
+export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path">;
 
 export interface PrivateTaskRequestModel {
     task_id?: number;
@@ -140,11 +130,4 @@ export interface PrivateTaskUpdateModel {
     task_progress_msg?: string;
     task_result?: string;
     task_error?: string;
-    task_question?: string;
-    task_reply?: string;
-    task_step?: string;
 }
-// export interface PublicTaskUpdateModel {
-//     task_id: number;
-//     task_reply: string;
-// }

@@ -9,7 +9,7 @@ import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-r
 
 import { ImportSamplesUseCase } from "../../interfaces/use-cases/sample/import-samples";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import path from "path";
 import { describeUvp5PivotReport } from "../../utils/uvp5-pivot-converter";
 
@@ -30,7 +30,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[], validated_samples: string[] = []): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[], validated_samples: string[] = []): Promise<PublicTaskResponseModel> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -54,7 +54,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         // start the task
         this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user, validated_samples);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     private ensureValidatedSamplesAreImported(samples_names_to_import: string[], validated_samples: string[]): void {
@@ -116,6 +116,8 @@ export class ImportSamples implements ImportSamplesUseCase {
             // Check that asked samples are in the importable list of samples
             await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id, log, project);
 
+            await this.taskRepository.throwIfCancelled(task_id);
+
             // 2/4 Copy source files to hiden project folder 
             await this.copySourcesToProjectFolder(task_id, log, samples_names_to_import, instrument_model, project);
         } catch (error) {
@@ -123,9 +125,15 @@ export class ImportSamples implements ImportSamplesUseCase {
             return;
         }
         try {
+            // From here on, a cancellation removes the copied sources in the catch below
+            await this.taskRepository.throwIfCancelled(task_id);
+
             // 3/4 Build the UVP5 pivots
             const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
             const formated_samples = await this.buildPivots(task_id, log, project, current_user.user_id, samples_names_to_import, vignette_count_map);
+
+            // Last checkpoint: once the samples exist in the database the import completes
+            await this.taskRepository.throwIfCancelled(task_id);
 
             // 4/4 Create samples
             await this.importSamples(task_id, log, project, current_user.user_id, samples_names_to_import, formated_samples, validated_samples);
@@ -235,6 +243,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             return formated_samples;
         }
         for (const [i, sample] of formated_samples.entries()) {
+            await this.taskRepository.throwIfCancelled(task_id);
             const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model);
             const progress = 55 + Math.round(((i + 1) / formated_samples.length) * 15);
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, "Step 3/4 pivot construction : " + describeUvp5PivotReport(report));

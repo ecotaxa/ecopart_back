@@ -5,6 +5,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { StreamZipFileUseCase } from "../../interfaces/use-cases/task/stream-zip-file";
 import * as fs from 'fs'; // For createWriteStream
+import path from 'path';
 
 export class StreamZipFile implements StreamZipFileUseCase {
     taskRepository: TaskRepository
@@ -39,7 +40,8 @@ export class StreamZipFile implements StreamZipFileUseCase {
         res.setHeader("Content-Type", "application/zip");
         res.setHeader(
             "Content-Disposition",
-            `attachment; filename="${zipFilePath}"`
+            // The file name only: the full path is a server path
+            `attachment; filename="${path.basename(zipFilePath)}"`
         );
 
         const fileStream = fs.createReadStream(zipFilePath);

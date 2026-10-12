@@ -11,7 +11,8 @@ import { ImportCTDSamples } from "../../../../src/domain/use-cases/ctd_sample/im
 import { TaskRepository } from "../../../../src/domain/interfaces/repositories/task-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { projectResponseModel } from "../../../entities/project";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
@@ -29,6 +30,9 @@ beforeEach(async () => {
     mockTaskRepository = new MockTaskRepository()
 
     importCTDSamplesUseCase = new ImportCTDSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository)
+    // Defaults: a task that is never cancelled, returned without its log file path
+    jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask);
 })
 
 describe("Import CTD Samples Use Case", () => {
@@ -178,7 +182,7 @@ describe("Import CTD Samples Use Case", () => {
 
             const result = await importCTDSamplesUseCase.execute(current_user, 1, ["sample_a", "sample_b"]);
 
-            expect(result).toEqual(task);
+            expect(result).toEqual(toPublicTask(task));
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
             expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: 1 });
@@ -207,10 +211,39 @@ describe("Import CTD Samples Use Case", () => {
 
             const result = await importCTDSamplesUseCase.execute(current_user, 1, ["sample_a"]);
 
-            expect(result).toEqual(task);
+            expect(result).toEqual(toPublicTask(task));
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: 1 });
             expect(mockTaskRepository.createTask).toBeCalledTimes(1);
             expect(mockTaskRepository.getOneTask).toBeCalledWith({ task_id: 99 });
+        });
+
+        test("a cancellation requested during the validation stops the task before any CTD file is copied", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 };
+            const task = { ...TaskResponseModel_1, task_id: 42 };
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true);
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
+            jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(projectResponseModel);
+            jest.spyOn(mockTaskRepository, "createTask").mockResolvedValue(42);
+            jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(task);
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue(undefined);
+            jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue([
+                { sample_name: "sample_a", file_extension: "ctd" },
+            ]);
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockRejectedValue(cancelled);
+            jest.spyOn(mockSampleRepository, "importCTDSamples");
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "finishTask");
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue(undefined);
+
+            await importCTDSamplesUseCase.execute(current_user, 1, ["sample_a"]);
+            await new Promise((resolve) => setImmediate(resolve));
+
+            expect(mockSampleRepository.importCTDSamples).toBeCalledTimes(0);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
+            expect(mockTaskRepository.failedTask).toBeCalledWith(42, cancelled);
         });
 
         test("background task imports the CTD files under its own task_id", async () => {

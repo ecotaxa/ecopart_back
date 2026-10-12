@@ -6,7 +6,7 @@ import archiver from "archiver";
 import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicSampleModel, RawFileCategory } from "../../entities/sample";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
@@ -181,7 +181,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         private base_url_path: string,
     ) { }
 
-    async execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
         const { sample_ids, export_types } = this.validateRequest(request);
@@ -236,7 +236,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         const export_started_at = new Date();
         this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     private validateRequest(request: ExportRawDataRequestModel): { sample_ids: number[]; export_types: RawExportType[] } {
@@ -303,6 +303,7 @@ export class ExportRawData implements ExportRawDataUseCase {
             const progressFor = (step_done: number) => Math.min(95, Math.round(5 + (step_done / step_count) * 90));
 
             for (const export_type of export_types) {
+                await this.taskRepository.throwIfCancelled(task_id);
                 step_index += 1;
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
@@ -323,6 +324,7 @@ export class ExportRawData implements ExportRawDataUseCase {
             // emitters use — so the README can't drift from the actual file contents.
             await fsPromises.writeFile(path.join(work_folder, "README.md"), renderReadme(export_types));
 
+            await this.taskRepository.throwIfCancelled(task_id);
             await this.zipFolder(work_folder, zip_path);
             await fsPromises.rm(work_folder, { recursive: true, force: true });
 

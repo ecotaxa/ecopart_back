@@ -9,7 +9,8 @@ import { RegeneratePivots } from "../../../../src/domain/use-cases/sample/regene
 import { UVP5_PIVOT_CONVERTER_VERSION } from "../../../../src/domain/utils/uvp5-pivot-converter";
 import { projectResponseModel } from "../../../entities/project";
 import { sampleModel_1, sampleModel_2 } from "../../../entities/sample";
-import { TaskResponseModel_1 } from "../../../entities/task";
+import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
@@ -43,6 +44,9 @@ beforeEach(() => {
     mockSampleRepository = new MockSampleRepository();
     mockTaskRepository = new MockTaskRepository();
     regeneratePivots = new RegeneratePivots(mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockSampleRepository, mockTaskRepository);
+    // Defaults: a task that is never cancelled, returned without its log file path
+    jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
+    jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask);
 });
 
 describe("RegeneratePivots", () => {
@@ -101,7 +105,7 @@ describe("RegeneratePivots", () => {
 
             const task = await regeneratePivots.execute(current_user, 1, { force: true });
 
-            expect(task).toEqual(TaskResponseModel_1);
+            expect(task).toEqual(toPublicTask(TaskResponseModel_1));
             expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
                 task_type: TaskType.Regenerate_Pivot,
                 task_project_id: projectResponseModel.project_id,
@@ -132,6 +136,20 @@ describe("RegeneratePivots", () => {
             expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 50, `perle3_001: pivot already at converter version ${UVP5_PIVOT_CONVERTER_VERSION}, kept`);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
+        });
+
+        test("a cancellation stops before the next sample, the pivots already rebuilt are kept", async () => {
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockRejectedValue(cancelled);
+            jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockResolvedValue(null);
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(report("perle3_001"));
+
+            await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
+
+            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(1);
+            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleModel_1, projectResponseModel.instrument_model);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled);
         });
 
         test("rebuilds an up-to-date pivot when forced", async () => {

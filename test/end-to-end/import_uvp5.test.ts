@@ -91,6 +91,7 @@ import { GetOneTask } from '../../src/domain/use-cases/task/get-one-task'
 import { GetLogFileTask } from '../../src/domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from '../../src/domain/use-cases/task/stream-zip-file'
 import { SearchTask } from '../../src/domain/use-cases/task/search-tasks'
+import { CancelTask } from '../../src/domain/use-cases/task/cancel-task'
 
 import { UserRepositoryImpl } from '../../src/domain/repositories/user-repository'
 import { AuthRepositoryImpl } from '../../src/domain/repositories/auth-repository'
@@ -333,7 +334,8 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new GetOneTask(taskRepo, userRepo, privilegeRepo),
             new GetLogFileTask(taskRepo, userRepo, privilegeRepo),
             new StreamZipFile(taskRepo, userRepo, privilegeRepo),
-            new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo)
+            new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo),
+            new CancelTask(taskRepo, userRepo)
         )
 
         const ecotaxaInstanceMiddleware = EcoTaxaInstanceRouter(

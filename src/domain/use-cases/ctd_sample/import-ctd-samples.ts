@@ -8,7 +8,7 @@ import { ImportCTDSamplesUseCase } from "../../interfaces/use-cases/ctd_sample/i
 
 import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 export class ImportCTDSamples implements ImportCTDSamplesUseCase {
     sampleRepository: SampleRepository;
@@ -25,7 +25,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
         this.taskRepository = taskRepository;
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, samples_names_to_import: string[]): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.ensureUserCanGet(current_user, project_id);
 
@@ -40,7 +40,7 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
 
         this.startImportCTDSamplesTask(task, samples_names_to_import, project, current_user);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     async createImportCTDSamplesTask(current_user: UserUpdateModel, project: ProjectResponseModel, samples: string[]): Promise<number> {
@@ -82,6 +82,8 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
 
             const importable_samples = await this.sampleRepository.listImportableCTDSamples(project.root_folder_path, project.instrument_model, project.project_id);
             this.ensureCTDSamplesAreImportables(importable_samples.map(s => s.sample_name), samples_names_to_import);
+
+            await this.taskRepository.throwIfCancelled(task_id);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/3 CTD sample copy: start");
             await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id, task_id);

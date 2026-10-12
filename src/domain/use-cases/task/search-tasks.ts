@@ -6,7 +6,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchTasksUseCase } from "../../interfaces/use-cases/task/search-task";
-import { TaskResponseModel } from "../../entities/task";
+import { PublicTaskResponseModel, TaskResponseModel, TaskVisibilityModel } from "../../entities/task";
 
 export class SearchTask implements SearchTasksUseCase {
     userRepository: UserRepository
@@ -22,7 +22,7 @@ export class SearchTask implements SearchTasksUseCase {
         this.projectRepository = projectRepository
         this.privilegeRepository = privilegeRepository
     }
-    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ tasks: TaskResponseModel[], search_info: SearchInfo }> {
+    async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ tasks: PublicTaskResponseModel[], search_info: SearchInfo }> {
         // DONE define wanted cases sensitivity : = is perfect match and LIKE is case insensitive
 
         // Ensure the current user is valid and not deleted
@@ -34,14 +34,17 @@ export class SearchTask implements SearchTasksUseCase {
         // Apply additional filters
         prepared_options = await this.applyAdditionalFilters(current_user, prepared_options);
 
+        // Restrict to the tasks the user may view (undefined for an admin)
+        const visible_to = await this.getVisibility(current_user);
+
         // Fetch tasks based on prepared search options
-        const result: SearchResult<TaskResponseModel> = await this.taskRepository.standardGetTasks(prepared_options);
+        const result: SearchResult<TaskResponseModel> = await this.taskRepository.standardGetTasks(prepared_options, visible_to);
 
         // Format search info
         const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, prepared_options);
 
         // Get the tasks from the result
-        const tasks = result.items;
+        const tasks = result.items.map(task => this.taskRepository.toPublicTask(task));
 
         // Return the search info and tasks
         return { search_info, tasks };
@@ -62,7 +65,6 @@ export class SearchTask implements SearchTasksUseCase {
             options = await this.applyTaskTypeFilter(options);
             options = await this.applyManagingFilter(current_user, options);
         }
-        options = await this.applyUserCanGetFilter(current_user, options);
 
         return options;
     }
@@ -136,9 +138,7 @@ export class SearchTask implements SearchTasksUseCase {
 
             // If filter is for managing = true, get all tasks where current_user is owner
             if (managingFilter.value === "true" || managingFilter.value === true) {
-                const taskIds = await this.taskRepository.getTasksByUser({ user_id: current_user.user_id });
-                // Add the new filter to the list of filters
-                options.filter.push({ field: "task_id", operator: "IN", value: taskIds });
+                options.filter.push({ field: "task_owner_id", operator: "=", value: current_user.user_id });
             } else if (!(managingFilter.value === "false" || managingFilter.value === false)) {
                 throw new Error("Task managing filter value is not valid");
             }
@@ -146,20 +146,13 @@ export class SearchTask implements SearchTasksUseCase {
         return options;
     }
 
-    // Applies the user_can_get filter.
-    private async applyUserCanGetFilter(current_user: UserUpdateModel, options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
-        // Admins can get all tasks
+    // Same rule as GetOneTask: an admin sees every task, any other user the tasks they own OR the
+    // tasks of a project they have a privilege on.
+    private async getVisibility(current_user: UserUpdateModel): Promise<TaskVisibilityModel | undefined> {
         const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        if (userIsAdmin) return options
+        if (userIsAdmin) return undefined;
 
-        // If the user is owner of the task, allow access
-        options.filter.push({ field: "task_owner_id", operator: "=", value: current_user.user_id });
-
-        // If the user have privileges in the project, allow access
-        const projectIds = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
-        options.filter.push({ field: "task_project_id", operator: "IN", value: [...projectIds, null] }); // TODO TEST the combinaison of filters when data allows it
-
-        return options;
+        const project_ids = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
+        return { user_id: current_user.user_id, project_ids };
     }
-
 }

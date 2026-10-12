@@ -2,7 +2,7 @@ import { RegeneratePivotsOptions } from "../../entities/pivot";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicSampleModel } from "../../entities/sample";
 import { PreparedSearchOptions } from "../../entities/search";
-import { PublicTaskRequestCreationModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
@@ -29,7 +29,7 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
         this.taskRepository = taskRepository
     }
 
-    async execute(current_user: UserUpdateModel, project_id: number, options: RegeneratePivotsOptions): Promise<TaskResponseModel> {
+    async execute(current_user: UserUpdateModel, project_id: number, options: RegeneratePivotsOptions): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
         await this.ensureUserCanRegenerate(current_user, project_id);
 
@@ -47,7 +47,7 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
 
         this.startRegeneratePivotsTask(task, project, samples, options.force === true);
 
-        return task;
+        return this.taskRepository.toPublicTask(task);
     }
 
     private async ensureUserCanRegenerate(current_user: UserUpdateModel, project_id: number): Promise<void> {
@@ -109,6 +109,7 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
             await this.taskRepository.startTask({ task_id: task_id });
             const failures: string[] = [];
             for (const [i, sample] of samples.entries()) {
+                await this.taskRepository.throwIfCancelled(task_id);
                 const progress = Math.round(((i + 1) / samples.length) * 99);
                 const version = await this.sampleRepository.getPivotConverterVersion(project.project_id, sample.sample_name);
                 if (!force && version === UVP5_PIVOT_CONVERTER_VERSION) {

@@ -9,6 +9,7 @@ import { SearchTasksUseCase } from '../../domain/interfaces/use-cases/task/searc
 import { GetOneTaskUseCase } from '../../domain/interfaces/use-cases/task/get-one-task'
 import { GetLogFileTaskUseCase } from '../../domain/interfaces/use-cases/task/get-log-file-task'
 import { StreamZipFileUseCase } from '../../domain/interfaces/use-cases/task/stream-zip-file'
+import { CancelTaskUseCase } from '../../domain/interfaces/use-cases/task/cancel-task'
 
 import { CustomRequest } from '../../domain/entities/auth'
 
@@ -19,7 +20,8 @@ export default function TaskRouter(
     getOneTaskUseCase: GetOneTaskUseCase,
     getLogFileTaskUseCase: GetLogFileTaskUseCase,
     streamZipFileUseCase: StreamZipFileUseCase,
-    searchTaskUseCase: SearchTasksUseCase
+    searchTaskUseCase: SearchTasksUseCase,
+    cancelTaskUseCase: CancelTaskUseCase
 ) {
     const router = express.Router()
     /**
@@ -107,7 +109,6 @@ export default function TaskRouter(
      *       | `task_project_id` | number or null | |
      *       | `task_progress_pct` | number | |
      *       | `task_progress_msg` | string | |
-     *       | `task_step` | number | |
      *       | `task_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `task_start_utc_date_time` | string (ISO timestamp) or null | |
      *       | `task_end_utc_date_time` | string (ISO timestamp) or null | |
@@ -286,7 +287,8 @@ export default function TaskRouter(
     // For admin only
     router.delete('/:task_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteTaskUseCase.execute((req as CustomRequest).token, { ...req.body, task_id: req.params.task_id })
+            // Only the id: the data source builds its WHERE clause from the keys it receives
+            await deleteTaskUseCase.execute((req as CustomRequest).token, { task_id: req.params.task_id as any })
             res.status(200).send({ message: "Task " + req.params.task_id + " successfully deleted" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
@@ -294,6 +296,74 @@ export default function TaskRouter(
             else if (err.message === "Cannot find task to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this task") res.status(403).send({ errors: ["Cannot delete task"] })
             else res.status(500).send({ errors: ["Cannot delete task"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /tasks/{task_id}/cancel:
+     *   post:
+     *     summary: Cancel task
+     *     description: |
+     *       Cancel a task (task owner or admin).
+     *
+     *       A `PENDING` task becomes `CANCELLED` at once. A `RUNNING` task becomes `CANCELLING`: its work
+     *       stops at its next checkpoint, removes what it produced, and the task ends `CANCELLED`. A task that
+     *       reaches its end before a checkpoint still ends `DONE` or `ERROR`.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: task_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The task ID to cancel.
+     *     responses:
+     *       200:
+     *         description: The task after the cancellation request (`CANCELLED` or `CANCELLING`).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       403:
+     *         description: User cannot be used or cannot cancel this task.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The task is already finished or already being cancelled.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    // For the task owner or an admin
+    router.post('/:task_id/cancel', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const task = await cancelTaskUseCase.execute((req as CustomRequest).token, parseInt(req.params.task_id));
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot cancel this task") res.status(403).send({ errors: ["Cannot cancel task"] })
+            else if (err.message === "Task cannot be cancelled") res.status(409).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot cancel task"] })
         }
     })
 

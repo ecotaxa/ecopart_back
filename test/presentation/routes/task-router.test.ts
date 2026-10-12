@@ -14,7 +14,8 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareTaskValidation } from '../../../src/presentation/interfaces/middleware/task-validation'
 
 import { Request, Response, NextFunction } from "express";
-import { MockDeleteTaskUseCase, MockGetOneTaskUseCase, MockSearchTasksUseCase, MockStreamZipFileUseCase, MockGetLogFileTask } from "../../mocks/task-mock";
+import { MockDeleteTaskUseCase, MockGetOneTaskUseCase, MockSearchTasksUseCase, MockStreamZipFileUseCase, MockGetLogFileTask, MockCancelTaskUseCase } from "../../mocks/task-mock";
+import { CancelTaskUseCase } from "../../../src/domain/interfaces/use-cases/task/cancel-task";
 import { GetLogFileTaskUseCase } from "../../../src/domain/interfaces/use-cases/task/get-log-file-task";
 import { SearchTasksResult } from "../../entities/task";
 
@@ -56,6 +57,7 @@ describe('TaskRouter', () => {
     let getLogFileTaskUseCase: GetLogFileTaskUseCase
     let streamZipFileUseCase: StreamZipFileUseCase
     let searchTaskUseCase: SearchTasksUseCase
+    let cancelTaskUseCase: CancelTaskUseCase
 
     beforeAll(() => {
 
@@ -66,8 +68,9 @@ describe('TaskRouter', () => {
         getLogFileTaskUseCase = new MockGetLogFileTask()
         streamZipFileUseCase = new MockStreamZipFileUseCase()
         searchTaskUseCase = new MockSearchTasksUseCase()
+        cancelTaskUseCase = new MockCancelTaskUseCase()
 
-        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase))
+        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase, cancelTaskUseCase))
     })
 
     beforeEach(() => {
@@ -232,6 +235,13 @@ describe('TaskRouter', () => {
             expect(deleteTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual({ message: "Task 1 successfully deleted" })
         });
+        test("forwards the task id only, never the keys of the request body", async () => {
+            jest.spyOn(deleteTaskUseCase, "execute").mockImplementation(() => Promise.resolve())
+            const response = await request(server).delete("/tasks/1").send({ "task_owner_id = 1 OR 1": 1, task_project_id: 2 })
+
+            expect(response.status).toBe(200)
+            expect(deleteTaskUseCase.execute).toBeCalledWith(expect.anything(), { task_id: "1" })
+        });
         test("failed if current user cannot be used", async () => {
             const expectedResponse = { errors: ["User cannot be used"] }
             jest.spyOn(deleteTaskUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
@@ -262,6 +272,58 @@ describe('TaskRouter', () => {
             const response = await request(server).delete("/tasks/1")
             expect(response.status).toBe(500)
             expect(deleteTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+    });
+    describe("Tests for POST /:task_id/cancel", () => {
+        test("Should return 200 with the cancelled task", async () => {
+            const ExpectedData = { ...SearchTasksResult.tasks[0], task_status: "CANCELLING" }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => Promise.resolve(ExpectedData))
+            const response = await request(server).post("/tasks/1/cancel")
+
+            expect(response.status).toBe(200)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
+            expect(cancelTaskUseCase.execute).toBeCalledWith(expect.anything(), 1)
+            expect(response.body).toStrictEqual(ExpectedData)
+        });
+        test("failed if current user cannot be used", async () => {
+            const expectedResponse = { errors: ["User cannot be used"] }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
+            const response = await request(server).post("/tasks/1/cancel")
+            expect(response.status).toBe(403)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("failed if cannot find task", async () => {
+            const expectedResponse = { errors: ["Cannot find task"] }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find task") })
+            const response = await request(server).post("/tasks/1/cancel")
+            expect(response.status).toBe(404)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("failed if logged user cannot cancel this task", async () => {
+            const expectedResponse = { errors: ["Cannot cancel task"] }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => { throw new Error("Logged user cannot cancel this task") })
+            const response = await request(server).post("/tasks/1/cancel")
+            expect(response.status).toBe(403)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("failed with 409 if the task cannot be cancelled", async () => {
+            const expectedResponse = { errors: ["Task cannot be cancelled"] }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task cannot be cancelled") })
+            const response = await request(server).post("/tasks/1/cancel")
+            expect(response.status).toBe(409)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("failed if cannot cancel task", async () => {
+            const expectedResponse = { errors: ["Cannot cancel task"] }
+            jest.spyOn(cancelTaskUseCase, "execute").mockImplementation(() => { throw new Error("xyz") })
+            const response = await request(server).post("/tasks/1/cancel")
+            expect(response.status).toBe(500)
+            expect(cancelTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
     });
