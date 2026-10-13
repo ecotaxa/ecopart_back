@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'path';
 import { ListImportFoldersUseCase } from '../../interfaces/use-cases/file_system/list-import-folders';
+import { isInsideFolder } from '../../utils/path-containment';
 
 export class ListImportFolders implements ListImportFoldersUseCase {
     importFolderPath: string
@@ -12,10 +13,9 @@ export class ListImportFolders implements ListImportFoldersUseCase {
     async execute(folder_path: string): Promise<string[]> {
         const targetPath = path.join(this.importFolderPath, folder_path);
         const resolvedPath = path.resolve(targetPath);
-        const resolvedRoot = path.resolve(this.importFolderPath);
 
         // Prevent directory traversal outside the import root
-        if (!resolvedPath.startsWith(resolvedRoot)) {
+        if (!isInsideFolder(this.importFolderPath, resolvedPath)) {
             throw new Error("Invalid folder path");
         }
 

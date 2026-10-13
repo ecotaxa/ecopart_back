@@ -1,4 +1,5 @@
 import path from "path";
+import { isInsideFolder } from "../../utils/path-containment";
 import { MinimalUserModel, UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../entities/project";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
@@ -86,7 +87,10 @@ export class UpdateProject implements UpdateProjectUseCase {
                     // Else if not in members, managers and contact add it to project_to_update
                 } else if (key !== "members" && key !== "managers" && key !== "contact") {
                     if (key === "root_folder_path") {
-                        project_to_update[key] = path.join(this.DATA_STORAGE_IMPORT, public_project_to_update[key] as string);
+                        const root_folder_path = path.join(this.DATA_STORAGE_IMPORT, public_project_to_update[key] as string);
+                        // Checked before any write: the backup copies and zips this folder
+                        if (!isInsideFolder(this.DATA_STORAGE_IMPORT, root_folder_path)) throw new Error("Root folder path must stay inside the import folder");
+                        project_to_update[key] = root_folder_path;
                     } else {
                         project_to_update[key] = public_project_to_update[key];
                     }

@@ -567,3 +567,20 @@ test("Reject incomplete EcoTaxa link payload", async () => {
 
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
 })
+
+test("Refuses a root folder outside the import folder before any write", async () => {
+    const current_user: UserUpdateModel = { user_id: 1 }
+    const project_to_update: PublicProjectUpdateModel = { ...projectUpdateModel, root_folder_path: "../../etc" }
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockProjectRepository, "standardUpdateProject")
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+
+    await expect(updateProjectUseCase.execute(current_user, project_to_update)).rejects.toThrow("Root folder path must stay inside the import folder");
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
+});

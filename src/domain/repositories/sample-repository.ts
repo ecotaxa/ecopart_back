@@ -26,6 +26,7 @@ import yauzl from 'yauzl';
 import archiver from 'archiver';
 import * as fzstd from 'fzstd';
 import * as tar from 'tar';
+import { isInsideFolder } from '../utils/path-containment';
 
 // Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
 // (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
@@ -1708,6 +1709,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                 : entry.name;
             if (!normalizedName) continue;
             const destPath = path.join(destFolder, normalizedName);
+            // An entry named like "../../x" would otherwise be written outside the extraction folder
+            if (!isInsideFolder(destFolder, destPath)) throw new Error(`Archive entry outside the extraction folder: ${entry.name}`);
             await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
             await fsPromises.writeFile(destPath, entry.content);
         }
@@ -1773,6 +1776,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                 : entry.name;
             if (!normalizedName) continue;
             const destPath = path.join(destFolder, normalizedName);
+            // An entry named like "../../x" would otherwise be written outside the extraction folder
+            if (!isInsideFolder(destFolder, destPath)) throw new Error(`Archive entry outside the extraction folder: ${entry.name}`);
             await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
             await fsPromises.writeFile(destPath, entry.content);
         }

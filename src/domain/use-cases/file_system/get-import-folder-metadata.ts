@@ -4,6 +4,7 @@ import { GetImportFolderMetadataUseCase } from '../../interfaces/use-cases/file_
 import { ProjectMetadataModel, ProjectMetadataPersonModel } from '../../entities/project';
 import { UserRepository } from '../../interfaces/repositories/user-repository';
 import { decodeUvpText } from '../../utils/decode-uvp-text';
+import { isInsideFolder } from '../../utils/path-containment';
 
 export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     importFolderPath: string;
@@ -17,8 +18,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     async execute(folder_path: string): Promise<ProjectMetadataModel> {
         // Validate the folder_path is within the import folder
         const fullPath = path.resolve(this.importFolderPath, folder_path);
-        const basePath = path.resolve(this.importFolderPath);
-        if (!fullPath.startsWith(basePath)) {
+        if (!isInsideFolder(this.importFolderPath, fullPath)) {
             throw new Error('Invalid folder path');
         }
 
