@@ -325,6 +325,33 @@ describe("EcotaxaAccount Repository", () => {
             )
         });
     });
+
+    describe("pollJobUntilDone", () => {
+        const status = (state: string, progress_pct: number) => ({ state, progress_pct, progress_msg: `step ${progress_pct}`, updated_on: `2026-10-13T15:00:${progress_pct}` });
+        const poll = (opts: { intervalMs: number, stallMinutes: number }) =>
+            (ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl).pollJobUntilDone("https://ecotaxa.test/", "token", 7, opts);
+
+        test("keeps waiting past the stall delay while the job progresses", async () => {
+            const http = jest.spyOn(ecotaxa_accountRepository as any, "http");
+            for (let pct = 0; pct < 10; pct++) http.mockResolvedValueOnce(status("R", pct));
+            http.mockResolvedValueOnce(status("F", 100));
+
+            // 10 polls of 10 ms each outlast the 30 ms stall delay, a total cap would have failed.
+            await expect(poll({ intervalMs: 10, stallMinutes: 0.0005 })).resolves.toEqual(status("F", 100));
+            expect(http).toBeCalledTimes(11);
+        });
+
+        test("fails when the job reports no progress for the stall delay", async () => {
+            jest.spyOn(ecotaxa_accountRepository as any, "http").mockResolvedValue(status("R", 40));
+
+            await expect(poll({ intervalMs: 5, stallMinutes: 0.0005 })).rejects.toThrow("EcoTaxa job 7 made no progress for 0.0005 minutes (state R, 40% step 40).");
+        });
+
+        test("fails at once when the job ends in error", async () => {
+            const http = jest.spyOn(ecotaxa_accountRepository as any, "http").mockResolvedValueOnce(status("E", 10));
+
+            await expect(poll({ intervalMs: 5, stallMinutes: 30 })).rejects.toThrow("Failed to poll job status for job 7: Import job failed");
+            expect(http).toBeCalledTimes(1);
+        });
+    });
 })
-
-

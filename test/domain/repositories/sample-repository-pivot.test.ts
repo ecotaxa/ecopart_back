@@ -92,4 +92,19 @@ describe("UVP5 pivot storage", () => {
             /^Cannot build the UVP5 pivot of sample s1c1: cannot read s1c1\.bru in s1c1_work\.zip \(.*\)\. Check that the file is in the sample folder of the project, then relaunch the import or the pivot regeneration\.$/);
         expect(fs.existsSync(path.join(sample_folder, "pivot"))).toBe(false);
     });
+
+    test("reads a .bru larger than the text limit line by line, for the pivot and the QC graphs", async () => {
+        await writeZip(path.join(sample_folder, "s1c1_work.zip"), {
+            "s1c1_datfile.txt": "    12;\t20200806221354_586;\t00136;00182!;\t2;\t4;\t12;\t0;\t0;\r\n",
+            "s1c1.bru": "12;0;3;10;1;1\r\n".repeat(500),
+        });
+        // The datfile and the header still fit, the .bru does not.
+        repo.max_text_file_bytes = 200;
+
+        const report = await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD");
+
+        expect(report.frames_written).toBe(1);
+        expect(await (repo as any).readFileFromZip(path.join(sample_folder, "pivot", "s1c1_Particule.zip"), "particules.csv")).toBe("20200806-221354-586,13.6,,1:3,500,10.0,\n");
+        expect((await repo.getPerImageRecords(5, "s1c1", "UVP5HD")).map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
+    });
 });

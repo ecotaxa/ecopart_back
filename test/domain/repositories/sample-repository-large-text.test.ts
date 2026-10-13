@@ -8,12 +8,9 @@ import * as tar from "tar";
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 import * as decodeModule from "../../../src/domain/utils/decode-uvp-text";
 
-// The tar.zst fixtures are plain tarballs: decompression is the identity here.
-jest.mock("fzstd", () => ({ decompress: (data: Uint8Array) => data }));
-
 const STRING_TOO_LONG = "Cannot create a string longer than 0x1fffffe8 characters";
 
-function writeZip(zip_path: string, members: Record<string, string>): Promise<void> {
+function writeZip(zip_path: string, members: Record<string, string | Buffer>): Promise<void> {
     return new Promise((resolve, reject) => {
         const output = fs.createWriteStream(zip_path);
         const archive = archiver("zip");
@@ -25,12 +22,33 @@ function writeZip(zip_path: string, members: Record<string, string>): Promise<vo
     });
 }
 
-function writeTar(tar_path: string, folder: string, members: Record<string, string>): void {
+// A zstd frame of raw (stored) blocks: valid Zstandard without needing a compressor.
+function zstdRawFrame(content: Buffer): Buffer {
+    const header = Buffer.alloc(13);
+    header.writeUInt32LE(0xFD2FB528, 0);
+    header[4] = 0xE0; // single segment, 8-byte content size
+    header.writeBigUInt64LE(BigInt(content.length), 5);
+    const parts = [header];
+    const MAX_BLOCK = 128 * 1024;
+    for (let offset = 0; offset < content.length || offset === 0; offset += MAX_BLOCK) {
+        const block = content.subarray(offset, offset + MAX_BLOCK);
+        const block_header = Buffer.alloc(3);
+        block_header.writeUIntLE((block.length << 3) | (offset + MAX_BLOCK >= content.length ? 1 : 0), 0, 3);
+        parts.push(block_header, block);
+    }
+    return Buffer.concat(parts);
+}
+
+// Writes `members` under `folder` and packs them, in this order, into a .tar.zst.
+function writeTar(tar_zst_path: string, folder: string, members: Record<string, string | Buffer>, preservePaths = false): void {
     for (const [name, content] of Object.entries(members)) {
         fs.mkdirSync(path.dirname(path.join(folder, name)), { recursive: true });
         fs.writeFileSync(path.join(folder, name), content);
     }
-    tar.c({ sync: true, file: tar_path, cwd: folder }, Object.keys(members));
+    const tar_path = `${tar_zst_path}.tar`;
+    tar.c({ sync: true, file: tar_path, cwd: folder, preservePaths }, Object.keys(members));
+    fs.writeFileSync(tar_zst_path, zstdRawFrame(fs.readFileSync(tar_path)));
+    fs.rmSync(tar_path);
 }
 
 describe("reading text from sample archives", () => {
@@ -104,6 +122,15 @@ describe("reading text from sample archives", () => {
 
             await expect(read(archive, "big.txt")).rejects.toThrow("s/big.txt in s.tar.zst is too large to be read as text (11 bytes, at most 10)");
             expect(decode).toBeCalledTimes(0);
+        });
+
+        test("rejects a missing member or a corrupted archive", async () => {
+            const archive = path.join(tmp, "s.tar.zst");
+            writeTar(archive, path.join(tmp, "content"), { "s/small.txt": "abc" });
+            fs.writeFileSync(path.join(tmp, "corrupted.tar.zst"), Buffer.from("not zstandard data"));
+
+            await expect(read(archive, "other.txt")).rejects.toThrow("other.txt or undefined not found in tar.zst file");
+            await expect(read(path.join(tmp, "corrupted.tar.zst"), "small.txt")).rejects.toThrow();
         });
 
         test("rejects when the decoding fails instead of throwing from the stream callback", async () => {
@@ -242,6 +269,97 @@ describe("reading text from sample archives", () => {
             const samples = await repo.getEcoTaxaSamplesFromUVP5Format(path.join(tmp, "work"), [{ sample_name: "profile_1", sample_id: 5 }]);
 
             expect(samples.map(sample => [sample.sample_name, sample.images])).toEqual([["profile_1", 2]]);
+        });
+    });
+
+    describe("UVP5 work archive extraction, streamed to disk", () => {
+        // Larger than a zstd block (128 KiB) and than the stream chunks.
+        const IMAGE = Buffer.from(Array.from({ length: 300_000 }, (_, i) => (i * 7) % 256));
+        const MEMBERS = {
+            "s1/s1_datfile.txt": "datfile",
+            "s1/images/img_1.png": IMAGE,
+            "s1/.DS_Store": "junk",
+            "__MACOSX/s1/._s1_datfile.txt": "junk",
+        };
+
+        const expectExtracted = (dest: string) => {
+            expect(fs.readdirSync(dest).sort()).toEqual(["images", "s1_datfile.txt"]);
+            expect(fs.readFileSync(path.join(dest, "s1_datfile.txt"), "utf8")).toBe("datfile");
+            expect(fs.readFileSync(path.join(dest, "images", "img_1.png")).equals(IMAGE)).toBe(true);
+            expect(fs.existsSync(`${dest}.extracting`)).toBe(false);
+        };
+
+        test("zip: the common top folder is stripped and macOS metadata left out", async () => {
+            await writeZip(path.join(tmp, "s1.zip"), MEMBERS);
+            const dest = path.join(tmp, "out", "s1_work");
+
+            await repo.extractZipNormalized(path.join(tmp, "s1.zip"), dest);
+
+            expectExtracted(dest);
+        });
+
+        test("zip: files without a common top folder keep their paths", async () => {
+            await writeZip(path.join(tmp, "s1.zip"), { "a.txt": "a", "sub/b.txt": "b" });
+            const dest = path.join(tmp, "out", "s1_work");
+
+            await repo.extractZipNormalized(path.join(tmp, "s1.zip"), dest);
+
+            expect(fs.readFileSync(path.join(dest, "a.txt"), "utf8")).toBe("a");
+            expect(fs.readFileSync(path.join(dest, "sub", "b.txt"), "utf8")).toBe("b");
+        });
+
+        test("tar.zst: the common top folder is stripped and macOS metadata left out", async () => {
+            writeTar(path.join(tmp, "s1.tar.zst"), path.join(tmp, "content"), MEMBERS);
+            const dest = path.join(tmp, "out", "s1_work");
+
+            await repo.extractTarZstNormalized(path.join(tmp, "s1.tar.zst"), dest);
+
+            expectExtracted(dest);
+        });
+
+        test("tar.zst: an entry outside the folder fails the extraction and is not written", async () => {
+            writeTar(path.join(tmp, "s1.tar.zst"), path.join(tmp, "content", "inner"), { "s1/a.txt": "a", "../evil.txt": "evil" }, true);
+            const dest = path.join(tmp, "out", "s1_work");
+
+            await expect(repo.extractTarZstNormalized(path.join(tmp, "s1.tar.zst"), dest)).rejects.toThrow("s1.tar.zst has an entry outside its folder: ../evil.txt");
+            expect(fs.existsSync(path.join(tmp, "out", "evil.txt"))).toBe(false);
+            expect(fs.existsSync(`${dest}.extracting`)).toBe(false);
+        });
+
+        test("tar.zst: a corrupted archive rejects and leaves nothing behind", async () => {
+            fs.writeFileSync(path.join(tmp, "s1.tar.zst"), Buffer.from("not zstandard data"));
+            const dest = path.join(tmp, "out", "s1_work");
+
+            await expect(repo.extractTarZstNormalized(path.join(tmp, "s1.tar.zst"), dest)).rejects.toThrow();
+            expect(fs.existsSync(dest)).toBe(false);
+            expect(fs.existsSync(`${dest}.extracting`)).toBe(false);
+        });
+    });
+
+    describe("UVP5 source .bru read line by line", () => {
+        const DATFILE = "    12;\t20200806221354_586;\t00136;00182!;\t2;\t4;\t12;\t0;\t0;\r\n";
+        const BRU = "12;0;3;10;1;1\r\n".repeat(500);
+
+        beforeEach(() => {
+            // The datfile still fits, the .bru does not: it must be streamed.
+            repo.max_text_file_bytes = 200;
+        });
+
+        test.each(["tar.zst", "zip", "folder"])("QC preview from a %s work source", async (form) => {
+            const work = path.join(tmp, "source", "work");
+            fs.mkdirSync(work, { recursive: true });
+            const members = { "s1/s1_datfile.txt": DATFILE, "s1/s1.bru": BRU };
+            if (form === "tar.zst") writeTar(path.join(work, "s1.tar.zst"), path.join(tmp, "content"), members);
+            if (form === "zip") await writeZip(path.join(work, "s1.zip"), members);
+            if (form === "folder") {
+                fs.mkdirSync(path.join(work, "s1"));
+                fs.writeFileSync(path.join(work, "s1", "s1_datfile.txt"), DATFILE);
+                fs.writeFileSync(path.join(work, "s1", "s1.bru"), BRU);
+            }
+
+            const records = await repo.getPerImageRecordsFromSource("source", "s1", "UVP5HD");
+
+            expect(records.map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
         });
     });
 });

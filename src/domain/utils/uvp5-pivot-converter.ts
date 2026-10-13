@@ -11,7 +11,9 @@ export interface Uvp5PivotInput {
     sample: Uvp5PivotSampleMetadata;
     instrument_model: string;
     datfile_content: string;
-    bru_content: string;
+    // The .bru grouped by frame (addBruLine): it is read line by line, since it grows with the
+    // particles of the sample and can outgrow the longest string V8 can build.
+    bru_blocks_by_frame: BruBlocksByFrame;
     // The sample's row of meta/uvp5_header_sn*.txt, columns in file order.
     header_row: Record<string, string>;
     // Passed in rather than read from the clock, so that a conversion is reproducible.
@@ -31,6 +33,8 @@ interface AreaBlock {
     nb_greys: number;
 }
 
+export type BruBlocksByFrame = Map<number, Map<number, AreaBlock>>;
+
 interface DatfileFrame {
     frame_index: number;
     timestamp: string;
@@ -49,7 +53,7 @@ const HEADER_COLUMNS_MOVED_TO_HW_CONF = new Set(["volimage", "aa", "exp"]);
 export function convertUvp5ToPivot(input: Uvp5PivotInput): Uvp5PivotFiles {
     const sample_name = input.sample.sample_name;
     const datfile_name = `${sample_name}_datfile.txt`;
-    const blocks_by_frame = parseBruBlocksByFrame(input.bru_content);
+    const blocks_by_frame = input.bru_blocks_by_frame;
     const frames = parseDatfile(input.datfile_content);
     if (frames.length === 0) {
         throw new Error(`${datfile_name} contains no frame. Check the work folder of the sample, then relaunch the import or the pivot regeneration.`);
@@ -127,28 +131,33 @@ export function convertUvp5ToPivot(input: Uvp5PivotInput): Uvp5PivotFiles {
 
 // bru1 rows (`frame; blob; area_px; meangrey; x; y`) grouped by frame, then by exact pixel area.
 // Scanned with indexOf: a .bru reaches ~100 MB.
-function parseBruBlocksByFrame(content: string): Map<number, Map<number, AreaBlock>> {
-    const by_frame = new Map<number, Map<number, AreaBlock>>();
+export function parseBruBlocksByFrame(content: string): BruBlocksByFrame {
+    const by_frame: BruBlocksByFrame = new Map();
     const len = content.length;
     let start = 0;
     while (start < len) {
         let end = content.indexOf("\n", start);
         if (end === -1) end = len;
-        const cols = content.slice(start, end).split(";");
+        addBruLine(by_frame, content.slice(start, end));
         start = end + 1;
-        if (cols.length < 4) continue;
-        const frame_index = parseInt(cols[0], 10);
-        const area = parseInt(cols[2], 10);
-        if (isNaN(frame_index) || isNaN(area)) continue;
-        const grey = parseInt(cols[3], 10);
-        let blocks = by_frame.get(frame_index);
-        if (!blocks) { blocks = new Map(); by_frame.set(frame_index, blocks); }
-        let block = blocks.get(area);
-        if (!block) { block = { nb_particles: 0, grey_sum: 0, nb_greys: 0 }; blocks.set(area, block); }
-        block.nb_particles++;
-        if (!isNaN(grey)) { block.grey_sum += grey; block.nb_greys++; }
     }
     return by_frame;
+}
+
+// Adds one bru1 row to its frame and area; a row that is not a particle is ignored.
+export function addBruLine(by_frame: BruBlocksByFrame, line: string): void {
+    const cols = line.split(";");
+    if (cols.length < 4) return;
+    const frame_index = parseInt(cols[0], 10);
+    const area = parseInt(cols[2], 10);
+    if (isNaN(frame_index) || isNaN(area)) return;
+    const grey = parseInt(cols[3], 10);
+    let blocks = by_frame.get(frame_index);
+    if (!blocks) { blocks = new Map(); by_frame.set(frame_index, blocks); }
+    let block = blocks.get(area);
+    if (!block) { block = { nb_particles: 0, grey_sum: 0, nb_greys: 0 }; blocks.set(area, block); }
+    block.nb_particles++;
+    if (!isNaN(grey)) { block.grey_sum += grey; block.nb_greys++; }
 }
 
 // Datfile rows: `frame; timestamp; sensor block…!; counts…`. The 12-value sensor block is

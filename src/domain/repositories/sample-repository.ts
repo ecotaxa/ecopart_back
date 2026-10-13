@@ -13,7 +13,7 @@ import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { readUvpTextLines } from "../utils/text-lines";
-import { convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
+import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
 import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
@@ -25,11 +25,12 @@ import * as fsPromises from 'fs/promises'; // For promise-based file operations/
 
 import path from 'path';
 import { constants as buffer_constants } from 'buffer';
-import { Readable } from 'stream';
+import { PassThrough, pipeline, Readable } from 'stream';
+import { pipeline as pipelinePromise } from 'stream/promises';
 import yauzl from 'yauzl';
 import archiver from 'archiver';
-import * as fzstd from 'fzstd';
 import * as tar from 'tar';
+import { createZstdDecompressStream } from '../utils/zstd-stream';
 
 // Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
 // (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
@@ -73,10 +74,14 @@ export class SampleRepositoryImpl implements SampleRepository {
     // a stream callback escapes the promise and stops the whole server, with every running task.
     private async readFileFromZip(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
         const { entry, stream } = await this.openZipEntry(zipPath, targetFileName, filePathPattern);
-        const description = `${entry.fileName} in ${path.basename(zipPath)}`;
-        if (entry.uncompressedSize > this.max_text_file_bytes) {
+        return this.readStreamAsText(stream, entry.uncompressedSize, `${entry.fileName} in ${path.basename(zipPath)}`);
+    }
+
+    // A file larger than the longest string V8 can build is refused before being read.
+    private async readStreamAsText(stream: Readable, size: number, description: string): Promise<string> {
+        if (size > this.max_text_file_bytes) {
             stream.destroy();
-            throw this.textTooLargeError(description, entry.uncompressedSize);
+            throw new Error(`${description} is too large to be read as text (${size} bytes, at most ${this.max_text_file_bytes})`);
         }
         // Decode once at the end: a multi-byte character can straddle two chunks.
         const chunks: Buffer[] = [];
@@ -125,51 +130,47 @@ export class SampleRepositoryImpl implements SampleRepository {
         yield* readUvpTextLines(stream);
     }
 
-    private textTooLargeError(description: string, size: number): Error {
-        return new Error(`${description} is too large to be read as text (${size} bytes, at most ${this.max_text_file_bytes})`);
-    }
-
     // Read a single file from a .tar.zst archive (zstd-compressed tarball). Mirrors
     // readFileFromZip — matches by exact name or by regex against the tar entry path.
     private async readFileFromTarZst(tarZstPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
-        const compressed = await fsPromises.readFile(tarZstPath);
-        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
+        const { name, size, stream } = await this.openTarZstEntry(tarZstPath, targetFileName, filePathPattern);
+        return this.readStreamAsText(stream, size, `${name} in ${path.basename(tarZstPath)}`);
+    }
 
+    // Streams the first matching file of a .tar.zst. The archive is decompressed on the fly and only up
+    // to that file: it holds the sample's images and can weigh several GB.
+    private openTarZstEntry(tarZstPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<{ name: string, size: number, stream: Readable }> {
         return new Promise((resolve, reject) => {
+            const source = fs.createReadStream(tarZstPath);
             const parser = new tar.Parser();
-            let found = false;
+            let found: PassThrough | undefined;
             parser.on('entry', (entry) => {
                 const name = entry.path;
                 const matches = !found && entry.type === 'File' && (
                     (targetFileName !== undefined && (name === targetFileName || path.basename(name) === targetFileName))
                     || (filePathPattern !== undefined && filePathPattern.test(name))
                 );
-                if (matches) {
-                    found = true;
-                    if (entry.size > this.max_text_file_bytes) {
-                        entry.resume();
-                        return reject(this.textTooLargeError(`${name} in ${path.basename(tarZstPath)}`, entry.size));
-                    }
-                    const chunks: Buffer[] = [];
-                    entry.on('data', (chunk: Buffer) => chunks.push(chunk));
-                    // Same rule as readFileFromZip: nothing may be thrown from a stream callback.
-                    entry.on('end', () => {
-                        try {
-                            resolve(decodeUvpText(Buffer.concat(chunks)));
-                        } catch (decode_error) {
-                            reject(decode_error);
-                        }
-                    });
-                    entry.on('error', reject);
-                } else {
+                if (!matches) {
                     entry.resume();
+                    return;
                 }
+                const file = new PassThrough();
+                found = file;
+                // Once the file is read or abandoned, the rest of the archive is not needed. The no-op
+                // listener keeps a late write into an abandoned stream from becoming an uncaught error.
+                file.on('error', () => undefined);
+                file.on('close', () => {
+                    entry.unpipe(file);
+                    source.destroy();
+                });
+                entry.on('error', (error: Error) => file.destroy(error));
+                entry.pipe(file);
+                resolve({ name, size: entry.size, stream: file });
             });
-            parser.on('end', () => {
-                if (!found) reject(new Error(`${targetFileName} or ${filePathPattern} not found in tar.zst file`));
+            pipeline(source, createZstdDecompressStream(), parser, (error) => {
+                if (!found) return reject(error ?? new Error(`${targetFileName} or ${filePathPattern} not found in tar.zst file`));
+                if (error && !found.writableEnded) found.destroy(error);
             });
-            parser.on('error', reject);
-            parser.end(tarBuffer);
         });
     }
 
@@ -1096,8 +1097,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                     return await this.countTsvDataLines(stream);
                 } catch {
                     try {
-                        const tsv_content = await this.readFileFromTarZst(work_tar_zst_path, undefined, tsv_pattern);
-                        return this.extractNumberOfTsvDataLines(tsv_content);
+                        const { stream } = await this.openTarZstEntry(work_tar_zst_path, undefined, tsv_pattern);
+                        return await this.countTsvDataLines(stream);
                     } catch {
                         const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
                         return await this.countTsvDataLines(fs.createReadStream(tsv_file_path));
@@ -1680,150 +1681,106 @@ export class SampleRepositoryImpl implements SampleRepository {
     /**
      * Extract a zip archive to destFolder, stripping a common top-level directory prefix if present.
      * For example, if every entry starts with "omer2_1/", that prefix is removed so files land at root.
+     * Each file is streamed to disk: a work archive holds the sample's images and can weigh several GB.
      */
     async extractZipNormalized(zipPath: string, destFolder: string): Promise<void> {
-        // Buffer all file entries (skip directory entries)
-        const fileEntries: { name: string; content: Uint8Array }[] = [];
-
-        await new Promise<void>((resolve, reject) => {
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-                if (err || !zipfile) return reject(err || new Error('Failed to open zip'));
-                zipfile.readEntry();
-
-                zipfile.on('entry', (entry) => {
-                    if (/\/$/.test(entry.fileName)) {
-                        // directory entry — skip
-                        zipfile.readEntry();
-                        return;
-                    }
-                    zipfile.openReadStream(entry, (streamErr, stream) => {
-                        if (streamErr || !stream) return reject(streamErr || new Error('Failed to open stream'));
-                        const chunks: Uint8Array[] = [];
-                        stream.on('data', (chunk: Uint8Array) => chunks.push(chunk));
-                        // Nothing may be thrown from a stream callback (it would stop the server):
-                        // a failed allocation for a huge entry rejects instead.
-                        stream.on('end', () => {
-                            try {
-                                const total = chunks.reduce((acc, c) => acc + c.length, 0);
-                                const merged = new Uint8Array(total);
-                                let offset = 0;
-                                for (const c of chunks) { merged.set(c, offset); offset += c.length; }
-                                fileEntries.push({ name: entry.fileName, content: merged });
-                            } catch (merge_error) {
-                                zipfile.close();
-                                return reject(merge_error);
-                            }
-                            zipfile.readEntry();
-                        });
-                        stream.on('error', reject);
-                    });
-                });
-
-                zipfile.on('end', () => resolve());
-                zipfile.on('error', reject);
-            });
-        });
-
-        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
-        // when detecting the common prefix and when extracting.
-        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
-            || name.endsWith('/.DS_Store')
-            || name === '.DS_Store'
-            || path.basename(name).startsWith('._');
-        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
-
-        // Determine a common top-level directory prefix to strip
-        let stripPrefix = '';
-        if (significantEntries.length > 0) {
-            const firstParts = significantEntries[0].name.split('/');
-            if (firstParts.length > 1) {
-                const candidate = firstParts[0] + '/';
-                if (significantEntries.every(e => e.name.startsWith(candidate))) {
-                    stripPrefix = candidate;
-                }
-            }
-        }
-
-        // Write files to destFolder with the prefix stripped
-        await fsPromises.mkdir(destFolder, { recursive: true });
-        for (const entry of significantEntries) {
-            const normalizedName = entry.name.startsWith(stripPrefix)
-                ? entry.name.slice(stripPrefix.length)
-                : entry.name;
-            if (!normalizedName) continue;
-            const destPath = path.join(destFolder, normalizedName);
-            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
-            await fsPromises.writeFile(destPath, entry.content);
-        }
+        await this.extractNormalized(destFolder, (staging, extracted) => this.extractZipFiles(zipPath, staging, extracted));
     }
 
     /**
      * Decompress and extract a `.tar.zst` archive to destFolder, stripping a common top-level
      * directory prefix if present — mirrors extractZipNormalized so the resulting layout is
-     * identical regardless of whether the source was a zip or a tar.zst.
+     * identical regardless of whether the source was a zip or a tar.zst. Decompressed on the fly.
      */
     async extractTarZstNormalized(tarZstPath: string, destFolder: string): Promise<void> {
-        // Decompress the zstandard stream to a raw tar buffer, then parse it in memory.
-        const compressed = await fsPromises.readFile(tarZstPath);
-        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
-
-        const fileEntries: { name: string; content: Uint8Array }[] = [];
-
-        await new Promise<void>((resolve, reject) => {
-            const parser = new tar.Parser();
-            parser.on('entry', (entry) => {
-                if (entry.type !== 'File') {
-                    // directory / pax / global header — skip
-                    entry.resume();
-                    return;
-                }
-                const chunks: Buffer[] = [];
-                entry.on('data', (chunk: Buffer) => chunks.push(chunk));
-                entry.on('end', () => {
-                    try {
-                        fileEntries.push({ name: entry.path, content: new Uint8Array(Buffer.concat(chunks)) });
-                    } catch (merge_error) {
-                        reject(merge_error);
+        await this.extractNormalized(destFolder, async (staging, extracted) => {
+            const unsafe: string[] = [];
+            await pipelinePromise(fs.createReadStream(tarZstPath), createZstdDecompressStream(), tar.x({
+                cwd: staging,
+                preserveOwner: false,
+                // Called while the archive is parsed, so it must not throw: an unsafe entry fails the
+                // extraction once it is over.
+                filter: (name, entry) => {
+                    if (!('type' in entry) || entry.type !== 'File' || this.isMacJunk(name)) return false;
+                    if (name.replace(/\\/g, '/').split('/').includes('..')) {
+                        unsafe.push(name);
+                        return false;
                     }
-                });
-                entry.on('error', reject);
-            });
-            parser.on('end', () => resolve());
-            parser.on('error', reject);
-            parser.end(tarBuffer);
+                    extracted.push(name);
+                    return true;
+                },
+            }));
+            if (unsafe.length > 0) {
+                throw new Error(`${path.basename(tarZstPath)} has an entry outside its folder: ${unsafe[0]}`);
+            }
         });
+    }
 
-        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
-        // when detecting the common prefix and when extracting.
-        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
+    // The files are extracted into a staging folder next to destFolder, then their common top-level
+    // folder (or the staging folder itself) becomes destFolder: the archive is read only once.
+    private async extractNormalized(destFolder: string, extract: (staging: string, extracted: string[]) => Promise<void>): Promise<void> {
+        const staging = `${destFolder}.extracting`;
+        const extracted: string[] = [];
+        await fsPromises.rm(staging, { recursive: true, force: true });
+        await fsPromises.mkdir(staging, { recursive: true });
+        try {
+            await extract(staging, extracted);
+            await fsPromises.rename(path.resolve(staging, this.commonTopFolder(extracted)), destFolder);
+        } finally {
+            await fsPromises.rm(staging, { recursive: true, force: true });
+        }
+    }
+
+    // Streams every file of the zip into staging, one at a time. yauzl refuses entries that would
+    // leave the folder ("../x", "/x").
+    private extractZipFiles(zipPath: string, staging: string, extracted: string[]): Promise<void> {
+        return new Promise((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) return reject(err || new Error('Failed to open zip'));
+                const fail = (error: Error) => {
+                    zipfile.close();
+                    reject(error);
+                };
+                zipfile.on('error', fail);
+                zipfile.on('end', () => resolve());
+                zipfile.on('entry', (entry: yauzl.Entry) => {
+                    const name = entry.fileName;
+                    // Directory entries are not files; macOS metadata is never extracted.
+                    if (name.endsWith('/') || this.isMacJunk(name)) return zipfile.readEntry();
+                    this.writeZipEntry(zipfile, entry, path.join(staging, name)).then(() => {
+                        extracted.push(name);
+                        zipfile.readEntry();
+                    }, fail);
+                });
+                zipfile.readEntry();
+            });
+        });
+    }
+
+    private async writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dest_path: string): Promise<void> {
+        await fsPromises.mkdir(path.dirname(dest_path), { recursive: true });
+        const stream = await new Promise<Readable>((resolve, reject) => {
+            zipfile.openReadStream(entry, (err, readStream) => err || !readStream ? reject(err || new Error('Failed to open stream')) : resolve(readStream));
+        });
+        await pipelinePromise(stream, fs.createWriteStream(dest_path));
+    }
+
+    // macOS metadata entries (__MACOSX/* resource forks, .DS_Store) are neither extracted nor taken
+    // into account for the common prefix.
+    private isMacJunk(name: string): boolean {
+        return name.startsWith('__MACOSX/')
             || name.endsWith('/.DS_Store')
             || name === '.DS_Store'
             || path.basename(name).startsWith('._');
-        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
+    }
 
-        // Determine a common top-level directory prefix to strip
-        let stripPrefix = '';
-        if (significantEntries.length > 0) {
-            const firstParts = significantEntries[0].name.split('/');
-            if (firstParts.length > 1) {
-                const candidate = firstParts[0] + '/';
-                if (significantEntries.every(e => e.name.startsWith(candidate))) {
-                    stripPrefix = candidate;
-                }
-            }
-        }
-
-        // Write files to destFolder with the prefix stripped
-        await fsPromises.mkdir(destFolder, { recursive: true });
-        for (const entry of significantEntries) {
-            const normalizedName = entry.name.startsWith(stripPrefix)
-                ? entry.name.slice(stripPrefix.length)
-                : entry.name;
-            if (!normalizedName) continue;
-            const destPath = path.join(destFolder, normalizedName);
-            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
-            await fsPromises.writeFile(destPath, entry.content);
-        }
+    // The top-level folder every file sits in ("omer2_1/"), or "" when they do not all share one.
+    private commonTopFolder(file_names: string[]): string {
+        if (file_names.length === 0) return '';
+        const first_parts = file_names[0].split('/');
+        if (first_parts.length < 2) return '';
+        const candidate = first_parts[0] + '/';
+        return file_names.every(name => name.startsWith(candidate)) ? candidate : '';
     }
 
     // Written to a temporary file and renamed on success: an interrupted run never leaves a truncated
@@ -2247,9 +2204,9 @@ export class SampleRepositoryImpl implements SampleRepository {
         // 2. .bru → per-particle pixel area (col idx 2 in the post-import bru1 variant), grouped by frame.
         let spectraByFrame = new Map<number, Record<number, number>>();
         try {
-            const bruContent = await this.readFileFromZip(workZip, `${sample_name}.bru`, undefined);
-            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+            for await (const line of this.readZipEntryLines(workZip, `${sample_name}.bru`)) this.addBruSpectrumLine(spectraByFrame, line);
         } catch {
+            spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
         return frames.map((f, i) => ({
@@ -2273,13 +2230,13 @@ export class SampleRepositoryImpl implements SampleRepository {
             const work_zip = path.join(sample_folder, `${sample_name}_work.zip`);
             const meta_conf_zip = path.join(sample_folder, `${sample_name}_meta_conf.zip`);
             const datfile_content = await this.readPivotSource(work_zip, `${sample_name}_datfile.txt`, `${sample_name}_datfile.txt`);
-            const bru_content = await this.readPivotSource(work_zip, `${sample_name}.bru`, `${sample_name}.bru`);
+            const bru_blocks_by_frame = await this.readPivotBru(work_zip, sample_name);
             const header_content = await this.readPivotSource(meta_conf_zip, "meta/uvp5_header_sn*.txt", undefined, /^meta\/uvp5_header_sn.*\.txt$/);
             const files = convertUvp5ToPivot({
                 sample,
                 instrument_model,
                 datfile_content,
-                bru_content,
+                bru_blocks_by_frame,
                 header_row: parseUvp5HeaderRow(header_content, sample_name),
                 converted_utc: new Date().toISOString(),
             });
@@ -2304,6 +2261,17 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     private getPivotZipPath(project_id: number, sample_name: string): string {
         return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, "pivot", `${sample_name}_Particule.zip`);
+    }
+
+    // The .bru is read line by line: it grows with the particles of the sample.
+    private async readPivotBru(work_zip: string, sample_name: string): Promise<BruBlocksByFrame> {
+        const by_frame: BruBlocksByFrame = new Map();
+        try {
+            for await (const line of this.readZipEntryLines(work_zip, `${sample_name}.bru`)) addBruLine(by_frame, line);
+        } catch (error) {
+            throw new Error(`cannot read ${sample_name}.bru in ${path.basename(work_zip)} (${(error as Error).message}). Check that the file is in the sample folder of the project, then relaunch the import or the pivot regeneration.`);
+        }
+        return by_frame;
     }
 
     private async readPivotSource(zipPath: string, description: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
@@ -2412,9 +2380,9 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         let spectraByFrame = new Map<number, Record<number, number>>();
         try {
-            const bruContent = await this.readWorkSourceFile(root_abs, sample_name, `${sample_name}.bru`, bruPattern);
-            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+            for await (const line of this.readWorkSourceLines(root_abs, sample_name, `${sample_name}.bru`, bruPattern)) this.addBruSpectrumLine(spectraByFrame, line);
         } catch {
+            spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
         return frames.map((f, i) => ({
@@ -2435,6 +2403,20 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Read one file from the UVP5 source work entry, whatever its on-disk form.
+    // Same sources as readWorkSourceFile, line by line, for the files that grow with the sample.
+    private async *readWorkSourceLines(root_abs: string, sample_name: string, file_base_name: string, pattern: RegExp): AsyncGenerator<string> {
+        const workTarZst = path.join(root_abs, "work", `${sample_name}.tar.zst`);
+        const workZip = path.join(root_abs, "work", `${sample_name}.zip`);
+        if (await this.pathExists(workTarZst)) {
+            yield* readUvpTextLines((await this.openTarZstEntry(workTarZst, undefined, pattern)).stream);
+        } else if (await this.pathExists(workZip)) {
+            yield* this.readZipEntryLines(workZip, undefined, pattern);
+        } else {
+            // Plain folder: files sit directly under work/<sample>/.
+            yield* readUvpTextLines(fs.createReadStream(path.join(root_abs, "work", sample_name, file_base_name)));
+        }
+    }
+
     private async readWorkSourceFile(root_abs: string, sample_name: string, file_base_name: string, pattern: RegExp): Promise<string> {
         const workTarZst = path.join(root_abs, "work", `${sample_name}.tar.zst`);
         const workZip = path.join(root_abs, "work", `${sample_name}.zip`);
@@ -2495,18 +2477,22 @@ export class SampleRepositoryImpl implements SampleRepository {
         while (start < len) {
             let end = content.indexOf("\n", start);
             if (end === -1) end = len;
-            const line = content.slice(start, end);
+            this.addBruSpectrumLine(byFrame, content.slice(start, end));
             start = end + 1;
-            const cols = line.split(";");
-            if (cols.length < 3) continue;
-            const frame_idx = parseInt(cols[0], 10);
-            const area_px = parseInt(cols[2], 10);
-            if (isNaN(frame_idx) || isNaN(area_px)) continue;
-            let spectrum = byFrame.get(frame_idx);
-            if (!spectrum) { spectrum = {}; byFrame.set(frame_idx, spectrum); }
-            spectrum[area_px] = (spectrum[area_px] ?? 0) + 1;
         }
         return byFrame;
+    }
+
+    // Counts one .bru particle in the spectrum of its frame; a row that is not a particle is ignored.
+    private addBruSpectrumLine(byFrame: Map<number, Record<number, number>>, line: string): void {
+        const cols = line.split(";");
+        if (cols.length < 3) return;
+        const frame_idx = parseInt(cols[0], 10);
+        const area_px = parseInt(cols[2], 10);
+        if (isNaN(frame_idx) || isNaN(area_px)) return;
+        let spectrum = byFrame.get(frame_idx);
+        if (!spectrum) { spectrum = {}; byFrame.set(frame_idx, spectrum); }
+        spectrum[area_px] = (spectrum[area_px] ?? 0) + 1;
     }
 
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string {
