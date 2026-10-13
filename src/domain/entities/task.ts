@@ -10,7 +10,7 @@ export enum TasksStatus {
 }
 
 export enum TaskType {
-    // Reserved for the binned export, not triggered yet.
+    // The binned export (POST /exports/binned).
     Export = "EXPORT",
     Import = "IMPORT",
     Import_Backup = "IMPORT_BACKUP",

@@ -5,12 +5,14 @@ import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareExportValidation } from '../middleware/export-validation'
 
 import { ExportRawDataUseCase } from '../../domain/interfaces/use-cases/export/export-raw-data'
+import { ExportBinnedDataUseCase } from '../../domain/interfaces/use-cases/export/export-binned-data'
 import { CustomRequest } from '../../domain/entities/auth'
 
 export default function ExportRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareExportValidation: IMiddlewareExportValidation,
     exportRawDataUseCase: ExportRawDataUseCase,
+    exportBinnedDataUseCase: ExportBinnedDataUseCase,
 ) {
     const router = express.Router()
 
@@ -167,6 +169,130 @@ export default function ExportRouter(
             else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export raw data"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /exports/binned:
+     *   post:
+     *     summary: Export binned particle data for a list of samples (possibly across multiple projects)
+     *     description: |
+     *       Creates an asynchronous task that computes, for each sample, the particle size spectra per depth or
+     *       time bin, and bundles them into a single ZIP. First version: particles only (no plankton table, no CTD).
+     *
+     *       ### Pipeline
+     *       1. **Authorization** — the caller must be usable. For every distinct project of the requested samples,
+     *          an admin or a member or manager of the project may always export; any other registered user only
+     *          when the project's privacy is `public` or `open` (privacy × role matrix of the specification).
+     *       2. **Resolution** — all `sample_ids` must resolve; any unknown id aborts the export (`404`).
+     *       3. **Visual QC gate** — same rule as `/exports/raw`: every sample must be `VALIDATED`, unless
+     *          `skip_not_validated=true` drops the others (listed in the task log).
+     *       4. **Checks** — every sample must come from a UVP5 or UVP6 project, carry its calibration (`aa`, `exp`,
+     *          image volume) and, for a UVP5, have its UVP6-format pivot; all the faulty samples are named at once
+     *          (`409`).
+     *       5. **Task** — an `EXPORT` task is created and returned immediately, not tied to a `task_project_id`.
+     *       6. **Background build** — the bins are computed on the fly from each sample's UVP6-format particle file
+     *          (the pivot built at import for a UVP5, the imported `particules.csv` for a UVP6), sample by sample.
+     *
+     *       ### Bins
+     *       - `bin_mode`: `auto` (default) bins depth profiles by depth and time series by time; `depth` or `time`
+     *         forces one axis for every sample.
+     *       - Depth bins are uniform slices of `bin_size_m` metres from 0 m; time bins uniform slices of `bin_size_h`
+     *         hours from the UTC hour of the first image used.
+     *       - Images used: operator window, then the project's descent filter on depth profiles, lit images only —
+     *         exactly the images the import QC graphs show as selected.
+     *       - Every bin between the first and the last image used is written, an empty one with a zero volume.
+     *
+     *       ### Archive contents
+     *       - `metadata/projects.tsv`, `metadata/samples.tsv` — identical to the raw export's.
+     *       - `particles.tsv` — one row per bin: 8 context columns, a pixel block (`count_1px`, `count_2px` and the
+     *         number of black images `nb_black_images`), then one block per quantity (`count_`, `concentration_`,
+     *         `biovolume_`, `intensity_`, `qcflag_`) with one column per size class, named by its bounds in µm
+     *         (`concentration_50p8um_64um`). Only the classes visible on
+     *         at least one exported sample get columns. `NA` marks a value that does not exist (a class the sample
+     *         cannot see, a bin without imaged volume, a mean grey without particle); `0` is a counted zero.
+     *       - `README.md` — every column, the conventions and the computation, generated from the writer's constants.
+     *
+     *       The ZIP is downloadable at `/api/tasks/{task_id}/file` once the task reaches the `DONE` status.
+     *     tags: [Exports]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [sample_ids]
+     *             properties:
+     *               sample_ids:
+     *                 type: array
+     *                 minItems: 1
+     *                 items: { type: integer, minimum: 1 }
+     *                 description: Ids of the samples to export. May belong to several projects.
+     *               bin_mode:
+     *                 type: string
+     *                 enum: [auto, depth, time]
+     *                 default: auto
+     *                 description: Axis of the bins. `auto` follows each sample's type (depth profile or time series).
+     *               bin_size_m:
+     *                 type: number
+     *                 minimum: 1
+     *                 maximum: 100
+     *                 default: 5
+     *                 description: Thickness of the depth bins, in metres.
+     *               bin_size_h:
+     *                 type: number
+     *                 minimum: 0.5
+     *                 maximum: 24
+     *                 default: 1
+     *                 description: Duration of the time bins, in hours.
+     *               skip_not_validated:
+     *                 type: boolean
+     *                 default: false
+     *                 description: >
+     *                   Opt-out of the all-or-nothing visual-QC gate, as for `/exports/raw`. 409 is still returned
+     *                   when no validated sample remains.
+     *     responses:
+     *       200:
+     *         description: Task created. Poll the task and download the file once done.
+     *       401:
+     *         description: User not allowed to export from one of the projects the requested samples belong to.
+     *       403:
+     *         description: User cannot be used.
+     *       404:
+     *         description: Sample or project not found — no sample resolved, or some requested ids do not exist.
+     *       409:
+     *         description: >
+     *           A sample is not VALIDATED, comes from an instrument the binned export does not support, lacks its
+     *           calibration, or (UVP5) has no pivot yet. The message names every sample at fault.
+     *       422:
+     *         description: Validation error.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.post('/binned', middlewareAuth.auth, middlewareExportValidation.rulesExportBinnedData, async (req: Request, res: Response) => {
+        try {
+            const task = await exportBinnedDataUseCase.execute((req as CustomRequest).token, {
+                sample_ids: req.body.sample_ids,
+                bin_mode: req.body.bin_mode,
+                bin_size_m: req.body.bin_size_m,
+                bin_size_h: req.body.bin_size_h,
+                skip_not_validated: req.body.skip_not_validated,
+            });
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            const msg: string = err?.message || "";
+            if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
+            else if (msg.startsWith("Logged user cannot export binned data")) res.status(401).send({ errors: [msg] })
+            else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
+            else if (msg.startsWith("Sample(s) not validated") || msg.startsWith("Sample(s) without calibration") || msg.startsWith("Sample(s) without pivot") || msg.startsWith("Instrument not supported by the binned export")) res.status(409).send({ errors: [msg] })
+            else if (msg.startsWith("sample_ids must") || msg.startsWith("bin_mode must") || msg.startsWith("bin_size_m must") || msg.startsWith("bin_size_h must")) res.status(422).send({ errors: [msg] })
+            else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
+            else res.status(500).send({ errors: ["Cannot export binned data"] })
         }
     })
 

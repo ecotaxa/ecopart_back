@@ -4,7 +4,7 @@
 
 import { RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
 
-const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
+export const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     // [column, description, origine]
     // The `origine` column tells you where the value actually comes from. For most project
     // fields the source is the EcoPart project-creation form (filled in once by the user),
@@ -36,7 +36,7 @@ const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["project_enable_descent_filter", "Whether data collected during ascending portions is removed. Useful in regular profiles when the instrument is supposed to be descending regularly but is sometimes going back up because of waves/swell and these portions need to be removed to avoid sampling disturbed water.", "EcoPart project-creation form."],
     ["project_creation_utc_date_time", "ISO UTC timestamp of project creation in EcoPart.", "EcoPart DB (auto at row insert)."],
     ["project_export_utc_date_time", "ISO UTC timestamp of the export event. Same value on every row of the file.", "Captured once at export-task start."],
-    ["project_privacy", "Current level of privacy of the project: `private`, `visible`, `public`, or `open`. `private`: only users explicitly added to the project know it exists. `visible`: all users see the project but cannot download it. `public`: particle data can be downloaded. `open`: classifications from EcoTaxa can be downloaded. Informational only — not enforced server-side today.", "Derived at export time from `project_creation_utc_date_time` + the three delays below."],
+    ["project_privacy", "Current level of privacy of the project: `private`, `visible`, `public`, or `open`. `private`: only users explicitly added to the project know it exists. `visible`: all users see the project but cannot download it. `public`: particle data can be downloaded. `open`: classifications from EcoTaxa can be downloaded. Enforced by the binned export: a registered user who is not a member of the project can export its particle data only when it is `public` or `open`. The raw-data export does not use it: it stays restricted to the project's members and to admins.", "Derived at export time from `project_creation_utc_date_time` + the three delays below."],
     ["project_privacy_delay", "Time delay in months since the creation of the project before switching it from `private` to `visible`.", "EcoPart project-creation form."],
     ["project_general_download_delay", "Same delay (months) for switching from `visible` to `public`.", "EcoPart project-creation form."],
     ["project_ecotaxa_classification_download_delay", "Same delay (months) for switching from `public` to `open`.", "EcoPart project-creation form."],
@@ -44,7 +44,7 @@ const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["project_members", "Names and emails of EcoPart project's members (people allowed to view and export the project's data). Same format as `project_managers`.", "EcoPart `privilege` table joined with `user`."],
 ];
 
-const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
+export const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     // [column, description, origine]
     // The `origine` column gives the per-instrument source. Format: "UVP5: <source>. UVP6: <source>."
     // — or a single line for fields that don't depend on the instrument.
@@ -117,7 +117,7 @@ const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["number_of_black", "Number of black (lights-off) images at import — noise reference.", "UVP6: counted at import from rows in `particules.csv` where the light flag is `0:1`. UVP5: always `0` by design (UVP5 doesn't acquire black frames)."],
 ];
 
-function formatTable(rows: Array<[string, string, string]>): string {
+export function formatTable(rows: Array<[string, string, string]>): string {
     const lines = ["| column | description | origine |", "|---|---|---|"];
     const escape = (s: string) => s.replace(/\|/g, "\\|");
     for (const [name, desc, origine] of rows) {

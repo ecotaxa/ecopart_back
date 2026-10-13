@@ -10,6 +10,7 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
 
 import { ExportRawDataUseCase } from "../../../src/domain/interfaces/use-cases/export/export-raw-data";
+import { ExportBinnedDataUseCase } from "../../../src/domain/interfaces/use-cases/export/export-binned-data";
 import { TaskResponseModel } from "../../../src/domain/entities/task";
 import { TaskResponseModel_1 } from "../../entities/task";
 
@@ -24,6 +25,12 @@ class MockMiddlewareAuth implements MiddlewareAuth {
 }
 
 class MockExportRawDataUseCase implements ExportRawDataUseCase {
+    execute(): Promise<TaskResponseModel> {
+        throw new Error("Method not implemented for execute");
+    }
+}
+
+class MockExportBinnedDataUseCase implements ExportBinnedDataUseCase {
     execute(): Promise<TaskResponseModel> {
         throw new Error("Method not implemented for execute");
     }
@@ -45,7 +52,7 @@ describe("ExportRouter — POST /exports/raw", () => {
         server = express();
         server.use(express.json());
         exportRawDataUseCase = new MockExportRawDataUseCase();
-        server.use("/exports", ExportRouter(new MockMiddlewareAuth(), validation, exportRawDataUseCase));
+        server.use("/exports", ExportRouter(new MockMiddlewareAuth(), validation, exportRawDataUseCase, new MockExportBinnedDataUseCase()));
     });
 
     beforeEach(() => {
@@ -169,6 +176,118 @@ describe("ExportRouter — POST /exports/raw", () => {
 
             expect(response.status).toBe(200);
             expect(exportRawDataUseCase.execute).toBeCalledTimes(1);
+        });
+    });
+});
+
+describe("ExportRouter — POST /exports/binned", () => {
+    let server: express.Express;
+    let exportBinnedDataUseCase: ExportBinnedDataUseCase;
+
+    const valid_body = { sample_ids: [1, 2] };
+
+    beforeAll(() => {
+        server = express();
+        server.use(express.json());
+        exportBinnedDataUseCase = new MockExportBinnedDataUseCase();
+        server.use("/exports", ExportRouter(new MockMiddlewareAuth(), validation, new MockExportRawDataUseCase(), exportBinnedDataUseCase));
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test("returns 200 with the created task and forwards the binning options", async () => {
+        jest.spyOn(exportBinnedDataUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+
+        const response = await request(server)
+            .post("/exports/binned")
+            .send({ sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toStrictEqual(JSON.parse(JSON.stringify(TaskResponseModel_1)));
+        expect(exportBinnedDataUseCase.execute).toBeCalledWith(
+            expect.objectContaining({ user_id: 1 }),
+            { sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true },
+        );
+    });
+
+    test("the string \"false\" does not turn skip_not_validated on", async () => {
+        jest.spyOn(exportBinnedDataUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+
+        const response = await request(server).post("/exports/binned").send({ sample_ids: [1], skip_not_validated: "false" });
+
+        expect(response.status).toBe(200);
+        expect(exportBinnedDataUseCase.execute).toBeCalledWith(expect.anything(), expect.objectContaining({ skip_not_validated: false }));
+    });
+
+    test("only sample_ids is required", async () => {
+        jest.spyOn(exportBinnedDataUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+
+        const response = await request(server).post("/exports/binned").send(valid_body);
+
+        expect(response.status).toBe(200);
+        expect(exportBinnedDataUseCase.execute).toBeCalledTimes(1);
+    });
+
+    describe("domain errors are mapped to status codes", () => {
+        // Must stay in sync with the messages thrown in export-binned-data.ts.
+        const cases: Array<[string, number]> = [
+            ["User cannot be used", 403],
+            ["Logged user cannot export binned data from project 3", 401],
+            ["No samples found", 404],
+            ["Sample(s) not found: 42", 404],
+            ["Cannot find project", 404],
+            ["Cannot find task", 404],
+            ["Sample(s) not validated: omer2_1", 409],
+            ["Sample(s) without calibration: omer2_1 (aa)", 409],
+            ["Sample(s) without pivot: s1c1. Run the pivot regeneration of their project.", 409],
+            ["Instrument not supported by the binned export: lisst_1 (LISST)", 409],
+            ["bin_size_m must be between 1 and 100", 422],
+            ["Cannot create log file", 500],
+        ];
+
+        test.each(cases)("'%s' → %i", async (message, status) => {
+            jest.spyOn(exportBinnedDataUseCase, "execute").mockImplementation(() => { throw new Error(message) });
+
+            const response = await request(server).post("/exports/binned").send(valid_body);
+
+            expect(response.status).toBe(status);
+            expect(response.body).toStrictEqual({ errors: [message] });
+        });
+
+        test("an unexpected error is masked behind a generic 500", async () => {
+            jest.spyOn(exportBinnedDataUseCase, "execute").mockImplementation(() => { throw new Error("SQLITE_BUSY: database is locked") });
+
+            const response = await request(server).post("/exports/binned").send(valid_body);
+
+            expect(response.status).toBe(500);
+            expect(response.body).toStrictEqual({ errors: ["Cannot export binned data"] });
+        });
+    });
+
+    describe("request validation (422, use case never called)", () => {
+        const invalid_bodies: Array<[string, Record<string, unknown>]> = [
+            ["sample_ids missing", {}],
+            ["sample_ids empty", { sample_ids: [] }],
+            ["sample_ids not integers", { sample_ids: ["abc"] }],
+            ["bin_mode unknown", { sample_ids: [1], bin_mode: "pressure" }],
+            ["bin_size_m below 1 m", { sample_ids: [1], bin_size_m: 0.5 }],
+            ["bin_size_m above 100 m", { sample_ids: [1], bin_size_m: 250 }],
+            ["bin_size_m not a number", { sample_ids: [1], bin_size_m: "five" }],
+            ["bin_size_h below 0.5 h", { sample_ids: [1], bin_size_h: 0.25 }],
+            ["bin_size_h above 24 h", { sample_ids: [1], bin_size_h: 48 }],
+            ["skip_not_validated not a boolean", { sample_ids: [1], skip_not_validated: "oui" }],
+        ];
+
+        test.each(invalid_bodies)("%s", async (_label, body) => {
+            jest.spyOn(exportBinnedDataUseCase, "execute");
+
+            const response = await request(server).post("/exports/binned").send(body);
+
+            expect(response.status).toBe(422);
+            expect(response.body.errors.length).toBeGreaterThan(0);
+            expect(exportBinnedDataUseCase.execute).toBeCalledTimes(0);
         });
     });
 });

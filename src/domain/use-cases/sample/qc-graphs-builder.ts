@@ -72,6 +72,14 @@ export function buildImageFilteringMetadata(input: QcGraphInput): ImageFiltering
     return buildImageFiltering(first, last, selectImages(input, first, last, depthConverter(input)));
 }
 
+// Per record, whether the sample uses it: the selection of graphs 2 and 3, for the computed
+// products (the binned export) to count exactly the images the QC graphs show as selected.
+export function selectUsedImages(input: QcGraphInput): boolean[] {
+    const first = normalizeBound(input.filter_first_image);
+    const last = normalizeBound(input.filter_last_image);
+    return selectImages(input, first, last, depthConverter(input)).selected;
+}
+
 export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponseModel {
     const image_volume_l = input.instrument_settings_image_volume_l ?? 0;
     const toDepth = depthConverter(input);

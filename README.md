@@ -47,6 +47,9 @@ Each tag push publishes the image under **two** Docker Hub tags:
 | `ecopart_back:vXX.XX.XX` | Immutable. The exact build for that git tag — never overwritten. |
 | `ecopart_back:latest` | Moving. Always the most recently published version; the test server tracks it. |
 
+Docker Hub also holds `ecopart_back:buildcache`: the build's layer cache, reused by the next tag
+build. It is not a runnable image; never deploy it.
+
 Once the image is published, the same workflow (`.github/workflows/public.yml`) automatically
 **redeploys the test server** (see "Automatic deployment to the test server" below).
 

@@ -3405,6 +3405,96 @@
         }
       }
     },
+    "/exports/binned": {
+      "post": {
+        "summary": "Export binned particle data for a list of samples (possibly across multiple projects)",
+        "description": "Creates an asynchronous task that computes, for each sample, the particle size spectra per depth or\ntime bin, and bundles them into a single ZIP. First version: particles only (no plankton table, no CTD).\n\n### Pipeline\n1. **Authorization** — the caller must be usable. For every distinct project of the requested samples,\n   an admin or a member or manager of the project may always export; any other registered user only\n   when the project's privacy is `public` or `open` (privacy × role matrix of the specification).\n2. **Resolution** — all `sample_ids` must resolve; any unknown id aborts the export (`404`).\n3. **Visual QC gate** — same rule as `/exports/raw`: every sample must be `VALIDATED`, unless\n   `skip_not_validated=true` drops the others (listed in the task log).\n4. **Checks** — every sample must come from a UVP5 or UVP6 project, carry its calibration (`aa`, `exp`,\n   image volume) and, for a UVP5, have its UVP6-format pivot; all the faulty samples are named at once\n   (`409`).\n5. **Task** — an `EXPORT` task is created and returned immediately, not tied to a `task_project_id`.\n6. **Background build** — the bins are computed on the fly from each sample's UVP6-format particle file\n   (the pivot built at import for a UVP5, the imported `particules.csv` for a UVP6), sample by sample.\n\n### Bins\n- `bin_mode`: `auto` (default) bins depth profiles by depth and time series by time; `depth` or `time`\n  forces one axis for every sample.\n- Depth bins are uniform slices of `bin_size_m` metres from 0 m; time bins uniform slices of `bin_size_h`\n  hours from the UTC hour of the first image used.\n- Images used: operator window, then the project's descent filter on depth profiles, lit images only —\n  exactly the images the import QC graphs show as selected.\n- Every bin between the first and the last image used is written, an empty one with a zero volume.\n\n### Archive contents\n- `metadata/projects.tsv`, `metadata/samples.tsv` — identical to the raw export's.\n- `particles.tsv` — one row per bin: 8 context columns, a pixel block (`count_1px`, `count_2px` and the\n  number of black images `nb_black_images`), then one block per quantity (`count_`, `concentration_`,\n  `biovolume_`, `intensity_`, `qcflag_`) with one column per size class, named by its bounds in µm\n  (`concentration_50p8um_64um`). Only the classes visible on\n  at least one exported sample get columns. `NA` marks a value that does not exist (a class the sample\n  cannot see, a bin without imaged volume, a mean grey without particle); `0` is a counted zero.\n- `README.md` — every column, the conventions and the computation, generated from the writer's constants.\n\nThe ZIP is downloadable at `/api/tasks/{task_id}/file` once the task reaches the `DONE` status.\n",
+        "tags": [
+          "Exports"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sample_ids"
+                ],
+                "properties": {
+                  "sample_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "description": "Ids of the samples to export. May belong to several projects."
+                  },
+                  "bin_mode": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "depth",
+                      "time"
+                    ],
+                    "default": "auto",
+                    "description": "Axis of the bins. `auto` follows each sample's type (depth profile or time series)."
+                  },
+                  "bin_size_m": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 5,
+                    "description": "Thickness of the depth bins, in metres."
+                  },
+                  "bin_size_h": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 24,
+                    "default": 1,
+                    "description": "Duration of the time bins, in hours."
+                  },
+                  "skip_not_validated": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Opt-out of the all-or-nothing visual-QC gate, as for `/exports/raw`. 409 is still returned when no validated sample remains.\n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task created. Poll the task and download the file once done."
+          },
+          "401": {
+            "description": "User not allowed to export from one of the projects the requested samples belong to."
+          },
+          "403": {
+            "description": "User cannot be used."
+          },
+          "404": {
+            "description": "Sample or project not found — no sample resolved, or some requested ids do not exist."
+          },
+          "409": {
+            "description": "A sample is not VALIDATED, comes from an instrument the binned export does not support, lacks its calibration, or (UVP5) has no pivot yet. The message names every sample at fault.\n"
+          },
+          "422": {
+            "description": "Validation error."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
     "/file_system/import_folders": {
       "get": {
         "summary": "List import folders",
