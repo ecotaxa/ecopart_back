@@ -67,6 +67,7 @@ import { RegeneratePivots } from '../../src/domain/use-cases/sample/regenerate-p
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from '../../src/domain/use-cases/export/export-raw-data'
+import { ExportBinnedData } from '../../src/domain/use-cases/export/export-binned-data'
 import { ListImportableSamples } from '../../src/domain/use-cases/sample/list-importable-samples'
 import { ImportSamples } from '../../src/domain/use-cases/sample/import-samples'
 import { DeleteSample } from '../../src/domain/use-cases/sample/delete-sample'
@@ -336,6 +337,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
             new MiddlewareExportValidation(),
             new ExportRawData(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo, ecotaxaAccountRepo, instrumentModelRepo, relTmpDir, "http://localhost:0"),
+            new ExportBinnedData(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo, ecotaxaAccountRepo, instrumentModelRepo, relTmpDir, "http://localhost:0"),
         )
 
         server.use("/users", userMiddleware)

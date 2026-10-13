@@ -14,6 +14,7 @@ import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
+import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
 import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
 
 
@@ -76,15 +77,25 @@ export class SampleRepositoryImpl implements SampleRepository {
 
                 zipfile.on('entry', (entry) => {
                     if ((targetFileName && entry.fileName === targetFileName) || (filePathPattern && filePathPattern.test(entry.fileName))) {
+                        // Reading stops at this entry, so the archive never reaches its 'end' event and
+                        // yauzl's autoClose never fires: it is closed here, or its descriptor leaks.
                         zipfile.openReadStream(entry, (err, readStream) => {
                             if (err || !readStream) {
+                                zipfile.close();
                                 return reject(err || new Error('Failed to open read stream'));
                             }
 
                             // Decode once at the end: a multi-byte character can straddle two chunks.
                             const chunks: Buffer[] = [];
                             readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
-                            readStream.on('end', () => resolve(decodeUvpText(Buffer.concat(chunks))));
+                            readStream.on('error', (stream_error) => {
+                                zipfile.close();
+                                reject(stream_error);
+                            });
+                            readStream.on('end', () => {
+                                zipfile.close();
+                                resolve(decodeUvpText(Buffer.concat(chunks)));
+                            });
                         });
                     } else {
                         zipfile.readEntry();
@@ -2104,7 +2115,13 @@ export class SampleRepositoryImpl implements SampleRepository {
     // class), the objects of that area, and the mean and std of the grey of their pixels. Block 0's
     // area_px is glued to the flag (so its count is field 0), later blocks carry their own area_px.
     parseParticulesCsvRecords(content: string): PerImageRecord[] {
-        const records: PerImageRecord[] = [];
+        return this.parsePivotParticulesCsv(content).map(({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }) =>
+            ({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }));
+    }
+
+    // Same grammar, keeping each block with its mean grey: what the binned export needs.
+    parsePivotParticulesCsv(content: string): PivotImageRecord[] {
+        const records: PivotImageRecord[] = [];
         let image_index = 0;
         for (const line of content.split(/\r\n|\n|\r/)) {
             // Data rows start with YYYYMMDD; HW_CONF / ACQ_CONF headers don't.
@@ -2118,24 +2135,42 @@ export class SampleRepositoryImpl implements SampleRepository {
             const light_on = flag[0] === "1";
             const first_class = parseInt(flag[1], 10);
             const spectrum_counts: Record<number, number> = {};
+            const blocks: PivotParticleBlock[] = [];
+            const addBlock = (area_px: number, nb_particles: number, grey: string | undefined) => {
+                if (isNaN(area_px) || isNaN(nb_particles)) return;
+                spectrum_counts[area_px] = nb_particles;
+                const grey_mean = parseFloat(grey ?? "");
+                blocks.push({ area_px, nb_particles, grey_mean: isNaN(grey_mean) ? null : grey_mean });
+            };
             // Spectrum blocks live after the flag; commas inside, ';' between blocks.
-            const blocks = parts.slice(4).join(",").split(";");
-            blocks.forEach((block, i) => {
+            parts.slice(4).join(",").split(";").forEach((block, i) => {
                 const v = block.split(",");
-                if (i === 0) {
-                    const cnt = parseInt(v[0], 10);
-                    if (!isNaN(first_class) && !isNaN(cnt)) spectrum_counts[first_class] = cnt;
-                } else {
-                    const cls = parseInt(v[0], 10);
-                    const cnt = parseInt(v[1], 10);
-                    if (!isNaN(cls) && !isNaN(cnt)) spectrum_counts[cls] = cnt;
-                }
+                if (i === 0) addBlock(first_class, parseInt(v[0], 10), v[1]);
+                else addBlock(parseInt(v[0], 10), parseInt(v[1], 10), v[2]);
             });
             const image_id = parts[0].trim();
             const particle_data_flag = PARTICLE_DATA_FLAGS.find((f) => line.slice(line.indexOf(":") + 1).includes(f));
-            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts, particle_data_flag });
+            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts, particle_data_flag, blocks });
         }
         return records;
+    }
+
+    // The UVP6-format particle file every computed product reads: the pivot built at import for a
+    // UVP5 sample, the imported `_Particule.zip` for a UVP6. Pressures are in decibar in both.
+    async getPivotImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImageRecord[]> {
+        let zip_path: string;
+        if (instrument_model.startsWith("UVP5")) {
+            zip_path = this.getPivotZipPath(project_id, sample_name);
+        } else if (instrument_model.startsWith("UVP6")) {
+            zip_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}_Particule.zip`);
+        } else {
+            throw new Error("Unknown instrument model");
+        }
+        try {
+            return this.parsePivotParticulesCsv(await this.readFileFromZip(zip_path, "particules.csv", undefined));
+        } catch (error) {
+            throw new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+        }
     }
 
     private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
