@@ -209,6 +209,7 @@ describe("ExportRawData — produced archive", () => {
             expect(outcome).toEqual({ outcome: "failed", detail: cancelled });
             expect(fs.existsSync(zip_path())).toBe(false);
             expect(fs.existsSync(path.join(path.dirname(zip_path()), "raw_export"))).toBe(false);
+            expect(log_messages).toContain("Cleanup after cancellation : removed the working folder raw_export/ of the task folder");
         });
     });
 
@@ -459,6 +460,7 @@ describe("ExportRawData — produced archive", () => {
             expect(outcome.outcome).toBe("failed");
             expect((outcome.detail as Error).message).toBe("EcoTaxa is down");
             expect(log_messages.some(m => m.includes("EcoTaxa: export failed for project 1: EcoTaxa is down"))).toBe(true);
+            expect(log_messages).toContain("Cleanup after failure : removed the working folder raw_export/ of the task folder");
             expect(fs.existsSync(zip_path())).toBe(false);
         });
     });

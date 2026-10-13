@@ -20,6 +20,7 @@ import { buildImageFilteringMetadata } from "../sample/qc-graphs-builder";
 import { ImageFilteringMetadata } from "../../entities/sample-qc-graph";
 import { computeProjectPrivacy } from "./project-privacy";
 import { renderReadme } from "./readme";
+import { cleanupLogPrefix } from "../../utils/task-cleanup";
 import { MinimalUserModel } from "../../entities/user";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
@@ -333,7 +334,7 @@ export class ExportRawData implements ExportRawDataUseCase {
             await this.taskRepository.logMessage(task.task_log_file_path, `Download link: ${download_link}`);
             await this.taskRepository.finishTask({ task_id }, download_link);
         } catch (error) {
-            if (work_folder_created) await this.removeWorkFolder(task, work_folder);
+            if (work_folder_created) await this.removeWorkFolder(task, work_folder, error);
             await this.taskRepository.failedTask(task_id, error as Error);
         }
     }
@@ -342,15 +343,18 @@ export class ExportRawData implements ExportRawDataUseCase {
     // it is named after the task, and it holds nothing but copies. The archive needs no cleaning
     // because zipFolder writes to a temporary file and renames only on success. The task folder itself
     // is kept, it holds the log failedTask is about to write to.
-    private async removeWorkFolder(task: TaskResponseModel, work_folder: string): Promise<void> {
+    private async removeWorkFolder(task: TaskResponseModel, work_folder: string, error: unknown): Promise<void> {
+        const prefix = cleanupLogPrefix(error);
+        const folder_name = `${path.basename(work_folder)}/`;
+        let message: string;
         try {
             await fsPromises.rm(work_folder, { recursive: true, force: true });
+            message = `removed the working folder ${folder_name} of the task folder`;
         } catch (cleanup_error) {
             // Never mask the original failure: report and move on.
-            await this.taskRepository
-                .logMessage(task.task_log_file_path, `Cleanup after failure left files behind: ${(cleanup_error as Error).message}`)
-                .catch(() => undefined);
+            message = `removal of the working folder ${folder_name} failed, files may remain in the task folder : ${(cleanup_error as Error).message}`;
         }
+        await this.taskRepository.logMessage(task.task_log_file_path, `${prefix} : ${message}`).catch(() => undefined);
     }
 
     private async writeMetadata(

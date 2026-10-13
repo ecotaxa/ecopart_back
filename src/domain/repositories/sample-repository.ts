@@ -1856,18 +1856,29 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    async deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void> {
+    // Returns what was actually removed, described before its removal (path, file count, size).
+    async deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<string[]> {
+        const removed: string[] = [];
         for (const sample of samples_names_to_import) {
             // Construct paths for the .zip file and the folder
             const zipPath = path.join(this.base_folder, dest_folder, `${sample}.zip`);
             const folderPath = path.join(this.base_folder, dest_folder, sample);
 
             // Delete the .zip file
-            await fsPromises.rm(zipPath, { force: true });
+            if (await this.pathExists(zipPath)) {
+                const description = await this.describeImportPath(zipPath).catch(() => this.relativeToBase(zipPath));
+                await fsPromises.rm(zipPath, { force: true });
+                removed.push(description);
+            }
 
             // Delete the folder and its contents recursively
-            await fsPromises.rm(folderPath, { recursive: true, force: true });
+            if (await this.pathExists(folderPath)) {
+                const description = await this.describeImportPath(folderPath).catch(() => this.relativeToBase(folderPath));
+                await fsPromises.rm(folderPath, { recursive: true, force: true });
+                removed.push(description);
+            }
         }
+        return removed;
     }
 
     async getSample(sample: SampleRequestModel): Promise<PublicSampleModel | null> {
