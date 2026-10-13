@@ -205,13 +205,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return data;
     }
 
-    async api_update_ecotaxa_project(base_url: string, token: string, ecotaxa_project: any): Promise<void> {
+    // PATCH /api/projects/{project_id}: EcoTaxa only touches the fields present in the body.
+    // Sending `managers` replaces every manager row and drops the contact flag unless `contact` is sent too.
+    async api_patch_ecotaxa_project(base_url: string, token: string, ecotaxa_project_id: number, ecotaxa_project_patch: any): Promise<void> {
         // returns null uppon success
-        const response = await this.fetchWithAgent(base_url + "api/projects/" + ecotaxa_project.projid, {
-            method: "PUT",
+        const response = await this.fetchWithAgent(base_url + "api/projects/" + ecotaxa_project_id, {
+            method: "PATCH",
             headers: this.JSON_HEADERS(token),
-            body: JSON.stringify(ecotaxa_project),
-            //mode: "cors"
+            body: JSON.stringify(ecotaxa_project_patch),
         });
 
         if (!response.ok) {
@@ -310,10 +311,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     }
     async add_default_values_to_ecotaxa_project(ecotaxa_instance: EcotaxaInstanceModel, ecotaxa_account: EcotaxaAccountResponseModel, ecotaxa_project: any): Promise<void> {
         // add default values to ecotaxa project
-        const ecotaxa_project_with_generic_user = this.addEcotaxaGenericCnnNetworkToProject(ecotaxa_project)
-        const ecotaxa_project_with_cnn = await this.addEcotaxaGenericAccountToProject(ecotaxa_instance, ecotaxa_project_with_generic_user)
+        const ecotaxa_project_with_cnn = this.addEcotaxaGenericCnnNetworkToProject(ecotaxa_project)
+        const ecotaxa_project_with_generic_user = await this.addEcotaxaGenericAccountToProject(ecotaxa_instance, ecotaxa_project_with_cnn)
 
-        await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_with_cnn)
+        await this.api_patch_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project.projid, {
+            cnn_network_id: ecotaxa_project_with_generic_user.cnn_network_id,
+            managers: ecotaxa_project_with_generic_user.managers,
+            contact: ecotaxa_project_with_generic_user.contact,
+        })
     }
     addEcotaxaGenericCnnNetworkToProject(ecotaxa_project: any): any {
         if (ecotaxa_project.cnn_network_id) return ecotaxa_project
@@ -589,7 +594,10 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         // remove the user from the project
         const ecotaxa_project_withour_generic_ecotaxa_user = await this.removeEcotaxaGenericAccountFromProject(ecotaxa_instance, ecotaxa_project)
 
-        await this.api_update_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_withour_generic_ecotaxa_user)
+        await this.api_patch_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, ecotaxa_project_id, {
+            managers: ecotaxa_project_withour_generic_ecotaxa_user.managers,
+            contact: ecotaxa_project_withour_generic_ecotaxa_user.contact,
+        })
     }
 
     // ---- Helper: safe fetch with better errors ---------------------------------
