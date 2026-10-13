@@ -12,6 +12,7 @@ import { ProjectResponseModel } from "../../entities/project";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import path from "path";
 import { describeUvp5PivotReport } from "../../utils/uvp5-pivot-converter";
+import { cleanupLogPrefix } from "../../utils/task-cleanup";
 
 export class ImportSamples implements ImportSamplesUseCase {
     sampleRepository: SampleRepository
@@ -141,7 +142,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
         } catch (error) {
-            await this.deleteSourcesFromProjectFolder(task_id, samples_names_to_import, project);
+            await this.deleteSourcesFromProjectFolder(task, samples_names_to_import, project, error);
             await this.taskRepository.failedTask(task_id, error);
         }
     }
@@ -219,16 +220,20 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/4 sample folders copy : done");
     }
 
-    async deleteSourcesFromProjectFolder(task_id: number, samples_names_to_import: string[], project: ProjectResponseModel) {
-        // Delete sources files from project folder
+    // Removes the copies made at step 2/4. Never throws: a failing removal is logged with what may be
+    // left behind, and the task still reaches its final status.
+    async deleteSourcesFromProjectFolder(task: TaskResponseModel, samples_names_to_import: string[], project: ProjectResponseModel, error: unknown) {
+        const prefix = cleanupLogPrefix(error);
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, `${prefix} : ${message}`).catch(() => undefined);
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
-        await this.sampleRepository.deleteSamplesFromImportFolder(dest_folder, samples_names_to_import);
-        // Log the action
-        const task_file_path = await this.taskRepository.getTask({ task_id });
-        if (!task_file_path) {
-            throw new Error("Cannot find task");
+
+        await log(`removing the copies of ${samples_names_to_import.length} sample(s) from ${dest_folder} : ${samples_names_to_import.join(", ")}`);
+        try {
+            const removed = await this.sampleRepository.deleteSamplesFromImportFolder(dest_folder, samples_names_to_import);
+            await log(removed.length > 0 ? `removed ${removed.join(", ")}` : "nothing removed, no copy found");
+        } catch (cleanup_error) {
+            await log(`removal failed, copies may remain in ${dest_folder} : ${(cleanup_error as Error).message}`);
         }
-        await this.taskRepository.logMessage(task_file_path.task_log_file_path, "Samples import failed, sources files deleted for samples: " + samples_names_to_import.join(", "));
     }
 
     // A UVP5 sample is created only once its UVP6 pivot exists: every computed product reads the

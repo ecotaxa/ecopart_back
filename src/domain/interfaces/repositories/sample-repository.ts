@@ -16,7 +16,7 @@ export interface SampleRepository {
     explainNotImportableSamples(root_folder_path: string, dest_folder: string, project_id: number, samples_names: string[]): Promise<Map<string, string>>;
     UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
     UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
-    deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<void>
+    deleteSamplesFromImportFolder(dest_folder: string, samples_names_to_import: string[]): Promise<string[]>
     getSample(sample: SampleRequestModel): Promise<PublicSampleModel | null>;
     deleteSample(sample: SampleIdModel): Promise<number>;
     deleteSampleFromStorage(sample_name: string, project_id: number): Promise<number>;

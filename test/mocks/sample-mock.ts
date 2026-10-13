@@ -30,7 +30,7 @@ export class MockSampleRepository implements SampleRepository {
     UVP5copySamplesToImportFolder(): Promise<void> {
         throw new Error("Method not implemented for UVP5copySamplesToImportFolder");
     }
-    deleteSamplesFromImportFolder(): Promise<void> {
+    deleteSamplesFromImportFolder(): Promise<string[]> {
         throw new Error("Method not implemented for deleteSamplesFromImportFolder");
     }
     getSample(): Promise<PublicSampleModel | null> {
