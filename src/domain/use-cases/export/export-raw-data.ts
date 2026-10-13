@@ -235,7 +235,8 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         // Fire-and-forget — the route returns the task immediately and the frontend polls.
         const export_started_at = new Date();
-        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated);
+        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated)
+            .catch((error) => console.log(new Date().toISOString(), `Raw export task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }

@@ -56,7 +56,10 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
 
         // start the task
-        this.startImportEcoTaxaSamplesTask(task, samples_names_to_import, project.instrument_model, project);
+        // Fire-and-forget: failures are recorded on the task inside; only a failure to record one (task deleted
+        // meanwhile, database unavailable) reaches this catch, which keeps it from stopping the server.
+        this.startImportEcoTaxaSamplesTask(task, samples_names_to_import, project.instrument_model, project)
+            .catch((error) => console.log(new Date().toISOString(), `EcoTaxa import task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }

@@ -45,7 +45,10 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
             throw new Error("Cannot find task");
         }
 
-        this.startRegeneratePivotsTask(task, project, samples, options.force === true);
+        // Fire-and-forget: failures are recorded on the task inside; only a failure to record one (task deleted
+        // meanwhile, database unavailable) reaches this catch, which keeps it from stopping the server.
+        this.startRegeneratePivotsTask(task, project, samples, options.force === true)
+            .catch((error) => console.log(new Date().toISOString(), `Pivot regeneration task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }

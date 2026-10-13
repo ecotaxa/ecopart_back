@@ -11,6 +11,7 @@ import { MiddlewareTaskValidation } from './presentation/middleware/task-validat
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
+import { errorHandler, notFoundHandler } from './presentation/middleware/error-handlers'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -126,6 +127,12 @@ import { MigrationLogger } from './data/migrations/migration-logger'
 
 sqlite3.verbose()
 
+// Background tasks catch their own failures. A rejection nobody handled is logged instead of stopping the
+// server, which would interrupt every task it runs.
+process.on('unhandledRejection', (reason) => {
+    console.log(new Date().toISOString(), 'Unhandled promise rejection:', reason)
+})
+
 const config = {
     DBSOURCE_NAME: process.env.DBSOURCE_NAME || '',
     DBSOURCE_FOLDER: process.env.DBSOURCE_FOLDER || '',
@@ -165,23 +172,28 @@ const config = {
     ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || ''
 
 }
-async function getSQLiteDS() {
-    const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
-        if (err) {
-            // Cannot open database
-            console.error(err.message)
-            throw err
-        } else {
-            console.log('Connected to the SQLite database.')
-        }
-    });
-    // Enable foreign keys in sqlite
-    db.get("PRAGMA foreign_keys = ON")
+async function getSQLiteDS(): Promise<sqlite3.Database> {
+    const db = await new Promise<sqlite3.Database>((resolve, reject) => {
+        const database: sqlite3.Database = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => err ? reject(err) : resolve(database))
+    })
+    console.log('Connected to the SQLite database.')
+
+    // Foreign keys are a per-connection setting: awaited so that no other statement can run before it
+    await new Promise<void>((resolve, reject) => db.run("PRAGMA foreign_keys = ON", (err) => err ? reject(err) : resolve()))
+    // The migration CLI opens its own connection: wait for a lock instead of failing at once with SQLITE_BUSY
+    db.configure("busyTimeout", 5000)
 
     return db
 }
 
 (async () => {
+    // Without these nobody can log in: refuse to start rather than fail on every request
+    const missing_secrets = (['ACCESS_TOKEN_SECRET', 'REFRESH_TOKEN_SECRET'] as const).filter(name => !config[name])
+    if (missing_secrets.length > 0) throw new Error(`Missing required configuration: ${missing_secrets.join(', ')}`)
+    for (const name of ['VALIDATION_TOKEN_SECRET', 'RESET_PASSWORD_TOKEN_SECRET'] as const) {
+        if (!config[name]) console.log(new Date().toISOString(), `${name} is empty: account validation or password reset e-mails will fail`)
+    }
+
     // Ensure required directories exist
     const requiredFolders = [
         config.DATA_STORAGE_FOLDER,
@@ -369,6 +381,14 @@ async function getSQLiteDS() {
     ))
 
 
+    // Registered after every router: unknown routes and uncaught errors get a JSON answer, never an HTML stack trace
+    server.use(notFoundHandler)
+    server.use(errorHandler)
+
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))
 
-})()
+})().catch((error) => {
+    // Configuration, database or migration failure: exit so the container restarts and the failure is visible
+    console.log(new Date().toISOString(), 'Startup failed:', error)
+    process.exit(1)
+})

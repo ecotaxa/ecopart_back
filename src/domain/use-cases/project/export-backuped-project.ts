@@ -49,7 +49,10 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
         }
 
         // start the task
-        this.startExportBackupedProjectTask(task, project, out_to_ftp);
+        // Fire-and-forget: failures are recorded on the task inside; only a failure to record one (task deleted
+        // meanwhile, database unavailable) reaches this catch, which keeps it from stopping the server.
+        this.startExportBackupedProjectTask(task, project, out_to_ftp)
+            .catch((error) => console.log(new Date().toISOString(), `Backup export task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }
