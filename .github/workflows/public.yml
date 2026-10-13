@@ -6,7 +6,36 @@ on:
       - "v*.*.*"
 
 jobs:
+  # A tag deploys to the test server: the same checks as "Tests CI" must pass first, whatever the
+  # branch the tag sits on (tags are sometimes put on feature branches).
+  test:
+    name: Type-check and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create env file
+        run: |
+          echo TEST_ACCESS_TOKEN_SECRET = access_secret >> .env
+          echo TEST_REFRESH_TOKEN_SECRET = refresh_secret >> .env
+
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.test.json
+
+      - name: Run tests
+        run: npm run test-CI
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

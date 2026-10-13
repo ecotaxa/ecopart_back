@@ -19,7 +19,7 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: "Create env file"
         run: |
@@ -32,6 +32,9 @@ jobs:
         run: |
           npm run openapi:generate
           git diff --exit-code openapi.json || (echo "::error::openapi.json is out of date. Run 'npm run openapi:generate' and commit the result." && exit 1)
+
+      - name: Type-check
+        run: npx tsc --noEmit -p tsconfig.test.json
 
       - name: Run tests
         run: npm run test-CI
