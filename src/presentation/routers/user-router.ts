@@ -283,7 +283,7 @@ export default function UsersRouter(
             res.status(201).send({ message: "User sucessfully created." })
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Cannot create user"] })
+            if (err.message === "Valid user already exists") res.status(403).send({ errors: ["Cannot create user"] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot update preexistent user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find updated preexistent user") res.status(404).send({ errors: [err.message] })

@@ -32,7 +32,7 @@ export class DeleteUser implements DeleteUserUseCase {
             if (nb_of_deleted_user == 0) throw new Error("Cannot delete user");
             await this.privilegeRepository.deletePrivileges({ user_id: user_to_update.user_id })
         } else {
-            throw new Error("Logged user cannot delet this user");
+            throw new Error("Logged user cannot delete this user");
         }
 
     }

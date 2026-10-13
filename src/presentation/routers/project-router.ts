@@ -2265,7 +2265,7 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete sample") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this sample") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
@@ -2664,7 +2664,7 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete sample") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this sample") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })

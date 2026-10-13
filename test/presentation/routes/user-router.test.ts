@@ -347,7 +347,7 @@ describe("User Router", () => {
             const expectedResponse = { errors: ["Cannot create user"] }
 
 
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Valid user already exist")))
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Valid user already exists")))
 
             const response = await request(server).post("/users").send(InputData)
 

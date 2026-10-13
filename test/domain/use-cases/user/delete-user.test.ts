@@ -88,7 +88,7 @@ describe("Delete User Use Case", () => {
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
-            expect(err.message).toBe("Logged user cannot delet this user");
+            expect(err.message).toBe("Logged user cannot delete this user");
         }
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
