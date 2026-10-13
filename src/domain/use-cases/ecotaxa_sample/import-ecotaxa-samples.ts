@@ -15,6 +15,7 @@ import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseMo
 
 import path from "path";
 import { PreparedSearchOptions } from "../../entities/search";
+import { cleanupLogPrefix } from "../../utils/task-cleanup";
 
 export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
     sampleRepository: SampleRepository
@@ -129,7 +130,7 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         } catch (error) {
             console.error("Error during EcoTaxa samples import:", error);
             // rollback : delete created ecotaxa samples in db
-            await this.deleteEcoTaxaSamplesFromDb(samples_names_to_import);
+            await this.deleteEcoTaxaSamplesFromDb(task, samples_names_to_import, error);
             await this.taskRepository.failedTask(task_id, error);
             //todo abbort import in ecotaxa?
         }
@@ -180,24 +181,35 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
     }
 
-    async deleteEcoTaxaSamplesFromDb(samples_names_to_import: string[]) {
-        console.log("Deleting EcoTaxa samples from db for : ", samples_names_to_import);
-        // update samples from db to empty ecotaxa related fields
-        const options: PreparedSearchOptions = {
-            filter: [
-                { field: "sample_name", operator: "IN", value: samples_names_to_import },
-                { field: "ecotaxa_sample_imported", operator: "=", value: true }
-            ],
-            sort_by: [],
-            page: 1,
-            limit: 1
+    // Rollback of step 4/5. Never throws: a failing rollback is logged, and the task still reaches its
+    // final status.
+    async deleteEcoTaxaSamplesFromDb(task: TaskResponseModel, samples_names_to_import: string[], error: unknown) {
+        const prefix = cleanupLogPrefix(error);
+        const log = (message: string) => this.taskRepository.logMessage(task.task_log_file_path, `${prefix} : ${message}`).catch(() => undefined);
+
+        await log(`resetting the EcoTaxa import fields in the database for : ${samples_names_to_import.join(", ")}`);
+        try {
+            // update samples from db to empty ecotaxa related fields
+            const options: PreparedSearchOptions = {
+                filter: [
+                    { field: "sample_name", operator: "IN", value: samples_names_to_import },
+                    { field: "ecotaxa_sample_imported", operator: "=", value: true }
+                ],
+                sort_by: [],
+                page: 1,
+                limit: 1
+            }
+            const ecotaxa_samples = await this.sampleRepository.standardGetSamples(options);
+            if (ecotaxa_samples.total === 0) {
+                await log("nothing reset, no sample is marked as imported in EcoTaxa");
+                return;
+            }
+            // delete samples from db
+            await this.sampleRepository.deleteEcoTaxaSamplesFromDb(ecotaxa_samples.items);
+            await log(`EcoTaxa import fields reset for ${ecotaxa_samples.items.map(sample => `${sample.sample_name} (sample_id ${sample.sample_id}, project ${sample.project_id})`).join(", ")}`);
+        } catch (cleanup_error) {
+            await log(`reset failed, samples may remain marked as imported in EcoTaxa : ${(cleanup_error as Error).message}`);
         }
-        const ecotaxa_samples = await this.sampleRepository.standardGetSamples(options);
-        if (ecotaxa_samples.total === 0) {
-            throw new Error("No EcoTaxa samples to delete");
-        }
-        // delete samples from db
-        await this.sampleRepository.deleteEcoTaxaSamplesFromDb(ecotaxa_samples.items);
     }
 
     async importEcoTaxaSamplesInDb(task_id: number, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[]): Promise<number> {

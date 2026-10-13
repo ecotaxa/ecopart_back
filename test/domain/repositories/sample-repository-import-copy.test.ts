@@ -93,4 +93,19 @@ describe("Import copy task log", () => {
             "s3 (3/3) : not copied from project_src/ecodata/s3/ : readme.txt",
         ]);
     });
+
+    test("removing the copies returns what was actually removed, described before the removal", async () => {
+        write("storage/1/s1/s1_Particule.zip", "particules");
+        write("storage/1/s1/s1_Images.zip", "img");
+        write("storage/1/s2.zip", "zipped");
+
+        const removed = await repo.deleteSamplesFromImportFolder("storage/1", ["s1", "s2", "s3"]);
+
+        expect(removed).toEqual([
+            "storage/1/s1/ (2 files, 13 B)",
+            "storage/1/s2.zip (6 B)",
+        ]);
+        expect(fs.existsSync(path.join(base_folder, "storage/1/s1"))).toBe(false);
+        expect(fs.existsSync(path.join(base_folder, "storage/1/s2.zip"))).toBe(false);
+    });
 });

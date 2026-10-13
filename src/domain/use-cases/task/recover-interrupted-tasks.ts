@@ -42,34 +42,33 @@ export class RecoverInterruptedTasks implements RecoverInterruptedTasksUseCase {
                 await this.removeLeftovers(task);
             } catch (error) {
                 console.error(new Date().toISOString(), `Cannot clean up after interrupted task ${task.task_id}:`, error);
+                await this.taskRepository.logMessage(task.task_log_file_path, `Interrupted task cleanup failed, files may remain : ${(error as Error).message}`).catch(() => undefined);
             }
         }
         return recovered;
     }
 
+    // Each removal is logged as soon as it is done, so a later failing one does not hide it.
     private async removeLeftovers(task: TaskResponseModel): Promise<void> {
-        const messages: string[] = [];
+        const logRemoved = (message: string) => this.taskRepository.logMessage(task.task_log_file_path, `Interrupted task cleanup, removed ${message}`).catch(() => undefined);
 
         const task_files = await this.taskRepository.removeTaskWorkFiles(task.task_id);
-        if (task_files.length > 0) messages.push(`task folder: ${task_files.join(", ")}`);
+        if (task_files.length > 0) await logRemoved(`task folder: ${task_files.join(", ")}`);
 
         if (task.task_project_id) {
             const temporary_files = await this.projectRepository.removeInterruptedWriteLeftovers(task.task_project_id);
-            if (temporary_files.length > 0) messages.push(`unfinished writes in project ${task.task_project_id}: ${temporary_files.join(", ")}`);
+            if (temporary_files.length > 0) await logRemoved(`unfinished writes in project ${task.task_project_id}: ${temporary_files.join(", ")}`);
 
             if (task.task_type === TaskType.Import) {
-                const samples = await this.removeUncreatedSampleCopies(task, task.task_project_id);
-                if (samples.length > 0) messages.push(`copies of the samples not created: ${samples.join(", ")}`);
+                const removed = await this.removeUncreatedSampleCopies(task, task.task_project_id);
+                if (removed.length > 0) await logRemoved(`copies of the samples not created: ${removed.join(", ")}`);
             }
-        }
-
-        for (const message of messages) {
-            await this.taskRepository.logMessage(task.task_log_file_path, `Interrupted task cleanup, removed ${message}`).catch(() => undefined);
         }
     }
 
     // An import stopped before creating its samples leaves their copies in the project storage, and
-    // a copied sample is no longer importable. A sample that exists in the database is kept.
+    // a copied sample is no longer importable. A sample that exists in the database is kept. Returns
+    // the removed paths.
     private async removeUncreatedSampleCopies(task: TaskResponseModel, project_id: number): Promise<string[]> {
         const sample_names = this.taskParams(task).samples;
         if (!Array.isArray(sample_names)) return [];
@@ -80,10 +79,8 @@ export class RecoverInterruptedTasks implements RecoverInterruptedTasksUseCase {
             const sample = await this.sampleRepository.getSample({ sample_name, project_id });
             if (!sample) uncreated.push(sample_name);
         }
-        if (uncreated.length > 0) {
-            await this.sampleRepository.deleteSamplesFromImportFolder(path.join(this.DATA_STORAGE_FS_STORAGE, `${project_id}`), uncreated);
-        }
-        return uncreated;
+        if (uncreated.length === 0) return [];
+        return await this.sampleRepository.deleteSamplesFromImportFolder(path.join(this.DATA_STORAGE_FS_STORAGE, `${project_id}`), uncreated);
     }
 
     // task_params is stored as JSON text
