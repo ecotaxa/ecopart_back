@@ -1,6 +1,7 @@
 //test/domain/repositories/ecotaxa_account-repository.test.ts
 import { EcotaxaAccountDataSource } from "../../../src/data/interfaces/data-sources/ecotaxa_account-data-source";
 import { EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel } from "../../../src/domain/entities/ecotaxa_account";
+import { ProjectResponseModel, PublicProjectUpdateModel } from "../../../src/domain/entities/project";
 import { PreparedSearchOptions } from "../../../src/domain/entities/search";
 import { EcotaxaAccountRepository } from "../../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 import { EcotaxaAccountRepositoryImpl } from "../../../src/domain/repositories/ecotaxa_account-repository";
@@ -253,6 +254,75 @@ describe("EcotaxaAccount Repository", () => {
                 expect(e).toBeInstanceOf(Error)
                 expect(e.message).toBe("Unauthorized or unexisting parameters : Unauthorized sort_by: ecotaxa_account_ecopart_user_id, Unauthorized order_by: toto, Filter field: ecotaxa_account_expiration_utc_date_time, Filter operator: -")
             }
+        });
+    });
+
+    describe("EcoTaxa project PATCH", () => {
+        let repositoryImpl: EcotaxaAccountRepositoryImpl;
+        const contact = { id: 10, name: "owner", email: "owner@test.fr", organisation: "LOV" };
+        const generic_manager = { id: 1, name: "ecotaxa_account_user_name", email: "ecotaxa_account_user_email", organisation: "" };
+        const ecotaxa_project = () => ({
+            projid: 42,
+            title: "EcoTaxa project",
+            instrument: "UVP6",
+            access: "0",
+            highest_right: "Manage",
+            cnn_network_id: null,
+            managers: [contact],
+            annotators: [],
+            viewers: [],
+            contact,
+        });
+
+        beforeEach(() => {
+            repositoryImpl = new EcotaxaAccountRepositoryImpl(mockEcotaxaAccountDataSource, "julie.coustenoble@imev-mer.fr", "TST")
+            jest.spyOn(repositoryImpl, "getEcotaxaGenericAccountForInstance").mockResolvedValue(ecotaxaAccountResponseModel_1)
+            jest.spyOn(repositoryImpl, "api_patch_ecotaxa_project").mockResolvedValue()
+        })
+
+        test("Should patch only cnn, managers and contact when adding default values", async () => {
+            await repositoryImpl.add_default_values_to_ecotaxa_project(ecotaxa_instance_test_ecotaxa, ecotaxaAccountResponseModel_1, ecotaxa_project())
+
+            expect(repositoryImpl.api_patch_ecotaxa_project).toBeCalledTimes(1)
+            expect(repositoryImpl.api_patch_ecotaxa_project).toBeCalledWith(
+                ecotaxa_instance_test_ecotaxa.ecotaxa_instance_url,
+                ecotaxaAccountResponseModel_1.ecotaxa_account_token,
+                42,
+                { cnn_network_id: "uvp6_beta_2022-01-26", managers: [contact, generic_manager], contact }
+            )
+        });
+
+        test("Should not duplicate the generic account nor change an existing cnn", async () => {
+            const project = { ...ecotaxa_project(), cnn_network_id: "custom_cnn", managers: [contact, generic_manager] }
+
+            await repositoryImpl.add_default_values_to_ecotaxa_project(ecotaxa_instance_test_ecotaxa, ecotaxaAccountResponseModel_1, project)
+
+            expect(repositoryImpl.api_patch_ecotaxa_project).toBeCalledWith(
+                ecotaxa_instance_test_ecotaxa.ecotaxa_instance_url,
+                ecotaxaAccountResponseModel_1.ecotaxa_account_token,
+                42,
+                { cnn_network_id: "custom_cnn", managers: [contact, generic_manager], contact }
+            )
+        });
+
+        test("Should patch managers without the generic account and keep the contact when unlinking", async () => {
+            const project = { ...ecotaxa_project(), managers: [contact, generic_manager] }
+            jest.spyOn(repositoryImpl, "getOneEcoTaxaInstance").mockResolvedValue(ecotaxa_instance_test_ecotaxa)
+            jest.spyOn(repositoryImpl, "getOneEcotaxaAccount").mockResolvedValue(ecotaxaAccountResponseModel_1)
+            jest.spyOn(repositoryImpl, "api_get_ecotaxa_project").mockResolvedValue(project)
+
+            await repositoryImpl.deleteEcopartUserFromEcotaxaProject(
+                { ecotaxa_instance_id: 1, ecotaxa_project_id: 42 } as ProjectResponseModel,
+                { ecotaxa_account_id: 3 } as PublicProjectUpdateModel
+            )
+
+            expect(repositoryImpl.api_patch_ecotaxa_project).toBeCalledTimes(1)
+            expect(repositoryImpl.api_patch_ecotaxa_project).toBeCalledWith(
+                ecotaxa_instance_test_ecotaxa.ecotaxa_instance_url,
+                ecotaxaAccountResponseModel_1.ecotaxa_account_token,
+                42,
+                { managers: [contact], contact }
+            )
         });
     });
 })
