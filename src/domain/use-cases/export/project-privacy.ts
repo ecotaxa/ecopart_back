@@ -16,6 +16,8 @@ export function computeProjectPrivacy(
     now: Date,
 ): ProjectPrivacyLevel {
     const elapsed = monthsBetween(new Date(project_creation_utc_date_time), now);
+    // The binned export decides access with this level: an unreadable date must not open a project.
+    if (!Number.isFinite(elapsed)) return "private";
     if (elapsed < privacy_duration) return "private";
     if (elapsed < privacy_duration + visible_duration) return "visible";
     if (elapsed < privacy_duration + visible_duration + public_duration) return "public";

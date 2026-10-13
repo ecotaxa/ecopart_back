@@ -92,6 +92,7 @@ import { TaskRepositoryImpl } from './domain/repositories/task-repository'
 import { BackupProject } from './domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from './domain/use-cases/project/export-backuped-project'
 import { ExportRawData } from './domain/use-cases/export/export-raw-data'
+import { ExportBinnedData } from './domain/use-cases/export/export-binned-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
 import { GetStats } from './domain/use-cases/admin/get-stats'
@@ -354,6 +355,7 @@ async function getSQLiteDS() {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExportValidation(),
         new ExportRawData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.API_URL),
+        new ExportBinnedData(user_repo, privilege_repo, project_repo, sample_repo, task_repo, ecotaxa_account_repo, instrument_model_repo, config.DATA_STORAGE_FOLDER, config.API_URL),
     ))
     server.use("/admin", AdminRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),

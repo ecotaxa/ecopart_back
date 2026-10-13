@@ -1,6 +1,7 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
+import { PivotImageRecord } from "../../entities/binned-export";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { TaskLogger } from "./task-repository";
 
@@ -67,4 +68,7 @@ export interface SampleRepository {
     generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport>;
     // converter_version recorded in the sample's pivot, null when it has none.
     getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null>;
+    // Per-image records of the UVP6-format particle file the computed products read (the pivot for
+    // a UVP5 sample, the imported particules.csv for a UVP6), blocks and mean grey included.
+    getPivotImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImageRecord[]>;
 }

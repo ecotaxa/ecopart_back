@@ -1,2 +1,20 @@
+# Only what `npm ci` + `npm run prod:build` need goes into the build context.
 node_modules
-dist/
+dist
+data_storage
+coverage
+test
+docs
+.git
+.github
+.githooks
+.vscode
+.claude
+.env*
+*.env
+*.md
+*.pdf
+*.log
+.DS_Store
+Dockerfile
+docker-compose.yml
