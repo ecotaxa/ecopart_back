@@ -1,4 +1,4 @@
-import { convertUvp5ToPivot, describeUvp5PivotReport, parseUvp5HeaderRow, Uvp5PivotInput, UVP5_PIVOT_CONVERTER_VERSION } from "../../../src/domain/utils/uvp5-pivot-converter";
+import { convertUvp5ToPivot, describeUvp5PivotReport, parseBruBlocksByFrame, parseUvp5HeaderRow, Uvp5PivotInput, UVP5_PIVOT_CONVERTER_VERSION } from "../../../src/domain/utils/uvp5-pivot-converter";
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 
 // work/ datfile rows: frame; timestamp; 12-value sensor block ending with "!"; then object counts
@@ -48,7 +48,7 @@ function input(overrides: Partial<Uvp5PivotInput> = {}, sample_overrides: Record
         },
         instrument_model: "UVP5HD",
         datfile_content: DATFILE,
-        bru_content: BRU,
+        bru_blocks_by_frame: parseBruBlocksByFrame(BRU),
         header_row: HEADER_ROW,
         converted_utc: "2026-10-01T00:00:00.000Z",
         ...overrides,
