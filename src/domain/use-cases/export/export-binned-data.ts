@@ -21,6 +21,7 @@ import { renderBinnedReadme } from "./binned-readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { computeProjectPrivacy } from "./project-privacy";
 import { zipFolder } from "./zip-folder";
+import { removeExportWorkFolder } from "./work-folder";
 
 const BIN_MODES: BinnedExportBinMode[] = ["auto", "depth", "time"];
 // particles.tsv is appended this many rows at a time, so a long sample never sits whole in memory.
@@ -278,20 +279,8 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             await this.taskRepository.logMessage(task.task_log_file_path, `Download link: ${download_link}`);
             await this.taskRepository.finishTask({ task_id }, download_link);
         } catch (error) {
-            if (work_folder_created) await this.removeWorkFolder(task, work_folder);
+            if (work_folder_created) await removeExportWorkFolder(this.taskRepository, task, work_folder, error);
             await this.taskRepository.failedTask(task_id, error as Error);
-        }
-    }
-
-    // The working folder is the only thing a failed export leaves behind; the task folder itself
-    // keeps the log failedTask is about to write to.
-    private async removeWorkFolder(task: TaskResponseModel, work_folder: string): Promise<void> {
-        try {
-            await fsPromises.rm(work_folder, { recursive: true, force: true });
-        } catch (cleanup_error) {
-            await this.taskRepository
-                .logMessage(task.task_log_file_path, `Cleanup after failure left files behind: ${(cleanup_error as Error).message}`)
-                .catch(() => undefined);
         }
     }
 }

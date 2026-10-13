@@ -353,6 +353,7 @@ describe("ExportBinnedData", () => {
             expect((outcome.detail as Error).message).toContain("Cannot read the particle file of sample perle3_001");
             expect(fs.existsSync(zip_path())).toBe(false);
             expect(fs.existsSync(path.join(task_folder(), "binned_export"))).toBe(false);
+            expect(log_messages).toContain("Cleanup after failure : removed the working folder binned_export/ of the task folder");
         });
 
         test("a cancellation stops the export and leaves no archive", async () => {
@@ -364,6 +365,7 @@ describe("ExportBinnedData", () => {
 
             expect(await task_finished).toEqual({ outcome: "failed", detail: cancelled });
             expect(fs.existsSync(zip_path())).toBe(false);
+            expect(log_messages).toContain("Cleanup after cancellation : removed the working folder binned_export/ of the task folder");
         });
 
         test("UVP5 and UVP6 samples share one table: the union of their classes, NA where a sample cannot see one", async () => {
