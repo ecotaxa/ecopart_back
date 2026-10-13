@@ -3,6 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel } from "../../../domain/entities/project";
 import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { sqlIdentifier } from "./sql-identifier"
 
 // Map domain-level field names to the physical SQLite column names where they differ.
 // The domain/API contract keeps using `cruise` / `ship`; the DB columns are `cruise_wmo` / `ship_floatref`.
@@ -47,7 +48,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(project)) {
             params.push(value)
-            placeholders = placeholders + `project.${key} = (?) AND `
+            placeholders = placeholders + `project.${sqlIdentifier(key)} = (?) AND `
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
@@ -121,7 +122,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
 
     // Returns the number of lines updates
-    updateOne(project: ProjectUpdateModel): Promise<number> {
+    async updateOne(project: ProjectUpdateModel): Promise<number> {
         const { project_id, ...projectData } = project; // Destructure the project object
 
         const params: any[] = []
@@ -132,7 +133,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             } else {
                 params.push(value)
             }
-            placeholders = placeholders + toPhysicalColumn(key) + "=(?),"
+            placeholders = placeholders + sqlIdentifier(toPhysicalColumn(key)) + "=(?),"
         }
         placeholders = placeholders.slice(0, -1);
         params.push(project_id)

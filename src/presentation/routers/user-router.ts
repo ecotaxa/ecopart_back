@@ -753,7 +753,8 @@ export default function UsersRouter(
      */
     router.delete('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
+            // Only the id: the data source builds its WHERE clause from the keys it receives
+            await deleteUserUseCase.execute((req as CustomRequest).token, { user_id: req.params.user_id as any })
             if ((req as CustomRequest).token.user_id == parseInt(req.params.user_id)) {
                 res
                     .clearCookie("access_token")
