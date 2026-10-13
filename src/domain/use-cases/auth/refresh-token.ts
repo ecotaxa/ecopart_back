@@ -15,8 +15,8 @@ export class RefreshToken implements RefreshTokenUseCase {
 
     async execute(userAuth: DecodedToken): Promise<AuthJwtRefreshedResponseModel> {
 
-        // Get full user based on decoded token user's email
-        const full_user = await this.userRepository.getUser({ email: userAuth.email })
+        // Get full user by id: an admin can change an email, and the address may then belong to someone else
+        const full_user = await this.userRepository.getUser({ user_id: userAuth.user_id })
 
         // If cannot find user
         if (full_user === null) throw new Error("Cannot find user");

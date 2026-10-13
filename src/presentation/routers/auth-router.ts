@@ -28,6 +28,8 @@ export default function AuthRouter(
     const http0nlyCookie = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "PROD",
+        // Not sent on cross-site POST/PUT/DELETE, which blocks CSRF; the front is served from the same site.
+        sameSite: "lax" as const,
     }
 
     /* LOGIN MANAGEMENT */
@@ -36,7 +38,7 @@ export default function AuthRouter(
      * /auth/login:
      *   post:
      *     summary: User login
-     *     description: Authenticate a user with email and password. Returns JWT tokens as httpOnly cookies and in the response body.
+     *     description: Authenticate a user with email and password. JWT tokens are only returned as httpOnly cookies, the body holds the user.
      *     tags: [Auth]
      *     requestBody:
      *       required: true
@@ -50,7 +52,7 @@ export default function AuthRouter(
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/AuthJwtResponse'
+     *               $ref: '#/components/schemas/PublicUser'
      *       401:
      *         description: Invalid credentials.
      *         content:
@@ -72,12 +74,13 @@ export default function AuthRouter(
      */
     router.post('/login', middlewareAuthValidation.rulesAuthUserCredentialsModel, async (req: Request, res: Response) => {
         try {
-            const tokens = await loginUserUseCase.execute(req.body)
+            const { jwt, jwt_refresh, ...user } = await loginUserUseCase.execute(req.body)
+            // Tokens only travel in httpOnly cookies, never in a body that page scripts can read
             res
-                .cookie("access_token", tokens.jwt, http0nlyCookie)
-                .cookie("refresh_token", tokens.jwt_refresh, http0nlyCookie)
+                .cookie("access_token", jwt, http0nlyCookie)
+                .cookie("refresh_token", jwt_refresh, http0nlyCookie)
                 .status(200)
-                .send(tokens)
+                .send(user)
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "Invalid credentials") res.status(401).send({ errors: [err.message] })
@@ -154,7 +157,7 @@ export default function AuthRouter(
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/AuthJwtRefreshedResponse'
+     *               $ref: '#/components/schemas/MessageResponse'
      *       403:
      *         description: User cannot be used.
      *         content:
@@ -181,7 +184,7 @@ export default function AuthRouter(
             res
                 .status(200)
                 .cookie("access_token", token.jwt, http0nlyCookie)
-                .send(token)
+                .send({ message: "Access token refreshed" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })

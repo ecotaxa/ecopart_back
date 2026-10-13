@@ -576,40 +576,6 @@
           "password"
         ]
       },
-      "AuthJwtResponse": {
-        "type": "object",
-        "description": "JWT token pair returned on successful login.",
-        "properties": {
-          "jwt": {
-            "type": "string",
-            "description": "JWT access token.",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-          },
-          "jwt_refresh": {
-            "type": "string",
-            "description": "JWT refresh token.",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-          }
-        },
-        "required": [
-          "jwt",
-          "jwt_refresh"
-        ]
-      },
-      "AuthJwtRefreshedResponse": {
-        "type": "object",
-        "description": "Refreshed JWT access token.",
-        "properties": {
-          "jwt": {
-            "type": "string",
-            "description": "New JWT access token.",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-          }
-        },
-        "required": [
-          "jwt"
-        ]
-      },
       "ChangePasswordRequest": {
         "type": "object",
         "description": "Request to change the current user password.",
@@ -2656,7 +2622,7 @@
     "/auth/login": {
       "post": {
         "summary": "User login",
-        "description": "Authenticate a user with email and password. Returns JWT tokens as httpOnly cookies and in the response body.",
+        "description": "Authenticate a user with email and password. JWT tokens are only returned as httpOnly cookies, the body holds the user.",
         "tags": [
           "Auth"
         ],
@@ -2676,7 +2642,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthJwtResponse"
+                  "$ref": "#/components/schemas/PublicUser"
                 }
               }
             }
@@ -2788,7 +2754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthJwtRefreshedResponse"
+                  "$ref": "#/components/schemas/MessageResponse"
                 }
               }
             }

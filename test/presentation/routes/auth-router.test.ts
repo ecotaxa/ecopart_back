@@ -123,8 +123,14 @@ describe("User Router", () => {
 
             expect(response.status).toBe(200)
             expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
-            expect(response.body).toStrictEqual(OutputData)
-            expect(response.headers['set-cookie']).toBeDefined(); // Check if cookies are set
+            // Tokens only in httpOnly cookies, never in the body
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { jwt, jwt_refresh, ...user } = OutputData
+            expect(response.body).toStrictEqual(user)
+            const cookies = response.headers['set-cookie'] as unknown as string[]
+            expect(cookies).toHaveLength(2)
+            expect(cookies[0]).toMatch(/^access_token=.*; HttpOnly; SameSite=Lax$/)
+            expect(cookies[1]).toMatch(/^refresh_token=.*; HttpOnly; SameSite=Lax$/)
         });
 
         test("Login with invalid credentials ", async () => {
@@ -251,8 +257,10 @@ describe("User Router", () => {
 
             expect(response.status).toBe(200)
             expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1);
-            expect(response.body).toStrictEqual(OutputData)
-            expect(response.headers['set-cookie']).toBeDefined();
+            expect(response.body).toStrictEqual({ message: "Access token refreshed" })
+            const cookies = response.headers['set-cookie'] as unknown as string[]
+            expect(cookies).toHaveLength(1)
+            expect(cookies[0]).toMatch(new RegExp("^access_token=" + OutputData.jwt + "; Path=/; HttpOnly; SameSite=Lax$"))
         });
 
         test("Should handle error during refresh token use case and return a 404 response", async () => {

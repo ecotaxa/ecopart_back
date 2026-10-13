@@ -112,7 +112,10 @@ describe("User Router", () => {
             const response = await request(server).post("/auth/login").send(InputData)
             expect(response.status).toBe(200)
             expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
-            expect(response.body).toStrictEqual(OutputData)
+            // Tokens only in httpOnly cookies, never in the body
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { jwt, jwt_refresh, ...user } = OutputData
+            expect(response.body).toStrictEqual(user)
             expect(response.headers['set-cookie']).toBeDefined(); // Check if cookies are set
         });
         test("Login valid eamil and invalid password ", async () => {

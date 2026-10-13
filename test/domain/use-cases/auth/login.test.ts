@@ -56,6 +56,35 @@ describe("Create User Use Case", () => {
         expect(result).toStrictEqual({ ...OutputUserData, ...OutputAuthData });
     });
 
+    test("Should not return the confirmation and reset password codes", async () => {
+        const InputData: AuthUserCredentialsModel = {
+            email: "test@email.com",
+            password: "good_password"
+        }
+        const PublicPart = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "usage",
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
+        }
+        const UserWithCodes: UserResponseModel = { ...PublicPart, confirmation_code: "confirm-uuid", reset_password_code: "reset-uuid" }
+
+        jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(UserWithCodes))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
+        jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
+        const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
+        const result = await loginUserUseCase.execute(InputData);
+        expect(result).toStrictEqual({ ...PublicPart, jwt: "access_token", jwt_refresh: "refresh_token" });
+    });
+
     test("Should handle bad credentials and throw error", async () => {
         const InputData: AuthUserCredentialsModel = {
             email: "test@email.com",

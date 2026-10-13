@@ -48,6 +48,64 @@ describe("Auth Repository", () => {
         });
     })
 
+    describe("Token payload and lifetime", () => {
+        const UserWithPrivateFields = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "usage",
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
+            confirmation_code: "confirm-uuid",
+            reset_password_code: "reset-uuid",
+            managing_projects: [1],
+            member_projects: [2],
+        }
+        const ExpectedPayload = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "usage",
+            user_creation_utc_date_time: '2023-08-01 10:30:00',
+        }
+
+        test("access token: one hour, without codes nor project lists", () => {
+            jest.spyOn(jwt, "sign").mockImplementation(() => "token")
+            authRepository.generateAccessToken(UserWithPrivateFields)
+            expect(jwt.sign).toBeCalledWith(ExpectedPayload, TEST_ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+        });
+
+        test("refresh token: one year, without codes nor project lists", () => {
+            jest.spyOn(jwt, "sign").mockImplementation(() => "token")
+            authRepository.generateRefreshToken(UserWithPrivateFields)
+            expect(jwt.sign).toBeCalledWith(ExpectedPayload, TEST_REFRESH_TOKEN_SECRET, { expiresIn: '1y' })
+        });
+
+        test("a real token verifies and expires one hour after issue", () => {
+            const realRepository = new AuthRepositoryImpl(new JwtAdapter(), "secret_for_test", "refresh_for_test")
+            const token = realRepository.generateAccessToken(UserWithPrivateFields)
+            const decoded = new JwtAdapter().verify(token, "secret_for_test") as JwtPayload
+            expect((decoded.exp as number) - (decoded.iat as number)).toBe(3600)
+            expect(decoded.reset_password_code).toBeUndefined()
+            expect(decoded.confirmation_code).toBeUndefined()
+        });
+
+        test("a token signed with another algorithm is rejected", () => {
+            const realJwt = new JwtAdapter()
+            const hs512 = realJwt.sign({ user_id: 1 }, "secret_for_test", { algorithm: 'HS512' })
+            expect(() => realJwt.verify(hs512, "secret_for_test")).toThrow("invalid algorithm")
+        });
+    })
+
     describe("Test generateRefreshToken", () => {
         test("Should return valid Refresh", async () => {
             const InputData = {

@@ -65,6 +65,8 @@ describe("Create User Use Case", () => {
         const loginUserUseCase = new RefreshToken(mockUserRepository, mockAuthRepository)
         const result = await loginUserUseCase.execute(InputUserData);
         expect(result).toStrictEqual(OutputAuthData);
+        // By id, not by email: an email can be reassigned to another account
+        expect(mockUserRepository.getUser).toBeCalledWith({ user_id: 1 });
     });
     test("Cannot find user ", async () => {
 
