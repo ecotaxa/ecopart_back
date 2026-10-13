@@ -27,7 +27,6 @@ export class AuthRepositoryImpl implements AuthRepository {
 
     // A JWT is only signed, not encrypted: single-use codes and admin-only lists must not travel in it.
     private toTokenPayload(user: UserResponseModel): object {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { confirmation_code, reset_password_code, managing_projects, member_projects, ...payload } = user
         return payload
     }

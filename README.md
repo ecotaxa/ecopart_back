@@ -390,7 +390,7 @@ Four npm scripts are available to manage migrations:
 
 | Command                            | Description                                  |
 | ---------------------------------- | -------------------------------------------- |
-| `npm run migrate:create -- <name>` | Create a new timestamped migration file      |
+| `npm run migrate:create -- <name>` | Create the next numbered migration file      |
 | `npm run migrate:up`               | Run all pending migrations                   |
 | `npm run migrate:down`             | Rollback the last applied migration          |
 | `npm run migrate:status`           | Show which migrations are applied or pending |
@@ -401,7 +401,7 @@ Four npm scripts are available to manage migrations:
 npm run migrate:create -- add_column_to_project
 ```
 
-This generates a file like `20260213143000_add_column_to_project.ts` in `src/data/migrations/` with `up` and `down` stubs ready to fill in.
+This generates the next numbered file, for example `029_add_column_to_project.ts`, in `src/data/migrations/` with `up` and `down` stubs ready to fill in.
 
 #### Example Migration
 
@@ -419,7 +419,7 @@ function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: any[] = []): Pro
 }
 
 export const migration: Migration = {
-    id: "20260213143000_add_column_to_project",
+    id: "029_add_column_to_project",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, "ALTER TABLE project ADD COLUMN status TEXT DEFAULT 'active';");
@@ -434,7 +434,7 @@ export const migration: Migration = {
 
 #### Important Notes
 
-- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a timestamp.
+- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a three-digit number (`000_` to `028_` today). Two branches that each add a migration may pick the same number: renumber one of them before merging.
 - The initial migration (`000_initial_schema.ts`) captures the full existing schema using `CREATE TABLE IF NOT EXISTS`, making it safe on both fresh and existing databases.
 - Migrations are executed inside the application startup flow (in `src/main.ts`), so deploying a new version with new migration files is enough — no manual step is required.
 - For production rollbacks, use `npm run migrate:down` from the server or connect via the CLI tool at `tools/migrate.ts`.

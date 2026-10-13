@@ -39,7 +39,7 @@ export const migration: Migration = {
         await runSQL(db, BACKFILL_SQL);
     },
 
-    async down(db: SQLiteDatabaseWrapper): Promise<void> {
+    async down(_db: SQLiteDatabaseWrapper): Promise<void> {
         // Irreversible by design: the pre-migration state was "NULL for some rows, and we cannot
         // tell which ones were NULL from the ones legitimately filled at import". Clearing every
         // gain would lose data the import now provides, so `down` is a no-op.

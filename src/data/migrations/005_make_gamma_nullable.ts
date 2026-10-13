@@ -89,6 +89,6 @@ export const migration: Migration = {
         await runSQL(db, `PRAGMA foreign_keys = ON;`);
     },
 
-    async down(db: SQLiteDatabaseWrapper): Promise<void> {
+    async down(_db: SQLiteDatabaseWrapper): Promise<void> {
     },
 };

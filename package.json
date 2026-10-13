@@ -11,6 +11,8 @@
     "hooks:install": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "copy-assets": "ts-node tools/copyAssets",
     "tsc": "tsc",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint src --ext .ts",
     "prod:build": " rimraf ./dist && tsc && ts-node tools/copyAssets",
     "prod:serve": "node dist/main.js",
     "prod:start": "npm run prod:build && node dist/main.js",

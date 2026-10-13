@@ -11,7 +11,7 @@ export const migration: Migration = {
         await runSQL(db, `ALTER TABLE sample ADD COLUMN ctd_import_date TEXT;`);
     },
 
-    async down(db: SQLiteDatabaseWrapper): Promise<void> {
+    async down(_db: SQLiteDatabaseWrapper): Promise<void> {
 
     },
 };

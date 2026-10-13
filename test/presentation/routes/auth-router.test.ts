@@ -124,7 +124,6 @@ describe("User Router", () => {
             expect(response.status).toBe(200)
             expect(mockLoginUserUseCase.execute).toBeCalledTimes(1)
             // Tokens only in httpOnly cookies, never in the body
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { jwt, jwt_refresh, ...user } = OutputData
             expect(response.body).toStrictEqual(user)
             const cookies = response.headers['set-cookie'] as unknown as string[]

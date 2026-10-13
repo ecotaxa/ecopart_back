@@ -34,7 +34,10 @@ jobs:
           git diff --exit-code openapi.json || (echo "::error::openapi.json is out of date. Run 'npm run openapi:generate' and commit the result." && exit 1)
 
       - name: Type-check
-        run: npx tsc --noEmit -p tsconfig.test.json
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
 
       - name: Run tests
         run: npm run test-CI

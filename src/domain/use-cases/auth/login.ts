@@ -33,7 +33,6 @@ export class LoginUser implements LoginUserUseCase {
             // Get authorisation access and refresh tokens
             const tokens = { jwt: this.authRepository.generateAccessToken(full_user), jwt_refresh: this.authRepository.generateRefreshToken(full_user) }
 
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { confirmation_code, reset_password_code, ...user_without_codes } = full_user
             return { ...user_without_codes, ...tokens }
 
