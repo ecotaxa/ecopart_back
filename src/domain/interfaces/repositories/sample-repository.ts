@@ -7,7 +7,7 @@ import { TaskLogger } from "./task-repository";
 
 export interface SampleRepository {
     deleteEcoTaxaSamplesFromDb(samples: SampleIdModel[]): Promise<number>;
-    formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel>;
+    formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string, root_folder_path: string): Promise<SampleRequestCreationModel>;
     createSample(sample: SampleRequestCreationModel): Promise<number>;
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
@@ -65,7 +65,7 @@ export interface SampleRepository {
     // UVP5 → UVP6 pivot
     // Converts the stored work.zip of a UVP5 sample into <sample>/pivot/<sample>_Particule.zip.
     // Throws an explicit "Cannot build the UVP5 pivot of sample …" error naming the fix.
-    generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport>;
+    generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string, root_folder_path: string): Promise<Uvp5PivotReport>;
     // converter_version recorded in the sample's pivot, null when it has none.
     getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null>;
     // Per-image records of the UVP6-format particle file the computed products read (the pivot for

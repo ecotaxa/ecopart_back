@@ -1708,7 +1708,7 @@
       },
       "ProjectMetadata": {
         "type": "object",
-        "description": "Project metadata extracted from an import folder. Used to pre-fill the project creation form.\nSources: `config/cruise_info.txt` (INI key=value) and `meta/*header*.txt` (semicolon-delimited CSV).\n",
+        "description": "Project metadata extracted from an import folder. Used to pre-fill the project creation form.\nSources: `config/cruise_info.txt` (INI key=value) and the meta header (semicolon-delimited CSV):\n`meta/<instrument>_header_<rest of the folder name>.txt` only.\n",
         "properties": {
           "project_acronym": {
             "type": "string",
@@ -1725,13 +1725,13 @@
           "cruise": {
             "type": "string",
             "nullable": true,
-            "description": "Source: `meta/*header*.txt` → column 1 (cruise) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`.",
+            "description": "Source: meta header → column 1 (cruise) of the first data row. Fallback: `config/cruise_info.txt` → key `acron`.",
             "example": "MPS2024"
           },
           "ship": {
             "type": "string",
             "nullable": true,
-            "description": "Source: `meta/*header*.txt` → column 2 (ship) of the first data row.",
+            "description": "Source: meta header → column 2 (ship) of the first data row.",
             "example": "R/V Thalassa"
           },
           "serial_number": {
@@ -3568,7 +3568,7 @@
     "/file_system/import_folder_metadata": {
       "get": {
         "summary": "Get metadata from an import folder",
-        "description": "Reads metadata files from the given import folder path and returns project-level metadata to pre-fill the project creation form. Works for both UVP5 and UVP6 folder structures.\n\n**Files read:**\n- `config/cruise_info.txt` — INI-style file (`[General]` section) containing cruise/project info and contact details.\n- `meta/*header*.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names.\n\n**Instrument detection:**\n- Presence of an `ecodata/` subdirectory → UVP6\n- Presence of a `work/` subdirectory → UVP5\n- The exact model (e.g. UVP6LP, UVP5HD) is deduced from the serial number suffix.\n\n**User lookup:** For each person (data_owner, operator, chief_scientist), the email is looked up in the EcoPart user database. If a match is found, `ecopart_user_id` is returned.\n",
+        "description": "Reads metadata files from the given import folder path and returns project-level metadata to pre-fill the project creation form. Works for both UVP5 and UVP6 folder structures.\n\n**Files read:**\n- `config/cruise_info.txt` — INI-style file (`[General]` section) containing cruise/project info and contact details.\n- `meta/<instrument>_header_<rest of the folder name>.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names. Other headers are ignored; without that file, cruise and ship are not pre-filled.\n\n**Instrument detection:**\n- Presence of an `ecodata/` subdirectory → UVP6\n- Presence of a `work/` subdirectory → UVP5\n- The exact model (e.g. UVP6LP, UVP5HD) is deduced from the serial number suffix.\n\n**User lookup:** For each person (data_owner, operator, chief_scientist), the email is looked up in the EcoPart user database. If a match is found, `ecopart_user_id` is returned.\n",
         "tags": [
           "File System"
         ],
@@ -4596,90 +4596,10 @@
         }
       }
     },
-    "/projects/{project_id}/samples/can_be_imported": {
-      "get": {
-        "summary": "List importable samples",
-        "description": "Returns a list of sample files that can be imported for the given project.",
-        "tags": [
-          "Samples"
-        ],
-        "security": [
-          {
-            "cookieAccessToken": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The project ID."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of importable sample names.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authorized for this project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "User cannot be used.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project or folder not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/projects/{project_id}/samples/import": {
       "post": {
         "summary": "Import samples",
-        "description": "Import the selected samples into the project. Starts an asynchronous **import** task and returns it\nimmediately as `task_import_samples` (poll the task for progress); the work below runs in the\nbackground. Requires admin rights or a privilege on the project.\n\n**Task pipeline (per sample requested in `samples`):**\n\n1. **Validation** — the sample must appear both in the instrument header (`meta/`) and in the source\n   data folder, and must pass QC level 1 (its source acquisition files are present). Any sample\n   missing, unknown, or failing QC aborts the whole task (nothing is imported). A depth sample must\n   also have at least one readable pressure in its particle file (UVP6 `particules.csv`, UVP5\n   datfile); a time sample may have none, its `max_pressure` is then null. `validated_samples`\n   must be a subset of `samples`.\n2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:\n   - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or\n     `.tar.zst` — normalized so files sit at the archive root) is re-zipped to `<sample>_work.zip`;\n     a `<sample>_meta_conf.zip` is built from `meta/` + `config/cruise_info.txt`,\n     `config/uvp5_settings/uvp5_configuration_data.txt` and `config/process_install_config.txt`.\n   - **UVP6:** only the `<sample>_Particule.zip` and `<sample>_Images.zip` archives found under\n     `ecodata/<sample>/` are copied as-is.\n3. **Create the sample rows** in the database — metadata parsed from the copied files, plus\n   `nb_vignettes` and (UVP6 only) `nb_black` (rows of `particules.csv` acquired lights-off; always 0\n   on UVP5). Samples listed in `validated_samples` are flipped to visual-QC VALIDATED with audit\n   fields set as a manual review. If DB creation fails, the copied source files are rolled back\n   (deleted) and the task is marked failed.\n\n**Optional backup** — when `backup_project` is `true`, a project backup task is started **after** a\nsuccessful import (see `POST /projects/{project_id}/backup`; `backup_project_skip_already_imported`\nmaps to that endpoint's `skip_already_imported`) and returned as `task_backup_project`. The backup is\nskipped if the import fails.\n\n**Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;\notherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages — a\nfailed backup after a successful import still returns `task_import_samples` alongside the error.\n",
+        "description": "Import the selected samples into the project. Starts an asynchronous **import** task and returns it\nimmediately as `task_import_samples` (poll the task for progress); the work below runs in the\nbackground. Requires admin rights or a privilege on the project.\n\n**Task pipeline (per sample requested in `samples`):**\n\n1. **Validation** — the sample must appear both in the meta header (chosen as described in\n   `GET /projects/{project_id}/samples/can_be_imported`) and in the source\n   data folder, and must pass QC level 1 (its source acquisition files are present). Any sample\n   missing, unknown, or failing QC aborts the whole task (nothing is imported). A depth sample must\n   also have at least one readable pressure in its particle file (UVP6 `particules.csv`, UVP5\n   datfile); a time sample may have none, its `max_pressure` is then null. `validated_samples`\n   must be a subset of `samples`.\n2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:\n   - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or\n     `.tar.zst` — normalized so files sit at the archive root) is re-zipped to `<sample>_work.zip`;\n     a `<sample>_meta_conf.zip` is built from `meta/` + `config/cruise_info.txt`,\n     `config/uvp5_settings/uvp5_configuration_data.txt` and `config/process_install_config.txt`.\n   - **UVP6:** only the `<sample>_Particule.zip` and `<sample>_Images.zip` archives found under\n     `ecodata/<sample>/` are copied as-is.\n3. **Create the sample rows** in the database — metadata parsed from the copied files (UVP5: the\n   sample's row of the same meta header), plus\n   `nb_vignettes` and (UVP6 only) `nb_black` (rows of `particules.csv` acquired lights-off; always 0\n   on UVP5). Samples listed in `validated_samples` are flipped to visual-QC VALIDATED with audit\n   fields set as a manual review. If DB creation fails, the copied source files are rolled back\n   (deleted) and the task is marked failed.\n\n**Optional backup** — when `backup_project` is `true`, a project backup task is started **after** a\nsuccessful import (see `POST /projects/{project_id}/backup`; `backup_project_skip_already_imported`\nmaps to that endpoint's `skip_already_imported`) and returned as `task_backup_project`. The backup is\nskipped if the import fails.\n\n**Outcomes** (`SampleImportResponse`): `200` when the import (and the backup, if requested) succeed;\notherwise `success: false` with an `errors` object carrying `import` and/or `backup` messages — a\nfailed backup after a successful import still returns `task_import_samples` alongside the error.\n",
         "tags": [
           "Samples"
         ],
@@ -5648,7 +5568,7 @@
             "description": "User cannot be used or lacks access to the project."
           },
           "404": {
-            "description": "Project or source folder not found."
+            "description": "Project, source folder or meta header not found."
           },
           "422": {
             "description": "Validation error or a requested sample is not importable."

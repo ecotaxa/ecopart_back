@@ -120,7 +120,7 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
                     continue;
                 }
                 try {
-                    const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model);
+                    const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model, project.root_folder_path);
                     await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, describeUvp5PivotReport(report));
                 } catch (error) {
                     failures.push((error as Error).message);

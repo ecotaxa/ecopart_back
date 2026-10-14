@@ -12,7 +12,9 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
-import { convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
+import { selectMetaHeaderFile } from "../utils/meta-header-file";
+import { readUvpTextLines } from "../utils/text-lines";
+import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
 import { CTD_COLUMN_ALIASES, CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS, CTD_STANDARD_COLUMNS } from "../constants/ctd-columns";
@@ -23,11 +25,13 @@ import * as fsPromises from 'fs/promises'; // For promise-based file operations/
 //import { parse, Options } from 'csv-parse'; // Use named import for `parse`
 
 import path from 'path';
+import { constants as buffer_constants } from 'buffer';
+import { PassThrough, pipeline, Readable } from 'stream';
+import { pipeline as pipelinePromise } from 'stream/promises';
 import yauzl from 'yauzl';
 import archiver from 'archiver';
-import * as fzstd from 'fzstd';
 import * as tar from 'tar';
-import { isInsideFolder } from '../utils/path-containment';
+import { createZstdDecompressStream } from '../utils/zstd-stream';
 
 // Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
 // (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
@@ -43,6 +47,9 @@ export class SampleRepositoryImpl implements SampleRepository {
     order_by_allow_params: string[] = ["asc", "desc"]
     filter_operator_allow_params: string[] = ["=", ">", "<", ">=", "<=", "<>", "IN", "LIKE"]
     base_folder = path.join(__dirname, '..', '..', '..');
+    // The longest string V8 can build (~512 MiB). Every character takes at least one byte, so a file
+    // up to this size always decodes; a larger one is refused before being buffered.
+    max_text_file_bytes = buffer_constants.MAX_STRING_LENGTH;
 
     constructor(sampleDataSource: SampleDataSource, DATA_STORAGE_FS_STORAGE: string) {
         this.sampleDataSource = sampleDataSource
@@ -50,7 +57,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Format a sample to import from fs storage 
-    async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
+    async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string, root_folder_path: string): Promise<SampleRequestCreationModel> {
         const projectIdSegment = base_sample?.project_id != null
             ? String(base_sample.project_id)
             : "";
@@ -60,12 +67,32 @@ export class SampleRepositoryImpl implements SampleRepository {
             projectIdSegment
         );
         // foreach sample in samples_names_to_import
-        const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
+        const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model, root_folder_path);
         return sample_to_return;
     }
 
-    // Generic method to read a file from a ZIP archive
+    // Generic method to read a file from a ZIP archive. Any failure must reject: an error thrown from
+    // a stream callback escapes the promise and stops the whole server, with every running task.
     private async readFileFromZip(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
+        const { entry, stream } = await this.openZipEntry(zipPath, targetFileName, filePathPattern);
+        return this.readStreamAsText(stream, entry.uncompressedSize, `${entry.fileName} in ${path.basename(zipPath)}`);
+    }
+
+    // A file larger than the longest string V8 can build is refused before being read.
+    private async readStreamAsText(stream: Readable, size: number, description: string): Promise<string> {
+        if (size > this.max_text_file_bytes) {
+            stream.destroy();
+            throw new Error(`${description} is too large to be read as text (${size} bytes, at most ${this.max_text_file_bytes})`);
+        }
+        // Decode once at the end: a multi-byte character can straddle two chunks.
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk);
+        return decodeUvpText(Buffer.concat(chunks));
+    }
+
+    // Opens the first entry matching the name or the pattern. The archive is released once the
+    // returned stream ends or is destroyed.
+    private openZipEntry(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<{ entry: yauzl.Entry, stream: Readable }> {
         return new Promise((resolve, reject) => {
             yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
                 if (err || !zipfile) {
@@ -78,25 +105,15 @@ export class SampleRepositoryImpl implements SampleRepository {
 
                 zipfile.on('entry', (entry) => {
                     if ((targetFileName && entry.fileName === targetFileName) || (filePathPattern && filePathPattern.test(entry.fileName))) {
-                        // Reading stops at this entry, so the archive never reaches its 'end' event and
-                        // yauzl's autoClose never fires: it is closed here, or its descriptor leaks.
                         zipfile.openReadStream(entry, (err, readStream) => {
+                            // Reading stops at this entry, so the archive never reaches its 'end' event and
+                            // yauzl's autoClose never fires. Closing now keeps the descriptor open until the
+                            // read stream ends or is destroyed.
+                            zipfile.close();
                             if (err || !readStream) {
-                                zipfile.close();
                                 return reject(err || new Error('Failed to open read stream'));
                             }
-
-                            // Decode once at the end: a multi-byte character can straddle two chunks.
-                            const chunks: Buffer[] = [];
-                            readStream.on('data', (chunk: Buffer) => chunks.push(chunk));
-                            readStream.on('error', (stream_error) => {
-                                zipfile.close();
-                                reject(stream_error);
-                            });
-                            readStream.on('end', () => {
-                                zipfile.close();
-                                resolve(decodeUvpText(Buffer.concat(chunks)));
-                            });
+                            resolve({ entry, stream: readStream });
                         });
                     } else {
                         zipfile.readEntry();
@@ -108,36 +125,53 @@ export class SampleRepositoryImpl implements SampleRepository {
         });
     }
 
+    // Lines of one file of a ZIP archive, for the files that grow with the deployment.
+    private async *readZipEntryLines(zipPath: string, targetFileName?: string, filePathPattern?: RegExp): AsyncGenerator<string> {
+        const { stream } = await this.openZipEntry(zipPath, targetFileName, filePathPattern);
+        yield* readUvpTextLines(stream);
+    }
+
     // Read a single file from a .tar.zst archive (zstd-compressed tarball). Mirrors
     // readFileFromZip — matches by exact name or by regex against the tar entry path.
     private async readFileFromTarZst(tarZstPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
-        const compressed = await fsPromises.readFile(tarZstPath);
-        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
+        const { name, size, stream } = await this.openTarZstEntry(tarZstPath, targetFileName, filePathPattern);
+        return this.readStreamAsText(stream, size, `${name} in ${path.basename(tarZstPath)}`);
+    }
 
+    // Streams the first matching file of a .tar.zst. The archive is decompressed on the fly and only up
+    // to that file: it holds the sample's images and can weigh several GB.
+    private openTarZstEntry(tarZstPath: string, targetFileName?: string, filePathPattern?: RegExp): Promise<{ name: string, size: number, stream: Readable }> {
         return new Promise((resolve, reject) => {
+            const source = fs.createReadStream(tarZstPath);
             const parser = new tar.Parser();
-            let found = false;
+            let found: PassThrough | undefined;
             parser.on('entry', (entry) => {
                 const name = entry.path;
                 const matches = !found && entry.type === 'File' && (
                     (targetFileName !== undefined && (name === targetFileName || path.basename(name) === targetFileName))
                     || (filePathPattern !== undefined && filePathPattern.test(name))
                 );
-                if (matches) {
-                    found = true;
-                    const chunks: Buffer[] = [];
-                    entry.on('data', (chunk: Buffer) => chunks.push(chunk));
-                    entry.on('end', () => resolve(decodeUvpText(Buffer.concat(chunks))));
-                    entry.on('error', reject);
-                } else {
+                if (!matches) {
                     entry.resume();
+                    return;
                 }
+                const file = new PassThrough();
+                found = file;
+                // Once the file is read or abandoned, the rest of the archive is not needed. The no-op
+                // listener keeps a late write into an abandoned stream from becoming an uncaught error.
+                file.on('error', () => undefined);
+                file.on('close', () => {
+                    entry.unpipe(file);
+                    source.destroy();
+                });
+                entry.on('error', (error: Error) => file.destroy(error));
+                entry.pipe(file);
+                resolve({ name, size: entry.size, stream: file });
             });
-            parser.on('end', () => {
-                if (!found) reject(new Error(`${targetFileName} or ${filePathPattern} not found in tar.zst file`));
+            pipeline(source, createZstdDecompressStream(), parser, (error) => {
+                if (!found) return reject(error ?? new Error(`${targetFileName} or ${filePathPattern} not found in tar.zst file`));
+                if (error && !found.writableEnded) found.destroy(error);
             });
-            parser.on('error', reject);
-            parser.end(tarBuffer);
         });
     }
 
@@ -156,33 +190,35 @@ export class SampleRepositoryImpl implements SampleRepository {
     // Method to parse and return pressures from particules.csv
     async getPressuresFromParticulesCsv(file_system_storage_project_folder: string, sample_name: string): Promise<(number | "NaN")[]> {
         const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
-        const fileContent = await this.readFileFromZip(zipPath, 'particules.csv', undefined);
-        return this.extractPressures(fileContent);
+        const pressures: (number | "NaN")[] = [];
+        for await (const line of this.readZipEntryLines(zipPath, 'particules.csv')) {
+            const pressure = this.extractPressure(line);
+            if (pressure !== null) pressures.push(pressure);
+        }
+        return pressures;
     }
 
     // UVP6 only — count rows in particules.csv where the lights are off (col[3] === "0:1").
     // These are "black" reference images used to measure imager noise.
     async countBlackParticulesUvp6(file_system_storage_project_folder: string, sample_name: string): Promise<number> {
         const zipPath = path.join(file_system_storage_project_folder, sample_name, `${sample_name}_Particule.zip`);
-        const fileContent = await this.readFileFromZip(zipPath, 'particules.csv', undefined);
-        return this.countBlackRowsInParticulesCsv(fileContent);
-    }
-
-    countBlackRowsInParticulesCsv(input: string): number {
         let count = 0;
-        for (const line of input.split(/\r\n|\n|\r/)) {
-            // Data rows start with YYYYMMDD; headers (HW_CONF / ACQ_CONF) don't match.
-            if (!/^\d{8}/.test(line)) continue;
-            // Columns: timestamp, pressure, ?, light_flag, ...
-            // light_flag "1:1" = lights on, "0:1" = lights off (black).
-            const parts = line.split(",");
-            if (parts.length < 4) continue;
-            if (parts[3].trim() === "0:1") count += 1;
+        for await (const line of this.readZipEntryLines(zipPath, 'particules.csv')) {
+            if (this.isBlackParticulesRow(line)) count += 1;
         }
         return count;
     }
 
-    async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
+    private isBlackParticulesRow(line: string): boolean {
+        // Data rows start with YYYYMMDD; headers (HW_CONF / ACQ_CONF) don't match.
+        if (!/^\d{8}/.test(line)) return false;
+        // Columns: timestamp, pressure, ?, light_flag, ...
+        // light_flag "1:1" = lights on, "0:1" = lights off (black).
+        const parts = line.split(",");
+        return parts.length >= 4 && parts[3].trim() === "0:1";
+    }
+
+    async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string, root_folder_path: string): Promise<SampleRequestCreationModel> {
         let sample_fss = {};
         if (instrument_model.startsWith('UVP6')) {
             // read from file_system_storage_project_folder/ecodata and return the list of samples
@@ -190,17 +226,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         else if (instrument_model.startsWith('UVP5')) {
             // read from file_system_storage_project_folder/work and return the list of samples
-            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string, instrument_model);
+            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string, instrument_model, root_folder_path);
         }
         const sample = this.constructSampleFromBaseAndFsStorage(sample_fss, base_sample);
 
         return sample;
     }
 
-    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string, instrument_model: string): Promise<Partial<SampleRequestCreationModel>> {
+    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string, instrument_model: string, root_folder_path: string): Promise<Partial<SampleRequestCreationModel>> {
         // Complete the sample object
         // Get sample info from meta/uvp5_header_sn
-        const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
+        const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name, root_folder_path);
         // get sample from work/profileid/profileid_datfile.txt
         const sample_work_datfile = await this.getSampleFromWorkDatfile(file_system_storage_project_folder, sample_name);
         // get sample from work/profileid/HDRfilename.txt 
@@ -302,33 +338,41 @@ export class SampleRepositoryImpl implements SampleRepository {
         const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseWorkDatfile(fileContent);
     }
-    async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
-        const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
+    async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string, root_folder_path: string): Promise<SampleFromMetaHeaderModel> {
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readSampleFile(zipPath, "meta/uvp5_header_sn*.txt", undefined, filePathPattern);
-        const fileName = await this.getFileNameFromZip(zipPath, filePathPattern);
-
-        return this.parseMetaHeader(fileContent, fileName, sample_name);
+        const header = await this.readMetaConfHeader(zipPath, root_folder_path);
+        return this.parseMetaHeader(header.content, header.file_name, sample_name);
     }
 
-    async getFileNameFromZip(zipPath: string, filePathPattern: RegExp): Promise<string> {
+    // The meta header of a sample, from the copy of the project's meta/ folder in its _meta_conf.zip.
+    private async readMetaConfHeader(zipPath: string, root_folder_path: string): Promise<{ file_name: string, content: string }> {
+        let meta_files: string[];
+        try {
+            meta_files = (await this.listZipEntryNames(zipPath))
+                .filter((name) => name.startsWith("meta/") && !name.slice("meta/".length).includes("/"))
+                .map((name) => name.slice("meta/".length));
+        } catch (error) {
+            throw new Error(`Cannot read meta/ in ${path.basename(zipPath)}: ${(error as Error).message}`);
+        }
+        const file_name = selectMetaHeaderFile(meta_files, root_folder_path);
+        return { file_name, content: await this.readSampleFile(zipPath, `meta/${file_name}`, `meta/${file_name}`) };
+    }
+
+    // Names of the entries of a ZIP archive, without reading them.
+    private listZipEntryNames(zipPath: string): Promise<string[]> {
         return new Promise((resolve, reject) => {
             yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
                 if (err || !zipfile) {
                     return reject(err || new Error('Failed to open zip file'));
                 }
-
-                zipfile.readEntry();
-
+                const names: string[] = [];
+                zipfile.on('error', (err) => reject(err));
                 zipfile.on('entry', (entry) => {
-                    if (filePathPattern.test(entry.fileName)) {
-                        resolve(entry.fileName);
-                    } else {
-                        zipfile.readEntry();
-                    }
+                    names.push(entry.fileName);
+                    zipfile.readEntry();
                 });
-
-                zipfile.on('end', () => reject(new Error('File not found in zip')));
+                zipfile.on('end', () => resolve(names));
+                zipfile.readEntry();
             });
         });
     }
@@ -466,31 +510,31 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     extractPressures(input: string): (number | "NaN")[] {
-        const lines = input.split(/\r\n|\n|\r/);
         const pressures: (number | "NaN")[] = [];
-
-        lines.forEach((line) => {
-
-            // 1) Check if the line starts with YYYYMMDD
-            if (!/^\d{8}/.test(line)) return;
-
-            // 2) Split col by comma
-            const parts = line.split(",");
-
-            // We need at least 2 columns: timestamp + pressure
-            if (parts.length < 2) return;
-            const rawPressure = parts[1]; // pressure column
-
-            // 3) Validate: must be a number or "NaN"
-            if (rawPressure !== "NaN" && isNaN(parseFloat(rawPressure))) return;
-
-            // 4) Convert to number or keep "NaN"
-            const pressure =
-                rawPressure === "NaN" ? "NaN" : parseFloat(rawPressure);
-
-            pressures.push(pressure);
-        });
+        for (const line of input.split(/\r\n|\n|\r/)) {
+            const pressure = this.extractPressure(line);
+            if (pressure !== null) pressures.push(pressure);
+        }
         return pressures;
+    }
+
+    // Pressure of one particules.csv line, null for a line that is not a data row.
+    private extractPressure(line: string): number | "NaN" | null {
+        // 1) Check if the line starts with YYYYMMDD
+        if (!/^\d{8}/.test(line)) return null;
+
+        // 2) Split col by comma
+        const parts = line.split(",");
+
+        // We need at least 2 columns: timestamp + pressure
+        if (parts.length < 2) return null;
+        const rawPressure = parts[1]; // pressure column
+
+        // 3) Validate: must be a number or "NaN"
+        if (rawPressure !== "NaN" && isNaN(parseFloat(rawPressure))) return null;
+
+        // 4) Convert to number or keep "NaN"
+        return rawPressure === "NaN" ? "NaN" : parseFloat(rawPressure);
     }
 
 
@@ -967,41 +1011,33 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]> {
         // List importable samples from root_folder_path
-        let samples: PublicHeaderSampleResponseModel[] = [];
         const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
         const meta_header_samples = await this.getSamplesFromHeaders(folderPath);
-        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, meta_header_samples);
 
+        let source_samples: string[];
+        let source_folder: string;
         if (instrument_model.startsWith('UVP6')) {
             // Read from folderPath/ecodata and return the list of samples
-            const samples_ecodata = await this.getSamplesFromEcodata(folderPath);
-            samples = await this.setupSamples(meta_header_samples, samples_ecodata, "ecodata", sample_images_counts);
-
+            source_samples = await this.getSamplesFromEcodata(folderPath);
+            source_folder = "ecodata";
         } else if (instrument_model.startsWith('UVP5')) {
             // Read from folderPath/work and return the list of samples
-            const samples_work = await this.getSamplesFromWork(folderPath);
-            samples = await this.setupSamples(meta_header_samples, samples_work, "work", sample_images_counts);
+            source_samples = await this.getSamplesFromWork(folderPath);
+            source_folder = "work";
+        } else {
+            return [];
         }
 
-
-        // Filter samples that are not already in the project folder 
+        // Samples already in the project folder or in the database are left out before the vignette
+        // counts: those read one archive per sample, seconds for the TSV of a long deployment.
         const fs_imported_samples_name = await this.getSamplesFromFsStorage(dest_folder);
-        const fs_filtered_samples = samples.filter(sample => {
-            const existingSample = fs_imported_samples_name.includes(sample.sample_name);
-            return !existingSample; // keep if sample is not found
-        });
-
-
-        // Filter samples that are not already in the database 
         const db_imported_samples_name = await this.getProjectSampleNames(project_id);
+        const not_imported_samples = meta_header_samples.filter(sample =>
+            !fs_imported_samples_name.includes(sample.profileId) && !db_imported_samples_name.includes(sample.profileId));
 
-        const db_fs_filtered_samples = fs_filtered_samples.filter(sample => {
-            const existingSample = db_imported_samples_name.includes(sample.sample_name);
-            return !existingSample; // keep if sample is not found
-        });
-
-        return db_fs_filtered_samples;
+        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, not_imported_samples);
+        return this.setupSamples(not_imported_samples, source_samples, source_folder, sample_images_counts);
     }
 
     // Why each sample is left out of listImportableSamples. Skips the vignette counts, which read
@@ -1056,8 +1092,8 @@ export class SampleRepositoryImpl implements SampleRepository {
         try {
             if (instrument_model.startsWith('UVP6')) {
                 const images_zip_path = path.join(folderPath, 'ecodata', sample_name, `${sample_name}_Images.zip`);
-                const tsv_content = await this.readFileFromZip(images_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
-                return this.extractNumberOfTsvDataLines(tsv_content);
+                const { stream } = await this.openZipEntry(images_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
+                return await this.countTsvDataLines(stream);
             }
 
             if (instrument_model.startsWith('UVP5')) {
@@ -1066,16 +1102,15 @@ export class SampleRepositoryImpl implements SampleRepository {
                 const tsv_pattern = new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 
                 try {
-                    const tsv_content = await this.readFileFromZip(work_zip_path, undefined, tsv_pattern);
-                    return this.extractNumberOfTsvDataLines(tsv_content);
+                    const { stream } = await this.openZipEntry(work_zip_path, undefined, tsv_pattern);
+                    return await this.countTsvDataLines(stream);
                 } catch {
                     try {
-                        const tsv_content = await this.readFileFromTarZst(work_tar_zst_path, undefined, tsv_pattern);
-                        return this.extractNumberOfTsvDataLines(tsv_content);
+                        const { stream } = await this.openTarZstEntry(work_tar_zst_path, undefined, tsv_pattern);
+                        return await this.countTsvDataLines(stream);
                     } catch {
                         const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
-                        const tsv_content = decodeUvpText(await fsPromises.readFile(tsv_file_path));
-                        return this.extractNumberOfTsvDataLines(tsv_content);
+                        return await this.countTsvDataLines(fs.createReadStream(tsv_file_path));
                     }
                 }
             }
@@ -1345,24 +1380,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         return samples_response;
     }
-    // Function to read and return samples from header.txt files
-    // Only the canonical header file is read: uvp5_header_<name>.txt or uvp6_header_<name>.txt
+    // Samples of the project's meta header (see selectMetaHeaderFile).
     async getSamplesFromHeaders(folderPath: string): Promise<HeaderSampleModel[]> {
         const samples: HeaderSampleModel[] = [];
         try {
             const header_path = path.join(folderPath, 'meta');
-            const files = await fsPromises.readdir(header_path);
-            for (const file of files) {
-                if (/^uvp[56]_header.*\.txt$/i.test(file)) {
-                    const filePath = path.join(header_path, file);
-                    const content = decodeUvpText(await fsPromises.readFile(filePath));
+            const file = selectMetaHeaderFile(await fsPromises.readdir(header_path), folderPath);
+            const content = decodeUvpText(await fsPromises.readFile(path.join(header_path, file)));
 
-                    const lines = content.trim().split(/\r\n|\n|\r/);
-                    for (let i = 1; i < lines.length; i++) {
-                        samples.push(this.getSampleFromHeaderLine(lines[i]));
-                    }
-                    break; // only one canonical header file expected
-                }
+            const lines = content.trim().split(/\r\n|\n|\r/);
+            for (let i = 1; i < lines.length; i++) {
+                samples.push(this.getSampleFromHeaderLine(lines[i]));
             }
         } catch (err) {
             throw new Error(`Error reading files: ${err.message}`);
@@ -1655,143 +1683,106 @@ export class SampleRepositoryImpl implements SampleRepository {
     /**
      * Extract a zip archive to destFolder, stripping a common top-level directory prefix if present.
      * For example, if every entry starts with "omer2_1/", that prefix is removed so files land at root.
+     * Each file is streamed to disk: a work archive holds the sample's images and can weigh several GB.
      */
     async extractZipNormalized(zipPath: string, destFolder: string): Promise<void> {
-        // Buffer all file entries (skip directory entries)
-        const fileEntries: { name: string; content: Uint8Array }[] = [];
-
-        await new Promise<void>((resolve, reject) => {
-            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-                if (err || !zipfile) return reject(err || new Error('Failed to open zip'));
-                zipfile.readEntry();
-
-                zipfile.on('entry', (entry) => {
-                    if (/\/$/.test(entry.fileName)) {
-                        // directory entry — skip
-                        zipfile.readEntry();
-                        return;
-                    }
-                    zipfile.openReadStream(entry, (streamErr, stream) => {
-                        if (streamErr || !stream) return reject(streamErr || new Error('Failed to open stream'));
-                        const chunks: Uint8Array[] = [];
-                        stream.on('data', (chunk: Uint8Array) => chunks.push(chunk));
-                        stream.on('end', () => {
-                            const total = chunks.reduce((acc, c) => acc + c.length, 0);
-                            const merged = new Uint8Array(total);
-                            let offset = 0;
-                            for (const c of chunks) { merged.set(c, offset); offset += c.length; }
-                            fileEntries.push({ name: entry.fileName, content: merged });
-                            zipfile.readEntry();
-                        });
-                        stream.on('error', reject);
-                    });
-                });
-
-                zipfile.on('end', () => resolve());
-                zipfile.on('error', reject);
-            });
-        });
-
-        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
-        // when detecting the common prefix and when extracting.
-        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
-            || name.endsWith('/.DS_Store')
-            || name === '.DS_Store'
-            || path.basename(name).startsWith('._');
-        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
-
-        // Determine a common top-level directory prefix to strip
-        let stripPrefix = '';
-        if (significantEntries.length > 0) {
-            const firstParts = significantEntries[0].name.split('/');
-            if (firstParts.length > 1) {
-                const candidate = firstParts[0] + '/';
-                if (significantEntries.every(e => e.name.startsWith(candidate))) {
-                    stripPrefix = candidate;
-                }
-            }
-        }
-
-        // Write files to destFolder with the prefix stripped
-        await fsPromises.mkdir(destFolder, { recursive: true });
-        for (const entry of significantEntries) {
-            const normalizedName = entry.name.startsWith(stripPrefix)
-                ? entry.name.slice(stripPrefix.length)
-                : entry.name;
-            if (!normalizedName) continue;
-            const destPath = path.join(destFolder, normalizedName);
-            // An entry named like "../../x" would otherwise be written outside the extraction folder
-            if (!isInsideFolder(destFolder, destPath)) throw new Error(`Archive entry outside the extraction folder: ${entry.name}`);
-            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
-            await fsPromises.writeFile(destPath, entry.content);
-        }
+        await this.extractNormalized(destFolder, (staging, extracted) => this.extractZipFiles(zipPath, staging, extracted));
     }
 
     /**
      * Decompress and extract a `.tar.zst` archive to destFolder, stripping a common top-level
      * directory prefix if present — mirrors extractZipNormalized so the resulting layout is
-     * identical regardless of whether the source was a zip or a tar.zst.
+     * identical regardless of whether the source was a zip or a tar.zst. Decompressed on the fly.
      */
     async extractTarZstNormalized(tarZstPath: string, destFolder: string): Promise<void> {
-        // Decompress the zstandard stream to a raw tar buffer, then parse it in memory.
-        const compressed = await fsPromises.readFile(tarZstPath);
-        const tarBuffer = Buffer.from(fzstd.decompress(new Uint8Array(compressed)));
-
-        const fileEntries: { name: string; content: Uint8Array }[] = [];
-
-        await new Promise<void>((resolve, reject) => {
-            const parser = new tar.Parser();
-            parser.on('entry', (entry) => {
-                if (entry.type !== 'File') {
-                    // directory / pax / global header — skip
-                    entry.resume();
-                    return;
-                }
-                const chunks: Buffer[] = [];
-                entry.on('data', (chunk: Buffer) => chunks.push(chunk));
-                entry.on('end', () => {
-                    fileEntries.push({ name: entry.path, content: new Uint8Array(Buffer.concat(chunks)) });
-                });
-                entry.on('error', reject);
-            });
-            parser.on('end', () => resolve());
-            parser.on('error', reject);
-            parser.end(tarBuffer);
+        await this.extractNormalized(destFolder, async (staging, extracted) => {
+            const unsafe: string[] = [];
+            await pipelinePromise(fs.createReadStream(tarZstPath), createZstdDecompressStream(), tar.x({
+                cwd: staging,
+                preserveOwner: false,
+                // Called while the archive is parsed, so it must not throw: an unsafe entry fails the
+                // extraction once it is over.
+                filter: (name, entry) => {
+                    if (!('type' in entry) || entry.type !== 'File' || this.isMacJunk(name)) return false;
+                    if (name.replace(/\\/g, '/').split('/').includes('..')) {
+                        unsafe.push(name);
+                        return false;
+                    }
+                    extracted.push(name);
+                    return true;
+                },
+            }));
+            if (unsafe.length > 0) {
+                throw new Error(`${path.basename(tarZstPath)} has an entry outside its folder: ${unsafe[0]}`);
+            }
         });
+    }
 
-        // Ignore macOS metadata entries (__MACOSX/* resource forks, .DS_Store)
-        // when detecting the common prefix and when extracting.
-        const isMacJunk = (name: string) => name.startsWith('__MACOSX/')
+    // The files are extracted into a staging folder next to destFolder, then their common top-level
+    // folder (or the staging folder itself) becomes destFolder: the archive is read only once.
+    private async extractNormalized(destFolder: string, extract: (staging: string, extracted: string[]) => Promise<void>): Promise<void> {
+        const staging = `${destFolder}.extracting`;
+        const extracted: string[] = [];
+        await fsPromises.rm(staging, { recursive: true, force: true });
+        await fsPromises.mkdir(staging, { recursive: true });
+        try {
+            await extract(staging, extracted);
+            await fsPromises.rename(path.resolve(staging, this.commonTopFolder(extracted)), destFolder);
+        } finally {
+            await fsPromises.rm(staging, { recursive: true, force: true });
+        }
+    }
+
+    // Streams every file of the zip into staging, one at a time. yauzl refuses entries that would
+    // leave the folder ("../x", "/x").
+    private extractZipFiles(zipPath: string, staging: string, extracted: string[]): Promise<void> {
+        return new Promise((resolve, reject) => {
+            yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+                if (err || !zipfile) return reject(err || new Error('Failed to open zip'));
+                const fail = (error: Error) => {
+                    zipfile.close();
+                    reject(error);
+                };
+                zipfile.on('error', fail);
+                zipfile.on('end', () => resolve());
+                zipfile.on('entry', (entry: yauzl.Entry) => {
+                    const name = entry.fileName;
+                    // Directory entries are not files; macOS metadata is never extracted.
+                    if (name.endsWith('/') || this.isMacJunk(name)) return zipfile.readEntry();
+                    this.writeZipEntry(zipfile, entry, path.join(staging, name)).then(() => {
+                        extracted.push(name);
+                        zipfile.readEntry();
+                    }, fail);
+                });
+                zipfile.readEntry();
+            });
+        });
+    }
+
+    private async writeZipEntry(zipfile: yauzl.ZipFile, entry: yauzl.Entry, dest_path: string): Promise<void> {
+        await fsPromises.mkdir(path.dirname(dest_path), { recursive: true });
+        const stream = await new Promise<Readable>((resolve, reject) => {
+            zipfile.openReadStream(entry, (err, readStream) => err || !readStream ? reject(err || new Error('Failed to open stream')) : resolve(readStream));
+        });
+        await pipelinePromise(stream, fs.createWriteStream(dest_path));
+    }
+
+    // macOS metadata entries (__MACOSX/* resource forks, .DS_Store) are neither extracted nor taken
+    // into account for the common prefix.
+    private isMacJunk(name: string): boolean {
+        return name.startsWith('__MACOSX/')
             || name.endsWith('/.DS_Store')
             || name === '.DS_Store'
             || path.basename(name).startsWith('._');
-        const significantEntries = fileEntries.filter(e => !isMacJunk(e.name));
+    }
 
-        // Determine a common top-level directory prefix to strip
-        let stripPrefix = '';
-        if (significantEntries.length > 0) {
-            const firstParts = significantEntries[0].name.split('/');
-            if (firstParts.length > 1) {
-                const candidate = firstParts[0] + '/';
-                if (significantEntries.every(e => e.name.startsWith(candidate))) {
-                    stripPrefix = candidate;
-                }
-            }
-        }
-
-        // Write files to destFolder with the prefix stripped
-        await fsPromises.mkdir(destFolder, { recursive: true });
-        for (const entry of significantEntries) {
-            const normalizedName = entry.name.startsWith(stripPrefix)
-                ? entry.name.slice(stripPrefix.length)
-                : entry.name;
-            if (!normalizedName) continue;
-            const destPath = path.join(destFolder, normalizedName);
-            // An entry named like "../../x" would otherwise be written outside the extraction folder
-            if (!isInsideFolder(destFolder, destPath)) throw new Error(`Archive entry outside the extraction folder: ${entry.name}`);
-            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
-            await fsPromises.writeFile(destPath, entry.content);
-        }
+    // The top-level folder every file sits in ("omer2_1/"), or "" when they do not all share one.
+    private commonTopFolder(file_names: string[]): string {
+        if (file_names.length === 0) return '';
+        const first_parts = file_names[0].split('/');
+        if (first_parts.length < 2) return '';
+        const candidate = first_parts[0] + '/';
+        return file_names.every(name => name.startsWith(candidate)) ? candidate : '';
     }
 
     // Written to a temporary file and renamed on success: an interrupted run never leaves a truncated
@@ -2122,53 +2113,66 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
         const zipPath = path.join(project_folder, sample_name, `${sample_name}_Particule.zip`);
-        const content = await this.readFileFromZip(zipPath, "particules.csv", undefined);
-        return this.parseParticulesCsvRecords(content);
+        const records: PerImageRecord[] = [];
+        for await (const line of this.readZipEntryLines(zipPath, "particules.csv")) {
+            const record = this.parsePivotParticulesCsvRow(line, records.length);
+            if (record) records.push(this.toPerImageRecord(record));
+        }
+        return records;
+    }
+
+    parseParticulesCsvRecords(content: string): PerImageRecord[] {
+        return this.parsePivotParticulesCsv(content).map(record => this.toPerImageRecord(record));
+    }
+
+    // The QC graphs read a pivot record without its blocks.
+    private toPerImageRecord({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }: PivotImageRecord): PerImageRecord {
+        return { image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag };
+    }
+
+    // Same grammar, keeping each block with its mean grey: what the binned export needs.
+    parsePivotParticulesCsv(content: string): PivotImageRecord[] {
+        const records: PivotImageRecord[] = [];
+        for (const line of content.split(/\r\n|\n|\r/)) {
+            const record = this.parsePivotParticulesCsvRow(line, records.length);
+            if (record) records.push(record);
+        }
+        return records;
     }
 
     // particules.csv: each data row is one image — `image_id, pressure, internal temperature, <flash>:<first_area>, <;-separated blocks>`.
     // Each block is `area_px, nb_particles, grey_mean, grey_std`: an exact pixel area (not a size
     // class), the objects of that area, and the mean and std of the grey of their pixels. Block 0's
     // area_px is glued to the flag (so its count is field 0), later blocks carry their own area_px.
-    parseParticulesCsvRecords(content: string): PerImageRecord[] {
-        return this.parsePivotParticulesCsv(content).map(({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }) =>
-            ({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }));
-    }
-
-    // Same grammar, keeping each block with its mean grey: what the binned export needs.
-    parsePivotParticulesCsv(content: string): PivotImageRecord[] {
-        const records: PivotImageRecord[] = [];
-        let image_index = 0;
-        for (const line of content.split(/\r\n|\n|\r/)) {
-            // Data rows start with YYYYMMDD; HW_CONF / ACQ_CONF headers don't.
-            if (!/^\d{8}/.test(line)) continue;
-            const parts = line.split(",");
-            if (parts.length < 4) continue;
-            // A NaN pressure stays: a time series without pressure is still placed by its time.
-            const pressure = parseFloat(parts[1]);
-            const raw_pressure = isNaN(pressure) ? null : pressure;
-            const flag = parts[3].trim().split(":");        // "<light>:<first_class>"
-            const light_on = flag[0] === "1";
-            const first_class = parseInt(flag[1], 10);
-            const spectrum_counts: Record<number, number> = {};
-            const blocks: PivotParticleBlock[] = [];
-            const addBlock = (area_px: number, nb_particles: number, grey: string | undefined) => {
-                if (isNaN(area_px) || isNaN(nb_particles)) return;
-                spectrum_counts[area_px] = nb_particles;
-                const grey_mean = parseFloat(grey ?? "");
-                blocks.push({ area_px, nb_particles, grey_mean: isNaN(grey_mean) ? null : grey_mean });
-            };
-            // Spectrum blocks live after the flag; commas inside, ';' between blocks.
-            parts.slice(4).join(",").split(";").forEach((block, i) => {
-                const v = block.split(",");
-                if (i === 0) addBlock(first_class, parseInt(v[0], 10), v[1]);
-                else addBlock(parseInt(v[0], 10), parseInt(v[1], 10), v[2]);
-            });
-            const image_id = parts[0].trim();
-            const particle_data_flag = PARTICLE_DATA_FLAGS.find((f) => line.slice(line.indexOf(":") + 1).includes(f));
-            records.push({ image_index: image_index++, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts, particle_data_flag, blocks });
-        }
-        return records;
+    // Returns null for a line that is not a data row; image_index counts the data rows before it.
+    private parsePivotParticulesCsvRow(line: string, image_index: number): PivotImageRecord | null {
+        // Data rows start with YYYYMMDD; HW_CONF / ACQ_CONF headers don't.
+        if (!/^\d{8}/.test(line)) return null;
+        const parts = line.split(",");
+        if (parts.length < 4) return null;
+        // A NaN pressure stays: a time series without pressure is still placed by its time.
+        const pressure = parseFloat(parts[1]);
+        const raw_pressure = isNaN(pressure) ? null : pressure;
+        const flag = parts[3].trim().split(":");        // "<light>:<first_class>"
+        const light_on = flag[0] === "1";
+        const first_class = parseInt(flag[1], 10);
+        const spectrum_counts: Record<number, number> = {};
+        const blocks: PivotParticleBlock[] = [];
+        const addBlock = (area_px: number, nb_particles: number, grey: string | undefined) => {
+            if (isNaN(area_px) || isNaN(nb_particles)) return;
+            spectrum_counts[area_px] = nb_particles;
+            const grey_mean = parseFloat(grey ?? "");
+            blocks.push({ area_px, nb_particles, grey_mean: isNaN(grey_mean) ? null : grey_mean });
+        };
+        // Spectrum blocks live after the flag; commas inside, ';' between blocks.
+        parts.slice(4).join(",").split(";").forEach((block, i) => {
+            const v = block.split(",");
+            if (i === 0) addBlock(first_class, parseInt(v[0], 10), v[1]);
+            else addBlock(parseInt(v[0], 10), parseInt(v[1], 10), v[2]);
+        });
+        const image_id = parts[0].trim();
+        const particle_data_flag = PARTICLE_DATA_FLAGS.find((f) => line.slice(line.indexOf(":") + 1).includes(f));
+        return { image_index, image_id, raw_pressure, image_time_ms: this.parseUvpTimestampMs(image_id), light_on, spectrum_counts, particle_data_flag, blocks };
     }
 
     // The UVP6-format particle file every computed product reads: the pivot built at import for a
@@ -2183,7 +2187,12 @@ export class SampleRepositoryImpl implements SampleRepository {
             throw new Error("Unknown instrument model");
         }
         try {
-            return this.parsePivotParticulesCsv(await this.readFileFromZip(zip_path, "particules.csv", undefined));
+            const records: PivotImageRecord[] = [];
+            for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
+                const record = this.parsePivotParticulesCsvRow(line, records.length);
+                if (record) records.push(record);
+            }
+            return records;
         } catch (error) {
             throw new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
         }
@@ -2197,9 +2206,9 @@ export class SampleRepositoryImpl implements SampleRepository {
         // 2. .bru → per-particle pixel area (col idx 2 in the post-import bru1 variant), grouped by frame.
         let spectraByFrame = new Map<number, Record<number, number>>();
         try {
-            const bruContent = await this.readFileFromZip(workZip, `${sample_name}.bru`, undefined);
-            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+            for await (const line of this.readZipEntryLines(workZip, `${sample_name}.bru`)) this.addBruSpectrumLine(spectraByFrame, line);
         } catch {
+            spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
         return frames.map((f, i) => ({
@@ -2216,20 +2225,20 @@ export class SampleRepositoryImpl implements SampleRepository {
     // ─── UVP5 → UVP6 pivot ───
     // Written under <sample>/pivot/ rather than next to the acquisition files: legacy EcoPart infers
     // the instrument from the presence of a `_Particule.zip`, and the archives must never ship it.
-    async generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport> {
+    async generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string, root_folder_path: string): Promise<Uvp5PivotReport> {
         const sample_name = sample.sample_name;
         const sample_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name);
         try {
             const work_zip = path.join(sample_folder, `${sample_name}_work.zip`);
             const meta_conf_zip = path.join(sample_folder, `${sample_name}_meta_conf.zip`);
             const datfile_content = await this.readPivotSource(work_zip, `${sample_name}_datfile.txt`, `${sample_name}_datfile.txt`);
-            const bru_content = await this.readPivotSource(work_zip, `${sample_name}.bru`, `${sample_name}.bru`);
-            const header_content = await this.readPivotSource(meta_conf_zip, "meta/uvp5_header_sn*.txt", undefined, /^meta\/uvp5_header_sn.*\.txt$/);
+            const bru_blocks_by_frame = await this.readPivotBru(work_zip, sample_name);
+            const header_content = (await this.readMetaConfHeader(meta_conf_zip, root_folder_path)).content;
             const files = convertUvp5ToPivot({
                 sample,
                 instrument_model,
                 datfile_content,
-                bru_content,
+                bru_blocks_by_frame,
                 header_row: parseUvp5HeaderRow(header_content, sample_name),
                 converted_utc: new Date().toISOString(),
             });
@@ -2254,6 +2263,17 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     private getPivotZipPath(project_id: number, sample_name: string): string {
         return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, "pivot", `${sample_name}_Particule.zip`);
+    }
+
+    // The .bru is read line by line: it grows with the particles of the sample.
+    private async readPivotBru(work_zip: string, sample_name: string): Promise<BruBlocksByFrame> {
+        const by_frame: BruBlocksByFrame = new Map();
+        try {
+            for await (const line of this.readZipEntryLines(work_zip, `${sample_name}.bru`)) addBruLine(by_frame, line);
+        } catch (error) {
+            throw new Error(`cannot read ${sample_name}.bru in ${path.basename(work_zip)} (${(error as Error).message}). Check that the file is in the sample folder of the project, then relaunch the import or the pivot regeneration.`);
+        }
+        return by_frame;
     }
 
     private async readPivotSource(zipPath: string, description: string, targetFileName?: string, filePathPattern?: RegExp): Promise<string> {
@@ -2362,9 +2382,9 @@ export class SampleRepositoryImpl implements SampleRepository {
 
         let spectraByFrame = new Map<number, Record<number, number>>();
         try {
-            const bruContent = await this.readWorkSourceFile(root_abs, sample_name, `${sample_name}.bru`, bruPattern);
-            spectraByFrame = this.parseBruSpectraByFrame(bruContent);
+            for await (const line of this.readWorkSourceLines(root_abs, sample_name, `${sample_name}.bru`, bruPattern)) this.addBruSpectrumLine(spectraByFrame, line);
         } catch {
+            spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
         return frames.map((f, i) => ({
@@ -2385,6 +2405,20 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Read one file from the UVP5 source work entry, whatever its on-disk form.
+    // Same sources as readWorkSourceFile, line by line, for the files that grow with the sample.
+    private async *readWorkSourceLines(root_abs: string, sample_name: string, file_base_name: string, pattern: RegExp): AsyncGenerator<string> {
+        const workTarZst = path.join(root_abs, "work", `${sample_name}.tar.zst`);
+        const workZip = path.join(root_abs, "work", `${sample_name}.zip`);
+        if (await this.pathExists(workTarZst)) {
+            yield* readUvpTextLines((await this.openTarZstEntry(workTarZst, undefined, pattern)).stream);
+        } else if (await this.pathExists(workZip)) {
+            yield* this.readZipEntryLines(workZip, undefined, pattern);
+        } else {
+            // Plain folder: files sit directly under work/<sample>/.
+            yield* readUvpTextLines(fs.createReadStream(path.join(root_abs, "work", sample_name, file_base_name)));
+        }
+    }
+
     private async readWorkSourceFile(root_abs: string, sample_name: string, file_base_name: string, pattern: RegExp): Promise<string> {
         const workTarZst = path.join(root_abs, "work", `${sample_name}.tar.zst`);
         const workZip = path.join(root_abs, "work", `${sample_name}.zip`);
@@ -2400,14 +2434,10 @@ export class SampleRepositoryImpl implements SampleRepository {
         return decodeUvpText(await fsPromises.readFile(workDirFile));
     }
 
-    // UVP5 source: the meta header is the shared meta/uvp5_header_sn*.txt (not yet zipped per sample).
+    // UVP5 source: the meta header is read from the project's meta/ folder (not yet zipped per sample).
     private async readMetaHeaderFromSource(root_abs: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
         const metaDir = path.join(root_abs, "meta");
-        const files = await fsPromises.readdir(metaDir);
-        const headerFile = files.find((f) => /^uvp5_header_sn.*\.txt$/i.test(f));
-        if (!headerFile) {
-            throw new Error("Meta header file not found");
-        }
+        const headerFile = selectMetaHeaderFile(await fsPromises.readdir(metaDir), root_abs);
         const content = decodeUvpText(await fsPromises.readFile(path.join(metaDir, headerFile)));
         return this.parseMetaHeader(content, headerFile, sample_name);
     }
@@ -2445,18 +2475,22 @@ export class SampleRepositoryImpl implements SampleRepository {
         while (start < len) {
             let end = content.indexOf("\n", start);
             if (end === -1) end = len;
-            const line = content.slice(start, end);
+            this.addBruSpectrumLine(byFrame, content.slice(start, end));
             start = end + 1;
-            const cols = line.split(";");
-            if (cols.length < 3) continue;
-            const frame_idx = parseInt(cols[0], 10);
-            const area_px = parseInt(cols[2], 10);
-            if (isNaN(frame_idx) || isNaN(area_px)) continue;
-            let spectrum = byFrame.get(frame_idx);
-            if (!spectrum) { spectrum = {}; byFrame.set(frame_idx, spectrum); }
-            spectrum[area_px] = (spectrum[area_px] ?? 0) + 1;
         }
         return byFrame;
+    }
+
+    // Counts one .bru particle in the spectrum of its frame; a row that is not a particle is ignored.
+    private addBruSpectrumLine(byFrame: Map<number, Record<number, number>>, line: string): void {
+        const cols = line.split(";");
+        if (cols.length < 3) return;
+        const frame_idx = parseInt(cols[0], 10);
+        const area_px = parseInt(cols[2], 10);
+        if (isNaN(frame_idx) || isNaN(area_px)) return;
+        let spectrum = byFrame.get(frame_idx);
+        if (!spectrum) { spectrum = {}; byFrame.set(frame_idx, spectrum); }
+        spectrum[area_px] = (spectrum[area_px] ?? 0) + 1;
     }
 
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string {
@@ -2628,8 +2662,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             // verify that tsv exists and read number of images img_file_name
             const zipPath = path.join(folderPath, sample, `${sample}_Images.zip`);
             try {
-                const fileContent = await this.readFileFromZip(zipPath, tsv_file_name, undefined);
-                const images = this.extractNumberOfImages(fileContent);
+                const images = await this.countTsvImages(this.readZipEntryLines(zipPath, tsv_file_name));
                 const db_sample_id = db_importable_samples_ecotaxa.find(s => s.sample_name === sample)?.sample_id as number;
                 if (db_sample_id === undefined) {
                     console.warn(`Warning: Sample ${sample} not found in database. Skipping this sample.`);
@@ -2674,8 +2707,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             const local_folder_tsv_path = path.join(folderPath, sample, sample + "_work.zip");//TODO PAS SUR
             try {
 
-                const tsv_content = await this.readFileFromZip(zip_path, tsv_file_name, undefined);
-                const images = this.extractNumberOfImages(tsv_content);
+                const images = await this.countTsvImages(this.readZipEntryLines(zip_path, tsv_file_name));
                 const db_sample_id = db_importable_samples_ecotaxa.find(s => s.sample_name === sample)?.sample_id as number;
                 if (db_sample_id === undefined) {
                     console.warn(`Warning: Sample ${sample} not found in database. Skipping this sample.`);
@@ -2703,17 +2735,19 @@ export class SampleRepositoryImpl implements SampleRepository {
         return samples_response;
     }
 
-    extractNumberOfImages(tsvString: string): number {
-        const lines = tsvString.split(/\r\n|\n|\r/).map(line => line.trim()).filter(line => line);
-        if (lines.length < 2) return 0;
-
-        const headers = lines[0].split('\t');
-        const imgIndex = headers.indexOf('img_file_name');
-        if (imgIndex === -1) throw new Error("Column 'img_file_name' not found");
-
-        const uniqueImages = new Set();
-        for (let i = 1; i < lines.length; i++) {
-            const columns = lines[i].split('\t');
+    // Number of distinct img_file_name values of an EcoTaxa TSV, read line by line.
+    async countTsvImages(lines: AsyncIterable<string> | Iterable<string>): Promise<number> {
+        let imgIndex: number | undefined;
+        const uniqueImages = new Set<string>();
+        for await (const raw_line of lines) {
+            const line = raw_line.trim();
+            if (!line) continue;
+            if (imgIndex === undefined) {
+                imgIndex = line.split('\t').indexOf('img_file_name');
+                continue;
+            }
+            if (imgIndex === -1) throw new Error("Column 'img_file_name' not found");
+            const columns = line.split('\t');
             if (columns[imgIndex]) uniqueImages.add(columns[imgIndex]);
         }
 
@@ -2731,6 +2765,15 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
 
         return lines.length - 1;
+    }
+
+    // Same count as extractNumberOfTsvDataLines, read line by line.
+    private async countTsvDataLines(stream: AsyncIterable<Buffer>): Promise<number> {
+        let non_blank_lines = 0;
+        for await (const line of readUvpTextLines(stream)) {
+            if (line.trim().length > 0) non_blank_lines++;
+        }
+        return non_blank_lines < 2 ? 0 : non_blank_lines - 1;
     }
 
     // Delete ecotaxa related samples fields from sample in db

@@ -132,7 +132,7 @@ describe("RegeneratePivots", () => {
             await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
 
             expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(1);
-            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleModel_2, projectResponseModel.instrument_model);
+            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleModel_2, projectResponseModel.instrument_model, projectResponseModel.root_folder_path);
             expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 50, `perle3_001: pivot already at converter version ${UVP5_PIVOT_CONVERTER_VERSION}, kept`);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
@@ -147,7 +147,7 @@ describe("RegeneratePivots", () => {
             await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
 
             expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(1);
-            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleModel_1, projectResponseModel.instrument_model);
+            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleModel_1, projectResponseModel.instrument_model, projectResponseModel.root_folder_path);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
             expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled);
         });

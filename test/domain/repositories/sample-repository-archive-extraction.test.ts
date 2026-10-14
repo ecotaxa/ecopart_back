@@ -60,7 +60,7 @@ describe("SampleRepository - archive extraction stays inside the destination", (
         ]));
         const dest = path.join(workdir, "nested", "dest");
 
-        await expect(repo.extractTarZstNormalized(archive, dest)).rejects.toThrow("Archive entry outside the extraction folder");
+        await expect(repo.extractTarZstNormalized(archive, dest)).rejects.toThrow("has an entry outside its folder");
         expect(fs.existsSync(path.join(workdir, "escaped.txt"))).toBe(false);
     });
 });

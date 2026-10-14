@@ -16,7 +16,7 @@ describe("Domain - Use Cases - Get Import Folder Metadata", () => {
     });
 
     test("Should keep accented characters of a Latin-1 meta header and cruise_info", async () => {
-        const projectFolder = path.join(importFolder, "tethys_2025");
+        const projectFolder = path.join(importFolder, "uvp5_sn002zd_tethys_2025");
         fs.mkdirSync(path.join(projectFolder, "meta"), { recursive: true });
         fs.mkdirSync(path.join(projectFolder, "config"), { recursive: true });
         fs.writeFileSync(
@@ -28,10 +28,22 @@ describe("Domain - Use Cases - Get Import Folder Metadata", () => {
             Buffer.from("[cruise]\nacron=TETHYS\ndescription=Campagne d'été\n", "latin1")
         );
 
-        const metadata = await new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute("tethys_2025");
+        const metadata = await new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute("uvp5_sn002zd_tethys_2025");
 
         expect(metadata.ship).toBe("Téthys_2");
         expect(metadata.cruise).toBe("campagne_été");
         expect(metadata.project_description).toBe("Campagne d'été");
+    });
+
+    test("Should read cruise and ship from the canonical meta header, not from another header next to it", async () => {
+        const projectFolder = path.join(importFolder, "uvp6_sn000171hf_20230720_wcb_1_test");
+        fs.mkdirSync(path.join(projectFolder, "meta"), { recursive: true });
+        fs.writeFileSync(path.join(projectFolder, "meta", "uvp6_header_sn000171hf_20230720_wcb_1.txt"), "cruise;ship;filename\nwcb_1;other_ship;20230720-000000\n");
+        fs.writeFileSync(path.join(projectFolder, "meta", "uvp6_header_sn000171hf_20230720_wcb_1_test.txt"), "cruise;ship;filename\nwcb_1_test;test_ship;20230720-000000\n");
+
+        const metadata = await new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute("uvp6_sn000171hf_20230720_wcb_1_test");
+
+        expect(metadata.cruise).toBe("wcb_1_test");
+        expect(metadata.ship).toBe("test_ship");
     });
 });

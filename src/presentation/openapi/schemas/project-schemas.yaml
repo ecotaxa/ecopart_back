@@ -450,7 +450,8 @@ components:
       type: object
       description: |
         Project metadata extracted from an import folder. Used to pre-fill the project creation form.
-        Sources: `config/cruise_info.txt` (INI key=value) and `meta/*header*.txt` (semicolon-delimited CSV).
+        Sources: `config/cruise_info.txt` (INI key=value) and the meta header (semicolon-delimited CSV):
+        `meta/<instrument>_header_<rest of the folder name>.txt` only.
       properties:
         project_acronym:
           type: string
@@ -465,13 +466,13 @@ components:
         cruise:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 1 (cruise) of the first data
+          description: "Source: meta header → column 1 (cruise) of the first data
             row. Fallback: `config/cruise_info.txt` → key `acron`."
           example: "MPS2024"
         ship:
           type: string
           nullable: true
-          description: "Source: `meta/*header*.txt` → column 2 (ship) of the first data
+          description: "Source: meta header → column 2 (ship) of the first data
             row."
           example: "R/V Thalassa"
         serial_number:

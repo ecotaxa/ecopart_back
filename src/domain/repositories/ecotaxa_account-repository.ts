@@ -755,16 +755,20 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         baseUrl: string,
         token: string,
         jobId: number | string,
-        opts: { intervalMs?: number; maxMinutes?: number } = {}
+        opts: { intervalMs?: number; stallMinutes?: number } = {}
     ): Promise<any> {
         const intervalMs = opts.intervalMs ?? 2000;
-        const maxMinutes = opts.maxMinutes ?? 20;
-        const deadline = Date.now() + maxMinutes * 60_000;
+        // No total duration cap: the job of a large sample can run for hours. It only fails when
+        // EcoTaxa reports no progress for this long.
+        const stallMs = (opts.stallMinutes ?? 30) * 60_000;
+        let last_progress: string | undefined;
+        let last_progress_at = Date.now();
 
-        while (Date.now() < deadline) {
+        for (; ;) {
             // Common pattern: GET /api/jobs/{jobId}/
+            let status1: any;
             try {
-                const status1 = await this.http(`${baseUrl}api/jobs/${jobId}/`, {
+                status1 = await this.http(`${baseUrl}api/jobs/${jobId}/`, {
                     method: "GET",
                     headers: this.JSON_HEADERS(token),
                 });
@@ -777,9 +781,15 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             } catch (e) {
                 throw new Error(`Failed to poll job status for job ${jobId}: ${e.message}`);
             }
+            const progress = JSON.stringify([status1?.state, status1?.progress_pct, status1?.progress_msg, status1?.updated_on]);
+            if (progress !== last_progress) {
+                last_progress = progress;
+                last_progress_at = Date.now();
+            } else if (Date.now() - last_progress_at >= stallMs) {
+                throw new Error(`EcoTaxa job ${jobId} made no progress for ${opts.stallMinutes ?? 30} minutes (state ${status1?.state}, ${status1?.progress_pct ?? "?"}% ${status1?.progress_msg ?? ""}).`);
+            }
             await new Promise((r) => setTimeout(r, intervalMs));
         }
-        throw new Error(`Timeout waiting for import job ${jobId} to finish.`);
     }
 
     // ---- Main API ---------------------------------------------------------------
@@ -833,7 +843,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         );
 
         // 6) Poll until done
-        await this.pollJobUntilDone(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, job_id, { intervalMs: 2500, maxMinutes: 30 }); //TODO make maxMinutes configurable?
+        await this.pollJobUntilDone(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, job_id, { intervalMs: 2500, stallMinutes: 30 });
 
         // Return uploaded filenames as a convenience
         const imported_sample_names = samples_to_import.map((s) => s.local_folder_tsv_path.split(path.sep).pop() as string);
@@ -1040,7 +1050,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         if (!job_id) throw new Error("EcoTaxa export did not return a job id");
 
         // Poll until the export job is done
-        await this.pollJobUntilDone(baseUrl, token, job_id, { intervalMs: 2500, maxMinutes: 30 });
+        await this.pollJobUntilDone(baseUrl, token, job_id, { intervalMs: 2500, stallMinutes: 30 });
 
         // Download the produced file
         const fileResp = await this.fetchWithAgent(`${baseUrl}api/jobs/${job_id}/file`, {
