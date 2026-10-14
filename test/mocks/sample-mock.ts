@@ -1,5 +1,5 @@
 import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
-import { PerImageRecord, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
+import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
 import { PivotImageRecord } from "../../src/domain/entities/binned-export";
@@ -93,10 +93,10 @@ export class MockSampleRepository implements SampleRepository {
     countBlackParticulesUvp6(): Promise<number> {
         throw new Error("Method not implemented for countBlackParticulesUvp6");
     }
-    getPerImageRecords(): Promise<PerImageRecord[]> {
+    getPerImageRecords(): Promise<PerImageColumns> {
         throw new Error("Method not implemented for getPerImageRecords");
     }
-    getPerImageRecordsFromSource(): Promise<PerImageRecord[]> {
+    getPerImageRecordsFromSource(): Promise<PerImageColumns> {
         throw new Error("Method not implemented for getPerImageRecordsFromSource");
     }
     getSourceFilterMetadata(): Promise<SampleSourceQcMetadata> {

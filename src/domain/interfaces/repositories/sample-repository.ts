@@ -1,5 +1,5 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
-import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
+import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -49,11 +49,11 @@ export interface SampleRepository {
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;
 
     // Import-time QC graphs
-    // Reads the sample's raw files and returns one normalised record per acquired image/frame.
-    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    // Reads the sample's raw files and returns one normalised record per acquired image/frame, in columns.
+    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
     // Pre-import variant: reads the per-image records straight from the project source folder
     // (root_folder_path) for a sample that has not been imported yet.
-    getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
     // Pre-import variant: reads the filtering/settings metadata (kept range, image volume, depth
     // offset) straight from the project source folder for a not-yet-imported sample.
     getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata>;

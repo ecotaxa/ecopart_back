@@ -1,7 +1,9 @@
 import { BinnedDepthProfile, BinnedProfile, BinnedTimeProfile, PerImageRecord } from "../../../../src/domain/entities/sample-qc-graph";
 import { buildSampleQcGraphs, GRAPH1_MAX_SLICES, QcGraphInput } from "../../../../src/domain/use-cases/sample/qc-graphs-builder";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
-function input(overrides: Partial<QcGraphInput>): QcGraphInput {
+// The tests write their records one object per image; the builder reads them in columns.
+function input({ records = [], ...overrides }: Partial<Omit<QcGraphInput, "records">> & { records?: PerImageRecord[] }): QcGraphInput {
     return {
         sample_id: null,
         sample_name: "s",
@@ -13,8 +15,8 @@ function input(overrides: Partial<QcGraphInput>): QcGraphInput {
         instrument_settings_image_volume_l: 1,
         is_depth_profile: true,
         descent_filter_enabled: true,
-        records: [],
         ...overrides,
+        records: toPerImageColumns(records),
     };
 }
 

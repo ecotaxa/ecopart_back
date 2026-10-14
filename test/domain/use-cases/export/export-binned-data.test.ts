@@ -22,6 +22,7 @@ import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 import { sampleModel_1 } from "../../../entities/sample";
 import { private_projectResponseModel } from "../../../entities/project";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 const TASK_ID = TaskResponseModel_1.task_id;
@@ -101,7 +102,7 @@ describe("ExportBinnedData", () => {
         jest.spyOn(mockInstrumentModelRepository, "getOneInstrumentModel").mockResolvedValue(null as any);
         jest.spyOn(mockSampleRepository, "countSamplesPerProject").mockResolvedValue(new Map([[1, 3]]));
         jest.spyOn(mockSampleRepository, "countEcotaxaSamplesPerProject").mockResolvedValue(new Map([[1, 0]]));
-        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue([]);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
         jest.spyOn(mockSampleRepository, "getPivotImageRecords").mockResolvedValue([
             pivotLine(1, 2, 10, 20, 0),      // depth 1 + 1 m project offset: bin 0-5 m
             pivotLine(12, 3, 4, 40, 1),      // depth 13 m: bin 10-15 m, the 5-10 m bin stays empty

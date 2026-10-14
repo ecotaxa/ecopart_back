@@ -2,6 +2,7 @@ import { PivotImageRecord } from "../../entities/binned-export";
 import { BINNED_MAX_BINS_PER_SAMPLE, NA } from "../../constants/binned-export";
 import { PART_DET_CLASS_LIMITS_MM, SIZE_CLASS_COUNT, sizeClassOfEsd, sizeClassSuffix } from "../../constants/size-classes";
 import { selectUsedImages } from "../sample/qc-graphs-builder";
+import { toPerImageColumns } from "../../utils/per-image-columns";
 
 /* Binned export (product 1), pure computation: per sample and per bin, the particle counts,
  * concentrations, biovolumes and mean grey of each size class, from the sample's UVP6-format pivot.
@@ -143,7 +144,7 @@ export function computeBinnedSample(settings: BinnedSampleSettings, records: Piv
         instrument_settings_image_volume_l: settings.image_volume_l,
         is_depth_profile: settings.is_depth_profile,
         descent_filter_enabled: settings.descent_filter_enabled,
-        records,
+        records: toPerImageColumns(records),
     });
     const used = records.filter((_, i) => selected[i]);
 

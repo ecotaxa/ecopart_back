@@ -7,7 +7,8 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
 import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
-import { ParticleDataFlag, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
+import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
+import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
@@ -36,6 +37,23 @@ import { createZstdDecompressStream } from '../utils/zstd-stream';
 // Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
 // (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
 const PARTICLE_DATA_FLAGS: ParticleDataFlag[] = ["OVER_EXPOSED", "EMPTY_IMAGE"];
+
+// parseInt(text.slice(start, end), 10) without building the slice, for the plain case: optional spaces
+// then at most 15 digits. Anything else (sign, other blank, no digit, a longer number) goes to parseInt.
+function parseIntAt(text: string, start: number, end: number): number {
+    let i = start;
+    while (i < end && text.charCodeAt(i) === 32) i++;
+    const first_digit = i;
+    let value = 0;
+    for (; i < end; i++) {
+        const digit = text.charCodeAt(i) - 48;
+        if (digit < 0 || digit > 9) break;
+        value = value * 10 + digit;
+    }
+    if (i === first_digit || i - first_digit > 15) return parseInt(text.slice(start, end), 10);
+    return value;
+}
+
 // Bounds the vignette count cache (a few hundred bytes per sample).
 const MAX_CACHED_VIGNETTE_COUNTS = 10_000;
 
@@ -2115,7 +2133,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     // ─── Import-time QC graphs: per-image raw extraction ───
     // Returns one normalised record per acquired image/frame. IO only — binning into
     // depth profiles is domain logic done in the GetSampleQcGraphs use case.
-    async getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageRecord[]> {
+    async getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageColumns> {
         const project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
         if (instrument_model.startsWith("UVP6")) {
             return this.getPerImageRecordsUVP6(project_folder, sample_name);
@@ -2125,14 +2143,14 @@ export class SampleRepositoryImpl implements SampleRepository {
         throw new Error("Unknown instrument model");
     }
 
-    private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
+    private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageColumns> {
         const zipPath = path.join(project_folder, sample_name, `${sample_name}_Particule.zip`);
-        const records: PerImageRecord[] = [];
+        const columns = new PerImageColumnsBuilder();
+        let image_index = 0;
         for await (const line of this.readZipEntryLines(zipPath, "particules.csv")) {
-            const record = this.parsePivotParticulesCsvRow(line, records.length);
-            if (record) records.push(this.toPerImageRecord(record));
+            if (this.pushParticulesCsvQcRow(columns, line, image_index)) image_index++;
         }
-        return records;
+        return columns.build();
     }
 
     parseParticulesCsvRecords(content: string): PerImageRecord[] {
@@ -2142,6 +2160,48 @@ export class SampleRepositoryImpl implements SampleRepository {
     // The QC graphs read a pivot record without its blocks.
     private toPerImageRecord({ image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag }: PivotImageRecord): PerImageRecord {
         return { image_index, image_id, raw_pressure, image_time_ms, light_on, spectrum_counts, particle_data_flag };
+    }
+
+    /* What the QC graphs read of a particules.csv row, pushed straight into the columns: the grammar of
+     * parsePivotParticulesCsvRow, but only the 1 to 3 pixel blocks are kept and no object is built per
+     * row or block, which reads a mooring of millions of rows several times faster. A test holds both
+     * parsers to the same result. Returns false for a line that is not a data row. */
+    private pushParticulesCsvQcRow(columns: PerImageColumnsBuilder, line: string, image_index: number): boolean {
+        if (!/^\d{8}/.test(line)) return false;
+        const c1 = line.indexOf(",");
+        const c2 = c1 === -1 ? -1 : line.indexOf(",", c1 + 1);
+        const c3 = c2 === -1 ? -1 : line.indexOf(",", c2 + 1);
+        if (c3 === -1) return false;
+        const c4 = line.indexOf(",", c3 + 1);
+        const flag = line.slice(c3 + 1, c4 === -1 ? line.length : c4).trim();     // "<light>:<first_class>"
+        const colon = flag.indexOf(":");
+        const light_on = (colon === -1 ? flag : flag.slice(0, colon)) === "1";
+        const first_class = colon === -1 ? NaN : parseInt(flag.slice(colon + 1), 10);
+        // Blocks after the flag, ';' between them; block 0's area is the class glued to the flag. The
+        // particle count is read only for an area of 1 to 3 pixels, and in place: parseIntAt stops at
+        // the first ',' like parseInt, so it reads a block's first or second field.
+        const counts = [0, 0, 0];
+        let start = c4 === -1 ? line.length : c4 + 1;
+        for (let block = 0; ; block++) {
+            const semicolon = line.indexOf(";", start);
+            const end = semicolon === -1 ? line.length : semicolon;
+            const area_px = block === 0 ? first_class : parseIntAt(line, start, end);
+            if (area_px >= 1 && area_px <= 3) {
+                const comma = block === 0 ? start - 1 : line.indexOf(",", start);
+                const nb_particles = comma === -1 || comma >= end ? NaN : parseIntAt(line, comma + 1, end);
+                if (!isNaN(nb_particles)) counts[area_px - 1] = nb_particles;
+            }
+            if (semicolon === -1) break;
+            start = semicolon + 1;
+        }
+        const image_id = line.slice(0, c1).trim();
+        const pressure = parseFloat(line.slice(c1 + 1, c2));
+        const after_flag = line.indexOf(":") + 1;
+        const flags = (light_on ? IMAGE_FLAG_LIGHT_ON : 0)
+            | (line.includes("OVER_EXPOSED", after_flag) ? IMAGE_FLAG_OVER_EXPOSED
+                : line.includes("EMPTY_IMAGE", after_flag) ? IMAGE_FLAG_EMPTY_IMAGE : 0);
+        columns.pushValues(image_index, image_id, pressure, this.parseUvpTimestampMs(image_id) ?? NaN, flags, counts[0], counts[1], counts[2]);
+        return true;
     }
 
     // Same grammar, keeping each block with its mean grey: what the binned export needs.
@@ -2212,7 +2272,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageRecord[]> {
+    private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageColumns> {
         const workZip = path.join(project_folder, sample_name, `${sample_name}_work.zip`);
         // 1. datfile → per-frame raw_pressure (col idx 2), keyed by frame index (col idx 0).
         const datfileContent = await this.readFileFromZip(workZip, `${sample_name}_datfile.txt`, undefined);
@@ -2225,15 +2285,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
-        return frames.map((f, i) => ({
-            image_index: i,
-            image_id: String(f.frame_idx),
-            raw_pressure: f.raw_pressure,
-            image_time_ms: f.time_ms,
-            // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
-            light_on: true,
-            spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
-        }));
+        return this.uvp5FramesToColumns(frames, spectraByFrame);
     }
 
     // ─── UVP5 → UVP6 pivot ───
@@ -2329,7 +2381,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     // match (ecodata/<sample>/<sample>_Particule.zip), so we reuse the existing readers; UVP5
     // needs to handle the source work archive (tar.zst / zip / plain folder) and the shared
     // meta/uvp5_header_sn*.txt header that has not yet been copied per-sample.
-    async getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageRecord[]> {
+    async getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageColumns> {
         const root_abs = path.join(this.base_folder, root_folder_path);
         if (instrument_model.startsWith("UVP6")) {
             // Same layout as post-import storage → reuse the existing UVP6 reader.
@@ -2387,7 +2439,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     // UVP5 source: read the datfile + .bru from the work archive (tar.zst > zip > folder),
     // matching by path so a top-level folder prefix inside the archive is tolerated.
-    private async getPerImageRecordsUVP5FromSource(root_abs: string, sample_name: string): Promise<PerImageRecord[]> {
+    private async getPerImageRecordsUVP5FromSource(root_abs: string, sample_name: string): Promise<PerImageColumns> {
         const esc = sample_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const bruPattern = new RegExp(`(^|/)${esc}\\.bru$`);
 
@@ -2401,15 +2453,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             spectraByFrame = new Map();
             // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
         }
-        return frames.map((f, i) => ({
-            image_index: i,
-            image_id: String(f.frame_idx),
-            raw_pressure: f.raw_pressure,
-            image_time_ms: f.time_ms,
-            // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
-            light_on: true,
-            spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
-        }));
+        return this.uvp5FramesToColumns(frames, spectraByFrame);
     }
 
     private async readSourceDatfile(root_abs: string, sample_name: string): Promise<string> {
@@ -2466,6 +2510,20 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // datfile rows are `frame_idx; timestamp; pressure; …` (semicolon-separated).
+    private uvp5FramesToColumns(frames: { frame_idx: number; raw_pressure: number | null; time_ms: number | null }[], spectraByFrame: Map<number, Record<number, number>>): PerImageColumns {
+        const columns = new PerImageColumnsBuilder();
+        frames.forEach((f, i) => columns.push({
+            image_index: i,
+            image_id: String(f.frame_idx),
+            raw_pressure: f.raw_pressure,
+            image_time_ms: f.time_ms,
+            // UVP5 acquires no lights-off frames today (nb_black ≡ 0) → all images are "on".
+            light_on: true,
+            spectrum_counts: spectraByFrame.get(f.frame_idx) ?? {},
+        }));
+        return columns.build();
+    }
+
     parseDatfileFrames(content: string): { frame_idx: number; raw_pressure: number | null; time_ms: number | null }[] {
         const frames: { frame_idx: number; raw_pressure: number | null; time_ms: number | null }[] = [];
         for (const line of content.split(/\r\n|\n|\r/)) {

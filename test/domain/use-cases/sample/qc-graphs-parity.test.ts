@@ -7,6 +7,7 @@ import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { GetSampleQcGraphs } from "../../../../src/domain/use-cases/sample/get-sample-qc-graphs";
 import { PreviewSamplesQcGraphs } from "../../../../src/domain/use-cases/sample/preview-samples-qc-graphs";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 /* Invariant: for the same sample, the pre-import preview (read from the source folder) and the
  * post-import GET qc-graphs (read from per-sample storage) must return the SAME graphs — they
@@ -38,7 +39,7 @@ async function postImportGraphs(instrument_model: string, records: PerImageRecor
         instrument_settings_depth_offset_m: meta.instrument_settings_depth_offset_m,
         instrument_settings_image_volume_l: meta.instrument_settings_image_volume_l,
     } as PublicSampleModel);
-    jest.spyOn(sampleRepo, "getPerImageRecords").mockResolvedValue(records);
+    jest.spyOn(sampleRepo, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
 
     return useCase.execute(current_user, 1, 42);
 }
@@ -56,7 +57,7 @@ async function preImportGraphs(instrument_model: string, records: PerImageRecord
     jest.spyOn(projectRepo, "getProject").mockResolvedValue({ project_id: 1, root_folder_path: "root", instrument_model } as any);
     jest.spyOn(sampleRepo, "ensureFolderExists").mockResolvedValue();
     jest.spyOn(sampleRepo, "listImportableSamples").mockResolvedValue([{ sample_name: "s1" } as any]);
-    jest.spyOn(sampleRepo, "getPerImageRecordsFromSource").mockResolvedValue(records);
+    jest.spyOn(sampleRepo, "getPerImageRecordsFromSource").mockResolvedValue(toPerImageColumns(records));
     jest.spyOn(sampleRepo, "getSourceFilterMetadata").mockResolvedValue(meta);
 
     const res = await useCase.execute(current_user, 1, ["s1"]);

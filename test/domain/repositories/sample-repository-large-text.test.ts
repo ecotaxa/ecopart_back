@@ -7,6 +7,8 @@ import * as tar from "tar";
 
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 import * as decodeModule from "../../../src/domain/utils/decode-uvp-text";
+import { recordsOf } from "../../entities/per-image-records";
+import { toPerImageColumns } from "../../../src/domain/utils/per-image-columns";
 
 const STRING_TOO_LONG = "Cannot create a string longer than 0x1fffffe8 characters";
 
@@ -294,7 +296,7 @@ describe("reading text from sample archives", () => {
 
             await expect(repo.computeMaxPressure(path.join(tmp, "7"), "mooring_1")).resolves.toBe(12.5);
             await expect(repo.countBlackParticulesUvp6(path.join(tmp, "7"), "mooring_1")).resolves.toBe(1);
-            await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(repo.parseParticulesCsvRecords(PARTICULES_CSV));
+            await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(toPerImageColumns(repo.parseParticulesCsvRecords(PARTICULES_CSV)));
             await expect(repo.getPivotImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(repo.parsePivotParticulesCsv(PARTICULES_CSV));
         });
 
@@ -402,7 +404,7 @@ describe("reading text from sample archives", () => {
                 fs.writeFileSync(path.join(work, "s1", "s1.bru"), BRU);
             }
 
-            const records = await repo.getPerImageRecordsFromSource("source", "s1", "UVP5HD");
+            const records = recordsOf(await repo.getPerImageRecordsFromSource("source", "s1", "UVP5HD"));
 
             expect(records.map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
         });

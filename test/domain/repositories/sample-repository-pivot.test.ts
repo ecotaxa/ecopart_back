@@ -5,6 +5,7 @@ import archiver from "archiver";
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 import { Uvp5PivotSampleMetadata } from "../../../src/domain/entities/pivot";
 import { UVP5_PIVOT_CONVERTER_VERSION } from "../../../src/domain/utils/uvp5-pivot-converter";
+import { recordsOf } from "../../entities/per-image-records";
 
 function writeZip(zip_path: string, members: Record<string, string>): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -118,6 +119,6 @@ describe("UVP5 pivot storage", () => {
 
         expect(report.frames_written).toBe(1);
         expect(await (repo as any).readFileFromZip(path.join(sample_folder, "pivot", "s1c1_Particule.zip"), "particules.csv")).toBe("20200806-221354-586,13.6,,1:3,500,10.0,\n");
-        expect((await repo.getPerImageRecords(5, "s1c1", "UVP5HD")).map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
+        expect(recordsOf(await repo.getPerImageRecords(5, "s1c1", "UVP5HD")).map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
     });
 });

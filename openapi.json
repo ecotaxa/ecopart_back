@@ -5389,6 +5389,9 @@
           "404": {
             "description": "Sample or project not found."
           },
+          "422": {
+            "description": "Unknown instrument model, or the sample has too many images to be read at once (more than 30 million)."
+          },
           "500": {
             "description": "Internal server error."
           }
@@ -5601,7 +5604,7 @@
             "description": "Project, source folder or meta header not found."
           },
           "422": {
-            "description": "Validation error or a requested sample is not importable."
+            "description": "Validation error, a requested sample is not importable, or it has too many images to be read at once (more than 30 million)."
           },
           "500": {
             "description": "Internal server error."

@@ -138,3 +138,24 @@ export interface PerImageRecord {
 }
 
 export type ParticleDataFlag = "OVER_EXPOSED" | "EMPTY_IMAGE";
+
+/* The same records for a whole sample, one typed column per field: a mooring holds millions of
+ * images, and one object each took ~560 bytes of JS heap (3.2 GB for 5.7 million images). The
+ * columns take ~55 bytes per image, outside the JS heap. Row k is the k-th image of the file.
+ * Built and read with the helpers of domain/utils/per-image-columns. */
+export interface PerImageColumns {
+    length: number;
+    image_index: Int32Array;
+    raw_pressure: Float64Array;          // NaN when unreadable
+    image_time_ms: Float64Array;         // NaN when unreadable
+    flags: Uint8Array;                   // IMAGE_FLAG_* bits
+    // Particles of 1, 2 and 3 pixels per image, pixel_counts[px - 1][k]: the QC graphs read no other class.
+    pixel_counts: [Int32Array, Int32Array, Int32Array];
+    // The image ids one after the other (latin1); image k ends at image_id_ends[k].
+    image_ids: Buffer;
+    image_id_ends: Int32Array;
+}
+
+export const IMAGE_FLAG_LIGHT_ON = 1;
+export const IMAGE_FLAG_OVER_EXPOSED = 2;
+export const IMAGE_FLAG_EMPTY_IMAGE = 4;

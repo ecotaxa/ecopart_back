@@ -21,6 +21,7 @@ import { sampleModel_1, sampleModel_2 } from "../../../entities/sample";
 import { private_projectResponseModel } from "../../../entities/project";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 /*
  * Tests of the *background* half of the use case: the archive `runExport` actually produces.
@@ -485,7 +486,7 @@ describe("ExportRawData — produced archive", () => {
         }
 
         test("reports the images the filter drops and the deepest image kept", async () => {
-            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(records as any));
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(toPerImageColumns(records as any)));
 
             await runExport([sampleWithWindow()], ["metadata"], [project({ project_id: 1, enable_descent_filter: true })]);
 
@@ -499,7 +500,7 @@ describe("ExportRawData — produced archive", () => {
         });
 
         test("nothing is removed when the project has the descent filter disabled", async () => {
-            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(records as any));
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(toPerImageColumns(records as any)));
 
             await runExport([sampleWithWindow()], ["metadata"], [project({ project_id: 1, enable_descent_filter: false })]);
 
@@ -509,7 +510,7 @@ describe("ExportRawData — produced archive", () => {
         });
 
         test("a time-based sample is never filtered, whatever the project setting", async () => {
-            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(records as any));
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockImplementation(() => Promise.resolve(toPerImageColumns(records as any)));
 
             await runExport([sampleWithWindow({ sample_type_label: "Time" })], ["metadata"],
                 [project({ project_id: 1, enable_descent_filter: true })]);

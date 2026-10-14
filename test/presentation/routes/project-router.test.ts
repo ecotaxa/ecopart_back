@@ -38,6 +38,7 @@ import { ListImportableCTDSamplesUseCase } from "../../../src/domain/interfaces/
 import { ImportCTDSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ctd_sample/import-ctd-samples";
 import { ListImportedCTDSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ctd_sample/list-imported-ctd-samples";
 import { DeleteImportedCTDSamplesUseCase } from "../../../src/domain/interfaces/use-cases/ctd_sample/delete-imported-ctd-samples";
+import { TOO_MANY_IMAGES_ERROR } from "../../../src/domain/utils/per-image-columns"
 
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(req: Request, __: Response, next: NextFunction): void {
@@ -116,6 +117,8 @@ describe("Project Router", () => {
     let mockDeleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase;
     let mockListShipsUseCase: ListShipsUseCase;
     let mockGetSampleUseCase: GetSampleUseCase;
+    let mockGetSampleQcGraphsUseCase: { execute: jest.Mock }
+    let mockPreviewSamplesQcGraphsUseCase: { execute: jest.Mock }
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -142,8 +145,10 @@ describe("Project Router", () => {
         mockDeleteImportedCTDSamplesUseCase = new MockDeleteImportedCTDSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
         mockGetSampleUseCase = new MockGetSampleUseCase()
+        mockGetSampleQcGraphsUseCase = { execute: jest.fn() }
+        mockPreviewSamplesQcGraphsUseCase = { execute: jest.fn() }
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any, mockGetSampleUseCase, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, mockGetSampleQcGraphsUseCase, {} as any, mockPreviewSamplesQcGraphsUseCase, {} as any, mockGetSampleUseCase, {} as any))
     })
 
     beforeEach(() => {
@@ -1167,6 +1172,21 @@ describe("Project Router", () => {
             const response = await request(server).get("/projects/1/samples/2")
             expect(response.status).toBe(500)
             expect(response.body).toStrictEqual({ errors: ["Cannot get sample"] })
+        });
+    });
+
+    describe("QC graphs of a sample with too many images", () => {
+        test("GET /projects/:project_id/samples/:sample_id/qc-graphs answers 422 with the reason", async () => {
+            mockGetSampleQcGraphsUseCase.execute.mockRejectedValue(new Error(TOO_MANY_IMAGES_ERROR))
+            const response = await request(server).get("/projects/1/samples/2/qc-graphs")
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual({ errors: ["Sample has too many images to be read at once"] })
+        });
+        test("POST /projects/:project_id/samples/qc-graphs-preview answers 422 with the reason", async () => {
+            mockPreviewSamplesQcGraphsUseCase.execute.mockRejectedValue(new Error(TOO_MANY_IMAGES_ERROR))
+            const response = await request(server).post("/projects/1/samples/qc-graphs-preview").send({ sample_names: ["s1"] })
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual({ errors: ["Sample has too many images to be read at once"] })
         });
     });
 
