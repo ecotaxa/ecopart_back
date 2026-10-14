@@ -1,7 +1,9 @@
 import { BinnedDepthProfile, BinnedProfile, BinnedTimeProfile, PerImageRecord } from "../../../../src/domain/entities/sample-qc-graph";
-import { buildSampleQcGraphs, QcGraphInput } from "../../../../src/domain/use-cases/sample/qc-graphs-builder";
+import { buildSampleQcGraphs, GRAPH1_MAX_SLICES, QcGraphInput } from "../../../../src/domain/use-cases/sample/qc-graphs-builder";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
-function input(overrides: Partial<QcGraphInput>): QcGraphInput {
+// The tests write their records one object per image; the builder reads them in columns.
+function input({ records = [], ...overrides }: Partial<Omit<QcGraphInput, "records">> & { records?: PerImageRecord[] }): QcGraphInput {
     return {
         sample_id: null,
         sample_name: "s",
@@ -13,8 +15,8 @@ function input(overrides: Partial<QcGraphInput>): QcGraphInput {
         instrument_settings_image_volume_l: 1,
         is_depth_profile: true,
         descent_filter_enabled: true,
-        records: [],
         ...overrides,
+        records: toPerImageColumns(records),
     };
 }
 
@@ -392,5 +394,47 @@ describe("buildSampleQcGraphs — images without pressure", () => {
         expect(res.image_filtering.removed_images.count).toBe(0);
         expect(res.image_filtering.last_image_used).toBe("c");
         expect(depthProfile(res.imaged_volume_profile).series[0].points.map((p) => p.depth_m)).toEqual([1.5, 3.5]);
+    });
+});
+
+describe("graph 1 reduction", () => {
+    // A UVP5 depth profile going down 0.1 m per frame, with one spike, and the operator window cutting
+    // the first quarter: selected and removed images both cross the slice limits.
+    const N = GRAPH1_MAX_SLICES * 10;
+    const SPIKE = 4321;
+    const records = Array.from({ length: N }, (_, i) => rec(i, String(i), i === SPIKE ? 50000 : i));
+    const graphs = () => buildSampleQcGraphs(input({ records, filter_first_image: String(N / 4), descent_filter_enabled: false }));
+
+    test("keeps every image up to 4 points per slice", () => {
+        const small = Array.from({ length: GRAPH1_MAX_SLICES * 4 }, (_, i) => rec(i, String(i), i));
+
+        const res = buildSampleQcGraphs(input({ records: small, descent_filter_enabled: false }));
+
+        expect(res.image_depth_profile.points).toHaveLength(GRAPH1_MAX_SLICES * 4);
+    });
+
+    test("keeps, per slice and selection state, the highest and lowest image, spikes and ends included", () => {
+        const { image_depth_profile: profile } = graphs();
+
+        expect(profile.points.length).toBeLessThanOrEqual(GRAPH1_MAX_SLICES * 4);
+        expect(profile.points.length).toBeGreaterThan(GRAPH1_MAX_SLICES);
+        const indexes = profile.points.map((p) => p.image_index);
+        expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+        expect(new Set(indexes).size).toBe(indexes.length);
+        expect(indexes).toEqual(expect.arrayContaining([0, N / 4 - 1, N / 4, SPIKE, N - 1]));
+        // The kept points are real images, with their own selection.
+        for (const point of profile.points) {
+            expect(point.image_id).toBe(String(point.image_index));
+            expect(point.depth_m).toBeCloseTo(point.image_index === SPIKE ? 5000 : point.image_index / 10);
+            expect(point.is_selected).toBe(point.image_index >= N / 4);
+        }
+    });
+
+    test("counts every image whatever is drawn", () => {
+        const { image_depth_profile: profile, image_filtering } = graphs();
+
+        expect(profile.total_images).toBe(N);
+        expect(profile.selected_images).toBe(N - N / 4);
+        expect(image_filtering.removed_images.count).toBe(0);
     });
 });

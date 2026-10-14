@@ -1,9 +1,13 @@
 import express from 'express';
+import compression from 'compression';
 import cookieParser from "cookie-parser";
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './presentation/openapi/swagger-definition';
 
 const server = express();
+// gzip for the clients that accept it. JSON shrinks about 7 times (the QC graphs above all); archives
+// (zip, tar.zst) are left as they are, their types not being compressible.
+server.use(compression());
 server.use(express.json());
 server.use(express.urlencoded({ extended: false }))
 server.use(cookieParser());

@@ -3,6 +3,9 @@ import os from "os";
 import path from "path";
 import archiver from "archiver";
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
+import { PivotImages } from "../../../src/domain/interfaces/repositories/sample-repository";
+import { PivotImageRecord } from "../../../src/domain/entities/binned-export";
+import { toPerImageColumns } from "../../../src/domain/utils/per-image-columns";
 
 function writeZip(zip_path: string, members: Record<string, string>): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -65,7 +68,14 @@ describe("parsePivotParticulesCsv", () => {
     });
 });
 
-describe("getPivotImageRecords", () => {
+// Every row of the second pass.
+async function rowsOf(pivot: PivotImages): Promise<PivotImageRecord[]> {
+    const rows: PivotImageRecord[] = [];
+    for await (const row of pivot.rows()) rows.push(row);
+    return rows;
+}
+
+describe("getPivotImages", () => {
     let base_folder: string;
     let repo: SampleRepositoryImpl;
 
@@ -84,10 +94,12 @@ describe("getPivotImageRecords", () => {
         fs.mkdirSync(pivot_folder, { recursive: true });
         await writeZip(path.join(pivot_folder, "s1c1_Particule.zip"), { "particules.csv": "20200806-221354-586,13.6,39,1:2,4,26.3,\n" });
 
-        const records = await repo.getPivotImageRecords(5, "s1c1", "UVP5HD");
+        const pivot = await repo.getPivotImages(5, "s1c1", "UVP5HD");
+        const records = await rowsOf(pivot);
 
         expect(records).toHaveLength(1);
         expect(records[0]).toMatchObject({ raw_pressure: 13.6, blocks: [{ area_px: 2, nb_particles: 4, grey_mean: 26.3 }] });
+        expect(pivot.columns).toEqual(toPerImageColumns(records));
     });
 
     test("a UVP6 sample is read from its imported particle file", async () => {
@@ -95,7 +107,7 @@ describe("getPivotImageRecords", () => {
         fs.mkdirSync(sample_folder, { recursive: true });
         await writeZip(path.join(sample_folder, "HS1447C1_Particule.zip"), { "particules.csv": "20230406-144332-1,1.2,28,1:1,12,30.1,9.0\n", "metadata.ini": "[HW_CONF]\n" });
 
-        const records = await repo.getPivotImageRecords(19, "HS1447C1", "UVP6HF");
+        const records = await rowsOf(await repo.getPivotImages(19, "HS1447C1", "UVP6HF"));
 
         expect(records[0].blocks).toEqual([{ area_px: 1, nb_particles: 12, grey_mean: 30.1 }]);
     });
@@ -106,19 +118,32 @@ describe("getPivotImageRecords", () => {
         await writeZip(path.join(sample_folder, "HS1447C1_Particule.zip"), { "metadata.ini": "[HW_CONF]\n", "particules.csv": "20230406-144332-1,1.2,28,1:1,12,30.1,9.0\n" });
         const openDescriptors = () => fs.readdirSync("/dev/fd").length;
 
-        await repo.getPivotImageRecords(19, "HS1447C1", "UVP6HF");
+        await rowsOf(await repo.getPivotImages(19, "HS1447C1", "UVP6HF"));
         const before = openDescriptors();
-        for (let i = 0; i < 30; i++) await repo.getPivotImageRecords(19, "HS1447C1", "UVP6HF");
+        for (let i = 0; i < 30; i++) await rowsOf(await repo.getPivotImages(19, "HS1447C1", "UVP6HF"));
 
         // Before the fix, every read left one descriptor open.
         expect(openDescriptors() - before).toBeLessThan(5);
     });
 
     test("a missing file is reported with the sample name", async () => {
-        await expect(repo.getPivotImageRecords(5, "s1c1", "UVP5HD")).rejects.toThrow(/^Cannot read the particle file of sample s1c1/);
+        await expect(repo.getPivotImages(5, "s1c1", "UVP5HD")).rejects.toThrow(/^Cannot read the particle file of sample s1c1/);
+    });
+
+    test("reads the rows again from the file at each pass, and reports a file gone in between", async () => {
+        const sample_folder = path.join(base_folder, "storage", "19", "HS1447C1");
+        fs.mkdirSync(sample_folder, { recursive: true });
+        await writeZip(path.join(sample_folder, "HS1447C1_Particule.zip"), { "particules.csv": "20230406-144332-1,1.2,28,1:1,12,30.1,9.0\n20230406-144333-1,1.3,28,1:1,5,30.1,9.0\n" });
+
+        const pivot = await repo.getPivotImages(19, "HS1447C1", "UVP6HF");
+        expect((await rowsOf(pivot)).map(r => r.image_index)).toEqual([0, 1]);
+        expect((await rowsOf(pivot)).map(r => r.image_index)).toEqual([0, 1]);
+
+        fs.rmSync(path.join(sample_folder, "HS1447C1_Particule.zip"));
+        await expect(rowsOf(pivot)).rejects.toThrow(/^Cannot read the particle file of sample HS1447C1/);
     });
 
     test("an instrument without a UVP6-format file is refused", async () => {
-        await expect(repo.getPivotImageRecords(5, "lisst_1", "LISST")).rejects.toThrow("Unknown instrument model");
+        await expect(repo.getPivotImages(5, "lisst_1", "LISST")).rejects.toThrow("Unknown instrument model");
     });
 });

@@ -10,6 +10,7 @@ import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { GetSampleQcGraphs } from "../../../../src/domain/use-cases/sample/get-sample-qc-graphs";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
@@ -62,7 +63,7 @@ describe("GetSampleQcGraphs", () => {
         ];
         jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub({ filter_last_image: "c" }));
         jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP" } as any);
-        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(records);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
 
         const res = await useCase.execute(current_user, 1, 10);
 
@@ -100,7 +101,7 @@ describe("GetSampleQcGraphs", () => {
         ];
         jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub({ filter_first_image: null as any, filter_last_image: null as any }));
         jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP5HD" } as any);
-        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(records);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
 
         const res = await useCase.execute(current_user, 1, 10);
 
@@ -118,7 +119,7 @@ describe("GetSampleQcGraphs", () => {
             { image_index: i, image_id: String(i + 1), raw_pressure, image_time_ms: null, light_on: true, spectrum_counts: {} }
         ));
         jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub({ sample_type_label: "Depth", filter_first_image: "1", filter_last_image: "4" }));
-        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(records);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
 
         jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP5HD", enable_descent_filter: true } as any);
         const filtered = await useCase.execute(current_user, 1, 10);
@@ -138,7 +139,7 @@ describe("GetSampleQcGraphs", () => {
         ];
         jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub({ sample_type_label: "Time", filter_first_image: "0", filter_last_image: "1" }));
         jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP", enable_descent_filter: true } as any);
-        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(records);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
 
         const res = await useCase.execute(current_user, 1, 10);
 

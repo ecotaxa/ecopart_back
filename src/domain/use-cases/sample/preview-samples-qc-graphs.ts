@@ -40,7 +40,8 @@ export class PreviewSamplesQcGraphs implements PreviewSamplesQcGraphsUseCase {
         // prevents using the endpoint to read arbitrary paths via a crafted sample name.
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
-        const importable = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
+        // Only the names are checked here: no vignette is counted.
+        const importable = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id, []);
         const importable_names = new Set(importable.map((s) => s.sample_name));
         const not_importable = sample_names.filter((name) => !importable_names.has(name));
         if (not_importable.length > 0) {

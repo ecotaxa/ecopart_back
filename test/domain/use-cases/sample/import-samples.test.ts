@@ -582,6 +582,8 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
+                // Only the vignettes of the samples to import are counted.
+                expect(mockSampleRepository.listImportableSamples).toBeCalledWith(projectResponseModel.root_folder_path, projectResponseModel.instrument_model, "data_storage/files_system_storage/1", projectResponseModel.project_id, ["sample1", "sample2"]);
                 expect(mockSampleRepository.explainNotImportableSamples).toBeCalledWith(projectResponseModel.root_folder_path, "data_storage/files_system_storage/1", projectResponseModel.project_id, ["sample1", "sample2"]);
                 expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(1);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);

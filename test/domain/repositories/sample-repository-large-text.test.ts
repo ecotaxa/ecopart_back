@@ -7,6 +7,8 @@ import * as tar from "tar";
 
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 import * as decodeModule from "../../../src/domain/utils/decode-uvp-text";
+import { recordsOf } from "../../entities/per-image-records";
+import { toPerImageColumns } from "../../../src/domain/utils/per-image-columns";
 
 const STRING_TOO_LONG = "Cannot create a string longer than 0x1fffffe8 characters";
 
@@ -211,6 +213,51 @@ describe("reading text from sample archives", () => {
             expect(count).toBeCalledTimes(1);
             expect(count).toBeCalledWith(expect.any(String), "UVP6LP", "new");
         });
+
+        describe("on a project of two samples", () => {
+            const images_zip = (name: string) => path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Images.zip`);
+
+            beforeEach(async () => {
+                fs.mkdirSync(path.join(tmp, "uvp6_m1", "meta"), { recursive: true });
+                fs.writeFileSync(path.join(tmp, "uvp6_m1", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;s1\nm1;ship;file_b;s2\n");
+                for (const name of ["s1", "s2"]) {
+                    fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", name), { recursive: true });
+                    await writeZip(images_zip(name), { [`ecotaxa_${name}.tsv`]: TSV });
+                }
+            });
+
+            const list = (vignettes_of?: string[]) => repo.listImportableSamples("uvp6_m1", "UVP6LP", path.join(tmp, "storage", "1"), 1, vignettes_of);
+            const vignettes = (samples: { sample_name: string, vignette_number: number }[]) => samples.map(sample => [sample.sample_name, sample.vignette_number]);
+
+            test("counts only the vignettes asked for, the other samples staying listed", async () => {
+                const open = jest.spyOn(repo as any, "openZipEntry");
+
+                expect(vignettes(await list(["s2"]))).toEqual([["s1", 0], ["s2", 3]]);
+                expect(vignettes(await list([]))).toEqual([["s1", 0], ["s2", 0]]);
+                expect(open).toBeCalledTimes(1);
+            });
+
+            test("reads a TSV again only once its archive has changed", async () => {
+                const open = jest.spyOn(repo as any, "openZipEntry");
+
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 3]]);
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 3]]);
+                expect(open).toBeCalledTimes(2);
+
+                await writeZip(images_zip("s2"), { "ecotaxa_s2.tsv": TSV + "d\t4\n" });
+                // The mtime has a coarse resolution on some file systems: the size alone tells here.
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 4]]);
+                expect(open).toBeCalledTimes(3);
+            });
+
+            test("does not keep a failed count", async () => {
+                fs.writeFileSync(images_zip("s1"), "not a zip");
+                expect(vignettes(await list(["s1"]))).toEqual([["s1", 0], ["s2", 0]]);
+
+                await writeZip(images_zip("s1"), { "ecotaxa_s1.tsv": TSV });
+                expect(vignettes(await list(["s1"]))).toEqual([["s1", 3], ["s2", 0]]);
+            });
+        });
     });
 
     describe("countTsvImages", () => {
@@ -249,8 +296,12 @@ describe("reading text from sample archives", () => {
 
             await expect(repo.computeMaxPressure(path.join(tmp, "7"), "mooring_1")).resolves.toBe(12.5);
             await expect(repo.countBlackParticulesUvp6(path.join(tmp, "7"), "mooring_1")).resolves.toBe(1);
-            await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(repo.parseParticulesCsvRecords(PARTICULES_CSV));
-            await expect(repo.getPivotImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(repo.parsePivotParticulesCsv(PARTICULES_CSV));
+            await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(toPerImageColumns(repo.parseParticulesCsvRecords(PARTICULES_CSV)));
+            const pivot = await repo.getPivotImages(7, "mooring_1", "UVP6LP");
+            const rows = [];
+            for await (const row of pivot.rows()) rows.push(row);
+            expect(rows).toEqual(repo.parsePivotParticulesCsv(PARTICULES_CSV));
+            expect(pivot.columns).toEqual(toPerImageColumns(rows));
         });
 
         test("EcoTaxa TSV of a UVP6 sample: images counted", async () => {
@@ -357,7 +408,7 @@ describe("reading text from sample archives", () => {
                 fs.writeFileSync(path.join(work, "s1", "s1.bru"), BRU);
             }
 
-            const records = await repo.getPerImageRecordsFromSource("source", "s1", "UVP5HD");
+            const records = recordsOf(await repo.getPerImageRecordsFromSource("source", "s1", "UVP5HD"));
 
             expect(records.map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
         });
