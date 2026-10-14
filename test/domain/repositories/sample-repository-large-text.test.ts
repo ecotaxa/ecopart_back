@@ -211,6 +211,51 @@ describe("reading text from sample archives", () => {
             expect(count).toBeCalledTimes(1);
             expect(count).toBeCalledWith(expect.any(String), "UVP6LP", "new");
         });
+
+        describe("on a project of two samples", () => {
+            const images_zip = (name: string) => path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Images.zip`);
+
+            beforeEach(async () => {
+                fs.mkdirSync(path.join(tmp, "uvp6_m1", "meta"), { recursive: true });
+                fs.writeFileSync(path.join(tmp, "uvp6_m1", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;s1\nm1;ship;file_b;s2\n");
+                for (const name of ["s1", "s2"]) {
+                    fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", name), { recursive: true });
+                    await writeZip(images_zip(name), { [`ecotaxa_${name}.tsv`]: TSV });
+                }
+            });
+
+            const list = (vignettes_of?: string[]) => repo.listImportableSamples("uvp6_m1", "UVP6LP", path.join(tmp, "storage", "1"), 1, vignettes_of);
+            const vignettes = (samples: { sample_name: string, vignette_number: number }[]) => samples.map(sample => [sample.sample_name, sample.vignette_number]);
+
+            test("counts only the vignettes asked for, the other samples staying listed", async () => {
+                const open = jest.spyOn(repo as any, "openZipEntry");
+
+                expect(vignettes(await list(["s2"]))).toEqual([["s1", 0], ["s2", 3]]);
+                expect(vignettes(await list([]))).toEqual([["s1", 0], ["s2", 0]]);
+                expect(open).toBeCalledTimes(1);
+            });
+
+            test("reads a TSV again only once its archive has changed", async () => {
+                const open = jest.spyOn(repo as any, "openZipEntry");
+
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 3]]);
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 3]]);
+                expect(open).toBeCalledTimes(2);
+
+                await writeZip(images_zip("s2"), { "ecotaxa_s2.tsv": TSV + "d\t4\n" });
+                // The mtime has a coarse resolution on some file systems: the size alone tells here.
+                expect(vignettes(await list())).toEqual([["s1", 3], ["s2", 4]]);
+                expect(open).toBeCalledTimes(3);
+            });
+
+            test("does not keep a failed count", async () => {
+                fs.writeFileSync(images_zip("s1"), "not a zip");
+                expect(vignettes(await list(["s1"]))).toEqual([["s1", 0], ["s2", 0]]);
+
+                await writeZip(images_zip("s1"), { "ecotaxa_s1.tsv": TSV });
+                expect(vignettes(await list(["s1"]))).toEqual([["s1", 3], ["s2", 0]]);
+            });
+        });
     });
 
     describe("countTsvImages", () => {

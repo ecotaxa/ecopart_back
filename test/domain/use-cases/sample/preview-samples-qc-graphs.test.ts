@@ -68,6 +68,8 @@ describe("PreviewSamplesQcGraphs", () => {
             { depth_m: 0.5, value: 2 },
             { depth_m: 1.5, value: 2 },
         ]);
+        // The names are checked without counting any vignette.
+        expect(mockSampleRepository.listImportableSamples).toBeCalledWith("root/path", "UVP6LP", "data_storage/fss/1", 1, []);
         // Reads straight from the source folder (root_folder_path), not the per-sample storage.
         expect(mockSampleRepository.getPerImageRecordsFromSource).toBeCalledWith("root/path", "s1", "UVP6LP");
         expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledWith("root/path", "s1", "UVP6LP");

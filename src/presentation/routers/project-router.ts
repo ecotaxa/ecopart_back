@@ -1761,6 +1761,10 @@ export default function ProjectRouter(
      *         being rank `firstimage + k`) and, on a depth sample whose project enables the descent
      *         filter, is kept by it. Graph 1 shows every image; graphs 2 and 3 only count the
      *         selected ones, and the imaged volume only the lit (flash on) images among them.
+     *       - **Graph 1 reduced above 4000 images**: the image range is cut into 1000 slices and each
+     *         slice keeps, for the selected and the removed images apart, the image with the lowest and
+     *         the one with the highest vertical position (same drawing, spikes included; images without
+     *         a vertical position are dropped). `total_images` still counts every image of the graph.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []

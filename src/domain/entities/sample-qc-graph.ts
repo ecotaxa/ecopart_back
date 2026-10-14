@@ -23,7 +23,8 @@ export type AxisScale = "linear" | "log";
 // Quantity on the vertical axis of every graph: depth (m) for depth profiles, time (h) for time series.
 export type VerticalAxis = "depth" | "time";
 
-/* Graph 1 — depth of each image (one point per image, NOT binned) */
+/* Graph 1 — depth of each image (one point per image, NOT binned; above 4 * GRAPH1_MAX_SLICES images,
+ * only the lowest and highest image of each slice, see qc-graphs-builder) */
 export interface ImageDepthPoint {
     image_index: number;     // order of the image/frame in the raw file (0-based)
     image_id: string;        // raw id (UVP6 "20240612-003906-1" / UVP5 datfile frame index)
@@ -36,7 +37,7 @@ export interface ImageDepthProfile {
     points: ImageDepthPoint[];
     filter_first_image: string | null;   // sample.filter_first_image
     filter_last_image: string | null;    // sample.filter_last_image
-    total_images: number;
+    total_images: number;               // every image of graph 1, also when `points` is reduced
     selected_images: number;             // images actually used (is_selected), i.e. what graphs 2 and 3 count
 }
 

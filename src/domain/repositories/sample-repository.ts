@@ -36,6 +36,8 @@ import { createZstdDecompressStream } from '../utils/zstd-stream';
 // Sentinels the UVP6 firmware writes in place of the particle data of a particules.csv line
 // (legacy `GenerateRawHistogramUVPAPP`, uvp_sample_import.py).
 const PARTICLE_DATA_FLAGS: ParticleDataFlag[] = ["OVER_EXPOSED", "EMPTY_IMAGE"];
+// Bounds the vignette count cache (a few hundred bytes per sample).
+const MAX_CACHED_VIGNETTE_COUNTS = 10_000;
 
 
 export class SampleRepositoryImpl implements SampleRepository {
@@ -50,6 +52,8 @@ export class SampleRepositoryImpl implements SampleRepository {
     // The longest string V8 can build (~512 MiB). Every character takes at least one byte, so a file
     // up to this size always decodes; a larger one is refused before being buffered.
     max_text_file_bytes = buffer_constants.MAX_STRING_LENGTH;
+    // Vignette counts per TSV source file, see getImportableSampleImagesCount.
+    private vignette_counts = new Map<string, { size: number, mtime_ms: number, count: number }>();
 
     constructor(sampleDataSource: SampleDataSource, DATA_STORAGE_FS_STORAGE: string) {
         this.sampleDataSource = sampleDataSource
@@ -1009,7 +1013,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]> {
+    async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, vignettes_of?: string[]): Promise<PublicHeaderSampleResponseModel[]> {
         // List importable samples from root_folder_path
         const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
@@ -1036,7 +1040,9 @@ export class SampleRepositoryImpl implements SampleRepository {
         const not_imported_samples = meta_header_samples.filter(sample =>
             !fs_imported_samples_name.includes(sample.profileId) && !db_imported_samples_name.includes(sample.profileId));
 
-        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, not_imported_samples);
+        const counted_names = vignettes_of ? new Set(vignettes_of) : null;
+        const to_count = counted_names ? not_imported_samples.filter(sample => counted_names.has(sample.profileId)) : not_imported_samples;
+        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, to_count);
         return this.setupSamples(not_imported_samples, source_samples, source_folder, sample_images_counts);
     }
 
@@ -1086,38 +1092,46 @@ export class SampleRepositoryImpl implements SampleRepository {
         return sample_images_counts;
     }
 
+    // The TSV is looked for in these sources, in this order; the first one it can be read from counts.
+    // A count is kept per source file and read again only when the file changes (size or modification
+    // time): the import tab, the QC preview and the import all list the samples, and the TSV of a long
+    // deployment takes seconds to read.
     private async getImportableSampleImagesCount(folderPath: string, instrument_model: string, sample_name: string): Promise<number> {
         const tsv_file_name = `ecotaxa_${sample_name}.tsv`;
-
-        try {
-            if (instrument_model.startsWith('UVP6')) {
-                const images_zip_path = path.join(folderPath, 'ecodata', sample_name, `${sample_name}_Images.zip`);
-                const { stream } = await this.openZipEntry(images_zip_path, undefined, new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`));
-                return await this.countTsvDataLines(stream);
-            }
-
-            if (instrument_model.startsWith('UVP5')) {
-                const work_zip_path = path.join(folderPath, 'work', `${sample_name}.zip`);
-                const work_tar_zst_path = path.join(folderPath, 'work', `${sample_name}.tar.zst`);
-                const tsv_pattern = new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-
-                try {
-                    const { stream } = await this.openZipEntry(work_zip_path, undefined, tsv_pattern);
-                    return await this.countTsvDataLines(stream);
-                } catch {
-                    try {
-                        const { stream } = await this.openTarZstEntry(work_tar_zst_path, undefined, tsv_pattern);
-                        return await this.countTsvDataLines(stream);
-                    } catch {
-                        const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
-                        return await this.countTsvDataLines(fs.createReadStream(tsv_file_path));
-                    }
-                }
-            }
-        } catch {
-            return 0;
+        const tsv_pattern = new RegExp(`(^|/)${tsv_file_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+        const openInZip = (zip_path: string) => async () => (await this.openZipEntry(zip_path, undefined, tsv_pattern)).stream;
+        const sources: { path: string, open: () => Promise<Readable> }[] = [];
+        if (instrument_model.startsWith('UVP6')) {
+            const images_zip_path = path.join(folderPath, 'ecodata', sample_name, `${sample_name}_Images.zip`);
+            sources.push({ path: images_zip_path, open: openInZip(images_zip_path) });
+        } else if (instrument_model.startsWith('UVP5')) {
+            const work_zip_path = path.join(folderPath, 'work', `${sample_name}.zip`);
+            const work_tar_zst_path = path.join(folderPath, 'work', `${sample_name}.tar.zst`);
+            const tsv_file_path = path.join(folderPath, 'work', sample_name, tsv_file_name);
+            sources.push(
+                { path: work_zip_path, open: openInZip(work_zip_path) },
+                { path: work_tar_zst_path, open: async () => (await this.openTarZstEntry(work_tar_zst_path, undefined, tsv_pattern)).stream },
+                { path: tsv_file_path, open: async () => fs.createReadStream(tsv_file_path) },
+            );
         }
-
+        for (const source of sources) {
+            let stat: fs.Stats;
+            try {
+                stat = await fsPromises.stat(source.path);
+            } catch {
+                continue;
+            }
+            const cached = this.vignette_counts.get(source.path);
+            if (cached && cached.size === stat.size && cached.mtime_ms === stat.mtimeMs) return cached.count;
+            try {
+                const count = await this.countTsvDataLines(await source.open());
+                if (this.vignette_counts.size >= MAX_CACHED_VIGNETTE_COUNTS) this.vignette_counts.clear();
+                this.vignette_counts.set(source.path, { size: stat.size, mtime_ms: stat.mtimeMs, count });
+                return count;
+            } catch {
+                // TSV missing from this source or unreadable: try the next one.
+            }
+        }
         return 0;
     }
 

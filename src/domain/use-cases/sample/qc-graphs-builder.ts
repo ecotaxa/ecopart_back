@@ -64,6 +64,36 @@ function isPlaceable(input: QcGraphInput, r: PerImageRecord): boolean {
     return !input.is_depth_profile || r.raw_pressure !== null;
 }
 
+/* Graph 1 is drawn about 400 px wide: past a few thousand points the images overlap, and a long
+ * series (a mooring holds millions of images) could not even be sent. Above the limit, the image
+ * range is cut into slices and each slice keeps, for the selected and for the removed images apart,
+ * its image with the lowest and the one with the highest vertical position: the drawing is the same,
+ * spikes included. Images without a vertical position cannot be drawn and are dropped then. */
+export const GRAPH1_MAX_SLICES = 1000;
+
+function reduceImagePoints(placeable: number[], records: PerImageRecord[], selected: boolean[], axis: ProfileAxis): number[] {
+    if (placeable.length <= GRAPH1_MAX_SLICES * 4) return placeable;
+    const first_index = records[placeable[0]].image_index;
+    const span = records[placeable[placeable.length - 1]].image_index - first_index + 1;
+    // Per slice and per selection state: the records with the lowest and the highest position.
+    const lowest = new Map<number, { i: number, y: number }>();
+    const highest = new Map<number, { i: number, y: number }>();
+    for (const i of placeable) {
+        const y = axis.position(records[i]);
+        if (y === null) continue;
+        const slice = Math.min(GRAPH1_MAX_SLICES - 1, Math.floor((records[i].image_index - first_index) * GRAPH1_MAX_SLICES / span));
+        const key = slice * 2 + (selected[i] ? 1 : 0);
+        const low = lowest.get(key);
+        if (!low || y < low.y) lowest.set(key, { i, y });
+        const high = highest.get(key);
+        if (!high || y > high.y) highest.set(key, { i, y });
+    }
+    const kept = new Set<number>();
+    for (const { i } of lowest.values()) kept.add(i);
+    for (const { i } of highest.values()) kept.add(i);
+    return Array.from(kept).sort((a, b) => a - b);
+}
+
 // Descent-filter outcome alone, for callers that need the metadata without the three profiles
 // (the raw-data export reports it in `metadata/samples.tsv`).
 export function buildImageFilteringMetadata(input: QcGraphInput): ImageFilteringMetadata {
@@ -103,13 +133,14 @@ export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponse
     // unlike legacy EcoPart, it counts in the imaged volume.
     const used = records.filter((_, i) => selection.selected[i]);
     const used_lit = used.filter((r) => r.light_on && r.particle_data_flag !== "OVER_EXPOSED");
-    const points = records.flatMap((r, i) => isPlaceable(input, r) ? [{
-        image_index: r.image_index,
-        image_id: r.image_id,
-        depth_m: toDepth(r.raw_pressure),
-        time_h: toHours(r),
+    const placeable = records.flatMap((r, i) => isPlaceable(input, r) ? [i] : []);
+    const points = reduceImagePoints(placeable, records, selection.selected, axis).map((i) => ({
+        image_index: records[i].image_index,
+        image_id: records[i].image_id,
+        depth_m: toDepth(records[i].raw_pressure),
+        time_h: toHours(records[i]),
         is_selected: selection.selected[i],
-    }] : []);
+    }));
 
     return {
         sample_id: input.sample_id,
@@ -123,7 +154,7 @@ export function buildSampleQcGraphs(input: QcGraphInput): SampleQcGraphsResponse
             points,
             filter_first_image: first,
             filter_last_image: last,
-            total_images: points.length,
+            total_images: placeable.length,
             selected_images: used.length,
         },
         // Lit images only: legacy EcoPart derives the imaged volume from the flash-on raw histogram,
