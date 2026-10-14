@@ -69,7 +69,15 @@ export interface SampleRepository {
     generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string, root_folder_path: string): Promise<Uvp5PivotReport>;
     // converter_version recorded in the sample's pivot, null when it has none.
     getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null>;
-    // Per-image records of the UVP6-format particle file the computed products read (the pivot for
-    // a UVP5 sample, the imported particules.csv for a UVP6), blocks and mean grey included.
-    getPivotImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImageRecord[]>;
+    // The UVP6-format particle file the computed products read (the pivot for a UVP5 sample, the
+    // imported particules.csv for a UVP6), read in two passes, see PivotImages.
+    getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages>;
+}
+
+// A sample's pivot read in two passes, so that a mooring of millions of images is never held in
+// memory: its columns, read once up front, then its rows one by one (blocks and mean grey
+// included), read again from the file each time rows() is called, in the order of the columns.
+export interface PivotImages {
+    columns: PerImageColumns;
+    rows(): AsyncIterable<PivotImageRecord>;
 }

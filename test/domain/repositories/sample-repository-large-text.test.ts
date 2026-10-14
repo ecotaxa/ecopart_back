@@ -297,7 +297,11 @@ describe("reading text from sample archives", () => {
             await expect(repo.computeMaxPressure(path.join(tmp, "7"), "mooring_1")).resolves.toBe(12.5);
             await expect(repo.countBlackParticulesUvp6(path.join(tmp, "7"), "mooring_1")).resolves.toBe(1);
             await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(toPerImageColumns(repo.parseParticulesCsvRecords(PARTICULES_CSV)));
-            await expect(repo.getPivotImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(repo.parsePivotParticulesCsv(PARTICULES_CSV));
+            const pivot = await repo.getPivotImages(7, "mooring_1", "UVP6LP");
+            const rows = [];
+            for await (const row of pivot.rows()) rows.push(row);
+            expect(rows).toEqual(repo.parsePivotParticulesCsv(PARTICULES_CSV));
+            expect(pivot.columns).toEqual(toPerImageColumns(rows));
         });
 
         test("EcoTaxa TSV of a UVP6 sample: images counted", async () => {

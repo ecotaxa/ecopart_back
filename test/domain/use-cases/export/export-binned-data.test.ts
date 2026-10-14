@@ -15,6 +15,7 @@ import { PublicSampleModel } from "../../../../src/domain/entities/sample";
 import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { TaskResponseModel, TaskType } from "../../../../src/domain/entities/task";
 import { PivotImageRecord } from "../../../../src/domain/entities/binned-export";
+import { PivotImages } from "../../../../src/domain/interfaces/repositories/sample-repository";
 import { ExportBinnedData } from "../../../../src/domain/use-cases/export/export-binned-data";
 import { ExportBinnedDataRequestModel } from "../../../../src/domain/interfaces/use-cases/export/export-binned-data";
 import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
@@ -45,6 +46,11 @@ function pivotLine(raw_pressure: number, area_px: number, nb_particles: number, 
         image_index: second, image_id: `img${second}`, raw_pressure, image_time_ms: Date.UTC(2020, 7, 6, 22, 0, second),
         light_on: true, spectrum_counts: { [area_px]: nb_particles }, blocks: [{ area_px, nb_particles, grey_mean }],
     };
+}
+
+// A pivot read in two passes from records already in memory.
+function pivotOf(records: PivotImageRecord[]): PivotImages {
+    return { columns: toPerImageColumns(records), rows: async function* () { yield* records; } };
 }
 
 describe("ExportBinnedData", () => {
@@ -103,10 +109,10 @@ describe("ExportBinnedData", () => {
         jest.spyOn(mockSampleRepository, "countSamplesPerProject").mockResolvedValue(new Map([[1, 3]]));
         jest.spyOn(mockSampleRepository, "countEcotaxaSamplesPerProject").mockResolvedValue(new Map([[1, 0]]));
         jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
-        jest.spyOn(mockSampleRepository, "getPivotImageRecords").mockResolvedValue([
+        jest.spyOn(mockSampleRepository, "getPivotImages").mockResolvedValue(pivotOf([
             pivotLine(1, 2, 10, 20, 0),      // depth 1 + 1 m project offset: bin 0-5 m
             pivotLine(12, 3, 4, 40, 1),      // depth 13 m: bin 10-15 m, the 5-10 m bin stays empty
-        ]);
+        ]));
 
         task_finished = new Promise((resolve) => {
             jest.spyOn(mockTaskRepository, "finishTask").mockImplementation(((_t: any, result: any) => {
@@ -323,7 +329,7 @@ describe("ExportBinnedData", () => {
             expect(entries["README.md"]).toContain("# EcoPart binned export");
             expect(entries["README.md"]).toContain("depth bins of 5 m");
             expect(progress_messages.some((m) => m.includes(`${sampleModel_1.sample_name}: 3 depth bin(s) of 5 m from 2 image(s) used`))).toBe(true);
-            expect(mockSampleRepository.getPivotImageRecords).toBeCalledWith(1, sampleModel_1.sample_name, "UVP5HD");
+            expect(mockSampleRepository.getPivotImages).toBeCalledWith(1, sampleModel_1.sample_name, "UVP5HD");
         });
 
         test("time bins when the request forces them", async () => {
@@ -344,7 +350,7 @@ describe("ExportBinnedData", () => {
         });
 
         test("a particle file that cannot be read fails the task and leaves no archive", async () => {
-            jest.spyOn(mockSampleRepository, "getPivotImageRecords").mockRejectedValue(new Error("Cannot read the particle file of sample perle3_001 (no such file)"));
+            jest.spyOn(mockSampleRepository, "getPivotImages").mockRejectedValue(new Error("Cannot read the particle file of sample perle3_001 (no such file)"));
             given([sample()], [project()]);
 
             await exportOf();
@@ -371,10 +377,10 @@ describe("ExportBinnedData", () => {
 
         test("UVP5 and UVP6 samples share one table: the union of their classes, NA where a sample cannot see one", async () => {
             const uvp6 = sample({ sample_id: 9, project_id: 2, sample_name: "uvp6_one", instrument_settings_aa: 2300, instrument_settings_exp: 1.136, instrument_settings_particule_minimum_area_pixels: undefined });
-            jest.spyOn(mockSampleRepository, "getPivotImageRecords").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(
+            jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(pivotOf(
                 sample_name === "uvp6_one"
                     ? [pivotLine(2, 1, 50, 30, 0), { ...pivotLine(3, 1, 7, 10, 1), light_on: false }]
-                    : [pivotLine(1, 2, 10, 20, 0)])) as any);
+                    : [pivotLine(1, 2, 10, 20, 0)]))) as any);
             given([uvp6, sample()], [project(), project({ project_id: 2, instrument_model: "UVP6LP" })]);
 
             await useCase.execute(current_user, { sample_ids: [9, 7] });
@@ -391,10 +397,10 @@ describe("ExportBinnedData", () => {
 
         test("logs a sample left without any row, and the particles below its minimum area", async () => {
             const no_pressure = sample({ sample_id: 8, sample_name: "no_pressure" });
-            jest.spyOn(mockSampleRepository, "getPivotImageRecords").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(
+            jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(pivotOf(
                 sample_name === "no_pressure"
                     ? [{ ...pivotLine(1, 2, 10, 20, 0), raw_pressure: null }]
-                    : [{ ...pivotLine(1, 2, 10, 20, 0), blocks: [{ area_px: 1, nb_particles: 6, grey_mean: 10 }, { area_px: 2, nb_particles: 10, grey_mean: 20 }] }])) as any);
+                    : [{ ...pivotLine(1, 2, 10, 20, 0), blocks: [{ area_px: 1, nb_particles: 6, grey_mean: 10 }, { area_px: 2, nb_particles: 10, grey_mean: 20 }] }]))) as any);
             given([sample(), no_pressure], [project()]);
 
             await useCase.execute(current_user, { sample_ids: [7, 8] });

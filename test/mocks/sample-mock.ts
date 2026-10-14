@@ -2,8 +2,7 @@ import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleRes
 import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
-import { PivotImageRecord } from "../../src/domain/entities/binned-export";
-import { SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
+import { PivotImages, SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
 
 export class MockSampleRepository implements SampleRepository {
     formatSampleToImport(): Promise<SampleRequestCreationModel> {
@@ -114,8 +113,8 @@ export class MockSampleRepository implements SampleRepository {
     getPivotConverterVersion(): Promise<string | null> {
         throw new Error("Method not implemented for getPivotConverterVersion");
     }
-    getPivotImageRecords(): Promise<PivotImageRecord[]> {
-        throw new Error("Method not implemented for getPivotImageRecords");
+    getPivotImages(): Promise<PivotImages> {
+        throw new Error("Method not implemented for getPivotImages");
     }
 }
 

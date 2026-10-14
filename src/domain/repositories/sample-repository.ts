@@ -10,7 +10,7 @@ import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, Importa
 import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
-import { SampleRepository } from "../interfaces/repositories/sample-repository";
+import { PivotImages, SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { selectMetaHeaderFile } from "../utils/meta-header-file";
@@ -2144,10 +2144,13 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageColumns> {
-        const zipPath = path.join(project_folder, sample_name, `${sample_name}_Particule.zip`);
+        return this.readParticulesCsvColumns(path.join(project_folder, sample_name, `${sample_name}_Particule.zip`));
+    }
+
+    private async readParticulesCsvColumns(zip_path: string): Promise<PerImageColumns> {
         const columns = new PerImageColumnsBuilder();
         let image_index = 0;
-        for await (const line of this.readZipEntryLines(zipPath, "particules.csv")) {
+        for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
             if (this.pushParticulesCsvQcRow(columns, line, image_index)) image_index++;
         }
         return columns.build();
@@ -2251,7 +2254,7 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     // The UVP6-format particle file every computed product reads: the pivot built at import for a
     // UVP5 sample, the imported `_Particule.zip` for a UVP6. Pressures are in decibar in both.
-    async getPivotImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImageRecord[]> {
+    async getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages> {
         let zip_path: string;
         if (instrument_model.startsWith("UVP5")) {
             zip_path = this.getPivotZipPath(project_id, sample_name);
@@ -2260,16 +2263,31 @@ export class SampleRepositoryImpl implements SampleRepository {
         } else {
             throw new Error("Unknown instrument model");
         }
+        const cannotRead = (error: unknown) => new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+        let columns: PerImageColumns;
         try {
-            const records: PivotImageRecord[] = [];
-            for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
-                const record = this.parsePivotParticulesCsvRow(line, records.length);
-                if (record) records.push(record);
-            }
-            return records;
+            columns = await this.readParticulesCsvColumns(zip_path);
         } catch (error) {
-            throw new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+            throw cannotRead(error);
         }
+        const readLines = (): AsyncGenerator<string> => this.readZipEntryLines(zip_path, "particules.csv");
+        const parseRow = (line: string, image_index: number) => this.parsePivotParticulesCsvRow(line, image_index);
+        return {
+            columns,
+            rows: async function* () {
+                let image_index = 0;
+                try {
+                    for await (const line of readLines()) {
+                        const record = parseRow(line, image_index);
+                        if (!record) continue;
+                        image_index++;
+                        yield record;
+                    }
+                } catch (error) {
+                    throw cannotRead(error);
+                }
+            },
+        };
     }
 
     private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageColumns> {
