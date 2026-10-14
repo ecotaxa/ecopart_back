@@ -4,6 +4,7 @@ import { GetImportFolderMetadataUseCase } from '../../interfaces/use-cases/file_
 import { ProjectMetadataModel, ProjectMetadataPersonModel } from '../../entities/project';
 import { UserRepository } from '../../interfaces/repositories/user-repository';
 import { decodeUvpText } from '../../utils/decode-uvp-text';
+import { selectMetaHeaderFile } from '../../utils/meta-header-file';
 
 export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     importFolderPath: string;
@@ -119,8 +120,7 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
         const metaPath = path.join(folderPath, 'meta');
         try {
             const files = await fs.readdir(metaPath);
-            const headerFile = files.find(f => f.includes('header') && f.endsWith('.txt') && !f.includes('backup'));
-            if (!headerFile) return null;
+            const headerFile = selectMetaHeaderFile(files, folderPath);
 
             const content = decodeUvpText(await fs.readFile(path.join(metaPath, headerFile)));
             const lines = content.trim().split(/\r\n|\n|\r/);

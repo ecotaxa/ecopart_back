@@ -12,6 +12,7 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
+import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
@@ -56,7 +57,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Format a sample to import from fs storage 
-    async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
+    async formatSampleToImport(base_sample: Partial<SampleRequestCreationModel>, instrument_model: string, root_folder_path: string): Promise<SampleRequestCreationModel> {
         const projectIdSegment = base_sample?.project_id != null
             ? String(base_sample.project_id)
             : "";
@@ -66,7 +67,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             projectIdSegment
         );
         // foreach sample in samples_names_to_import
-        const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model);
+        const sample_to_return = await this.getSampleFromFsStorage(file_system_storage_project_folder, base_sample, instrument_model, root_folder_path);
         return sample_to_return;
     }
 
@@ -217,7 +218,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return parts.length >= 4 && parts[3].trim() === "0:1";
     }
 
-    async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string): Promise<SampleRequestCreationModel> {
+    async getSampleFromFsStorage(file_system_storage_project_folder: string, base_sample: Partial<SampleRequestCreationModel>, instrument_model: string, root_folder_path: string): Promise<SampleRequestCreationModel> {
         let sample_fss = {};
         if (instrument_model.startsWith('UVP6')) {
             // read from file_system_storage_project_folder/ecodata and return the list of samples
@@ -225,17 +226,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         else if (instrument_model.startsWith('UVP5')) {
             // read from file_system_storage_project_folder/work and return the list of samples
-            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string, instrument_model);
+            sample_fss = await this.getSampleFromFsStorageUVP5(file_system_storage_project_folder, base_sample.sample_name as string, instrument_model, root_folder_path);
         }
         const sample = this.constructSampleFromBaseAndFsStorage(sample_fss, base_sample);
 
         return sample;
     }
 
-    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string, instrument_model: string): Promise<Partial<SampleRequestCreationModel>> {
+    async getSampleFromFsStorageUVP5(file_system_storage_project_folder: string, sample_name: string, instrument_model: string, root_folder_path: string): Promise<Partial<SampleRequestCreationModel>> {
         // Complete the sample object
         // Get sample info from meta/uvp5_header_sn
-        const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name);
+        const sample_header = await this.getSampleFromMetaHeader(file_system_storage_project_folder, sample_name, root_folder_path);
         // get sample from work/profileid/profileid_datfile.txt
         const sample_work_datfile = await this.getSampleFromWorkDatfile(file_system_storage_project_folder, sample_name);
         // get sample from work/profileid/HDRfilename.txt 
@@ -337,33 +338,41 @@ export class SampleRepositoryImpl implements SampleRepository {
         const fileContent = await this.readSampleFile(zipPath, filePath, filePath, undefined);
         return this.parseWorkDatfile(fileContent);
     }
-    async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
-        const filePathPattern = new RegExp(`^meta/uvp5_header_sn.*\\.txt$`);//uvp5_header_sn205_perle_03_2020.txt
+    async getSampleFromMetaHeader(file_system_storage_project_folder: string, sample_name: string, root_folder_path: string): Promise<SampleFromMetaHeaderModel> {
         const zipPath = path.join(file_system_storage_project_folder, sample_name, sample_name + "_meta_conf.zip");
-        const fileContent = await this.readSampleFile(zipPath, "meta/uvp5_header_sn*.txt", undefined, filePathPattern);
-        const fileName = await this.getFileNameFromZip(zipPath, filePathPattern);
-
-        return this.parseMetaHeader(fileContent, fileName, sample_name);
+        const header = await this.readMetaConfHeader(zipPath, root_folder_path);
+        return this.parseMetaHeader(header.content, header.file_name, sample_name);
     }
 
-    async getFileNameFromZip(zipPath: string, filePathPattern: RegExp): Promise<string> {
+    // The meta header of a sample, from the copy of the project's meta/ folder in its _meta_conf.zip.
+    private async readMetaConfHeader(zipPath: string, root_folder_path: string): Promise<{ file_name: string, content: string }> {
+        let meta_files: string[];
+        try {
+            meta_files = (await this.listZipEntryNames(zipPath))
+                .filter((name) => name.startsWith("meta/") && !name.slice("meta/".length).includes("/"))
+                .map((name) => name.slice("meta/".length));
+        } catch (error) {
+            throw new Error(`Cannot read meta/ in ${path.basename(zipPath)}: ${(error as Error).message}`);
+        }
+        const file_name = selectMetaHeaderFile(meta_files, root_folder_path);
+        return { file_name, content: await this.readSampleFile(zipPath, `meta/${file_name}`, `meta/${file_name}`) };
+    }
+
+    // Names of the entries of a ZIP archive, without reading them.
+    private listZipEntryNames(zipPath: string): Promise<string[]> {
         return new Promise((resolve, reject) => {
             yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
                 if (err || !zipfile) {
                     return reject(err || new Error('Failed to open zip file'));
                 }
-
-                zipfile.readEntry();
-
+                const names: string[] = [];
+                zipfile.on('error', (err) => reject(err));
                 zipfile.on('entry', (entry) => {
-                    if (filePathPattern.test(entry.fileName)) {
-                        resolve(entry.fileName);
-                    } else {
-                        zipfile.readEntry();
-                    }
+                    names.push(entry.fileName);
+                    zipfile.readEntry();
                 });
-
-                zipfile.on('end', () => reject(new Error('File not found in zip')));
+                zipfile.on('end', () => resolve(names));
+                zipfile.readEntry();
             });
         });
     }
@@ -1371,24 +1380,17 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         return samples_response;
     }
-    // Function to read and return samples from header.txt files
-    // Only the canonical header file is read: uvp5_header_<name>.txt or uvp6_header_<name>.txt
+    // Samples of the project's meta header (see selectMetaHeaderFile).
     async getSamplesFromHeaders(folderPath: string): Promise<HeaderSampleModel[]> {
         const samples: HeaderSampleModel[] = [];
         try {
             const header_path = path.join(folderPath, 'meta');
-            const files = await fsPromises.readdir(header_path);
-            for (const file of files) {
-                if (/^uvp[56]_header.*\.txt$/i.test(file)) {
-                    const filePath = path.join(header_path, file);
-                    const content = decodeUvpText(await fsPromises.readFile(filePath));
+            const file = selectMetaHeaderFile(await fsPromises.readdir(header_path), folderPath);
+            const content = decodeUvpText(await fsPromises.readFile(path.join(header_path, file)));
 
-                    const lines = content.trim().split(/\r\n|\n|\r/);
-                    for (let i = 1; i < lines.length; i++) {
-                        samples.push(this.getSampleFromHeaderLine(lines[i]));
-                    }
-                    break; // only one canonical header file expected
-                }
+            const lines = content.trim().split(/\r\n|\n|\r/);
+            for (let i = 1; i < lines.length; i++) {
+                samples.push(this.getSampleFromHeaderLine(lines[i]));
             }
         } catch (err) {
             throw new Error(`Error reading files: ${err.message}`);
@@ -2223,7 +2225,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     // ─── UVP5 → UVP6 pivot ───
     // Written under <sample>/pivot/ rather than next to the acquisition files: legacy EcoPart infers
     // the instrument from the presence of a `_Particule.zip`, and the archives must never ship it.
-    async generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string): Promise<Uvp5PivotReport> {
+    async generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string, root_folder_path: string): Promise<Uvp5PivotReport> {
         const sample_name = sample.sample_name;
         const sample_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name);
         try {
@@ -2231,7 +2233,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             const meta_conf_zip = path.join(sample_folder, `${sample_name}_meta_conf.zip`);
             const datfile_content = await this.readPivotSource(work_zip, `${sample_name}_datfile.txt`, `${sample_name}_datfile.txt`);
             const bru_blocks_by_frame = await this.readPivotBru(work_zip, sample_name);
-            const header_content = await this.readPivotSource(meta_conf_zip, "meta/uvp5_header_sn*.txt", undefined, /^meta\/uvp5_header_sn.*\.txt$/);
+            const header_content = (await this.readMetaConfHeader(meta_conf_zip, root_folder_path)).content;
             const files = convertUvp5ToPivot({
                 sample,
                 instrument_model,
@@ -2432,14 +2434,10 @@ export class SampleRepositoryImpl implements SampleRepository {
         return decodeUvpText(await fsPromises.readFile(workDirFile));
     }
 
-    // UVP5 source: the meta header is the shared meta/uvp5_header_sn*.txt (not yet zipped per sample).
+    // UVP5 source: the meta header is read from the project's meta/ folder (not yet zipped per sample).
     private async readMetaHeaderFromSource(root_abs: string, sample_name: string): Promise<SampleFromMetaHeaderModel> {
         const metaDir = path.join(root_abs, "meta");
-        const files = await fsPromises.readdir(metaDir);
-        const headerFile = files.find((f) => /^uvp5_header_sn.*\.txt$/i.test(f));
-        if (!headerFile) {
-            throw new Error("Meta header file not found");
-        }
+        const headerFile = selectMetaHeaderFile(await fsPromises.readdir(metaDir), root_abs);
         const content = decodeUvpText(await fsPromises.readFile(path.join(metaDir, headerFile)));
         return this.parseMetaHeader(content, headerFile, sample_name);
     }

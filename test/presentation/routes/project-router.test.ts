@@ -742,6 +742,13 @@ describe("Project Router", () => {
             expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("GET /projects/:project_id/samples/can_be_imported fail for a missing meta header should return 404 naming the expected file", async () => {
+            const message = "Error reading files: Meta header file not found: meta/uvp6_header_sn000171hf_20230720_wcb_1_test.txt"
+            jest.spyOn(mockListImportableSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).get("/projects/1/samples/can_be_imported")
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
         // any other error
         test("GET /projects/:project_id/samples/can_be_imported fail for any other error should return 500", async () => {
             const expectedResponse = { errors: ["Cannot list importable samples"] }

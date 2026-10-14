@@ -12,8 +12,8 @@ describe("explainNotImportableSamples", () => {
 
     beforeEach(() => {
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-importable-"));
-        fs.mkdirSync(path.join(tmp, "source", "meta"), { recursive: true });
-        fs.writeFileSync(path.join(tmp, "source", "meta", "uvp5_header_m197.txt"), [
+        fs.mkdirSync(path.join(tmp, "uvp5_m197", "meta"), { recursive: true });
+        fs.writeFileSync(path.join(tmp, "uvp5_m197", "meta", "uvp5_header_m197.txt"), [
             "cruise;ship;filename;profileid",
             "m197;ship;file_a;in_db",
             "m197;ship;file_b;in_storage",
@@ -32,7 +32,7 @@ describe("explainNotImportableSamples", () => {
     });
 
     test("gives one reason per sample left out of the importable list", async () => {
-        const reasons = await repo.explainNotImportableSamples("source", dest_folder, 1, ["in_db", "in_storage", "not_in_header", "listed"]);
+        const reasons = await repo.explainNotImportableSamples("uvp5_m197", dest_folder, 1, ["in_db", "in_storage", "not_in_header", "listed"]);
 
         expect(reasons).toEqual(new Map([
             ["in_db", "already imported in this project"],

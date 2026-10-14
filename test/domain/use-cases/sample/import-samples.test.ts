@@ -771,7 +771,8 @@ describe("Delete Sample Use Case", () => {
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
                 expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(10);
                 expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(2);
-                expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleRequestCreationModel_1, "UVP5HD");
+                expect(mockSampleRepository.formatSampleToImport).toBeCalledWith(expect.objectContaining({ sample_name: "perle3_001" }), "UVP5HD", projectResponseModel.root_folder_path);
+                expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleRequestCreationModel_1, "UVP5HD", projectResponseModel.root_folder_path);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
                 expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(1);
                 expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
