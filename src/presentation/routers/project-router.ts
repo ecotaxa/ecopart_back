@@ -337,7 +337,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -375,14 +375,14 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find the created project.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
-            else if (err.message.includes("User cannot use the provided ecotaxa account current user id: ")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("User cannot use the provided ecotaxa account current user id: ")) res.status(403).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance ID is required for a new Ecotaxa project.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance ID is required for an existing Ecotaxa project.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa account not found.") res.status(401).send({ errors: [err.message] })
             else if (err.message === "EcoTaxa project not found") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Mismatch: Ecotaxa instance ID does not match the Ecotaxa account's instance ID.") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Instruments do not match")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa generic account not found for instance : ")) res.status(500).send({ errors: [err.message] })
@@ -540,7 +540,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User is deleted.
+     *         description: User is deleted. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -565,7 +565,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot update this property or project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot update this property or project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Member user cannot be use") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Manager user cannot be use") res.status(404).send({ errors: [err.message] })
@@ -610,13 +610,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: Logged user cannot delete this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Logged user cannot delete this project. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -643,7 +643,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this project") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete project"] })
         }
     })
@@ -715,13 +715,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -753,7 +753,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
@@ -795,13 +795,13 @@ export default function ProjectRouter(
      *                   format: date-time
      *                   nullable: true
      *       401:
-     *         description: User not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -827,7 +827,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get last backup date"] })
         }
@@ -882,13 +882,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -920,7 +920,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
@@ -967,13 +967,13 @@ export default function ProjectRouter(
      *               items:
      *                 type: string
      *       401:
-     *         description: Not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -998,7 +998,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Meta header file not found")) res.status(404).send({ errors: [err.message] })
@@ -1009,7 +1009,7 @@ export default function ProjectRouter(
     const sendErrorResponseSampleImport = (res: Response, err: Error, defaultMessage: string) => {
         const errorMap: { [key: string]: { status: number; message: string } } = {
             "User cannot be used": { status: 403, message: err.message },
-            "Logged user cannot list importable samples in this project": { status: 401, message: err.message },
+            "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
             "Task type not found": { status: 404, message: err.message },
             "Task status not found": { status: 404, message: err.message },
@@ -1102,13 +1102,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleImportResponse'
      *       401:
-     *         description: User not authorized.
+     *         description: Missing or invalid access token, or samples not importable.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -1271,13 +1271,13 @@ export default function ProjectRouter(
      *                     type: string
      *                     description: CTD file extension (e.g. "ctd").
      *       401:
-     *         description: Not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -1302,7 +1302,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err);
             if (err.message === 'User cannot be used') res.status(403).send({ errors: [err.message] });
-            else if (err.message === 'Logged user cannot list importable CTD samples in this project') res.status(401).send({ errors: [err.message] });
+            else if (err.message === 'Logged user cannot list importable CTD samples in this project') res.status(403).send({ errors: [err.message] });
             else if (err.message === 'Cannot find project') res.status(404).send({ errors: [err.message] });
             else if (err.message === 'No CTD folder found in project folder') res.status(404).send({ errors: [err.message] });
             else if (err.message === 'Unknown instrument model') res.status(404).send({ errors: [err.message] });
@@ -1313,7 +1313,7 @@ export default function ProjectRouter(
     const sendErrorResponseCTDSampleImport = (err: Error, defaultMessage: string) => {
         const errorMap: { [key: string]: { status: number; message: string } } = {
             'User cannot be used': { status: 403, message: err.message },
-            'Logged user cannot import CTD samples in this project': { status: 401, message: err.message },
+            'Logged user cannot import CTD samples in this project': { status: 403, message: err.message },
             'Cannot find project': { status: 404, message: err.message },
             'Task type not found': { status: 404, message: err.message },
             'Task status not found': { status: 404, message: err.message },
@@ -1397,13 +1397,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User not authorized or provided non-importable samples.
+     *         description: Missing or invalid access token, or provided non-importable samples.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -1477,13 +1477,13 @@ export default function ProjectRouter(
      *                     type: string
      *                     description: CTD file extension (e.g. "ctd").
      *       401:
-     *         description: User is not allowed to list imported CTD samples.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User is not allowed to list imported CTD samples. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -1511,7 +1511,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") return res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list imported CTD samples in this project") return res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list imported CTD samples in this project") return res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") return res.status(404).send({ errors: [err.message] })
             else return res.status(500).send({ errors: ["Cannot list imported CTD samples"] })
         }
@@ -1566,7 +1566,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -1595,7 +1595,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") return res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete imported CTD samples in this project") return res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete imported CTD samples in this project") return res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") return res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find CTD samples to delete") return res.status(404).send({ errors: [err.message] })
             else if (err.message.startsWith("Some CTD samples to delete were not found:")) return res.status(404).send({ errors: [err.message] })
@@ -2054,9 +2054,9 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User not authorized for this project.
+     *         description: Missing or invalid access token.
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.
      *       404:
      *         description: Project, samples or task not found.
      *       422:
@@ -2071,7 +2071,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot regenerate pivots in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot regenerate pivots in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "No samples in this project") res.status(404).send({ errors: [err.message] })
             else if (err.message.startsWith("Samples not found in this project")) res.status(404).send({ errors: [err.message] })
@@ -2256,7 +2256,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -2284,7 +2284,7 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete this sample") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this sample") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
@@ -2317,13 +2317,13 @@ export default function ProjectRouter(
      *               items:
      *                 type: string
      *       401:
-     *         description: Not authorized for this project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -2348,7 +2348,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot list importable EcoTaxa samples in this project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot list importable EcoTaxa samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot list importable EcoTaxa samples"] })
@@ -2358,7 +2358,7 @@ export default function ProjectRouter(
     const sendErrorResponseEcoTaxaSampleImport = (res: Response, err: Error, defaultMessage: string) => {
         const errorMap: { [key: string]: { status: number; message: string } } = {
             "User cannot be used": { status: 403, message: err.message },
-            "Logged user cannot list importable samples in this project": { status: 401, message: err.message },
+            "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
             "Task type not found": { status: 404, message: err.message },
             "Task status not found": { status: 404, message: err.message },
@@ -2440,13 +2440,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleImportResponse'
      *       401:
-     *         description: User not authorized.
+     *         description: Missing or invalid access token, or samples not importable.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. Not authorized for this project.
      *         content:
      *           application/json:
      *             schema:
@@ -2655,7 +2655,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -2683,7 +2683,7 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete this sample") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot delete this sample") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
     })
@@ -2762,7 +2762,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -2805,7 +2805,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Admin only")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Admin only")) res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
@@ -2813,7 +2813,7 @@ export default function ProjectRouter(
             else if (err.message === "EcoTaxa project not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa instance ID is required")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Mismatch: Ecotaxa instance ID does not match")) res.status(401).send({ errors: [err.message] })
-            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Instruments do not match")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("already linked")) res.status(409).send({ errors: [err.message] })
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })

@@ -69,13 +69,13 @@ export default function EcoTaxaInstanceRouter(
      *             schema:
      *               $ref: '#/components/schemas/EcotaxaInstance'
      *       401:
-     *         description: Logged user cannot create an EcoTaxa instance.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User is deleted.
+     *         description: User is deleted. Logged user cannot create an EcoTaxa instance. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -95,7 +95,7 @@ export default function EcoTaxaInstanceRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot create an EcoTaxa instance") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot create an EcoTaxa instance") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create EcoTaxa instance"] })
         }
     })

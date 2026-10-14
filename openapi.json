@@ -3296,7 +3296,7 @@
             }
           },
           "401": {
-            "description": "Logged user cannot create an EcoTaxa instance.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3306,7 +3306,7 @@
             }
           },
           "403": {
-            "description": "User is deleted.",
+            "description": "User is deleted. Logged user cannot create an EcoTaxa instance. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3395,10 +3395,10 @@
             "description": "Task created. Poll the task and download the file once done."
           },
           "401": {
-            "description": "User not authorized for one of the projects the requested samples belong to."
+            "description": "Missing or invalid access token."
           },
           "403": {
-            "description": "User cannot be used."
+            "description": "User cannot be used. User not authorized for one of the projects the requested samples belong to. The logged user is not allowed to perform this action."
           },
           "404": {
             "description": "Sample or project not found — no sample resolved, or some requested ids do not exist."
@@ -3485,10 +3485,10 @@
             "description": "Task created. Poll the task and download the file once done."
           },
           "401": {
-            "description": "User not allowed to export from one of the projects the requested samples belong to."
+            "description": "Missing or invalid access token."
           },
           "403": {
-            "description": "User cannot be used."
+            "description": "User cannot be used. User not allowed to export from one of the projects the requested samples belong to. The logged user is not allowed to perform this action."
           },
           "404": {
             "description": "Sample or project not found — no sample resolved, or some requested ids do not exist."
@@ -3899,7 +3899,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4221,7 +4221,7 @@
             }
           },
           "403": {
-            "description": "User is deleted.",
+            "description": "User is deleted. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4286,7 +4286,7 @@
             }
           },
           "401": {
-            "description": "Logged user cannot delete this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4296,7 +4296,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Logged user cannot delete this project. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4373,7 +4373,7 @@
             }
           },
           "401": {
-            "description": "User not authorized for this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4383,7 +4383,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4467,7 +4467,7 @@
             }
           },
           "401": {
-            "description": "User not authorized for this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4477,7 +4477,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4554,7 +4554,7 @@
             }
           },
           "401": {
-            "description": "User not authorized for this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4564,7 +4564,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4651,7 +4651,7 @@
             }
           },
           "401": {
-            "description": "User not authorized.",
+            "description": "Missing or invalid access token, or samples not importable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4661,7 +4661,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4741,7 +4741,7 @@
             }
           },
           "401": {
-            "description": "Not authorized for this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4751,7 +4751,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4840,7 +4840,7 @@
             }
           },
           "401": {
-            "description": "User not authorized or provided non-importable samples.",
+            "description": "Missing or invalid access token, or provided non-importable samples.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4850,7 +4850,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4944,7 +4944,7 @@
             }
           },
           "401": {
-            "description": "User is not allowed to list imported CTD samples.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4954,7 +4954,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. User is not allowed to list imported CTD samples. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5051,7 +5051,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5297,7 +5297,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5650,10 +5650,10 @@
             }
           },
           "401": {
-            "description": "User not authorized for this project."
+            "description": "Missing or invalid access token."
           },
           "403": {
-            "description": "User cannot be used."
+            "description": "User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action."
           },
           "404": {
             "description": "Project, samples or task not found."
@@ -5829,7 +5829,7 @@
             }
           },
           "401": {
-            "description": "Not authorized for this project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5839,7 +5839,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5916,7 +5916,7 @@
             }
           },
           "401": {
-            "description": "User not authorized.",
+            "description": "Missing or invalid access token, or samples not importable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5926,7 +5926,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. Not authorized for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6109,7 +6109,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6244,7 +6244,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7467,7 +7467,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized to update this user or property.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7477,7 +7477,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used or is deleted.",
+            "description": "User cannot be used or is deleted. Unauthorized to update this user or property. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7552,7 +7552,7 @@
             }
           },
           "401": {
-            "description": "Logged user cannot delete this user.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7562,7 +7562,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used or is deleted.",
+            "description": "User cannot be used or is deleted. Logged user cannot delete this user. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7730,7 +7730,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used or EcoTaxa login forbidden.",
+            "description": "User cannot be used or EcoTaxa login forbidden. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7831,7 +7831,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7897,7 +7897,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized to delete this account.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7907,7 +7907,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used or cannot logout.",
+            "description": "User cannot be used or cannot logout. Unauthorized to delete this account. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
