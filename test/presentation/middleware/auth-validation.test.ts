@@ -20,6 +20,7 @@ import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/
 import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 import { SearchInfo } from "../../../src/domain/entities/search";
 import { SearchUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/search-user";
+import { MockLogoutUserUseCase } from "../../mocks/auth-mock";
 
 class MockLoginUserUseCase implements LoginUserUseCase {
     execute(): Promise<(UserResponseModel & AuthJwtResponseModel)> {
@@ -65,6 +66,7 @@ describe("User Router", () => {
     let mockResetPasswordRequestUseCase: MockResetPasswordRequestUseCase;
     let mockResetPasswordUseCase: MockResetPasswordUseCase;
     let mockSearchUsersUseCase: MockSearchUsersUseCase;
+    let mockLogoutUserUseCase: MockLogoutUserUseCase;
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
     const TEST_REFRESH_TOKEN_SECRET = process.env.TEST_REFRESH_TOKEN_SECRET || ''
@@ -79,8 +81,9 @@ describe("User Router", () => {
         mockResetPasswordRequestUseCase = new MockResetPasswordRequestUseCase()
         mockResetPasswordUseCase = new MockResetPasswordUseCase()
         mockSearchUsersUseCase = new MockSearchUsersUseCase()
+        mockLogoutUserUseCase = new MockLogoutUserUseCase()
 
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, middlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase, mockSearchUsersUseCase))
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, middlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase, mockSearchUsersUseCase, mockLogoutUserUseCase))
     })
 
     beforeEach(() => {

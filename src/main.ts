@@ -37,6 +37,7 @@ import { ChangePassword } from './domain/use-cases/auth/change-password'
 import { ValidUser } from './domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
 import { ResetPassword } from './domain/use-cases/auth/reset-password'
+import { LogoutUser } from './domain/use-cases/auth/logout'
 import { DeleteUser } from './domain/use-cases/user/delete-user'
 import { CreateProject } from './domain/use-cases/project/create-project'
 import { DeleteProject } from './domain/use-cases/project/delete-project'
@@ -106,6 +107,7 @@ import { DeleteBroadcastMessage } from './domain/use-cases/broadcast_message/del
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLiteUserSessionDataSource } from './data/data-sources/sqlite/sqlite-user-session-data-source'
 import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
@@ -260,7 +262,14 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
 
     })
     const user_repo = new UserRepositoryImpl(user_dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
-    const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
+    const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET, new SQLiteUserSessionDataSource(db))
+    // Housekeeping only: a failure is logged and does not stop the server
+    try {
+        const purged_sessions = await auth_repo.purgeEndedSessions()
+        if (purged_sessions > 0) console.log(new Date().toISOString(), `${purged_sessions} ended login session(s) removed`)
+    } catch (error) {
+        console.log(new Date().toISOString(), 'Cannot remove the ended login sessions:', error)
+    }
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER, config.DATA_STORAGE_IMPORT)
@@ -309,10 +318,11 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new MiddlewareAuthValidation(),
         new LoginUser(user_repo, auth_repo),
         new RefreshToken(user_repo, auth_repo),
-        new ChangePassword(user_repo),
+        new ChangePassword(user_repo, auth_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
-        new ResetPassword(user_repo),
-        new SearchUsers(user_repo, search_repo, privilege_repo)
+        new ResetPassword(user_repo, auth_repo),
+        new SearchUsers(user_repo, search_repo, privilege_repo),
+        new LogoutUser(auth_repo)
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),

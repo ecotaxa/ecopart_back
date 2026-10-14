@@ -11,6 +11,7 @@ import { ChangePasswordUseCase } from '../../domain/interfaces/use-cases/auth/ch
 import { ResetPasswordRequestUseCase } from '../../domain/interfaces/use-cases/auth/reset-password-request'
 import { ResetPasswordUseCase } from '../../domain/interfaces/use-cases/auth/reset-password'
 import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/search-user'
+import { LogoutUserUseCase } from '../../domain/interfaces/use-cases/auth/logout'
 
 // Password securituy rules //HTTPS //SALTING before hashing //rate limiting //timeout //SSO
 export default function AuthRouter(
@@ -21,7 +22,8 @@ export default function AuthRouter(
     changePasswordUseCase: ChangePasswordUseCase,
     resetPasswordRequestUseCase: ResetPasswordRequestUseCase,
     resetPasswordUseCase: ResetPasswordUseCase,
-    searchUsersUseCase: SearchUsersUseCase
+    searchUsersUseCase: SearchUsersUseCase,
+    logoutUserUseCase: LogoutUserUseCase
 ) {
     const router = express.Router()
 
@@ -147,17 +149,23 @@ export default function AuthRouter(
      * /auth/refreshToken:
      *   post:
      *     summary: Refresh access token
-     *     description: Uses the refresh token cookie to generate a new access token.
+     *     description: Uses the refresh token cookie to generate a new access token, as long as its login session is active. The session end is pushed back and the refresh token cookie is reissued.
      *     tags: [Auth]
      *     security:
      *       - cookieRefreshToken: []
      *     responses:
      *       200:
-     *         description: New access token generated and set as cookie.
+     *         description: New access and refresh tokens set as cookies.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
+     *       401:
+     *         description: Missing or invalid refresh token, or its session was revoked (logout, password change or reset) or has expired.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
      *         description: User cannot be used.
      *         content:
@@ -181,13 +189,16 @@ export default function AuthRouter(
         try {
             const user = (req as CustomRequest).token
             const token = await refreshTokenUseCase.execute(user)
+            // The refresh token is reissued too: the session end moved forward, so must the token expiry
             res
                 .status(200)
                 .cookie("access_token", token.jwt, http0nlyCookie)
+                .cookie("refresh_token", token.jwt_refresh, http0nlyCookie)
                 .send({ message: "Access token refreshed" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })
+            if (err.message === "Session revoked or expired") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot refresh token"] })
         }
@@ -198,7 +209,7 @@ export default function AuthRouter(
      * /auth/logout:
      *   post:
      *     summary: Logout
-     *     description: Clears the access and refresh token cookies to log the user out.
+     *     description: Revokes the login session of the refresh token cookie, then clears the access and refresh token cookies. Always succeeds.
      *     tags: [Auth]
      *     responses:
      *       200:
@@ -209,6 +220,12 @@ export default function AuthRouter(
      *               $ref: '#/components/schemas/MessageResponse'
      */
     router.post('/logout', async (req: Request, res: Response) => {
+        try {
+            await logoutUserUseCase.execute(req.cookies?.refresh_token)
+        } catch (err) {
+            // The cookies are cleared anyway: logging out must always succeed for the browser
+            console.log(new Date().toISOString(), err)
+        }
         res
             .clearCookie("access_token")
             .clearCookie("refresh_token")

@@ -3,6 +3,10 @@ import { JwtPayload } from "jsonwebtoken";
 import { AuthRepository } from "../../../src/domain/interfaces/repositories/auth-repository";
 import { AuthRepositoryImpl } from "../../../src/domain/repositories/auth-repository";
 import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
+import { UserSessionDataSource } from "../../../src/data/interfaces/data-sources/user-session-data-source";
+
+// Token tests do not touch sessions; session behaviour is tested on a real database in auth-repository-sessions.test.ts
+const noSessions = {} as UserSessionDataSource
 
 class MockJwtAdapter extends JwtAdapter {
     sign(): string {
@@ -24,7 +28,7 @@ describe("Auth Repository", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         jwt = new MockJwtAdapter()
-        authRepository = new AuthRepositoryImpl(jwt, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET)
+        authRepository = new AuthRepositoryImpl(jwt, TEST_ACCESS_TOKEN_SECRET, TEST_REFRESH_TOKEN_SECRET, noSessions)
     })
 
     describe("Test generateAccessToken", () => {
@@ -84,14 +88,20 @@ describe("Auth Repository", () => {
             expect(jwt.sign).toBeCalledWith(ExpectedPayload, TEST_ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
         });
 
-        test("refresh token: one year, without codes nor project lists", () => {
+        test("access token carries the session id when there is one", () => {
             jest.spyOn(jwt, "sign").mockImplementation(() => "token")
-            authRepository.generateRefreshToken(UserWithPrivateFields)
-            expect(jwt.sign).toBeCalledWith(ExpectedPayload, TEST_REFRESH_TOKEN_SECRET, { expiresIn: '1y' })
+            authRepository.generateAccessToken(UserWithPrivateFields, "sid-1")
+            expect(jwt.sign).toBeCalledWith({ ...ExpectedPayload, sid: "sid-1" }, TEST_ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+        });
+
+        test("refresh token: thirty days, with its session id, without codes nor project lists", () => {
+            jest.spyOn(jwt, "sign").mockImplementation(() => "token")
+            authRepository.generateRefreshToken(UserWithPrivateFields, "sid-1")
+            expect(jwt.sign).toBeCalledWith({ ...ExpectedPayload, sid: "sid-1" }, TEST_REFRESH_TOKEN_SECRET, { expiresIn: '30d' })
         });
 
         test("a real token verifies and expires one hour after issue", () => {
-            const realRepository = new AuthRepositoryImpl(new JwtAdapter(), "secret_for_test", "refresh_for_test")
+            const realRepository = new AuthRepositoryImpl(new JwtAdapter(), "secret_for_test", "refresh_for_test", noSessions)
             const token = realRepository.generateAccessToken(UserWithPrivateFields)
             const decoded = new JwtAdapter().verify(token, "secret_for_test") as JwtPayload
             expect((decoded.exp as number) - (decoded.iat as number)).toBe(3600)
@@ -122,7 +132,7 @@ describe("Auth Repository", () => {
             }
             const expectedData = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZmlyc3ROYW1lIjoiSm9obiIsImxhc3ROYW1lIjoiU21pdGgiLCJlbWFpbCI6ImpvaG5AZ21haWwuY29tIiwic3RhdHVzIjoiUGVuZGluZyIsIm9yZ2FuaXNhdGlvbiI6IkxPViIsImNvdW50cnkiOiJGcmFuY2UiLCJ1c2VyX3BsYW5uZWRfdXNhZ2UiOiJNb24gdXNhZ2UiLCJ1c2VyX2NyZWF0aW9uX2RhdGUiOiIyMDIzLTA3LTMxIDE3OjE4OjQ3IiwiaWF0IjoxNjkzNDA2MDI3LCJleHAiOjE2OTM0MDc4Mjd9.pES4WXEsoN9QBo5OBoy3NmFW02OcvC8KyPT1E0zBRog"
             jest.spyOn(jwt, "sign").mockImplementation(() => { return expectedData })
-            const result = authRepository.generateRefreshToken(InputData);
+            const result = authRepository.generateRefreshToken(InputData, "sid-1");
             expect(result).toBe(expectedData)
         });
     })

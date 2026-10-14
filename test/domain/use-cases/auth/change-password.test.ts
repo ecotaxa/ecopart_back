@@ -2,6 +2,7 @@ import { DecodedToken, ChangeCredentialsModel } from "../../../../src/domain/ent
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { ChangePassword } from '../../../../src/domain/use-cases/auth/change-password';
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockAuthRepository } from "../../../mocks/auth-mock";
 
 /* TESTED HERE */
 // User is not admin : edit password on himself : ok
@@ -17,10 +18,13 @@ import { MockUserRepository } from "../../../mocks/user-mock";
 describe("Change password Use Case", () => {
 
     let mockUserRepository: UserRepository;
+    let mockAuthRepository: MockAuthRepository;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
+        mockAuthRepository = new MockAuthRepository()
+        jest.spyOn(mockAuthRepository, "revokeUserSessions").mockImplementation(() => Promise.resolve(0))
     })
 
     describe("Not admin user", () => {
@@ -55,7 +59,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -100,7 +104,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -128,6 +132,7 @@ describe("Change password Use Case", () => {
                 user_planned_usage: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
                 user_creation_utc_date_time: '2023-08-01 10:30:00',
 
+                sid: "current-session",
                 iat: 1693237789,
                 exp: 1724795389
             }
@@ -142,7 +147,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
             } catch (err) {
@@ -152,6 +157,8 @@ describe("Change password Use Case", () => {
             expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(2);
             expect(mockUserRepository.verifyUserLogin).toBeCalledWith({ email: current_user.email, password: credentials.password });
             expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
+            // Other sessions end, the one that made the change stays open
+            expect(mockAuthRepository.revokeUserSessions).toBeCalledWith(1, "current-session");
 
         });
 
@@ -185,7 +192,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -229,7 +236,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -273,7 +280,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -283,6 +290,7 @@ describe("Change password Use Case", () => {
                 expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(2);
                 expect(mockUserRepository.verifyUserLogin).toBeCalledWith({ email: current_user.email, password: credentials.password });
                 expect(mockUserRepository.changePassword).not.toBeCalled();
+                expect(mockAuthRepository.revokeUserSessions).not.toBeCalled();
             }
 
         });
@@ -316,7 +324,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)
@@ -359,7 +367,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
@@ -400,13 +408,14 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
                 expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledTimes(2);
                 expect(mockUserRepository.verifyUserLogin).not.toBeCalled();
                 expect(mockUserRepository.changePassword).toBeCalledWith(credentials);
+                expect(mockAuthRepository.revokeUserSessions).toBeCalledWith(2, undefined);
             } catch (err) {
                 expect(true).toBe(false)
             }
@@ -441,7 +450,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(1))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(mockUserRepository.isAdmin).toBeCalledWith(1);
@@ -482,7 +491,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(false))
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(0))
 
-            const changePasswordUseCase = new ChangePassword(mockUserRepository)
+            const changePasswordUseCase = new ChangePassword(mockUserRepository, mockAuthRepository)
             try {
                 await changePasswordUseCase.execute(current_user, credentials);
                 expect(true).toBe(false)

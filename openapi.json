@@ -2743,7 +2743,7 @@
     "/auth/refreshToken": {
       "post": {
         "summary": "Refresh access token",
-        "description": "Uses the refresh token cookie to generate a new access token.",
+        "description": "Uses the refresh token cookie to generate a new access token, as long as its login session is active. The session end is pushed back and the refresh token cookie is reissued.",
         "tags": [
           "Auth"
         ],
@@ -2754,11 +2754,21 @@
         ],
         "responses": {
           "200": {
-            "description": "New access token generated and set as cookie.",
+            "description": "New access and refresh tokens set as cookies.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid refresh token, or its session was revoked (logout, password change or reset) or has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2799,7 +2809,7 @@
     "/auth/logout": {
       "post": {
         "summary": "Logout",
-        "description": "Clears the access and refresh token cookies to log the user out.",
+        "description": "Revokes the login session of the refresh token cookie, then clears the access and refresh token cookies. Always succeeds.",
         "tags": [
           "Auth"
         ],

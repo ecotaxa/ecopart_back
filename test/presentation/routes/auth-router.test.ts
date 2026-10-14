@@ -19,6 +19,7 @@ import { JwtAdapter } from "../../../src/infra/auth/jsonwebtoken";
 import { IMiddlewareAuthValidation } from "../../../src/presentation/interfaces/middleware/auth-validation";
 import { SearchInfo } from "../../../src/domain/entities/search";
 import { SearchUsersUseCase } from "../../../src/domain/interfaces/use-cases/user/search-user";
+import { MockLogoutUserUseCase } from "../../mocks/auth-mock";
 
 
 class MockLoginUserUseCase implements LoginUserUseCase {
@@ -71,6 +72,7 @@ describe("User Router", () => {
     let mockResetPasswordRequestUseCase: MockResetPasswordRequestUseCase;
     let mockResetPasswordUseCase: MockResetPasswordUseCase;
     let mockSearchUsersUseCase: MockSearchUsersUseCase;
+    let mockLogoutUserUseCase: MockLogoutUserUseCase;
 
 
     const TEST_ACCESS_TOKEN_SECRET = process.env.TEST_ACCESS_TOKEN_SECRET || ''
@@ -87,8 +89,9 @@ describe("User Router", () => {
         mockResetPasswordRequestUseCase = new MockResetPasswordRequestUseCase()
         mockResetPasswordUseCase = new MockResetPasswordUseCase()
         mockSearchUsersUseCase = new MockSearchUsersUseCase()
+        mockLogoutUserUseCase = new MockLogoutUserUseCase()
 
-        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase, mockSearchUsersUseCase))
+        server.use("/auth", AuthRouter(mockMiddlewareAuth, mockMiddlewareAuthValidation, mockLoginUserUseCase, mockRefreshTokenUseCase, mockChangePasswordUseCase, mockResetPasswordRequestUseCase, mockResetPasswordUseCase, mockSearchUsersUseCase, mockLogoutUserUseCase))
     })
 
     beforeEach(() => {
@@ -244,8 +247,8 @@ describe("User Router", () => {
         test("Should refresh token and return a new token", async () => {
             const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
             const OutputData = {
-                jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7fSwiaWF0IjoxNjkzMjE1Njk2LCJleHAiOjE2OTMyMTc0OTZ9.aofgJ6Mu1hWbUDM1dBm2oVj1R9JV8NU0FFFyslbMV_o"
-
+                jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7fSwiaWF0IjoxNjkzMjE1Njk2LCJleHAiOjE2OTMyMTc0OTZ9.aofgJ6Mu1hWbUDM1dBm2oVj1R9JV8NU0FFFyslbMV_o",
+                jwt_refresh: "reissued.refresh.token"
             }
 
             jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => Promise.resolve(OutputData))
@@ -257,9 +260,24 @@ describe("User Router", () => {
             expect(response.status).toBe(200)
             expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1);
             expect(response.body).toStrictEqual({ message: "Access token refreshed" })
+            // Both cookies: the session end moved forward, so does the refresh token expiry
             const cookies = response.headers['set-cookie'] as unknown as string[]
-            expect(cookies).toHaveLength(1)
+            expect(cookies).toHaveLength(2)
             expect(cookies[0]).toMatch(new RegExp("^access_token=" + OutputData.jwt + "; Path=/; HttpOnly; SameSite=Lax$"))
+            expect(cookies[1]).toMatch(new RegExp("^refresh_token=" + OutputData.jwt_refresh + "; Path=/; HttpOnly; SameSite=Lax$"))
+        });
+
+        test("Refuses with 401 a refresh token whose session was revoked or expired", async () => {
+            const valid_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkzMjE1NjM5LCJleHAiOjQ4NDg5NzU2Mzl9.XZxrf3_f6xsl0LG9U9huC7AnDZsVZsiiVUT9WzDvACs"
+            jest.spyOn(mockRefreshTokenUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Session revoked or expired")))
+
+            const response = await request(server)
+                .post("/auth/refreshToken")
+                .set("Cookie", `refresh_token=${valid_refresh_token}; Path=/; HttpOnly;`);
+
+            expect(response.status).toBe(401)
+            expect(response.body).toStrictEqual({ errors: ["Session revoked or expired"] })
+            expect(response.headers['set-cookie']).toBeUndefined();
         });
 
         test("Should handle error during refresh token use case and return a 404 response", async () => {
@@ -316,15 +334,28 @@ describe("User Router", () => {
     // logout
     describe("Test /auth/logout endpoint", () => {
         test("Testing logout endpoint", async () => {
+            jest.spyOn(mockLogoutUserUseCase, "execute").mockImplementation(() => Promise.resolve())
 
-            const response = await request(server).post("/auth/logout").send();
+            const response = await request(server).post("/auth/logout").set("Cookie", "refresh_token=the.refresh.token").send();
 
+            // The session of the refresh token cookie is revoked
+            expect(mockLogoutUserUseCase.execute).toBeCalledWith("the.refresh.token")
             expect(response.status).toBe(200)
             expect(response.body).toEqual({ message: "You are Logged Out" });
             expect(response.header['set-cookie']).toEqual([
                 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
                 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
             ]);
+        });
+
+        test("Logout still clears the cookies when the session cannot be revoked", async () => {
+            jest.spyOn(mockLogoutUserUseCase, "execute").mockImplementation(() => Promise.reject(new Error("database is locked")))
+
+            const response = await request(server).post("/auth/logout").send();
+
+            expect(mockLogoutUserUseCase.execute).toBeCalledWith(undefined)
+            expect(response.status).toBe(200)
+            expect(response.header['set-cookie']).toHaveLength(2);
         });
 
     })
