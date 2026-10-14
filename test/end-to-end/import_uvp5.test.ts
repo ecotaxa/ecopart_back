@@ -276,7 +276,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new ResendMigrationEmails(userRepo, transporter, mailerAdapter),
             new UpdateUser(userRepo),
             new ValidUser(userRepo),
-            new DeleteUser(userRepo, privilegeRepo),
+            new DeleteUser(userRepo, privilegeRepo, ecotaxaAccountRepo),
             new LoginEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new LogoutEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new SearchUsers(userRepo, searchRepo, privilegeRepo),

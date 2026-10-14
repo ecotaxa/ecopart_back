@@ -334,6 +334,16 @@ When you add or modify an endpoint, add/update the `@openapi` annotation above i
 ### Link with EcoTaxa
 You can configure GENERIC_ECOTAXA_ACCOUNT_EMAIL in the .env file. Applicative accounts are created with this email in every EcoTaxa instances. You should then loggin to ecopart user that uses the same email as GENERIC_ECOTAXA_ACCOUNT_EMAIL and loggin for every instances to the related applicative ecotaxa account. For now you should reconnect to theses accounts every 30 day. We are working on an EcoTaxa feature to ease this process trough a refresh token or longer token.
 
+#### EcoTaxa tokens at rest
+
+The EcoTaxa token of every linked account is stored in the database. Set `ECOTAXA_TOKEN_ENCRYPTION_KEY` in the `.env` of each server to store these tokens encrypted (AES-256-GCM). Generate one key per server with `openssl rand -base64 32` and keep it with the other secrets.
+
+- At startup, tokens saved in clear are encrypted. The log says how many.
+- Without the variable, tokens are stored in clear as before, and the startup log says so.
+- Changing or losing the key makes the stored tokens unreadable. They are then handled like expired ones: each user logs out of the EcoTaxa account and logs in again, including for the generic accounts. The startup log counts these tokens.
+- Rolling back to a version older than this feature has the same effect, since the older code cannot read encrypted tokens.
+- Deleting an EcoPart user also deletes their EcoTaxa accounts, except the generic account (`GENERIC_ECOTAXA_ACCOUNT_EMAIL`), which EcoPart itself uses.
+
 ### Database
 
 EcoPart uses **SQLite** as its database. The database file location is configured via the `DBSOURCE_FOLDER` and `DBSOURCE_NAME` environment variables in the `.env` file.

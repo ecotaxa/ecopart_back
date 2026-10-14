@@ -113,6 +113,12 @@ export class MockUserRepository implements UserRepository {
 }
 
 export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    deleteEcotaxaAccountsOfUser(): Promise<number> {
+        throw new Error("Method not implemented for deleteEcotaxaAccountsOfUser.");
+    }
+    encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }> {
+        throw new Error("Method not implemented for encryptStoredTokens.");
+    }
     api_ecotaxa_get_samples_in_project(): Promise<Array<{ sampleid: number; orig_id: string; }>> {
         throw new Error("Method not implemented for api_ecotaxa_get_samples_in_project.");
     }
@@ -201,6 +207,9 @@ export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     }
     deleteOne(): Promise<number> {
         throw new Error("Method not implemented for deleteOne.");
+    }
+    updateToken(): Promise<number> {
+        throw new Error("Method not implemented for updateToken.");
     }
     getOneEcoTaxaInstance(): Promise<EcotaxaInstanceModel | null> {
         throw new Error("Method not implemented for getOneEcoTaxaInstance.");

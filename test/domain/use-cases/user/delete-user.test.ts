@@ -2,18 +2,21 @@ import { UserResponseModel, UserUpdateModel } from "../../../../src/domain/entit
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
 import { DeleteUser } from '../../../../src/domain/use-cases/user/delete-user'
-import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockEcotaxaAccountRepository, MockUserRepository } from "../../../mocks/user-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 
 describe("Delete User Use Case", () => {
 
     let mockUserRepository: UserRepository;
     let mockPrivilegeRepository: PrivilegeRepository
+    let mockEcotaxaAccountRepository: MockEcotaxaAccountRepository
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
         mockPrivilegeRepository = new MockPrivilegeRepository()
+        mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
+        jest.spyOn(mockEcotaxaAccountRepository, "deleteEcotaxaAccountsOfUser").mockImplementation(() => Promise.resolve(0))
     })
 
 
@@ -46,13 +49,17 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "deleteUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         await updateUserUseCase.execute(current_user, user_to_delete);
 
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.deleteUser).toBeCalledWith(user_to_delete);
+        // EcoTaxa tokens are removed before the user is anonymised
+        expect(mockEcotaxaAccountRepository.deleteEcotaxaAccountsOfUser).toBeCalledWith(1);
+        expect((mockEcotaxaAccountRepository.deleteEcotaxaAccountsOfUser as jest.Mock).mock.invocationCallOrder[0])
+            .toBeLessThan((mockUserRepository.deleteUser as jest.Mock).mock.invocationCallOrder[0]);
     });
 
 
@@ -84,12 +91,13 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false))
         jest.spyOn(mockUserRepository, "deleteUser").mockImplementation(() => Promise.resolve(1))
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
             expect(err.message).toBe("Logged user cannot delete this user");
         }
+        expect(mockEcotaxaAccountRepository.deleteEcotaxaAccountsOfUser).toBeCalledTimes(0);
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
         expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(current_user.user_id);
         expect(mockUserRepository.isAdmin).toBeCalledWith(current_user.user_id);
@@ -127,7 +135,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "deleteUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         await updateUserUseCase.execute(current_user, user_to_delete);
 
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
@@ -166,7 +174,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "deleteUser").mockImplementation(() => Promise.resolve(1))
         jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(1))
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         await updateUserUseCase.execute(current_user, user_to_delete);
 
         expect(mockUserRepository.getUser).toBeCalledWith(user_to_delete);
@@ -190,7 +198,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockUserRepository, "deleteUser")
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
 
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
@@ -230,7 +238,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockUserRepository, "deleteUser")
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
@@ -256,7 +264,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin")
         jest.spyOn(mockUserRepository, "deleteUser")
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {
@@ -295,7 +303,7 @@ describe("Delete User Use Case", () => {
         jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true))
         jest.spyOn(mockUserRepository, "deleteUser").mockImplementation(() => Promise.resolve(0))
 
-        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository)
+        const updateUserUseCase = new DeleteUser(mockUserRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository)
         try {
             await updateUserUseCase.execute(current_user, user_to_delete);
         } catch (err) {

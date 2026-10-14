@@ -12,6 +12,7 @@ import { MiddlewareExportValidation } from './presentation/middleware/export-val
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
 import { errorHandler, notFoundHandler } from './presentation/middleware/error-handlers'
+import { AesGcmTokenCipher } from './infra/cryptography/aes-gcm-token-cipher'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -161,6 +162,7 @@ const config = {
 
     NODE_ENV: process.env.NODE_ENV || '',
     ECOTAXA_ALLOW_SELF_SIGNED_CERT: (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || '').toLowerCase() === 'true',
+    ECOTAXA_TOKEN_ENCRYPTION_KEY: process.env.ECOTAXA_TOKEN_ENCRYPTION_KEY || '',
 
     GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
     TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || '',
@@ -268,7 +270,19 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
     if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT)
+    // Throws at startup when the key is set but malformed
+    const ecotaxa_token_cipher = new AesGcmTokenCipher(config.ECOTAXA_TOKEN_ENCRYPTION_KEY)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT, ecotaxa_token_cipher)
+    // Tokens saved before a key was configured are encrypted now; without a key they stay in clear, as before.
+    // A failure here is logged and does not stop the server: it only delays the encryption to the next start.
+    if (!ecotaxa_token_cipher.enabled) console.log(new Date().toISOString(), 'ECOTAXA_TOKEN_ENCRYPTION_KEY is not set: EcoTaxa tokens are stored in clear')
+    try {
+        const ecotaxa_tokens = await ecotaxa_account_repo.encryptStoredTokens()
+        if (ecotaxa_tokens.encrypted > 0) console.log(new Date().toISOString(), `${ecotaxa_tokens.encrypted} EcoTaxa token(s) saved in clear are now encrypted`)
+        if (ecotaxa_tokens.unreadable > 0) console.log(new Date().toISOString(), `${ecotaxa_tokens.unreadable} EcoTaxa token(s) cannot be decrypted with the current key: those users must log in to EcoTaxa again`)
+    } catch (error) {
+        console.log(new Date().toISOString(), 'Cannot encrypt the stored EcoTaxa tokens:', error)
+    }
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
@@ -282,7 +296,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
             new ResendMigrationEmails(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
-            new DeleteUser(user_repo, privilege_repo),
+            new DeleteUser(user_repo, privilege_repo, ecotaxa_account_repo),
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo, privilege_repo),
