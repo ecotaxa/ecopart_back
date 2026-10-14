@@ -35,6 +35,7 @@ import { MigrateEcotaxaProjectUseCase } from '../../domain/interfaces/use-cases/
 
 
 import { CustomRequest } from '../../domain/entities/auth'
+import { TOO_MANY_IMAGES_ERROR } from '../../domain/utils/per-image-columns'
 import { IMiddlewareSampleValidation } from '../interfaces/middleware/sample-validation'
 
 export default function ProjectRouter(
@@ -1761,6 +1762,10 @@ export default function ProjectRouter(
      *         being rank `firstimage + k`) and, on a depth sample whose project enables the descent
      *         filter, is kept by it. Graph 1 shows every image; graphs 2 and 3 only count the
      *         selected ones, and the imaged volume only the lit (flash on) images among them.
+     *       - **Graph 1 reduced above 4000 images**: the image range is cut into 1000 slices and each
+     *         slice keeps, for the selected and the removed images apart, the image with the lowest and
+     *         the one with the highest vertical position (same drawing, spikes included; images without
+     *         a vertical position are dropped). `total_images` still counts every image of the graph.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -1782,6 +1787,8 @@ export default function ProjectRouter(
      *         description: User cannot be used or lacks access to the project.
      *       404:
      *         description: Sample or project not found.
+     *       422:
+     *         description: Unknown instrument model, or the sample has too many images to be read at once (more than 30 million).
      *       500:
      *         description: Internal server error.
      */
@@ -1796,6 +1803,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find sample" || err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else if (err.message === TOO_MANY_IMAGES_ERROR) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get sample QC graphs"] })
         }
     })
@@ -1975,7 +1983,7 @@ export default function ProjectRouter(
      *       404:
      *         description: Project, source folder or meta header not found.
      *       422:
-     *         description: Validation error or a requested sample is not importable.
+     *         description: Validation error, a requested sample is not importable, or it has too many images to be read at once (more than 30 million).
      *       500:
      *         description: Internal server error.
      */
@@ -1993,6 +2001,7 @@ export default function ProjectRouter(
             else if (err.message === "No samples to preview") res.status(422).send({ errors: [err.message] })
             else if (err.message.startsWith("Samples not importable")) res.status(422).send({ errors: [err.message] })
             else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
+            else if (err.message === TOO_MANY_IMAGES_ERROR) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot preview sample QC graphs"] })
         }
     })

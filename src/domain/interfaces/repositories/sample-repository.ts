@@ -1,5 +1,5 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
-import { PerImageRecord, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
+import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -11,7 +11,8 @@ export interface SampleRepository {
     createSample(sample: SampleRequestCreationModel): Promise<number>;
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
-    listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number): Promise<PublicHeaderSampleResponseModel[]>;
+    // vignettes_of: count the vignettes of these samples only, the others report 0 (all when omitted).
+    listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, vignettes_of?: string[]): Promise<PublicHeaderSampleResponseModel[]>;
     // Reason, per sample name, why listImportableSamples leaves it out.
     explainNotImportableSamples(root_folder_path: string, dest_folder: string, project_id: number, samples_names: string[]): Promise<Map<string, string>>;
     UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
@@ -48,11 +49,11 @@ export interface SampleRepository {
     standardUpdateManySamples(sampleData: Partial<SampleUpdateModel>, filter: MinimalSampleRequestModel): Promise<number>;
 
     // Import-time QC graphs
-    // Reads the sample's raw files and returns one normalised record per acquired image/frame.
-    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    // Reads the sample's raw files and returns one normalised record per acquired image/frame, in columns.
+    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
     // Pre-import variant: reads the per-image records straight from the project source folder
     // (root_folder_path) for a sample that has not been imported yet.
-    getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageRecord[]>;
+    getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
     // Pre-import variant: reads the filtering/settings metadata (kept range, image volume, depth
     // offset) straight from the project source folder for a not-yet-imported sample.
     getSourceFilterMetadata(root_folder_path: string, sample_name: string, instrument_model: string): Promise<SampleSourceQcMetadata>;
@@ -68,7 +69,15 @@ export interface SampleRepository {
     generateUvp5Pivot(project_id: number, sample: Uvp5PivotSampleMetadata, instrument_model: string, root_folder_path: string): Promise<Uvp5PivotReport>;
     // converter_version recorded in the sample's pivot, null when it has none.
     getPivotConverterVersion(project_id: number, sample_name: string): Promise<string | null>;
-    // Per-image records of the UVP6-format particle file the computed products read (the pivot for
-    // a UVP5 sample, the imported particules.csv for a UVP6), blocks and mean grey included.
-    getPivotImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImageRecord[]>;
+    // The UVP6-format particle file the computed products read (the pivot for a UVP5 sample, the
+    // imported particules.csv for a UVP6), read in two passes, see PivotImages.
+    getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages>;
+}
+
+// A sample's pivot read in two passes, so that a mooring of millions of images is never held in
+// memory: its columns, read once up front, then its rows one by one (blocks and mean grey
+// included), read again from the file each time rows() is called, in the order of the columns.
+export interface PivotImages {
+    columns: PerImageColumns;
+    rows(): AsyncIterable<PivotImageRecord>;
 }

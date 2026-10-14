@@ -1,6 +1,8 @@
 import { PivotImageRecord, PivotParticleBlock } from "../../../../src/domain/entities/binned-export";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import {
     aaInMm2,
+    BinnedSampleBuilder,
     BinnedSampleSettings,
     computeBinnedSample,
     esdMm,
@@ -224,6 +226,40 @@ describe("computeBinnedSample, bin bounds and range", () => {
     test("a stray pressure fails the same way", () => {
         expect(() => computeBinnedSample(UVP6, sequence([img(1), img(99999)]), { axis: "depth", step: 1 }))
             .toThrow("Sample uvp6_sample would need 99999 depth bins of 1 m (from 1 m to 100000 m)");
+    });
+    test("the bin range is checked from the first pass, before any particle is read", () => {
+        const records = sequence([img(1), img(99999)]);
+        expect(() => new BinnedSampleBuilder(UVP6, toPerImageColumns(records), { axis: "depth", step: 1 }))
+            .toThrow("Sample uvp6_sample would need 99999 depth bins of 1 m (from 1 m to 100000 m)");
+    });
+});
+
+describe("BinnedSampleBuilder, two passes over the pivot", () => {
+    const records = sequence([img(1, [[1, 7, 10]]), img(2, [[2, 3, 20]]), img(3, [[3, 1, 30]])]);
+
+    test("gives the bins of computeBinnedSample, the rows bringing only their blocks", () => {
+        const builder = new BinnedSampleBuilder(UVP6, toPerImageColumns(records), { axis: "depth", step: 1 });
+        // The second pass carries the blocks; position, time and flags come from the first pass.
+        for (const record of records) builder.add({ ...record, raw_pressure: null, image_time_ms: null, light_on: false });
+
+        expect(builder.finish()).toEqual(computeBinnedSample(UVP6, records, { axis: "depth", step: 1 }));
+    });
+
+    test("refuses a file that changed between the two passes", () => {
+        const changedWhileRead = "The particle file of sample uvp6_sample changed while it was read. Relaunch the export.";
+        const columns = toPerImageColumns(records);
+
+        const other_row = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
+        other_row.add(records[0]);
+        expect(() => other_row.add(records[2])).toThrow(changedWhileRead);
+
+        const fewer_rows = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
+        records.slice(0, 2).forEach((record) => fewer_rows.add(record));
+        expect(() => fewer_rows.finish()).toThrow(changedWhileRead);
+
+        const more_rows = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
+        records.forEach((record) => more_rows.add(record));
+        expect(() => more_rows.add({ ...records[0], image_id: "img3" })).toThrow(changedWhileRead);
     });
 });
 

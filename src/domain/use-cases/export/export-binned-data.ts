@@ -16,7 +16,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportBinnedDataRequestModel, ExportBinnedDataUseCase } from "../../interfaces/use-cases/export/export-binned-data";
-import { BinAxis, BinnedSampleSettings, computeBinnedSample, exportedSizeClasses, particleColumns, particleRow, sampleVisibleSizeClasses } from "./binned-computation";
+import { BinAxis, BinnedSampleBuilder, BinnedSampleSettings, exportedSizeClasses, particleColumns, particleRow, sampleVisibleSizeClasses } from "./binned-computation";
 import { renderBinnedReadme } from "./binned-readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { computeProjectPrivacy } from "./project-privacy";
@@ -239,8 +239,11 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
                 const axis = this.axisOf(sample, plan.bin_mode);
                 const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
-                const records = await this.sampleRepository.getPivotImageRecords(sample.project_id, sample.sample_name, settings.instrument_model);
-                const binned = computeBinnedSample(settings, records, { axis, step });
+                // Two passes over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
+                const pivot = await this.sampleRepository.getPivotImages(sample.project_id, sample.sample_name, settings.instrument_model);
+                const builder = new BinnedSampleBuilder(settings, pivot.columns, { axis, step });
+                for await (const record of pivot.rows()) builder.add(record);
+                const binned = builder.finish();
                 for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
                     const rows = binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleRow(sample.sample_id, binned, bin, class_indexes).join("\t"));
                     await fsPromises.appendFile(particles_path, rows.join("\n") + "\n");
@@ -250,8 +253,9 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round(((i + 1) / samples.length) * 75), `Step 2/2 particles: ${summary}`);
                 if (binned.bins.length === 0) {
                     const position = axis === "depth" ? "pressure" : "readable time";
-                    const placeable = records.some(r => axis === "depth" ? r.raw_pressure !== null : r.image_time_ms !== null);
-                    const reason = records.length === 0 ? "its particle file holds no image"
+                    const positions = axis === "depth" ? pivot.columns.raw_pressure : pivot.columns.image_time_ms;
+                    const placeable = positions.some(position => !Number.isNaN(position));
+                    const reason = pivot.columns.length === 0 ? "its particle file holds no image"
                         : !placeable ? `none of its images has a ${position}`
                             : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
                                 : `none of its ${binned.used_images} image(s) used has a ${position}`;

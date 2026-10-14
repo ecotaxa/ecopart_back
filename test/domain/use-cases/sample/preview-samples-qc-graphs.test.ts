@@ -9,6 +9,7 @@ import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { PreviewSamplesQcGraphs } from "../../../../src/domain/use-cases/sample/preview-samples-qc-graphs";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
@@ -50,7 +51,7 @@ beforeEach(() => {
         { sample_name: "s1" } as any,
         { sample_name: "s2" } as any,
     ]);
-    jest.spyOn(mockSampleRepository, "getPerImageRecordsFromSource").mockResolvedValue(records);
+    jest.spyOn(mockSampleRepository, "getPerImageRecordsFromSource").mockResolvedValue(toPerImageColumns(records));
     jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(meta);
 });
 
@@ -68,6 +69,8 @@ describe("PreviewSamplesQcGraphs", () => {
             { depth_m: 0.5, value: 2 },
             { depth_m: 1.5, value: 2 },
         ]);
+        // The names are checked without counting any vignette.
+        expect(mockSampleRepository.listImportableSamples).toBeCalledWith("root/path", "UVP6LP", "data_storage/fss/1", 1, []);
         // Reads straight from the source folder (root_folder_path), not the per-sample storage.
         expect(mockSampleRepository.getPerImageRecordsFromSource).toBeCalledWith("root/path", "s1", "UVP6LP");
         expect(mockSampleRepository.getSourceFilterMetadata).toBeCalledWith("root/path", "s1", "UVP6LP");
@@ -75,10 +78,10 @@ describe("PreviewSamplesQcGraphs", () => {
 
     test("honours the project's descent filter setting", async () => {
         // b (1.0 m) comes back up after a (1.5 m): an ascent image on this depth sample.
-        jest.spyOn(mockSampleRepository, "getPerImageRecordsFromSource").mockResolvedValue([
+        jest.spyOn(mockSampleRepository, "getPerImageRecordsFromSource").mockResolvedValue(toPerImageColumns([
             { ...records[0], raw_pressure: 1.5 },
             { ...records[1], raw_pressure: 1.0 },
-        ]);
+        ]));
 
         jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ ...project, enable_descent_filter: true });
         const [filtered] = await useCase.execute(current_user, 1, ["s1"]);

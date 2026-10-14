@@ -77,10 +77,11 @@ export class ImportSamples implements ImportSamplesUseCase {
         return await this.taskRepository.createTask(task);
     }
 
-    private async listImportableSamples(project: ProjectResponseModel): Promise<PublicHeaderSampleResponseModel[]> {
+    // Only the vignettes of the imported samples are counted: those of the others are not needed.
+    private async listImportableSamples(project: ProjectResponseModel, samples_names_to_import: string[]): Promise<PublicHeaderSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
-        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
+        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id, samples_names_to_import);
         if (samples.length === 0) { throw new Error("No samples to import"); }
 
         return samples;
@@ -113,7 +114,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             await this.taskRepository.startTask({ task_id: task_id });
 
             // 1/4 Do validation before importing
-            importable_samples = await this.listImportableSamples(project);
+            importable_samples = await this.listImportableSamples(project, samples_names_to_import);
             // Check that asked samples are in the importable list of samples
             await this.ensureSamplesAreImportables(importable_samples, samples_names_to_import, task_id, log, project);
 

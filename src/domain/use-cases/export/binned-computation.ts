@@ -1,7 +1,9 @@
 import { PivotImageRecord } from "../../entities/binned-export";
+import { IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, PerImageColumns } from "../../entities/sample-qc-graph";
 import { BINNED_MAX_BINS_PER_SAMPLE, NA } from "../../constants/binned-export";
 import { PART_DET_CLASS_LIMITS_MM, SIZE_CLASS_COUNT, sizeClassOfEsd, sizeClassSuffix } from "../../constants/size-classes";
 import { selectUsedImages } from "../sample/qc-graphs-builder";
+import { hasImageFlag, imageIdAt, imageTimeAt, rawPressureAt, toPerImageColumns } from "../../utils/per-image-columns";
 
 /* Binned export (product 1), pure computation: per sample and per bin, the particle counts,
  * concentrations, biovolumes and mean grey of each size class, from the sample's UVP6-format pivot.
@@ -124,95 +126,138 @@ function emptyAccumulator(): BinAccumulator {
     };
 }
 
-export function computeBinnedSample(settings: BinnedSampleSettings, records: PivotImageRecord[], options: BinningOptions): BinnedSample {
-    const aa_mm2 = aaInMm2(settings.instrument_model, settings.aa);
-    const minimum_area_px = minimumAreaPx(settings.particle_minimum_area_px);
-    const visible_classes = visibleSizeClasses(aa_mm2, settings.exp, minimum_area_px);
-
-    // The images the QC graphs show as selected. A UVP5 pivot was cut to the operator window at
-    // conversion (D2), so only a UVP6 file still has its window applied here.
-    const window_cut_at_conversion = settings.instrument_model.startsWith("UVP5");
-    const selected = selectUsedImages({
-        sample_id: null,
-        sample_name: settings.sample_name,
-        instrument_model: PIVOT_FORMAT,
-        visual_qc_status_label: "",
-        filter_first_image: window_cut_at_conversion ? null : settings.filter_first_image,
-        filter_last_image: window_cut_at_conversion ? null : settings.filter_last_image,
-        instrument_settings_depth_offset_m: settings.depth_offset_m,
-        instrument_settings_image_volume_l: settings.image_volume_l,
-        is_depth_profile: settings.is_depth_profile,
-        descent_filter_enabled: settings.descent_filter_enabled,
-        records,
-    });
-    const used = records.filter((_, i) => selected[i]);
-
-    const offset = settings.depth_offset_m ?? 0;
-    // Negative depths are forced to 0, as in legacy EcoPart.
-    const depthOf = (r: PivotImageRecord): number | null => r.raw_pressure === null ? null : Math.max(0, r.raw_pressure + offset);
-    const step_units = Math.round(options.step * (options.axis === "depth" ? UM_PER_M : MS_PER_HOUR));
-    // Time bins start at the UTC hour of the first image, like the legacy and the QC graphs.
-    let time_origin_ms: number | null = null;
-    if (options.axis === "time") {
-        for (const r of used) {
-            if (r.image_time_ms !== null && (time_origin_ms === null || r.image_time_ms < time_origin_ms)) time_origin_ms = r.image_time_ms;
-        }
-        if (time_origin_ms !== null) time_origin_ms = Math.floor(time_origin_ms / MS_PER_HOUR) * MS_PER_HOUR;
-    }
-    const binOf = (r: PivotImageRecord): number | null => {
-        if (options.axis === "depth") {
-            const depth = depthOf(r);
-            return depth === null ? null : Math.floor(Math.round(depth * UM_PER_M) / step_units);
-        }
-        if (time_origin_ms === null || r.image_time_ms === null) return null;
-        return Math.floor((r.image_time_ms - time_origin_ms) / step_units);
-    };
-
+/* One sample in two passes over its pivot, so that a mooring of millions of images is never held
+ * in memory: the columns (pressure, time, flags) give up front the images used, the time origin and
+ * the range of bins; then the rows, read one by one in the same order, bring the particle blocks of
+ * the images used. */
+export class BinnedSampleBuilder {
+    private readonly aa_mm2: number;
+    private readonly minimum_area_px: number;
+    private readonly visible_classes: boolean[];
+    private readonly selected: Uint8Array;
+    private readonly used_images: number;
+    private readonly time_origin_ms: number | null = null;
+    private readonly step_units: number;
+    private readonly min_bin: number = Infinity;
+    private readonly max_bin: number = -Infinity;
+    private readonly accumulators = new Map<number, BinAccumulator>();
     // Areas repeat across images: ESD and unit biovolume are computed once per area.
-    const size_by_area = new Map<number, { class_index: number; biovolume_mm3: number }>();
-    const sizeOf = (area_px: number) => {
-        let size = size_by_area.get(area_px);
+    private readonly size_by_area = new Map<number, { class_index: number; biovolume_mm3: number }>();
+    private particles_below_minimum_area = 0;
+    private next_row = 0;
+
+    constructor(private readonly settings: BinnedSampleSettings, private readonly columns: PerImageColumns, private readonly options: BinningOptions) {
+        this.aa_mm2 = aaInMm2(settings.instrument_model, settings.aa);
+        this.minimum_area_px = minimumAreaPx(settings.particle_minimum_area_px);
+        this.visible_classes = visibleSizeClasses(this.aa_mm2, settings.exp, this.minimum_area_px);
+
+        // The images the QC graphs show as selected. A UVP5 pivot was cut to the operator window at
+        // conversion (D2), so only a UVP6 file still has its window applied here.
+        const window_cut_at_conversion = settings.instrument_model.startsWith("UVP5");
+        this.selected = selectUsedImages({
+            sample_id: null,
+            sample_name: settings.sample_name,
+            instrument_model: PIVOT_FORMAT,
+            visual_qc_status_label: "",
+            filter_first_image: window_cut_at_conversion ? null : settings.filter_first_image,
+            filter_last_image: window_cut_at_conversion ? null : settings.filter_last_image,
+            instrument_settings_depth_offset_m: settings.depth_offset_m,
+            instrument_settings_image_volume_l: settings.image_volume_l,
+            is_depth_profile: settings.is_depth_profile,
+            descent_filter_enabled: settings.descent_filter_enabled,
+            records: columns,
+        });
+        let used_images = 0;
+        for (let k = 0; k < columns.length; k++) used_images += this.selected[k];
+        this.used_images = used_images;
+
+        this.step_units = Math.round(options.step * (options.axis === "depth" ? UM_PER_M : MS_PER_HOUR));
+        // Time bins start at the UTC hour of the first image, like the legacy and the QC graphs.
+        if (options.axis === "time") {
+            let earliest: number | null = null;
+            for (let k = 0; k < columns.length; k++) {
+                const time_ms = imageTimeAt(columns, k);
+                if (this.selected[k] && time_ms !== null && (earliest === null || time_ms < earliest)) earliest = time_ms;
+            }
+            if (earliest !== null) this.time_origin_ms = Math.floor(earliest / MS_PER_HOUR) * MS_PER_HOUR;
+        }
+
+        // Every image used that has a place in the profile widens the range, black and over-exposed
+        // ones included; checked here, before any particle is read.
+        for (let k = 0; k < columns.length; k++) {
+            if (!this.selected[k]) continue;
+            const bin = this.binAt(k);
+            if (bin === null) continue;
+            this.min_bin = Math.min(this.min_bin, bin);
+            this.max_bin = Math.max(this.max_bin, bin);
+        }
+        const on_depth = options.axis === "depth";
+        if (this.max_bin - this.min_bin + 1 > BINNED_MAX_BINS_PER_SAMPLE) {
+            const from = on_depth ? `${formatNumber(this.min_bin * this.step_units / UM_PER_M)} m` : new Date((this.time_origin_ms as number) + this.min_bin * this.step_units).toISOString();
+            const to = on_depth ? `${formatNumber((this.max_bin + 1) * this.step_units / UM_PER_M)} m` : new Date((this.time_origin_ms as number) + (this.max_bin + 1) * this.step_units).toISOString();
+            throw new Error(`Sample ${settings.sample_name} would need ${this.max_bin - this.min_bin + 1} ${options.axis} bins of ${options.step} ${on_depth ? "m" : "h"} (from ${from} to ${to}), more than the ${BINNED_MAX_BINS_PER_SAMPLE} a sample may have. Check the ${on_depth ? "pressures" : "image times"} of its particle file, or choose a larger step.`);
+        }
+    }
+
+    // Negative depths are forced to 0, as in legacy EcoPart.
+    private depthAt(k: number): number | null {
+        const raw_pressure = rawPressureAt(this.columns, k);
+        return raw_pressure === null ? null : Math.max(0, raw_pressure + (this.settings.depth_offset_m ?? 0));
+    }
+
+    private binAt(k: number): number | null {
+        if (this.options.axis === "depth") {
+            const depth = this.depthAt(k);
+            return depth === null ? null : Math.floor(Math.round(depth * UM_PER_M) / this.step_units);
+        }
+        const time_ms = imageTimeAt(this.columns, k);
+        if (this.time_origin_ms === null || time_ms === null) return null;
+        return Math.floor((time_ms - this.time_origin_ms) / this.step_units);
+    }
+
+    private sizeOf(area_px: number): { class_index: number; biovolume_mm3: number } {
+        let size = this.size_by_area.get(area_px);
         if (!size) {
-            const esd = esdMm(area_px, aa_mm2, settings.exp);
+            const esd = esdMm(area_px, this.aa_mm2, this.settings.exp);
             // Legacy `uvp_sample_import.py:685`: biovolume = nb × (esd / 2)³ × 4π / 3.
             size = { class_index: sizeClassOfEsd(esd), biovolume_mm3: Math.pow(esd / 2, 3) * 4 * Math.PI / 3 };
-            size_by_area.set(area_px, size);
+            this.size_by_area.set(area_px, size);
         }
         return size;
-    };
+    }
 
-    const accumulators = new Map<number, BinAccumulator>();
-    let min_bin = Infinity;
-    let max_bin = -Infinity;
-    let particles_below_minimum_area = 0;
-    for (const r of used) {
-        const bin = binOf(r);
-        if (bin === null) continue;
-        min_bin = Math.min(min_bin, bin);
-        max_bin = Math.max(max_bin, bin);
-        let acc = accumulators.get(bin);
-        if (!acc) { acc = emptyAccumulator(); accumulators.set(bin, acc); }
-        if (!r.light_on) {
+    // The next row of the pivot, in file order. Only its particle blocks are read: everything else
+    // comes from the columns, read from the same file.
+    add(record: PivotImageRecord): void {
+        const k = this.next_row++;
+        if (k >= this.columns.length || record.image_id !== imageIdAt(this.columns, k)) throw this.changedWhileRead();
+        if (!this.selected[k]) return;
+        const bin = this.binAt(k);
+        if (bin === null) return;
+        let acc = this.accumulators.get(bin);
+        if (!acc) { acc = emptyAccumulator(); this.accumulators.set(bin, acc); }
+        if (!hasImageFlag(this.columns, k, IMAGE_FLAG_LIGHT_ON)) {
             acc.nb_black_images++;
-            continue;
+            return;
         }
         // Keeps its place in the profile but adds no volume, as in the QC graphs and legacy EcoPart.
-        if (r.particle_data_flag === "OVER_EXPOSED") continue;
+        if (hasImageFlag(this.columns, k, IMAGE_FLAG_OVER_EXPOSED)) return;
         acc.nb_images++;
-        if (r.image_time_ms !== null) {
-            if (acc.first_time_ms === null || r.image_time_ms < acc.first_time_ms) acc.first_time_ms = r.image_time_ms;
-            if (acc.last_time_ms === null || r.image_time_ms > acc.last_time_ms) acc.last_time_ms = r.image_time_ms;
+        const time_ms = imageTimeAt(this.columns, k);
+        if (time_ms !== null) {
+            if (acc.first_time_ms === null || time_ms < acc.first_time_ms) acc.first_time_ms = time_ms;
+            if (acc.last_time_ms === null || time_ms > acc.last_time_ms) acc.last_time_ms = time_ms;
         }
-        const depth = depthOf(r);
+        const depth = this.depthAt(k);
         if (depth !== null) { acc.depth_sum += depth; acc.depth_count++; }
-        for (const block of r.blocks) {
-            if (block.area_px < minimum_area_px) {
-                particles_below_minimum_area += block.nb_particles;
+        for (const block of record.blocks) {
+            if (block.area_px < this.minimum_area_px) {
+                this.particles_below_minimum_area += block.nb_particles;
                 continue;
             }
             if (block.area_px === 1) acc.count_1px += block.nb_particles;
             else if (block.area_px === 2) acc.count_2px += block.nb_particles;
-            const { class_index, biovolume_mm3 } = sizeOf(block.area_px);
+            const { class_index, biovolume_mm3 } = this.sizeOf(block.area_px);
             if (class_index < 0) continue;
             acc.counts[class_index] += block.nb_particles;
             acc.biovolumes_mm3[class_index] += block.nb_particles * biovolume_mm3;
@@ -223,47 +268,56 @@ export function computeBinnedSample(settings: BinnedSampleSettings, records: Piv
         }
     }
 
-    const on_depth = options.axis === "depth";
-    if (max_bin - min_bin + 1 > BINNED_MAX_BINS_PER_SAMPLE) {
-        const from = on_depth ? `${formatNumber(min_bin * step_units / UM_PER_M)} m` : new Date((time_origin_ms as number) + min_bin * step_units).toISOString();
-        const to = on_depth ? `${formatNumber((max_bin + 1) * step_units / UM_PER_M)} m` : new Date((time_origin_ms as number) + (max_bin + 1) * step_units).toISOString();
-        throw new Error(`Sample ${settings.sample_name} would need ${max_bin - min_bin + 1} ${options.axis} bins of ${options.step} ${on_depth ? "m" : "h"} (from ${from} to ${to}), more than the ${BINNED_MAX_BINS_PER_SAMPLE} a sample may have. Check the ${on_depth ? "pressures" : "image times"} of its particle file, or choose a larger step.`);
+    finish(): BinnedSample {
+        if (this.next_row !== this.columns.length) throw this.changedWhileRead();
+        const on_depth = this.options.axis === "depth";
+        const step_units = this.step_units;
+        // Every bin between the first and the last image is written, an empty one with a zero volume
+        // (M5); bins outside the sampled range are not, like legacy EcoPart. The empty bins share one
+        // accumulator, which nothing writes to any more.
+        const empty = emptyAccumulator();
+        const bins: SampleBin[] = [];
+        for (let index = this.min_bin; index <= this.max_bin; index++) {
+            const acc = this.accumulators.get(index) ?? empty;
+            bins.push({
+                index,
+                depth_start_m: on_depth ? index * step_units / UM_PER_M : (acc.depth_count > 0 ? acc.depth_sum / acc.depth_count : null),
+                depth_stop_m: on_depth ? (index + 1) * step_units / UM_PER_M : null,
+                time_start_ms: on_depth ? acc.first_time_ms : (this.time_origin_ms as number) + index * step_units,
+                time_stop_ms: on_depth ? acc.last_time_ms : (this.time_origin_ms as number) + (index + 1) * step_units,
+                nb_images: acc.nb_images,
+                nb_black_images: acc.nb_black_images,
+                water_volume_l: roundTo(acc.nb_images * this.settings.image_volume_l, VOLUME_DECIMALS),
+                count_1px: acc.count_1px,
+                count_2px: acc.count_2px,
+                counts: acc.counts,
+                biovolumes_mm3: acc.biovolumes_mm3,
+                grey_sums: acc.grey_sums,
+                grey_weights: acc.grey_weights,
+            });
+        }
+
+        return {
+            axis: this.options.axis,
+            visible_classes: this.visible_classes,
+            minimum_area_px: this.minimum_area_px,
+            black_images_recorded: !this.settings.instrument_model.startsWith("UVP5"),
+            used_images: this.used_images,
+            particles_below_minimum_area: this.particles_below_minimum_area,
+            bins,
+        };
     }
 
-    // Every bin between the first and the last image is written, an empty one with a zero volume
-    // (M5); bins outside the sampled range are not, like legacy EcoPart. The empty bins share one
-    // accumulator, which nothing writes to any more.
-    const empty = emptyAccumulator();
-    const bins: SampleBin[] = [];
-    for (let index = min_bin; index <= max_bin; index++) {
-        const acc = accumulators.get(index) ?? empty;
-        bins.push({
-            index,
-            depth_start_m: on_depth ? index * step_units / UM_PER_M : (acc.depth_count > 0 ? acc.depth_sum / acc.depth_count : null),
-            depth_stop_m: on_depth ? (index + 1) * step_units / UM_PER_M : null,
-            time_start_ms: on_depth ? acc.first_time_ms : (time_origin_ms as number) + index * step_units,
-            time_stop_ms: on_depth ? acc.last_time_ms : (time_origin_ms as number) + (index + 1) * step_units,
-            nb_images: acc.nb_images,
-            nb_black_images: acc.nb_black_images,
-            water_volume_l: roundTo(acc.nb_images * settings.image_volume_l, VOLUME_DECIMALS),
-            count_1px: acc.count_1px,
-            count_2px: acc.count_2px,
-            counts: acc.counts,
-            biovolumes_mm3: acc.biovolumes_mm3,
-            grey_sums: acc.grey_sums,
-            grey_weights: acc.grey_weights,
-        });
+    private changedWhileRead(): Error {
+        return new Error(`The particle file of sample ${this.settings.sample_name} changed while it was read. Relaunch the export.`);
     }
+}
 
-    return {
-        axis: options.axis,
-        visible_classes,
-        minimum_area_px,
-        black_images_recorded: !settings.instrument_model.startsWith("UVP5"),
-        used_images: used.length,
-        particles_below_minimum_area,
-        bins,
-    };
+// Both passes over records already in memory.
+export function computeBinnedSample(settings: BinnedSampleSettings, records: PivotImageRecord[], options: BinningOptions): BinnedSample {
+    const builder = new BinnedSampleBuilder(settings, toPerImageColumns(records), options);
+    for (const record of records) builder.add(record);
+    return builder.finish();
 }
 
 function roundTo(value: number, decimals: number): number {
