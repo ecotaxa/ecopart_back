@@ -71,6 +71,10 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ecopart_back:${{ github.ref_name }}
+          # Baked into the image: GET /version and the startup log tell which tag a server runs,
+          # preprod included since promotion re-points the tag without rebuilding.
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
           # Layer cache stored on Docker Hub under `:buildcache` (the GitHub Actions cache is not
           # shared between tag runs): the npm install layers are reused while package-lock.json
           # is unchanged. A failed cache export never fails the release.

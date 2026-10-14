@@ -63,6 +63,10 @@
     {
       "name": "Broadcast Messages",
       "description": "Application-wide message shown to users, managed by admins"
+    },
+    {
+      "name": "Version",
+      "description": "Version of the running API"
     }
   ],
   "components": {
@@ -7942,6 +7946,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "summary": "Running version",
+        "description": "The git tag the running image was built from, or \"dev\" outside a tagged image. No authentication.",
+        "tags": [
+          "Version"
+        ],
+        "responses": {
+          "200": {
+            "description": "The running version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "example": "v0.0.78"
+                    }
+                  }
                 }
               }
             }

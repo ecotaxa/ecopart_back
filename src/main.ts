@@ -25,6 +25,8 @@ import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
 import AdminRouter from './presentation/routers/admin-router'
 import BroadcastMessageRouter from './presentation/routers/broadcast_message-router'
+import VersionRouter from './presentation/routers/version-router'
+import { setServedApiVersion } from './presentation/openapi/swagger-definition'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -175,7 +177,10 @@ const config = {
     ECOPART_USER_PASSWORD_HASH: process.env.ECOPART_USER_PASSWORD_HASH || '',
     ECOPART_USER_ORGANISATION: process.env.ECOPART_USER_ORGANISATION || '',
     ECOPART_USER_COUNTRY: process.env.ECOPART_USER_COUNTRY || '',
-    ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || ''
+    ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || '',
+
+    // Set by the Docker image from the git tag it is built from
+    APP_VERSION: process.env.APP_VERSION || 'dev'
 
 }
 async function getSQLiteDS(): Promise<sqlite3.Database> {
@@ -193,6 +198,9 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
 }
 
 (async () => {
+    console.log(new Date().toISOString(), `EcoPart API version ${config.APP_VERSION}`)
+    setServedApiVersion(config.APP_VERSION)
+
     // Without these nobody can log in: refuse to start rather than fail on every request
     const missing_secrets = (['ACCESS_TOKEN_SECRET', 'REFRESH_TOKEN_SECRET'] as const).filter(name => !config[name])
     if (missing_secrets.length > 0) throw new Error(`Missing required configuration: ${missing_secrets.join(', ')}`)
@@ -413,6 +421,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new DeleteBroadcastMessage(user_repo, broadcast_message_repo)
     ))
 
+
+    server.use("/version", VersionRouter(config.APP_VERSION))
 
     // Registered after every router: unknown routes and uncaught errors get a JSON answer, never an HTML stack trace
     server.use(notFoundHandler)

@@ -179,6 +179,17 @@ One-time setup on the preprod server:
    image tags only exist for versions published *after* this change, so `v0.0.66` and earlier are
    not promotable — only `:latest` was pushed for those.
 
+### Checking which version a server runs
+
+The tag workflow bakes the git tag into the image (`APP_VERSION`). On any server:
+
+```bash
+curl <API_URL>/version                                # {"version":"v0.0.78"}
+docker compose logs api | grep "EcoPart API version"  # printed at every start
+```
+
+The Swagger page (`/api-docs`) shows the same version. Preprod reports the tag it was promoted from, since promotion re-points `:preprod` without rebuilding. An image built locally, or a run outside Docker, reports `dev`.
+
 ### Production Procedure
 
 The test/production server runs the **frontend and backend together** from a single
