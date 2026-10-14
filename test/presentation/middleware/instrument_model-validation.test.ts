@@ -43,6 +43,14 @@ describe("Instrument model Router", () => {
             expect(mockSearchInstrumentModelUseCase.execute).toBeCalledTimes(1)
         });
 
+        test("Get instrument-model without parameters uses defaults the repository accepts", async () => {
+            jest.spyOn(mockSearchInstrumentModelUseCase, "execute").mockImplementation(() => Promise.resolve(SearchInstrument_modelResult))
+            const response = await request(server).get("/instrument-models")
+
+            expect(response.status).toBe(200)
+            expect(mockSearchInstrumentModelUseCase.execute).toBeCalledWith(expect.objectContaining({ page: 1, limit: 10, sort_by: "asc(instrument_model_id)" }))
+        });
+
         test("Get instrument-model with invalid page", async () => {
             const options = {
                 page: "a",
