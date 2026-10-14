@@ -12,6 +12,7 @@ import { MiddlewareExportValidation } from './presentation/middleware/export-val
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
 import { errorHandler, notFoundHandler } from './presentation/middleware/error-handlers'
+import { bodyEmail, limitAttempts } from './presentation/middleware/rate-limit'
 import { AesGcmTokenCipher } from './infra/cryptography/aes-gcm-token-cipher'
 
 import UserRouter from './presentation/routers/user-router'
@@ -361,6 +362,12 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo),
         new CancelTask(task_repo, user_repo)
     )
+
+    // Registered before the routers. Password guessing on login, and e-mail flooding through registration and
+    // reset requests (both send a mail), counted per target e-mail.
+    server.post("/auth/login", limitAttempts({ max: 10, window_ms: 15 * 60 * 1000, key: bodyEmail }))
+    server.post("/auth/password/reset", limitAttempts({ max: 5, window_ms: 60 * 60 * 1000, key: bodyEmail }))
+    server.post("/users", limitAttempts({ max: 5, window_ms: 60 * 60 * 1000, key: bodyEmail }))
 
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
