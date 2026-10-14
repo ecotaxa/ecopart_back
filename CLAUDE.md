@@ -95,7 +95,8 @@ root). There is no DI container.
    (`presentation/routers/*-router.ts`) with OpenAPI annotations.
 6. Wire everything in `main.ts`; mount the router with `server.use(...)`.
 7. DB change? add a migration `src/data/migrations/NNN_*.ts` (idempotent `up`, reversible
-   `down`; seed lookup tables with `INSERT OR IGNORE`).
+   `down`; seed lookup tables with `INSERT OR IGNORE`). Each one runs in a transaction: no
+   `BEGIN`/`COMMIT`/`PRAGMA foreign_keys` inside; set `foreignKeysOff: true` when it rebuilds a table.
 8. Update mocks in `test/mocks/` for any new interface methods, then add tests.
 
 ## Conventions observed in this codebase

@@ -100,6 +100,8 @@ function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: any[] = []): Pro
 
 export const migration: Migration = {
     id: "${migrationId}",
+    // Runs in a transaction. Uncomment when up or down rebuilds a table (copy, DROP, RENAME):
+    // foreignKeysOff: true,
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         // TODO: Write your migration here

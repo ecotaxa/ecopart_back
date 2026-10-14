@@ -493,7 +493,9 @@ export const migration: Migration = {
 
 #### Important Notes
 
-- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a three-digit number (`000_` to `028_` today). Two branches that each add a migration may pick the same number: renumber one of them before merging.
+- Each migration runs **in a transaction**, together with its record in `_migrations`: a migration that fails halfway leaves the database as it was, and the server does not start. Do not write `BEGIN`, `COMMIT` or `PRAGMA foreign_keys` in a migration.
+- A migration that **rebuilds a table** (create a copy, `DROP`, `RENAME`) declares `foreignKeysOff: true`. SQLite ignores `PRAGMA foreign_keys` inside a transaction, so the runner switches foreign keys off before it, checks that the migration created no foreign key violation, then switches them back. Without the flag, dropping a parent table would cascade-delete its child rows.
+- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a three-digit number (`000_` to `029_` today). Two branches that each add a migration may pick the same number: renumber one of them before merging.
 - The initial migration (`000_initial_schema.ts`) captures the full existing schema using `CREATE TABLE IF NOT EXISTS`, making it safe on both fresh and existing databases.
 - Migrations are executed inside the application startup flow (in `src/main.ts`), so deploying a new version with new migration files is enough — no manual step is required.
 - For production rollbacks, use `npm run migrate:down` from the server or connect via the CLI tool at `tools/migrate.ts`.
