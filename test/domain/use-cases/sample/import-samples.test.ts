@@ -498,18 +498,22 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
                 expect(mockTaskRepository.logMessage).toBeCalledTimes(0);
             });
-            test("should throw an error if no samples to import", async () => {
+            test("should explain every requested sample when none is importable", async () => {
                 const current_user: UserUpdateModel = {
                     user_id: 1
                 };
                 const is = new ImportSamples(mockSampleRepository, mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockTaskRepository, DATA_STORAGE_FS_STORAGE)
 
-                const errorOutput = new Error("No samples to import");
+                const errorOutput = new Error("Samples not importable: sample1 (already imported in this project), sample2 (a folder with this name already exists in the project storage but the sample is not in the database)");
 
                 jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
                 jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
                 jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue([]);
-                jest.spyOn(mockTaskRepository, "updateTaskProgress");
+                jest.spyOn(mockSampleRepository, "explainNotImportableSamples").mockResolvedValue(new Map([
+                    ["sample1", "already imported in this project"],
+                    ["sample2", "a folder with this name already exists in the project storage but the sample is not in the database"],
+                ]));
+                jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
                 //ensureSamplesAreBothInHeadersAndInRawData
                 //jest.spyOn(mockTaskRepository, "updateTaskProgress");
                 //jest.spyOn(mockTaskRepository, "updateTaskProgress");
@@ -532,7 +536,8 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
-                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(0);
+                expect(mockSampleRepository.explainNotImportableSamples).toBeCalledWith(projectResponseModel.root_folder_path, "data_storage/files_system_storage/1", projectResponseModel.project_id, ["sample1", "sample2"]);
+                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(1);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
                 expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.failedTask).toBeCalledTimes(1);
@@ -1052,6 +1057,21 @@ describe("Delete Sample Use Case", () => {
     });
 
     describe("validate at import", () => {
+        test("rejects an empty sample list before any task is created", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 };
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true);
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+            const createTask = jest.spyOn(mockTaskRepository, "createTask");
+            const getProject = jest.spyOn(mockProjectRepository, "getProject");
+
+            await expect(importSamplesUseCase.execute(current_user, 1, [])).rejects.toThrow("No samples to import");
+
+            expect(getProject).toBeCalledTimes(0);
+            expect(createTask).toBeCalledTimes(0);
+        });
+
         test("rejects validated_samples that are not part of the imported set (before any task is created)", async () => {
             const current_user: UserUpdateModel = { user_id: 1 };
 

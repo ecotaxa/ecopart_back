@@ -1532,6 +1532,29 @@ export class SampleRepositoryImpl implements SampleRepository {
             }
         }
     }
+
+    // Copies the samples one at a time. When a copy fails, the sample folders started by this call are
+    // removed before rethrowing, so the samples stay importable. The callers check first that none of
+    // these folders exists, so none of them belongs to another import.
+    private async copyEachSampleOrRemoveCopies(dest_folder: string, samples_names: string[], log: TaskLogger, copy_sample: (sample: string, i: number) => Promise<void>): Promise<void> {
+        const started: string[] = [];
+        try {
+            for (const [i, sample] of samples_names.entries()) {
+                started.push(sample);
+                await copy_sample(sample, i);
+            }
+        } catch (error) {
+            const cleanup_log: TaskLogger = (message) => log(`Cleanup after failure : ${message}`).catch(() => undefined);
+            try {
+                const removed = await this.deleteSamplesFromImportFolder(dest_folder, started);
+                await cleanup_log(removed.length > 0 ? `removed ${removed.join(", ")}` : "nothing removed, no copy found");
+            } catch (cleanup_error) {
+                await cleanup_log(`removal failed, copies may remain in ${dest_folder} : ${(cleanup_error as Error).message}`);
+            }
+            throw error;
+        }
+    }
+
     async UVP5copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void> {
 
         // Ensure that none of the samples folder already exists
@@ -1542,7 +1565,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         await log(`copying ${samples_names_to_import.length} sample(s) from ${source_folder} to ${dest_folder}`);
 
         // Iterate over each sample name, create the sample folder, copy files, and zip the folder
-        for (const [i, sample] of samples_names_to_import.entries()) {
+        await this.copyEachSampleOrRemoveCopies(dest_folder, samples_names_to_import, log, async (sample, i) => {
             const log_prefix = `${sample} (${i + 1}/${samples_names_to_import.length})`;
             const sourcePath = path.join(this.base_folder, source_folder);
             const destPath = path.join(this.base_folder, dest_folder, sample);
@@ -1665,7 +1688,7 @@ export class SampleRepositoryImpl implements SampleRepository {
                 throw new Error(`Error zipping meta_conf folder for sample ${sample}: ${error.message}`);
             }
             await log(`${log_prefix} : meta_conf written to ${await this.describeImportPath(metaConfZipFilePath)}, ${metaConfFilesCount} files, from ${metaConfSources.join(", ")}`);
-        }
+        });
     }
 
     private relativeToBase(absolute_path: string): string {
@@ -1855,7 +1878,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         await log(`copying ${samples_names_to_import.length} sample(s) from ${source_folder} to ${dest_folder}`);
 
         // Iterate over each sample name and copy .zip files only
-        for (const [i, sample] of samples_names_to_import.entries()) {
+        await this.copyEachSampleOrRemoveCopies(dest_folder, samples_names_to_import, log, async (sample, i) => {
             const log_prefix = `${sample} (${i + 1}/${samples_names_to_import.length})`;
             const sourcePath = path.join(this.base_folder, source_folder, sample);
             const destPath = path.join(this.base_folder, dest_folder, sample);
@@ -1892,7 +1915,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             if (ignored.length > 0) {
                 await log(`${log_prefix} : not copied from ${source_label} : ${ignored.join(", ")}`);
             }
-        }
+        });
     }
 
     // Returns what was actually removed, described before its removal (path, file count, size).
