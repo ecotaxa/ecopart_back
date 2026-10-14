@@ -38,6 +38,8 @@ export class ImportSamples implements ImportSamplesUseCase {
         // Ensure the current user has permission to get the project importable samples
         await this.ensureUserCanGet(current_user, project_id);
 
+        if (samples_names_to_import.length === 0) { throw new Error("No samples to import"); }
+
         // Samples pre-validated via the QC preview must be part of the imported set.
         this.ensureValidatedSamplesAreImported(samples_names_to_import, validated_samples);
 
@@ -80,10 +82,7 @@ export class ImportSamples implements ImportSamplesUseCase {
     private async listImportableSamples(project: ProjectResponseModel): Promise<PublicHeaderSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`);
-        const samples = await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
-        if (samples.length === 0) { throw new Error("No samples to import"); }
-
-        return samples;
+        return await this.sampleRepository.listImportableSamples(project.root_folder_path, project.instrument_model, dest_folder, project.project_id);
     }
 
     private async getProjectIfExist(project_id: number): Promise<ProjectResponseModel> {
