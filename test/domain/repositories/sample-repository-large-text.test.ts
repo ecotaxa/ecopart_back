@@ -172,40 +172,40 @@ describe("reading text from sample archives", () => {
         });
 
         test("counts a UVP6 TSV larger than the text limit", async () => {
-            fs.mkdirSync(path.join(tmp, "source", "meta"), { recursive: true });
-            fs.writeFileSync(path.join(tmp, "source", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;mooring_1\n");
-            fs.mkdirSync(path.join(tmp, "source", "ecodata", "mooring_1"), { recursive: true });
-            await writeZip(path.join(tmp, "source", "ecodata", "mooring_1", "mooring_1_Images.zip"), { "ecotaxa_mooring_1.tsv": TSV });
+            fs.mkdirSync(path.join(tmp, "uvp6_m1", "meta"), { recursive: true });
+            fs.writeFileSync(path.join(tmp, "uvp6_m1", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;mooring_1\n");
+            fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", "mooring_1"), { recursive: true });
+            await writeZip(path.join(tmp, "uvp6_m1", "ecodata", "mooring_1", "mooring_1_Images.zip"), { "ecotaxa_mooring_1.tsv": TSV });
 
-            const samples = await repo.listImportableSamples("source", "UVP6LP", path.join(tmp, "storage", "1"), 1);
+            const samples = await repo.listImportableSamples("uvp6_m1", "UVP6LP", path.join(tmp, "storage", "1"), 1);
 
             expect(samples.map(sample => [sample.sample_name, sample.vignette_number])).toEqual([["mooring_1", 3]]);
         });
 
         test("counts UVP5 TSVs larger than the text limit, zipped or in a plain work folder", async () => {
-            fs.mkdirSync(path.join(tmp, "source", "meta"), { recursive: true });
-            fs.writeFileSync(path.join(tmp, "source", "meta", "uvp5_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;zipped\nm1;ship;file_b;plain\n");
-            fs.mkdirSync(path.join(tmp, "source", "work", "plain"), { recursive: true });
-            await writeZip(path.join(tmp, "source", "work", "zipped.zip"), { "zipped/ecotaxa_zipped.tsv": TSV });
-            fs.writeFileSync(path.join(tmp, "source", "work", "plain", "ecotaxa_plain.tsv"), TSV);
+            fs.mkdirSync(path.join(tmp, "uvp5_m1", "meta"), { recursive: true });
+            fs.writeFileSync(path.join(tmp, "uvp5_m1", "meta", "uvp5_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;zipped\nm1;ship;file_b;plain\n");
+            fs.mkdirSync(path.join(tmp, "uvp5_m1", "work", "plain"), { recursive: true });
+            await writeZip(path.join(tmp, "uvp5_m1", "work", "zipped.zip"), { "zipped/ecotaxa_zipped.tsv": TSV });
+            fs.writeFileSync(path.join(tmp, "uvp5_m1", "work", "plain", "ecotaxa_plain.tsv"), TSV);
 
-            const samples = await repo.listImportableSamples("source", "UVP5HD", path.join(tmp, "storage", "1"), 1);
+            const samples = await repo.listImportableSamples("uvp5_m1", "UVP5HD", path.join(tmp, "storage", "1"), 1);
 
             expect(samples.map(sample => [sample.sample_name, sample.vignette_number])).toEqual([["zipped", 3], ["plain", 3]]);
         });
 
         test("does not count the vignettes of samples already imported", async () => {
-            fs.mkdirSync(path.join(tmp, "source", "meta"), { recursive: true });
-            fs.writeFileSync(path.join(tmp, "source", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;in_db\nm1;ship;file_b;in_storage\nm1;ship;file_c;new\n");
+            fs.mkdirSync(path.join(tmp, "uvp6_m1", "meta"), { recursive: true });
+            fs.writeFileSync(path.join(tmp, "uvp6_m1", "meta", "uvp6_header_m1.txt"), "cruise;ship;filename;profileid\nm1;ship;file_a;in_db\nm1;ship;file_b;in_storage\nm1;ship;file_c;new\n");
             for (const name of ["in_db", "in_storage", "new"]) {
-                fs.mkdirSync(path.join(tmp, "source", "ecodata", name), { recursive: true });
-                await writeZip(path.join(tmp, "source", "ecodata", name, `${name}_Images.zip`), { [`ecotaxa_${name}.tsv`]: TSV });
+                fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", name), { recursive: true });
+                await writeZip(path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Images.zip`), { [`ecotaxa_${name}.tsv`]: TSV });
             }
             fs.mkdirSync(path.join(tmp, "storage", "1", "in_storage"), { recursive: true });
             getAll.mockResolvedValue({ items: [{ sample_name: "in_db" }], total: 1 });
             const count = jest.spyOn(repo as any, "getImportableSampleImagesCount");
 
-            const samples = await repo.listImportableSamples("source", "UVP6LP", path.join(tmp, "storage", "1"), 1);
+            const samples = await repo.listImportableSamples("uvp6_m1", "UVP6LP", path.join(tmp, "storage", "1"), 1);
 
             expect(samples.map(sample => [sample.sample_name, sample.vignette_number, sample.qc_lvl1])).toEqual([["new", 3, true]]);
             expect(count).toBeCalledTimes(1);

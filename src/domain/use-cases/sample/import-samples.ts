@@ -249,7 +249,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
         for (const [i, sample] of formated_samples.entries()) {
             await this.taskRepository.throwIfCancelled(task_id);
-            const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model);
+            const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model, project.root_folder_path);
             const progress = 55 + Math.round(((i + 1) / formated_samples.length) * 15);
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, "Step 3/4 pivot construction : " + describeUvp5PivotReport(report));
         }
@@ -272,7 +272,8 @@ export class ImportSamples implements ImportSamplesUseCase {
             samples_names_to_import.map(async (sample_name) => {
                 const sample = await this.sampleRepository.formatSampleToImport(
                     { ...base_sample, sample_name: sample_name },
-                    project.instrument_model
+                    project.instrument_model,
+                    project.root_folder_path
                 );
                 sample.nb_vignettes = vignette_count_map.get(sample_name) ?? 0;
                 if (is_uvp6) {

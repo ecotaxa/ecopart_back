@@ -57,7 +57,7 @@ describe("UVP5 pivot storage", () => {
     });
 
     test("writes <sample>/pivot/<sample>_Particule.zip with its three members and no temporary file", async () => {
-        const report = await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD");
+        const report = await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot");
 
         const pivot_zip = path.join(sample_folder, "pivot", "s1c1_Particule.zip");
         expect(report.frames_written).toBe(1);
@@ -69,16 +69,29 @@ describe("UVP5 pivot storage", () => {
         expect(await read("metadata.ini")).toContain("source_instrument=UVP5HD\n");
     });
 
+    test("takes the sample metadata from the canonical header of the project folder", async () => {
+        await writeZip(path.join(sample_folder, "s1c1_meta_conf.zip"), {
+            "meta/uvp5_header_sn222_hot - Copy.txt": "cruise;profileid;firstimage\r\nwrong;s1c1;12\r\n",
+            "meta/uvp5_header_sn222_hot.txt": "cruise;profileid;firstimage\r\nc1;s1c1;12\r\n",
+        });
+
+        await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot");
+
+        const ini = await (repo as any).readFileFromZip(path.join(sample_folder, "pivot", "s1c1_Particule.zip"), "metadata.ini");
+        expect(ini).toContain("cruise=c1\n");
+        expect(ini).not.toContain("wrong");
+    });
+
     test("reads back the converter version of the pivot, null when the sample has none", async () => {
         expect(await repo.getPivotConverterVersion(5, "s1c1")).toBeNull();
 
-        await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD");
+        await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot");
 
         expect(await repo.getPivotConverterVersion(5, "s1c1")).toBe(UVP5_PIVOT_CONVERTER_VERSION);
     });
 
     test("is never picked up by the archive recovery", async () => {
-        await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD");
+        await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot");
 
         const lpm = await repo.listRawFilesForSample("UVP5HD", 5, "s1c1", "lpm");
 
@@ -88,7 +101,7 @@ describe("UVP5 pivot storage", () => {
     test("fails with an explicit error naming the missing file, and leaves no pivot", async () => {
         await writeZip(path.join(sample_folder, "s1c1_work.zip"), { "s1c1_datfile.txt": "" });
 
-        await expect(repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD")).rejects.toThrow(
+        await expect(repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot")).rejects.toThrow(
             /^Cannot build the UVP5 pivot of sample s1c1: cannot read s1c1\.bru in s1c1_work\.zip \(.*\)\. Check that the file is in the sample folder of the project, then relaunch the import or the pivot regeneration\.$/);
         expect(fs.existsSync(path.join(sample_folder, "pivot"))).toBe(false);
     });
@@ -101,7 +114,7 @@ describe("UVP5 pivot storage", () => {
         // The datfile and the header still fit, the .bru does not.
         repo.max_text_file_bytes = 200;
 
-        const report = await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD");
+        const report = await repo.generateUvp5Pivot(5, SAMPLE, "UVP5HD", "uvp5_sn222_hot");
 
         expect(report.frames_written).toBe(1);
         expect(await (repo as any).readFileFromZip(path.join(sample_folder, "pivot", "s1c1_Particule.zip"), "particules.csv")).toBe("20200806-221354-586,13.6,,1:3,500,10.0,\n");

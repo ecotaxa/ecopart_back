@@ -77,7 +77,7 @@ export default function FileSystemRouter(
      *
      *       **Files read:**
      *       - `config/cruise_info.txt` — INI-style file (`[General]` section) containing cruise/project info and contact details.
-     *       - `meta/*header*.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names.
+     *       - `meta/<instrument>_header_<rest of the folder name>.txt` — Semicolon-delimited CSV. The first data row provides cruise and ship names. Other headers are ignored; without that file, cruise and ship are not pre-filled.
      *
      *       **Instrument detection:**
      *       - Presence of an `ecodata/` subdirectory → UVP6

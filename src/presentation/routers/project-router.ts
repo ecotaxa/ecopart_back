@@ -939,7 +939,13 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples/can_be_imported:
      *   get:
      *     summary: List importable samples
-     *     description: Returns a list of sample files that can be imported for the given project.
+     *     description: |
+     *       Returns a list of sample files that can be imported for the given project.
+     *
+     *       **Meta header read:** `meta/<instrument>_header_<rest of the folder name>.txt`, the legacy EcoPart
+     *       name (e.g. `meta/uvp6_header_sn000171hf_20230720_wcb_1_test.txt` for the folder
+     *       `uvp6_sn000171hf_20230720_wcb_1_test`). Other headers next to it are ignored, and when that file
+     *       is absent the route answers 404 naming it.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -972,7 +978,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Project or folder not found.
+     *         description: Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`).
      *         content:
      *           application/json:
      *             schema:
@@ -994,6 +1000,7 @@ export default function ProjectRouter(
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Meta header file not found")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot list importable samples"] })
         }
     })
@@ -1041,7 +1048,8 @@ export default function ProjectRouter(
      *
      *       **Task pipeline (per sample requested in `samples`):**
      *
-     *       1. **Validation** — the sample must appear both in the instrument header (`meta/`) and in the source
+     *       1. **Validation** — the sample must appear both in the meta header (chosen as described in
+     *          `GET /projects/{project_id}/samples/can_be_imported`) and in the source
      *          data folder, and must pass QC level 1 (its source acquisition files are present). Any sample
      *          missing, unknown, or failing QC aborts the whole task (nothing is imported). A depth sample must
      *          also have at least one readable pressure in its particle file (UVP6 `particules.csv`, UVP5
@@ -1054,7 +1062,8 @@ export default function ProjectRouter(
      *            `config/uvp5_settings/uvp5_configuration_data.txt` and `config/process_install_config.txt`.
      *          - **UVP6:** only the `<sample>_Particule.zip` and `<sample>_Images.zip` archives found under
      *            `ecodata/<sample>/` are copied as-is.
-     *       3. **Create the sample rows** in the database — metadata parsed from the copied files, plus
+     *       3. **Create the sample rows** in the database — metadata parsed from the copied files (UVP5: the
+     *          sample's row of the same meta header), plus
      *          `nb_vignettes` and (UVP6 only) `nb_black` (rows of `particules.csv` acquired lights-off; always 0
      *          on UVP5). Samples listed in `validated_samples` are flipped to visual-QC VALIDATED with audit
      *          fields set as a manual review. If DB creation fails, the copied source files are rolled back
@@ -1964,7 +1973,7 @@ export default function ProjectRouter(
      *       403:
      *         description: User cannot be used or lacks access to the project.
      *       404:
-     *         description: Project or source folder not found.
+     *         description: Project, source folder or meta header not found.
      *       422:
      *         description: Validation error or a requested sample is not importable.
      *       500:
@@ -1980,6 +1989,7 @@ export default function ProjectRouter(
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Folder does not exist at path")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Meta header file not found")) res.status(404).send({ errors: [err.message] })
             else if (err.message === "No samples to preview") res.status(422).send({ errors: [err.message] })
             else if (err.message.startsWith("Samples not importable")) res.status(422).send({ errors: [err.message] })
             else if (err.message === "Unknown instrument model") res.status(422).send({ errors: [err.message] })
