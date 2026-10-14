@@ -336,13 +336,59 @@ You can configure GENERIC_ECOTAXA_ACCOUNT_EMAIL in the .env file. Applicative ac
 
 #### EcoTaxa tokens at rest
 
-The EcoTaxa token of every linked account is stored in the database. Set `ECOTAXA_TOKEN_ENCRYPTION_KEY` in the `.env` of each server to store these tokens encrypted (AES-256-GCM). Generate one key per server with `openssl rand -base64 32` and keep it with the other secrets.
+The EcoTaxa token of every linked account is stored in the database. With `ECOTAXA_TOKEN_ENCRYPTION_KEY` set, these tokens are stored encrypted (AES-256-GCM), so a copy of the database (backup, local copy) does not give working EcoTaxa access. Without the variable, tokens are stored in clear as before, and the startup log says so.
 
-- At startup, tokens saved in clear are encrypted. The log says how many.
-- Without the variable, tokens are stored in clear as before, and the startup log says so.
-- Changing or losing the key makes the stored tokens unreadable. They are then handled like expired ones: each user logs out of the EcoTaxa account and logs in again, including for the generic accounts. The startup log counts these tokens.
-- Rolling back to a version older than this feature has the same effect, since the older code cannot read encrypted tokens.
-- Deleting an EcoPart user also deletes their EcoTaxa accounts, except the generic account (`GENERIC_ECOTAXA_ACCOUNT_EMAIL`), which EcoPart itself uses.
+##### Enabling the encryption on a server
+
+Do this once on each server (test, preprod, production), in the directory that holds its `docker-compose.yml` and `.env` (`/ecotaxadev2/ecopart/new_ecopart` for test, `/home/ecopart/ecopart_pre_prod` for preprod).
+
+1. **Generate a key**, one per server, on any machine:
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+   Keep it wherever the other secrets of that server are kept. Never commit it, and never reuse the key of another server.
+
+2. **Add it to the server `.env`**:
+
+   ```bash
+   ECOTAXA_TOKEN_ENCRYPTION_KEY = <the generated key>
+   ```
+
+   Doing this before the version that supports encryption is deployed is harmless: older versions ignore the variable.
+
+3. **Recreate the backend container** so that it reads the new `.env` (a plain `restart` keeps the old environment):
+
+   ```bash
+   docker compose up -d --force-recreate api
+   ```
+
+4. **Check the startup log**:
+
+   ```bash
+   docker compose logs api | grep "EcoTaxa token"
+   ```
+
+   - On the first start with the key: `N EcoTaxa token(s) saved in clear are now encrypted`. Later starts print nothing.
+   - `ECOTAXA_TOKEN_ENCRYPTION_KEY is not set` means the variable did not reach the container: check the `.env` and step 3.
+   - `cannot be decrypted with the current key` means the key differs from the one the tokens were encrypted with (see below).
+   - A malformed key stops the server at startup with `ECOTAXA_TOKEN_ENCRYPTION_KEY must be 32 bytes encoded in base64`.
+
+5. **Optionally, check the database** from the host (requires `sqlite3`, path valid when `DBSOURCE_FOLDER` keeps its default `data_storage/sqlite_db/`). The count must be 0:
+
+   ```bash
+   sqlite3 data_storage/sqlite_db/<DBSOURCE_NAME> "SELECT count(*) FROM ecotaxa_account WHERE ecotaxa_account_token NOT LIKE 'enc:v1:%';"
+   ```
+
+Local development needs no key: leave the variable empty.
+
+##### Good to know
+
+- **Changing or losing the key** makes the stored tokens unreadable. EcoPart then treats them like expired tokens, and the startup log counts them. Each user logs out of the EcoTaxa account in the EcoTaxa accounts tab of their EcoPart profile, then logs in again. Do the same for the generic accounts, from the EcoPart user that owns them (see above).
+- **Rolling back** to a version older than this feature has the same effect, because the older code cannot read encrypted tokens.
+- **Copying a database** to another server or to a development machine leaves its tokens unreadable there, unless the source server's key is used. That is the intended protection: accounts log in to EcoTaxa again on the copy.
+- **Deleting an EcoPart user** also deletes their EcoTaxa accounts, except the generic account (`GENERIC_ECOTAXA_ACCOUNT_EMAIL`), which EcoPart itself uses.
 
 ### Database
 
