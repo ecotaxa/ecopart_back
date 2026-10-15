@@ -156,6 +156,7 @@ export class TaskRepositoryImpl implements TaskRepository {
 
     // Only a finished task can be deleted: the work of an unfinished one may still be running, it is
     // cancelled instead. The delete only lands if the status it was decided from is still current.
+    // Its files go first, so a failure to remove them leaves the task in place to delete again.
     async deleteTask(task: PrivateTaskRequestModel): Promise<number> {
         for (let attempt = 0; attempt < this.statusUpdateAttempts; attempt++) {
             const task_to_delete = await this.taskDataSource.getOne({ task_id: task.task_id });
@@ -164,10 +165,26 @@ export class TaskRepositoryImpl implements TaskRepository {
                 throw new Error(`Task ${task_to_delete.task_id} is still ${task_to_delete.task_status}: cancel it before deleting it.`);
             }
 
+            await this.removeTaskFolder(task_to_delete);
             const deleted = await this.taskDataSource.deleteOne({ task_id: task_to_delete.task_id }, task_to_delete.task_status_id);
             if (deleted > 0) return deleted;
         }
         throw new Error("Task status changed concurrently");
+    }
+
+    // The task folder holds the log and everything the task wrote (archives, working files). The log
+    // path was stored at creation: if the storage folder has moved since, that folder goes too.
+    private async removeTaskFolder(task: TaskResponseModel): Promise<void> {
+        const folders = new Set([path.join(this.base_folder, this.DATA_STORAGE_FOLDER, "tasks", `${task.task_id}`)]);
+        if (task.task_log_file_path) {
+            const log_folder = path.dirname(task.task_log_file_path);
+            const is_task_folder = path.basename(log_folder) === `${task.task_id}` && path.basename(path.dirname(log_folder)) === "tasks";
+            if (is_task_folder) folders.add(log_folder);
+            else await fs.rm(task.task_log_file_path, { force: true });
+        }
+        for (const folder of folders) {
+            await fs.rm(folder, { recursive: true, force: true });
+        }
     }
 
     // private async updateTask(task: TaskUpdateModel, params: string[]): Promise<number> {

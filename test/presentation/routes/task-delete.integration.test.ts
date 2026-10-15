@@ -1,6 +1,6 @@
 // DELETE /tasks/:task_id through the real router, use case, repository and data source, on a
-// migrated in-memory database: an unfinished task answers 409 and stays (row and log file), a
-// finished one is deleted.
+// migrated in-memory database: an unfinished task answers 409 and stays (row, log and archive), a
+// finished one is deleted with its folder.
 import express from 'express'
 import request from 'supertest'
 import sqlite3 from 'sqlite3'
@@ -47,6 +47,17 @@ describe('DELETE /tasks/:task_id (integration)', () => {
         return task_id
     }
 
+    // The task folder, with its log and an archive written next to it as an export does
+    async function taskFiles(task_id: number): Promise<{ folder: string, log: string, archive: string }> {
+        const log = (await taskDs.getOne({ task_id }))!.task_log_file_path as string
+        const folder = path.dirname(log)
+        const archive = path.join(folder, `ecopart_export_raw_${task_id}.zip`)
+        fs.writeFileSync(archive, 'zip')
+        expect(folder).toBe(path.join(tmp_dir, 'tasks', `${task_id}`))
+        expect(fs.existsSync(log)).toBe(true)
+        return { folder, log, archive }
+    }
+
     beforeEach(async () => {
         db = new sqlite3.Database(':memory:')
         await run(db, 'PRAGMA foreign_keys = ON;')
@@ -83,24 +94,26 @@ describe('DELETE /tasks/:task_id (integration)', () => {
 
     test.each([TasksStatus.Pending, TasksStatus.Running, TasksStatus.Cancelling])('a %s task answers 409 and is not deleted', async (status) => {
         const task_id = await taskWithStatus(status)
-        const log_file_path = (await taskDs.getOne({ task_id }))!.task_log_file_path as string
-        expect(fs.existsSync(log_file_path)).toBe(true)
+        const { log, archive } = await taskFiles(task_id)
 
         const response = await request(app).delete(`/tasks/${task_id}`)
 
         expect(response.status).toBe(409)
         expect(response.body).toStrictEqual({ errors: [`Task ${task_id} is still ${status}: cancel it before deleting it.`] })
         expect((await taskDs.getOne({ task_id }))?.task_status).toBe(status)
-        expect(fs.existsSync(log_file_path)).toBe(true)
+        expect(fs.existsSync(log)).toBe(true)
+        expect(fs.existsSync(archive)).toBe(true)
     })
 
-    test.each([TasksStatus.Done, TasksStatus.Error, TasksStatus.Cancelled])('a %s task is deleted', async (status) => {
+    test.each([TasksStatus.Done, TasksStatus.Error, TasksStatus.Cancelled])('a %s task is deleted with its folder', async (status) => {
         const task_id = await taskWithStatus(status)
+        const { folder } = await taskFiles(task_id)
 
         const response = await request(app).delete(`/tasks/${task_id}`)
 
         expect(response.status).toBe(200)
         expect(response.body).toStrictEqual({ message: `Task ${task_id} successfully deleted` })
         expect(await taskDs.getOne({ task_id })).toBeNull()
+        expect(fs.existsSync(folder)).toBe(false)
     })
 })
