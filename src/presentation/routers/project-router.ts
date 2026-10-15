@@ -982,7 +982,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`).
+     *         description: "Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`)."
      *         content:
      *           application/json:
      *             schema:

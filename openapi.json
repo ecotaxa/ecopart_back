@@ -4637,6 +4637,86 @@
         }
       }
     },
+    "/projects/{project_id}/samples/can_be_imported": {
+      "get": {
+        "summary": "List importable samples",
+        "description": "Returns a list of sample files that can be imported for the given project.\n\n**Meta header read:** `meta/<instrument>_header_<rest of the folder name>.txt`, the legacy EcoPart\nname (e.g. `meta/uvp6_header_sn000171hf_20230720_wcb_1_test.txt` for the folder\n`uvp6_sn000171hf_20230720_wcb_1_test`). Other headers next to it are ignored, and when that file\nis absent the route answers 404 naming it.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of importable sample names.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authorized for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects/{project_id}/samples/import": {
       "post": {
         "summary": "Import samples",

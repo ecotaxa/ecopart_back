@@ -64,7 +64,8 @@ export class UpdateProject implements UpdateProjectUseCase {
 
     private async ensureRootFolderIsFree(root_folder_path: string, project_id: number): Promise<void> {
         const owners = await this.projectRepository.getProjectsByRootFolderPath(root_folder_path);
-        if (owners.some(owner => owner.project_id !== project_id)) throw new Error("Root folder already used by another project");
+        // The route hands the id over as a string
+        if (owners.some(owner => Number(owner.project_id) !== Number(project_id))) throw new Error("Root folder already used by another project");
     }
 
     // Editing a project, its metadata as much as its privileges, is managing it: only its managers

@@ -621,6 +621,7 @@ test("Manager may keep the project on its own source folder", async () => {
 
     const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
 
-    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, root_folder_path: "root_folder_path" })).resolves.toStrictEqual(projectResponseModel)
+    // The route hands the id over as a string: the project must still recognise its own folder
+    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: "1" as unknown as number, root_folder_path: "root_folder_path" })).resolves.toStrictEqual(projectResponseModel)
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
 });
