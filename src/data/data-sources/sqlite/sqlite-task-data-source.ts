@@ -43,11 +43,16 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         })
     }
 
-    async deleteOne(task: PrivateTaskRequestModel): Promise<number> {
+    async deleteOne(task: PrivateTaskRequestModel, expected_status_id?: number): Promise<number> {
         // delete task based on task_id
-        const sql = `DELETE FROM task WHERE task_id = (?)`;
+        let sql = `DELETE FROM task WHERE task_id = (?)`;
+        const params: any[] = [task.task_id]
+        if (expected_status_id !== undefined) {
+            sql += ` AND task_status_id = (?)`
+            params.push(expected_status_id)
+        }
         return await new Promise((resolve, reject) => {
-            this.db.run(sql, [task.task_id], function (err) {
+            this.db.run(sql, params, function (err) {
                 if (err) {
                     console.log("DB error--", err)
                     reject(err);

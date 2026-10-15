@@ -154,9 +154,20 @@ export class TaskRepositoryImpl implements TaskRepository {
         return result;
     }
 
+    // Only a finished task can be deleted: the work of an unfinished one may still be running, it is
+    // cancelled instead. The delete only lands if the status it was decided from is still current.
     async deleteTask(task: PrivateTaskRequestModel): Promise<number> {
-        const result = await this.taskDataSource.deleteOne(task)
-        return result;
+        for (let attempt = 0; attempt < this.statusUpdateAttempts; attempt++) {
+            const task_to_delete = await this.taskDataSource.getOne({ task_id: task.task_id });
+            if (!task_to_delete) return 0;
+            if (!this.isFinished(task_to_delete.task_status)) {
+                throw new Error(`Task ${task_to_delete.task_id} is still ${task_to_delete.task_status}: cancel it before deleting it.`);
+            }
+
+            const deleted = await this.taskDataSource.deleteOne({ task_id: task_to_delete.task_id }, task_to_delete.task_status_id);
+            if (deleted > 0) return deleted;
+        }
+        throw new Error("Task status changed concurrently");
     }
 
     // private async updateTask(task: TaskUpdateModel, params: string[]): Promise<number> {
@@ -455,6 +466,11 @@ export class TaskRepositoryImpl implements TaskRepository {
 
     // Statuses of a task whose work may still be running.
     private activeStatuses: TasksStatus[] = [TasksStatus.Pending, TasksStatus.Running, TasksStatus.Cancelling];
+
+    // A finished task never changes status any more. An unknown status is not finished.
+    private isFinished(status: string): boolean {
+        return this.allowedTransitions[status as TasksStatus]?.length === 0;
+    }
 
     // A status write only lands if the status it was decided from is still current. A concurrent
     // change (a cancellation racing the end of the task) is re-read and decided again.

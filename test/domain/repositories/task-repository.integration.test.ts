@@ -214,6 +214,35 @@ describe('task repository (integration)', () => {
         })
     })
 
+    describe('deletion', () => {
+        test('an unfinished task is refused with its current status, a finished one is deleted', async () => {
+            const task_id = await newTask()
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still PENDING: cancel it before deleting it.`)
+            await taskRepo.startTask({ task_id })
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still RUNNING: cancel it before deleting it.`)
+            await taskRepo.cancelTask(task_id)
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still CANCELLING: cancel it before deleting it.`)
+            expect(await statusOf(task_id)).toBe(TasksStatus.Cancelling)
+
+            await taskRepo.failedTask(task_id, new Error('cancelled'))
+            expect(await taskRepo.deleteTask({ task_id })).toBe(1)
+            expect(await taskRepo.getOneTask({ task_id })).toBeNull()
+        })
+
+        test('the delete is conditional on the status it was decided from', async () => {
+            const task_id = await newTask()
+            const task = await taskRepo.getOneTask({ task_id })
+            // The task started meanwhile: a delete expecting PENDING is a no-op
+            await taskRepo.startTask({ task_id })
+            expect(await taskDs.deleteOne({ task_id }, task!.task_status_id)).toBe(0)
+            expect(await statusOf(task_id)).toBe(TasksStatus.Running)
+        })
+
+        test('a task that no longer exists deletes nothing', async () => {
+            expect(await taskRepo.deleteTask({ task_id: 999 })).toBe(0)
+        })
+    })
+
     describe('active tasks', () => {
         test('hasActiveTask only sees pending, running or cancelling tasks of the given types and project', async () => {
             const backup = await newTask(TaskType.Import_Backup, project_1)
