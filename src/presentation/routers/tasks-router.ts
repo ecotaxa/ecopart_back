@@ -247,7 +247,11 @@ export default function TaskRouter(
      * /tasks/{task_id}:
      *   delete:
      *     summary: Delete task
-     *     description: Delete a task (admin only).
+     *     description: |
+     *       Delete a finished task (admin only): `DONE`, `ERROR` or `CANCELLED`.
+     *
+     *       A `PENDING`, `RUNNING` or `CANCELLING` task may still have work running: it is cancelled
+     *       (`POST /tasks/{task_id}/cancel`), not deleted, and the request answers 409.
      *     tags: [Tasks]
      *     security:
      *       - cookieAccessToken: []
@@ -277,6 +281,14 @@ export default function TaskRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The task is not finished, it must be cancelled first.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *             example:
+     *               errors: ["Task 42 is still RUNNING: cancel it before deleting it."]
      *       500:
      *         description: Internal server error.
      *         content:
@@ -295,6 +307,7 @@ export default function TaskRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this task") res.status(403).send({ errors: ["Cannot delete task"] })
+            else if (err.message.endsWith(": cancel it before deleting it.")) res.status(409).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete task"] })
         }
     })
