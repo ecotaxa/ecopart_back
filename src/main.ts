@@ -306,7 +306,7 @@ async function getSQLiteDS() {
         new ListImportableSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteSample(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
-        new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo),
+        new SearchSamples(user_repo, sample_repo, search_repo, instrument_model_repo, privilege_repo, project_repo),
         new ListImportableEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, config.DATA_STORAGE_FS_STORAGE),
         new ImportEcoTaxaSamples(sample_repo, user_repo, privilege_repo, project_repo, task_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE),
         new DeleteEcoTaxaSamples(user_repo, sample_repo, privilege_repo, ecotaxa_account_repo, project_repo),
@@ -321,7 +321,7 @@ async function getSQLiteDS() {
         new SetSampleVisualQc(user_repo, sample_repo, privilege_repo),
         new PreviewSamplesQcGraphs(user_repo, sample_repo, project_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
         new SelectSampleCoordinates(user_repo, sample_repo, privilege_repo),
-        new GetSample(user_repo, sample_repo, privilege_repo),
+        new GetSample(user_repo, sample_repo, privilege_repo, project_repo),
         new RegeneratePivots(user_repo, privilege_repo, project_repo, sample_repo, task_repo),
     )
 
@@ -348,7 +348,7 @@ async function getSQLiteDS() {
     ))
     server.use("/file_system", FileSystemRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
-        new ListImportFolders(config.DATA_STORAGE_IMPORT),
+        new ListImportFolders(config.DATA_STORAGE_IMPORT, user_repo),
         new GetImportFolderMetadata(config.DATA_STORAGE_IMPORT, user_repo)
     ))
     server.use("/exports", ExportRouter(

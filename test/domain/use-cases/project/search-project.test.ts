@@ -30,6 +30,9 @@ beforeEach(() => {
     mockInstrumentModelRepository = new MockInstrumentModelRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
     searchProjectUseCase = new SearchProject(mockUserRepository, mockProjectRepository, mockSearchRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    // The user has a privilege on both fixture projects, so the full projects come back
+    jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
+    jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1, 2])
 })
 
 test("deleted or invalid user should not be able to search for projects", async () => {
@@ -323,7 +326,7 @@ test("Should return data for user with filter on managing = false", async () => 
     jest.spyOn(mockProjectRepository, "standardGetProjects").mockImplementation(() => Promise.resolve(ExpectedResult))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => projectResponseModel).mockImplementationOnce(() => projectResponseModel2)
     jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => { return search_info })
-    jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockImplementation(() => Promise.resolve([]))
+    jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockImplementation(() => Promise.resolve([1, 2]))
     const result = await searchProjectUseCase.execute(current_user, options, filters);
 
     // expect functions ahve been called with
@@ -614,3 +617,75 @@ test("Should return error if cannot find privileges", async () => {
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
     expect(mockProjectRepository.standardGetProjects).toBeCalledTimes(1)
 });
+
+describe("what the list shows depends on the user's role on each project", () => {
+    const options: SearchOptions = { limit: 10, page: 1, sort_by: [] }
+    const full_1 = { ...projectResponseModel, root_folder_path: "folder_1", last_backup_utc_date_time: "2026-01-01" }
+    const full_2 = { ...projectResponseModel2, root_folder_path: "folder_2", last_backup_utc_date_time: null }
+
+    beforeEach(() => {
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue([])
+        jest.spyOn(mockSearchRepository, "formatSortBy").mockReturnValue([])
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
+        jest.spyOn(mockProjectRepository, "standardGetProjects").mockResolvedValue({ items: projectResponseModelArray, total: 2 })
+        jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation((project) => project.project_id === 1 ? full_1 : full_2)
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockReturnValue({ total: 2, limit: 10, total_on_page: 2, page: 1, pages: 1 })
+    })
+
+    test("a user outside a project still lists it, without its import folder or backup date", async () => {
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([2])
+
+        const result = await searchProjectUseCase.execute({ user_id: 1 }, options, [])
+
+        expect(result.projects[0]).not.toHaveProperty("root_folder_path")
+        expect(result.projects[0]).not.toHaveProperty("last_backup_utc_date_time")
+        expect(result.projects[0].managers).toStrictEqual(full_1.managers)
+        expect(result.projects[0].privacy_status).toBe("open")
+        expect(result.projects[1]).toStrictEqual(full_2)
+        expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledWith({ user_id: 1 })
+    })
+
+    test("an admin lists every project in full without any privilege lookup", async () => {
+        jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser")
+
+        const result = await searchProjectUseCase.execute({ user_id: 1 }, options, [])
+
+        expect(result.projects).toStrictEqual([full_1, full_2])
+        expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
+    })
+
+    test("an empty page asks for no privilege at all", async () => {
+        jest.spyOn(mockProjectRepository, "standardGetProjects").mockResolvedValue({ items: [], total: 0 })
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser")
+
+        const result = await searchProjectUseCase.execute({ user_id: 1 }, options, [])
+
+        expect(result.projects).toStrictEqual([])
+        expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
+    })
+
+    test.each([
+        ["filter", [{ field: "root_folder_path", operator: "LIKE", value: "uvp5%" }], []],
+        ["sort", [], [{ sort_by: "root_folder_path", order_by: "asc" }]],
+    ])("a user cannot probe the hidden import folder through a %s", async (_label, filter, sort_by) => {
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filter)
+        jest.spyOn(mockSearchRepository, "formatSortBy").mockReturnValue(sort_by)
+        jest.spyOn(mockProjectRepository, "standardGetProjects")
+
+        await expect(searchProjectUseCase.execute({ user_id: 1 }, { ...options, sort_by: "asc(root_folder_path)" }, filter)).rejects.toThrow("Unauthorized or unexisting parameters : root_folder_path")
+        expect(mockProjectRepository.standardGetProjects).toBeCalledTimes(0)
+    })
+
+    test("an admin may filter on the import folder", async () => {
+        jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+        const filter = [{ field: "root_folder_path", operator: "=", value: "uvp5_a" }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filter)
+
+        const result = await searchProjectUseCase.execute({ user_id: 1 }, options, filter)
+
+        expect(result.projects).toStrictEqual([full_1, full_2])
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter }))
+    })
+})

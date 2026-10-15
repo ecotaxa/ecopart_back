@@ -5,6 +5,8 @@ import { PublicPrivilege } from "../entities/privilege";
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../entities/project";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
+import { ProjectPrivacyInputs } from "../use-cases/project/project-access";
+import { computeProjectPrivacy } from "../utils/project-privacy";
 
 import * as fsPromises from 'fs/promises'; // For promise-based file operations//import fs from 'fs'; // Correct import for `createReadStream`
 import * as fs from 'fs'; // For createWriteStream
@@ -200,6 +202,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             managers: privileges.managers,
             contact: privileges.contact,
             project_creation_utc_date_time: project.project_creation_utc_date_time,
+            privacy_status: computeProjectPrivacy(project.project_creation_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, new Date()),
             ecotaxa_project_id: project.ecotaxa_project_id,
             ecotaxa_project_name: project.ecotaxa_project_name,
             ecotaxa_instance_id: project.ecotaxa_instance_id,
@@ -586,5 +589,21 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
     async getDistinctShips(): Promise<string[]> {
         return await this.projectDataSource.getDistinctShips();
+    }
+
+    async getProjectsByRootFolderPath(root_folder_path: string): Promise<ProjectResponseModel[]> {
+        const projects = await this.projectDataSource.getAll({ filter: [{ field: "root_folder_path", operator: "=", value: root_folder_path }], sort_by: [], page: 1, limit: Number.MAX_SAFE_INTEGER });
+        return projects.items;
+    }
+
+    async listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]> {
+        const projects = await this.projectDataSource.getAll({ filter: [], sort_by: [], page: 1, limit: Number.MAX_SAFE_INTEGER });
+        return projects.items.map(project => ({
+            project_id: project.project_id,
+            project_creation_utc_date_time: project.project_creation_utc_date_time,
+            privacy_duration: project.privacy_duration,
+            visible_duration: project.visible_duration,
+            public_duration: project.public_duration,
+        }));
     }
 }

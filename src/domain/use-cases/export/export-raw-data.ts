@@ -18,6 +18,7 @@ import { renderReadme } from "./readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { zipFolder } from "./zip-folder";
 import { removeExportWorkFolder } from "./work-folder";
+import { ProjectAccessPolicy } from "../project/project-access";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
 
@@ -45,6 +46,7 @@ export class ExportRawData implements ExportRawDataUseCase {
     ) { }
 
     private readonly metadataWriter = new ExportMetadataWriter(this.sampleRepository, this.privilegeRepository, this.taskRepository, this.ecotaxaAccountRepository, this.instrumentModelRepository);
+    private readonly access = new ProjectAccessPolicy(this.userRepository, this.privilegeRepository);
 
     async execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
@@ -59,6 +61,16 @@ export class ExportRawData implements ExportRawDataUseCase {
         const found_ids = new Set(all_samples.map(s => s.sample_id));
         const missing = sample_ids.filter(id => !found_ids.has(id));
         if (missing.length > 0) throw new Error(`Sample(s) not found: ${missing.join(", ")}`);
+
+        // Authorization first, per distinct project of the requested samples, so that the QC gate
+        // below never names samples the caller may not see.
+        const projects_by_id = new Map<number, ProjectResponseModel>();
+        for (const project_id of Array.from(new Set(all_samples.map(s => s.project_id)))) {
+            const project = await this.projectRepository.getProject({ project_id });
+            if (!project) throw new Error("Cannot find project");
+            await this.ensureUserCanAccess(current_user, project);
+            projects_by_id.set(project_id, project);
+        }
 
         // QC gate: only visual-QC-validated samples may be exported. By default a single
         // non-validated sample aborts the whole export; with `skip_not_validated` the caller accepts
@@ -75,15 +87,6 @@ export class ExportRawData implements ExportRawDataUseCase {
             : all_samples;
         if (samples.length === 0) {
             throw new Error(`Sample(s) not validated: ${not_validated.map(s => s.sample_name).join(", ")}`);
-        }
-
-        const project_ids = Array.from(new Set(samples.map(s => s.project_id)));
-        const projects_by_id = new Map<number, ProjectResponseModel>();
-        for (const project_id of project_ids) {
-            await this.ensureUserCanAccess(current_user, project_id);
-            const project = await this.projectRepository.getProject({ project_id });
-            if (!project) throw new Error("Cannot find project");
-            projects_by_id.set(project_id, project);
         }
 
         const task_id = await this.taskRepository.createTask({
@@ -123,11 +126,11 @@ export class ExportRawData implements ExportRawDataUseCase {
         return { sample_ids, export_types };
     }
 
-    private async ensureUserCanAccess(current_user: UserUpdateModel, project_id: number): Promise<void> {
-        const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        if (userIsAdmin) return;
-        const userHasPrivilege = await this.privilegeRepository.isGranted({ user_id: current_user.user_id, project_id });
-        if (!userHasPrivilege) throw new Error(`Logged user cannot export raw data from project ${project_id}`);
+    // The raw export is the archive recovery (product 3): it gives back the files the members
+    // imported, so it stays with admins, members and managers whatever the project's privacy.
+    private async ensureUserCanAccess(current_user: UserUpdateModel, project: ProjectResponseModel): Promise<void> {
+        if (await this.access.can(current_user.user_id, project, "export_archive")) return;
+        throw new Error(`Logged user cannot export raw data from project ${project.project_id}`);
     }
 
     private async runExport(

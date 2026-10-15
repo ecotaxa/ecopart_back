@@ -1,6 +1,6 @@
 import { MigrateEcotaxaProject } from '../../../../src/domain/use-cases/project/migrate-ecotaxa-project';
 import { UserUpdateModel } from '../../../../src/domain/entities/user';
-import { PublicProjectResponseModel } from '../../../../src/domain/entities/project';
+import { ProjectResponseModel, PublicProjectResponseModel } from '../../../../src/domain/entities/project';
 import { SearchResult } from '../../../../src/domain/entities/search';
 import { PublicSampleModel } from '../../../../src/domain/entities/sample';
 import { ProjectRepository } from '../../../../src/domain/interfaces/repositories/project-repository';
@@ -57,7 +57,7 @@ describe('Migrate EcoTaxa Project Use Case', () => {
             ecotaxa_project_name: 'uvp5_sn002zd_omer_2',
             ecotaxa_instance_id: 3,
             last_backup_utc_date_time: null,
-        } as PublicProjectResponseModel;
+        } as ProjectResponseModel & PublicProjectResponseModel;
 
         const ecotaxaSamples = [
             { sampleid: 101, orig_id: 'omer2_1' },

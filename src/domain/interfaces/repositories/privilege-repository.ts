@@ -5,7 +5,7 @@ import { PrivilegeRequestModel, PrivilegeResponseModel, PublicPrivilege } from "
 import { ProjectRequestModel } from "../../entities/project";
 
 export interface PrivilegeRepository {
-    isManager(is_granted_params: PrivilegeRequestModel): unknown;
+    isManager(is_granted_params: PrivilegeRequestModel): Promise<boolean>;
     ensurePrivilegeCoherence(publicPrivilege: PublicPrivilege): void;
     getProjectsByMembers(user_ids: number[]): Promise<number[]>;
     getProjectsByManagers(user_ids: number[]): Promise<number[]>;

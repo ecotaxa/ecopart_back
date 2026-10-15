@@ -148,9 +148,16 @@ export interface PublicProjectRequestCreationModel extends PublicProjectRequestC
     ecotaxa_account_id: number | null;
 }
 
-export interface PublicProjectResponseModel extends PublicProjectRequestCreationModel_base {
+// The privacy status of a project moves from private to visible, public then open as the delays
+// set by its managers elapse after its creation date (see domain/utils/project-privacy.ts).
+export type ProjectPrivacyLevel = "private" | "visible" | "public" | "open";
+
+export interface PublicProjectResponseModel extends Omit<PublicProjectRequestCreationModel_base, "root_folder_path"> {
     project_id: number;
     project_creation_utc_date_time: string;
+    privacy_status: ProjectPrivacyLevel;
+    // Only served to admins and to the project's members and managers (see project-access.ts).
+    root_folder_path?: string;
     last_backup_utc_date_time?: string | null;
 }
 

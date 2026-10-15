@@ -483,21 +483,25 @@ export const privateProjectRequestCreationModel_withmissingOverrideDepthOffset =
     ecotaxa_instance_id: null,
 }
 
-export const projectResponseModel: PublicProjectResponseModel = {
+// Typed as both the stored and the public shape: the use-case tests feed it to repository mocks
+// as what the data source returns, and read it back as what the API serves.
+export const projectResponseModel: PublicProjectResponseModel & ProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 1,
     project_creation_utc_date_time: '2024-04-29 15:43:10',
+    privacy_status: "open",
     last_backup_utc_date_time: null
 }
 
-export const projectResponseModel2: PublicProjectResponseModel = {
+export const projectResponseModel2: PublicProjectResponseModel & ProjectResponseModel = {
     ...projectRequestCreationModel,
     project_id: 2,
     project_creation_utc_date_time: '2024-04-30 12:15:11',
+    privacy_status: "open",
     last_backup_utc_date_time: null
 }
 
-export const projectResponseModelArray: PublicProjectResponseModel[] = [projectResponseModel, projectResponseModel2]
+export const projectResponseModelArray: (PublicProjectResponseModel & ProjectResponseModel)[] = [projectResponseModel, projectResponseModel2]
 
 export const projectRequestModel: ProjectRequestModel = {
     project_id: 1

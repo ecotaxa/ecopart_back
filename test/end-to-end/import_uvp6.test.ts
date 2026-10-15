@@ -297,7 +297,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new ListImportableSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage),
             new DeleteSample(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
-            new SearchSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new SearchSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo, projectRepo),
             new ListImportableEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
             new DeleteEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
@@ -312,7 +312,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
-            new GetSample(userRepo, sampleRepo, privilegeRepo),
+            new GetSample(userRepo, sampleRepo, privilegeRepo, projectRepo),
             new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
         )
 

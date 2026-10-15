@@ -41,6 +41,7 @@ beforeEach(() => {
     mockPrivilegeRepository = new MockPrivilegeRepository()
     mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
     mockSampleRepository = new MockSampleRepository()
+    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([])
 })
 
 test("Current_user is deleted or invalid", async () => {
@@ -52,7 +53,7 @@ test("Current_user is deleted or invalid", async () => {
     const OutputError = new Error("User cannot be used")
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.reject(OutputError))
-    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject")
     jest.spyOn(mockProjectRepository, "getProject")
 
@@ -71,7 +72,7 @@ test("Current_user is deleted or invalid", async () => {
 
 });
 
-test("User can update project", async () => {
+test("Manager can update project", async () => {
     const current_user: UserUpdateModel = {
         user_id: 1
     }
@@ -84,8 +85,8 @@ test("User can update project", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel)).mockImplementationOnce(() => Promise.resolve(OutputData))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockUserRepository, "isAdmin")//.mockImplementation(() => Promise.resolve(true))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
@@ -95,7 +96,7 @@ test("User can update project", async () => {
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
     expect(data).toStrictEqual(OutputData);
@@ -113,8 +114,8 @@ test("Cannot update project", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockUserRepository, "isAdmin")//.mockImplementation(() => Promise.resolve(true))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(0))
 
 
@@ -127,7 +128,7 @@ test("Cannot update project", async () => {
     }
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(1)
 
@@ -144,8 +145,8 @@ test("Cannot find updated project", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel)).mockImplementationOnce(() => Promise.resolve(null))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockUserRepository, "isAdmin")//.mockImplementation(() => Promise.resolve(true))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     //jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     //jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
@@ -159,7 +160,7 @@ test("Cannot find updated project", async () => {
     }
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
 
@@ -175,8 +176,8 @@ test("User try to update an unexisting project", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(null))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
 
     const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
@@ -235,7 +236,7 @@ test("Admin can update privilege part", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
@@ -276,7 +277,7 @@ test("Manager can update privilege part", async () => {
     const data = await updateProjectUseCase.execute(current_user, project_to_update);
 
     expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+    expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
     expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
     expect(data).toStrictEqual(OutputData);
@@ -302,7 +303,7 @@ test("Member cannot update privilege part", async () => {
         await updateProjectUseCase.execute(current_user, project_to_update);
         expect(true).toBe(false)
     } catch (err) {
-        expect(err).toStrictEqual(new Error("Logged user cannot update privileges"));
+        expect(err).toStrictEqual(new Error("Logged user cannot update this property or project"));
         expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
         expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
@@ -320,7 +321,7 @@ test("Update instrument model", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(publicPrivileges))
@@ -366,7 +367,7 @@ test("Update project with privileges partially filled", async () => {
     } catch (err) {
         expect(err).toStrictEqual(expected_error)
         expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
         expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(1)
         expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(0)
@@ -404,7 +405,7 @@ test("Update project with privileges partially created", async () => {
     } catch (err) {
         expect(err).toStrictEqual(expected_error)
         expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
         expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(1)
         expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(1)
@@ -444,7 +445,7 @@ test("Please provide at least one property to update", async () => {
     } catch (err) {
         expect(err).toStrictEqual(expected_error)
         expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(1)
         expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(0)
@@ -480,7 +481,7 @@ test("Cannot find updated privileges", async () => {
     } catch (err) {
         expect(err).toStrictEqual(expected_error)
         expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledTimes(1)
-        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(0)
+        expect(mockUserRepository.isAdmin).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
         expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
         expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(0)
@@ -518,7 +519,8 @@ test("Unlink EcoTaxa project with ecotaxa_project_id null", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(current_project_with_ecotaxa)).mockImplementationOnce(() => Promise.resolve(OutputData))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.resolve(1))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(publicPrivileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
@@ -553,7 +555,8 @@ test("Reject incomplete EcoTaxa link payload", async () => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockUserRepository, "isAdmin")
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockProjectRepository, "standardUpdateProject")
 
     const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
@@ -567,3 +570,57 @@ test("Reject incomplete EcoTaxa link payload", async () => {
 
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
 })
+
+test("Member cannot update the project metadata: editing a project is managing it", async () => {
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+    const project_to_update: PublicProjectUpdateModel = projectUpdateModel
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockProjectRepository, "standardUpdateProject")
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+
+    await expect(updateProjectUseCase.execute(current_user, project_to_update)).rejects.toThrow("Logged user cannot update this property or project")
+
+    expect(mockPrivilegeRepository.isManager).toHaveBeenCalledWith({ user_id: 1, project_id: 1 })
+    expect(mockPrivilegeRepository.isGranted).toHaveBeenCalledTimes(0)
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
+});
+
+test("Manager cannot move the project onto a source folder another project imports from", async () => {
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([{ ...projectResponseModel, project_id: 2 }])
+    jest.spyOn(mockProjectRepository, "standardUpdateProject")
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+
+    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, root_folder_path: "taken" })).rejects.toThrow("Root folder already used by another project")
+
+    expect(mockProjectRepository.getProjectsByRootFolderPath).toHaveBeenCalledWith("data_storage/ecopart_data_to_import/taken")
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
+});
+
+test("Manager may keep the project on its own source folder", async () => {
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
+    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([projectResponseModel])
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockReturnValue(projectResponseModel)
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+
+    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, root_folder_path: "root_folder_path" })).resolves.toStrictEqual(projectResponseModel)
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
+});

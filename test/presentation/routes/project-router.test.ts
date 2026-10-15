@@ -1220,10 +1220,10 @@ describe("Project Router", () => {
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        // Logged user cannot delete sample
-        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete sample should return 401", async () => {
-            const expectedResponse = { errors: ["Logged user cannot delete sample"] }
-            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete sample")))
+        // Logged user cannot delete this sample
+        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete this sample should return 401", async () => {
+            const expectedResponse = { errors: ["Logged user cannot delete this sample"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete this sample")))
             const response = await request(server).delete("/projects/1/samples/1")
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse)

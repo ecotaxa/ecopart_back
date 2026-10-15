@@ -6,9 +6,10 @@ import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { UpdateProjectUseCase } from "../../interfaces/use-cases/project/update-project";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
-import { PrivilegeRequestModel, PublicPrivilege } from "../../entities/privilege";
+import { PublicPrivilege } from "../../entities/privilege";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { ProjectAccessPolicy } from "./project-access";
 
 export class UpdateProject implements UpdateProjectUseCase {
     userRepository: UserRepository
@@ -18,6 +19,7 @@ export class UpdateProject implements UpdateProjectUseCase {
     ecotaxa_accountRepository: EcotaxaAccountRepository;
     sampleRepository: SampleRepository;
     DATA_STORAGE_IMPORT: string
+    private readonly access: ProjectAccessPolicy
 
     constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, sampleRepository: SampleRepository, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
@@ -27,6 +29,7 @@ export class UpdateProject implements UpdateProjectUseCase {
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
         this.sampleRepository = sampleRepository
         this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
+        this.access = new ProjectAccessPolicy(userRepository, privilegeRepository)
     }
 
     async execute(current_user: UserUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<PublicProjectResponseModel> {
@@ -35,9 +38,11 @@ export class UpdateProject implements UpdateProjectUseCase {
         // Ensure the project to delete exists
         const current_project = await this.ensureProjectExists(public_project_to_update);
         // Ensure user has the privilege to update the project
-        await this.ensureUserCanUpdate(current_user, public_project_to_update);
+        await this.ensureUserCanUpdate(current_user, current_project);
         // Prepare the project update model
         const project_to_update: ProjectUpdateModel = await this.prepareProjectUpdateModel(public_project_to_update);
+        // A source folder belongs to one project (see CreateProject)
+        if (project_to_update.root_folder_path !== undefined) await this.ensureRootFolderIsFree(project_to_update.root_folder_path, project_to_update.project_id);
         // Update the project
         await this.updateProject(current_user, project_to_update, public_project_to_update, current_project);
         // Retrieve updated project
@@ -57,19 +62,16 @@ export class UpdateProject implements UpdateProjectUseCase {
         return projectExists;
     }
 
-    // Ensure user is admin or has privilege to update the project
-    private async ensureUserCanUpdate(current_user: UserUpdateModel, project: PublicProjectUpdateModel): Promise<void> {
-        const is_granted_params: PrivilegeRequestModel = { user_id: current_user.user_id, project_id: project.project_id }
-        const hasPrivilege = await this.privilegeRepository.isGranted(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
-        if (!hasPrivilege) {
+    private async ensureRootFolderIsFree(root_folder_path: string, project_id: number): Promise<void> {
+        const owners = await this.projectRepository.getProjectsByRootFolderPath(root_folder_path);
+        if (owners.some(owner => owner.project_id !== project_id)) throw new Error("Root folder already used by another project");
+    }
+
+    // Editing a project, its metadata as much as its privileges, is managing it: only its managers
+    // and admins may (access matrix of the specification).
+    private async ensureUserCanUpdate(current_user: UserUpdateModel, project: ProjectResponseModel): Promise<void> {
+        if (!await this.access.can(current_user.user_id, project, "manage")) {
             throw new Error("Logged user cannot update this property or project");
-        }
-        // Only managers or admin can update privileges of a project
-        if (this.isPrivilegeUpdate(project)) {
-            const canUpdatePrivilege = await this.privilegeRepository.isManager(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
-            if (!canUpdatePrivilege) {
-                throw new Error("Logged user cannot update privileges");
-            }
         }
     }
 
