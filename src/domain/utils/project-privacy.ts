@@ -1,4 +1,4 @@
-export type ProjectPrivacyLevel = "private" | "visible" | "public" | "open";
+import { ProjectPrivacyLevel } from "../entities/project";
 
 function monthsBetween(from: Date, to: Date): number {
     const years = to.getUTCFullYear() - from.getUTCFullYear();

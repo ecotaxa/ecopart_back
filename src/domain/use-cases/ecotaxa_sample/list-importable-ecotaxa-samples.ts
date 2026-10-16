@@ -60,7 +60,7 @@ export class ListImportableEcoTaxaSamples implements ListImportableEcoTaxaSample
             project_id: project_id
         });
         if (!userIsAdmin && !userHasPrivilege) {
-            throw new Error("Logged user cannot list importable ecotaxa samples in this project");
+            throw new Error("Logged user cannot list importable EcoTaxa samples in this project");
         }
     }
 }

@@ -4,6 +4,13 @@ import path from "path";
 import { GetImportFolderMetadata } from "../../../../src/domain/use-cases/file_system/get-import-folder-metadata";
 import { MockUserRepository } from "../../../mocks/user-mock";
 
+const current_user = { user_id: 1 };
+function usableUserRepository(): MockUserRepository {
+    const repository = new MockUserRepository();
+    jest.spyOn(repository, "ensureUserCanBeUsed").mockResolvedValue();
+    return repository;
+}
+
 describe("Domain - Use Cases - Get Import Folder Metadata", () => {
     let importFolder: string;
 
@@ -28,7 +35,7 @@ describe("Domain - Use Cases - Get Import Folder Metadata", () => {
             Buffer.from("[cruise]\nacron=TETHYS\ndescription=Campagne d'été\n", "latin1")
         );
 
-        const metadata = await new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute("uvp5_sn002zd_tethys_2025");
+        const metadata = await new GetImportFolderMetadata(importFolder, usableUserRepository()).execute(current_user, "uvp5_sn002zd_tethys_2025");
 
         expect(metadata.ship).toBe("Téthys_2");
         expect(metadata.cruise).toBe("campagne_été");
@@ -41,9 +48,20 @@ describe("Domain - Use Cases - Get Import Folder Metadata", () => {
         fs.writeFileSync(path.join(projectFolder, "meta", "uvp6_header_sn000171hf_20230720_wcb_1.txt"), "cruise;ship;filename\nwcb_1;other_ship;20230720-000000\n");
         fs.writeFileSync(path.join(projectFolder, "meta", "uvp6_header_sn000171hf_20230720_wcb_1_test.txt"), "cruise;ship;filename\nwcb_1_test;test_ship;20230720-000000\n");
 
-        const metadata = await new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute("uvp6_sn000171hf_20230720_wcb_1_test");
+        const metadata = await new GetImportFolderMetadata(importFolder, usableUserRepository()).execute(current_user, "uvp6_sn000171hf_20230720_wcb_1_test");
 
         expect(metadata.cruise).toBe("wcb_1_test");
         expect(metadata.ship).toBe("test_ship");
+    });
+
+    test("refuses a user who cannot be used before touching the file system", async () => {
+        const repository = new MockUserRepository();
+        jest.spyOn(repository, "ensureUserCanBeUsed").mockRejectedValue(new Error("User cannot be used"));
+
+        await expect(new GetImportFolderMetadata(importFolder, repository).execute(current_user, "any")).rejects.toThrow("User cannot be used");
+    });
+
+    test.each(["..", "../sibling", "../" + path.basename(os.tmpdir()) + "x"])("refuses a folder outside the import root: %s", async (folder) => {
+        await expect(new GetImportFolderMetadata(importFolder, usableUserRepository()).execute(current_user, folder)).rejects.toThrow("Invalid folder path");
     });
 });

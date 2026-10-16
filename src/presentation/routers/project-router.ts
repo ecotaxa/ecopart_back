@@ -96,7 +96,7 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      */
     // List of all distinct ships
-    router.get('/ships', async (req: Request, res: Response) => {
+    router.get('/ships', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const ships = await listShipsUseCase.execute();
             res.status(200).send(ships)
@@ -446,7 +446,6 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot get this project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get project"] })
         }
@@ -566,6 +565,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot update this property or project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project to update") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Member user cannot be use") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Manager user cannot be use") res.status(404).send({ errors: [err.message] })
@@ -979,7 +979,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`).
+     *         description: "Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`)."
      *         content:
      *           application/json:
      *             schema:
@@ -1010,6 +1010,7 @@ export default function ProjectRouter(
         const errorMap: { [key: string]: { status: number; message: string } } = {
             "User cannot be used": { status: 403, message: err.message },
             "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
+            "Logged user cannot list importable EcoTaxa samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
             "Task type not found": { status: 404, message: err.message },
             "Task status not found": { status: 404, message: err.message },
@@ -1664,6 +1665,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
@@ -1733,7 +1735,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Cannot find sample") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find sample" || err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get sample"] })
         }
@@ -2209,6 +2211,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
@@ -2359,6 +2362,7 @@ export default function ProjectRouter(
         const errorMap: { [key: string]: { status: number; message: string } } = {
             "User cannot be used": { status: 403, message: err.message },
             "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
+            "Logged user cannot list importable EcoTaxa samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
             "Task type not found": { status: 404, message: err.message },
             "Task status not found": { status: 404, message: err.message },
@@ -2600,6 +2604,8 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot get EcoTaxa samples for this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Project is not linked to an EcoTaxa instance") res.status(409).send({ errors: [err.message] })
             else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })

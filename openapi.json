@@ -1460,7 +1460,7 @@
       },
       "PublicProjectResponse": {
         "type": "object",
-        "description": "Public project information returned by API endpoints.",
+        "description": "Public project information returned by API endpoints. Every logged-in user may read a\nproject's metadata, whatever its privacy status, so that access can be requested from its\nmanagers; `root_folder_path` and `last_backup_utc_date_time` are only present for admins and\nfor the project's members and managers.\n",
         "properties": {
           "project_id": {
             "type": "integer",
@@ -1472,9 +1472,20 @@
             "description": "Project creation date.",
             "example": "2024-01-15T10:30:00.000Z"
           },
+          "privacy_status": {
+            "type": "string",
+            "enum": [
+              "private",
+              "visible",
+              "public",
+              "open"
+            ],
+            "description": "Current privacy status, computed from the creation date and the three durations below.\nFor a user without privilege on the project: `private` = metadata only, `visible` = samples\nand QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.\nMembers and managers are not bound by it.\n",
+            "example": "visible"
+          },
           "root_folder_path": {
             "type": "string",
-            "description": "Import folder path relative to the import root."
+            "description": "Import folder path relative to the import root. Members, managers and admins only."
           },
           "project_title": {
             "type": "string",
@@ -4589,6 +4600,86 @@
           },
           "409": {
             "description": "A backup task (import or export) is already running for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/samples/can_be_imported": {
+      "get": {
+        "summary": "List importable samples",
+        "description": "Returns a list of sample files that can be imported for the given project.\n\n**Meta header read:** `meta/<instrument>_header_<rest of the folder name>.txt`, the legacy EcoPart\nname (e.g. `meta/uvp6_header_sn000171hf_20230720_wcb_1_test.txt` for the folder\n`uvp6_sn000171hf_20230720_wcb_1_test`). Other headers next to it are ignored, and when that file\nis absent the route answers 404 naming it.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of importable sample names.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used. Not authorized for this project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, folder or meta header not found (`Meta header file not found: meta/<expected name>`).",
             "content": {
               "application/json": {
                 "schema": {

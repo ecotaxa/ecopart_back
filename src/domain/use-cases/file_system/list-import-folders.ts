@@ -1,23 +1,23 @@
 import fs from 'node:fs/promises';
 import path from 'path';
 import { ListImportFoldersUseCase } from '../../interfaces/use-cases/file_system/list-import-folders';
-import { isInsideFolder } from '../../utils/path-containment';
+import { UserRepository } from '../../interfaces/repositories/user-repository';
+import { UserUpdateModel } from '../../entities/user';
+import { resolveInsideImportFolder } from './import-folder-path';
 
 export class ListImportFolders implements ListImportFoldersUseCase {
     importFolderPath: string
+    userRepository: UserRepository
 
-    constructor(importFolderPath: string) {
+    constructor(importFolderPath: string, userRepository: UserRepository) {
         this.importFolderPath = importFolderPath
+        this.userRepository = userRepository
     }
 
-    async execute(folder_path: string): Promise<string[]> {
-        const targetPath = path.join(this.importFolderPath, folder_path);
-        const resolvedPath = path.resolve(targetPath);
-
-        // Prevent directory traversal outside the import root
-        if (!isInsideFolder(this.importFolderPath, resolvedPath)) {
-            throw new Error("Invalid folder path");
-        }
+    // Any user may browse the import folders to create a project on one of them (data producer role).
+    async execute(current_user: UserUpdateModel, folder_path: string): Promise<string[]> {
+        await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
+        const resolvedPath = resolveInsideImportFolder(this.importFolderPath, folder_path);
 
         const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
         const folders: string[] = [];

@@ -1,6 +1,7 @@
 import { InstrumentModelResponseModel } from "../../entities/instrument_model";
 import { PublicPrivilege } from "../../entities/privilege";
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../../entities/project";
+import { ProjectPrivacyInputs } from "../../use-cases/project/project-access";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 export interface ProjectRepository {
@@ -21,4 +22,6 @@ export interface ProjectRepository {
     exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string>;
     ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void>;
     getDistinctShips(): Promise<string[]>;
+    // Every project's privacy inputs, to tell which ones a user outside them may look into.
+    listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]>;
 }

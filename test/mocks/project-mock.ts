@@ -3,6 +3,7 @@ import { EcoTaxaSampleListItem, PublicHeaderSampleResponseModel, PublicImportabl
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
 import { TaskResponseModel } from "../../src/domain/entities/task";
 import { ProjectRepository } from "../../src/domain/interfaces/repositories/project-repository"
+import { ProjectPrivacyInputs } from "../../src/domain/use-cases/project/project-access";
 import { BackupProjectUseCase } from "../../src/domain/interfaces/use-cases/project/backup-project";
 import { CreateProjectUseCase } from "../../src/domain/interfaces/use-cases/project/create-project";
 import { DeleteProjectUseCase } from "../../src/domain/interfaces/use-cases/project/delete-project";
@@ -75,6 +76,9 @@ export class MockProjectRepository implements ProjectRepository {
     }
     getDistinctShips(): Promise<string[]> {
         throw new Error("Method not implemented : getDistinctShips");
+    }
+    listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]> {
+        throw new Error("Method not implemented : listProjectsPrivacy");
     }
 
 }

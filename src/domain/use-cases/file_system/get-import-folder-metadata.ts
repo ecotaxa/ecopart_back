@@ -4,8 +4,9 @@ import { GetImportFolderMetadataUseCase } from '../../interfaces/use-cases/file_
 import { ProjectMetadataModel, ProjectMetadataPersonModel } from '../../entities/project';
 import { UserRepository } from '../../interfaces/repositories/user-repository';
 import { decodeUvpText } from '../../utils/decode-uvp-text';
-import { isInsideFolder } from '../../utils/path-containment';
 import { selectMetaHeaderFile } from '../../utils/meta-header-file';
+import { UserUpdateModel } from '../../entities/user';
+import { resolveInsideImportFolder } from './import-folder-path';
 
 export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
     importFolderPath: string;
@@ -16,12 +17,10 @@ export class GetImportFolderMetadata implements GetImportFolderMetadataUseCase {
         this.userRepository = userRepository;
     }
 
-    async execute(folder_path: string): Promise<ProjectMetadataModel> {
-        // Validate the folder_path is within the import folder
-        const fullPath = path.resolve(this.importFolderPath, folder_path);
-        if (!isInsideFolder(this.importFolderPath, fullPath)) {
-            throw new Error('Invalid folder path');
-        }
+    // Any user may read a folder's metadata to prefill a project on it (data producer role).
+    async execute(current_user: UserUpdateModel, folder_path: string): Promise<ProjectMetadataModel> {
+        await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
+        const fullPath = resolveInsideImportFolder(this.importFolderPath, folder_path);
 
         // Detect instrument type based on directory structure
         const instrumentType = await this.detectInstrumentType(fullPath);

@@ -5,6 +5,13 @@ import { ListImportFolders } from "../../../../src/domain/use-cases/file_system/
 import { GetImportFolderMetadata } from "../../../../src/domain/use-cases/file_system/get-import-folder-metadata";
 import { MockUserRepository } from "../../../mocks/user-mock";
 
+const current_user = { user_id: 1 };
+function usableUserRepository(): MockUserRepository {
+    const repository = new MockUserRepository();
+    jest.spyOn(repository, "ensureUserCanBeUsed").mockResolvedValue();
+    return repository;
+}
+
 describe("Domain - Use Cases - Import folder containment", () => {
     let parent: string;
     let importFolder: string;
@@ -22,14 +29,14 @@ describe("Domain - Use Cases - Import folder containment", () => {
     });
 
     test("lists a folder inside the import folder", async () => {
-        await expect(new ListImportFolders(importFolder).execute("")).resolves.toEqual(["project_a"]);
+        await expect(new ListImportFolders(importFolder, usableUserRepository()).execute(current_user, "")).resolves.toEqual(["project_a"]);
     });
 
     test.each(["../import_other", "..", "../.."])("refuses to list %s", async (folder) => {
-        await expect(new ListImportFolders(importFolder).execute(folder)).rejects.toThrow("Invalid folder path");
+        await expect(new ListImportFolders(importFolder, usableUserRepository()).execute(current_user, folder)).rejects.toThrow("Invalid folder path");
     });
 
     test.each(["../import_other/secret_project", "..", "/etc"])("refuses to read the metadata of %s", async (folder) => {
-        await expect(new GetImportFolderMetadata(importFolder, new MockUserRepository()).execute(folder)).rejects.toThrow("Invalid folder path");
+        await expect(new GetImportFolderMetadata(importFolder, usableUserRepository()).execute(current_user, folder)).rejects.toThrow("Invalid folder path");
     });
 });

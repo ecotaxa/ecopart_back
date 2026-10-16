@@ -96,14 +96,14 @@ describe("ExportRawDataUseCase", () => {
             jest.spyOn(mockSampleRepository, "getSamplesByIds").mockImplementation(() => Promise.resolve([validated(sampleModel_1)]));
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false));
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(false));
-            jest.spyOn(mockProjectRepository, "getProject");
+            // An open project changes nothing: the archive recovery never follows the privacy status
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve({ ...private_projectResponseModel, project_id: sampleModel_1.project_id, privacy_duration: 0, visible_duration: 0, public_duration: 0 }));
             jest.spyOn(mockTaskRepository, "createTask");
 
             await expect(exportRawDataUseCase.execute(current_user, { sample_ids: [1], export_types: ["metadata"] }))
                 .rejects.toThrow(`Logged user cannot export raw data from project ${sampleModel_1.project_id}`);
 
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: sampleModel_1.project_id });
-            expect(mockProjectRepository.getProject).toBeCalledTimes(0);
             expect(mockTaskRepository.createTask).toBeCalledTimes(0);
         });
 
@@ -129,7 +129,7 @@ describe("ExportRawDataUseCase", () => {
             jest.spyOn(mockSampleRepository, "getSamplesByIds").mockImplementation(() => Promise.resolve(samples));
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false));
             jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(true));
-            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel));
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(({ project_id }) => Promise.resolve({ ...private_projectResponseModel, project_id }));
             jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1.task_id));
             jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
             stubBackgroundWork();
@@ -141,6 +141,17 @@ describe("ExportRawDataUseCase", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: sampleModel_1.project_id });
             expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: sampleModel_2.project_id });
             expect(mockProjectRepository.getProject).toBeCalledTimes(2);
+        });
+
+        test("authorization comes before the QC gate, which would name the samples", async () => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve());
+            jest.spyOn(mockSampleRepository, "getSamplesByIds").mockImplementation(() => Promise.resolve([{ ...sampleModel_1, visual_qc_status_label: "PENDING" }]));
+            jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(false));
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementation(() => Promise.resolve(false));
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve({ ...private_projectResponseModel, project_id: sampleModel_1.project_id }));
+
+            await expect(exportRawDataUseCase.execute(current_user, { sample_ids: [1], export_types: ["metadata"] }))
+                .rejects.toThrow(`Logged user cannot export raw data from project ${sampleModel_1.project_id}`);
         });
 
         test("a project that cannot be resolved aborts the export", async () => {
@@ -235,7 +246,7 @@ describe("ExportRawDataUseCase", () => {
         beforeEach(() => {
             jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve());
             jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true));
-            jest.spyOn(mockProjectRepository, "getProject");
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(({ project_id }) => Promise.resolve({ ...private_projectResponseModel, project_id }));
             jest.spyOn(mockTaskRepository, "createTask");
         });
 
@@ -245,8 +256,8 @@ describe("ExportRawDataUseCase", () => {
             await expect(exportRawDataUseCase.execute(current_user, { sample_ids: [1], export_types: ["metadata"] }))
                 .rejects.toThrow(`Sample(s) not validated: ${sampleModel_1.sample_name}`);
 
-            // The gate runs before project authorization, so nothing further is reached.
-            expect(mockProjectRepository.getProject).toBeCalledTimes(0);
+            // Project authorization runs before the gate; nothing further is reached.
+            expect(mockProjectRepository.getProject).toBeCalledTimes(1);
             expect(mockTaskRepository.createTask).toBeCalledTimes(0);
         });
 
@@ -294,9 +305,11 @@ describe("ExportRawDataUseCase", () => {
                 expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
                     task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true },
                 }));
-                // Only the validated sample's project is authorized/resolved.
-                expect(mockProjectRepository.getProject).toBeCalledTimes(1);
+                // Every requested sample's project is authorized, the dropped one included, so that
+                // the gate never names a sample the caller may not see.
+                expect(mockProjectRepository.getProject).toBeCalledTimes(2);
                 expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: sampleModel_1.project_id });
+                expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: sampleModel_2.project_id });
             });
 
             test("still refuses the export when no validated sample remains", async () => {

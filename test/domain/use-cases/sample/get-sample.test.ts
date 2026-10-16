@@ -8,25 +8,33 @@ import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { GetSample } from "../../../../src/domain/use-cases/sample/get-sample";
 import { sampleModel_1 } from "../../../entities/sample";
+import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
+import { ProjectResponseModel } from "../../../../src/domain/entities/project";
+import { MockProjectRepository } from "../../../mocks/project-mock";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
 let mockPrivilegeRepository: PrivilegeRepository;
+let mockProjectRepository: ProjectRepository;
 let useCase: GetSample;
 
 const current_user: UserUpdateModel = { user_id: 7 };
 const sample: PublicSampleModel = { ...sampleModel_1, sample_id: 10, project_id: 1 };
+const private_project = { project_id: 1, project_creation_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel;
+const visible_project = { ...private_project, privacy_duration: 0, visible_duration: 1200 };
 
 beforeEach(() => {
     jest.clearAllMocks();
     mockUserRepository = new MockUserRepository();
     mockSampleRepository = new MockSampleRepository();
     mockPrivilegeRepository = new MockPrivilegeRepository();
-    useCase = new GetSample(mockUserRepository, mockSampleRepository, mockPrivilegeRepository);
+    mockProjectRepository = new MockProjectRepository();
+    useCase = new GetSample(mockUserRepository, mockSampleRepository, mockPrivilegeRepository, mockProjectRepository);
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
     jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false);
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+    jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(private_project);
 });
 
 describe("GetSample", () => {
@@ -55,6 +63,26 @@ describe("GetSample", () => {
         const getSample = jest.spyOn(mockSampleRepository, "getSample");
 
         await expect(useCase.execute(current_user, 1, 10)).rejects.toThrow("User cannot be used");
+        expect(getSample).toBeCalledTimes(0);
+    });
+
+    test("a user outside a visible project gets the sample without any privilege lookup", async () => {
+        jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(visible_project);
+        jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sample);
+
+        const res = await useCase.execute(current_user, 1, 10);
+
+        expect(res).toStrictEqual(sample);
+        expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: 1 });
+        expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0);
+    });
+
+    test("throws when the project does not exist", async () => {
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(null);
+        const getSample = jest.spyOn(mockSampleRepository, "getSample");
+
+        await expect(useCase.execute(current_user, 1, 10)).rejects.toThrow("Cannot find project");
         expect(getSample).toBeCalledTimes(0);
     });
 

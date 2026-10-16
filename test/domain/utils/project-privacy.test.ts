@@ -1,4 +1,4 @@
-import { computeProjectPrivacy } from "../../../../src/domain/use-cases/export/project-privacy";
+import { computeProjectPrivacy } from "../../../src/domain/utils/project-privacy";
 
 describe("computeProjectPrivacy", () => {
     const now = new Date(Date.UTC(2026, 9, 12));

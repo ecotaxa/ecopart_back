@@ -242,7 +242,11 @@ components:
 
     PublicProjectResponse:
       type: object
-      description: Public project information returned by API endpoints.
+      description: |
+        Public project information returned by API endpoints. Every logged-in user may read a
+        project's metadata, whatever its privacy status, so that access can be requested from its
+        managers; `root_folder_path` and `last_backup_utc_date_time` are only present for admins and
+        for the project's members and managers.
       properties:
         project_id:
           type: integer
@@ -252,9 +256,18 @@ components:
           type: string
           description: Project creation date.
           example: "2024-01-15T10:30:00.000Z"
+        privacy_status:
+          type: string
+          enum: [private, visible, public, open]
+          description: |
+            Current privacy status, computed from the creation date and the three durations below.
+            For a user without privilege on the project: `private` = metadata only, `visible` = samples
+            and QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.
+            Members and managers are not bound by it.
+          example: visible
         root_folder_path:
           type: string
-          description: Import folder path relative to the import root.
+          description: Import folder path relative to the import root. Members, managers and admins only.
         project_title:
           type: string
           description: Full title of the project.

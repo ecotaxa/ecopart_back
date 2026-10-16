@@ -19,7 +19,7 @@ import { ExportBinnedDataRequestModel, ExportBinnedDataUseCase } from "../../int
 import { BinAxis, BinnedSampleBuilder, BinnedSampleSettings, exportedSizeClasses, particleColumns, particleRow, sampleVisibleSizeClasses } from "./binned-computation";
 import { renderBinnedReadme } from "./binned-readme";
 import { ExportMetadataWriter } from "./export-metadata";
-import { computeProjectPrivacy } from "./project-privacy";
+import { ProjectAccessPolicy } from "../project/project-access";
 import { zipFolder } from "./zip-folder";
 import { removeExportWorkFolder } from "./work-folder";
 
@@ -51,6 +51,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
     ) { }
 
     private readonly metadataWriter = new ExportMetadataWriter(this.sampleRepository, this.privilegeRepository, this.taskRepository, this.ecotaxaAccountRepository, this.instrumentModelRepository);
+    private readonly access = new ProjectAccessPolicy(this.userRepository, this.privilegeRepository);
 
     async execute(current_user: UserUpdateModel, request: ExportBinnedDataRequestModel): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
@@ -141,10 +142,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
     // the project's members and managers, always; any other registered user once the project is
     // public or open.
     private async ensureUserCanExport(current_user: UserUpdateModel, project: ProjectResponseModel, now: Date): Promise<void> {
-        if (await this.userRepository.isAdmin(current_user.user_id)) return;
-        if (await this.privilegeRepository.isGranted({ user_id: current_user.user_id, project_id: project.project_id })) return;
-        const privacy = computeProjectPrivacy(project.project_creation_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, now);
-        if (privacy === "public" || privacy === "open") return;
+        if (await this.access.can(current_user.user_id, project, "export_particles", now)) return;
         throw new Error(`Logged user cannot export binned data from project ${project.project_id}`);
     }
 

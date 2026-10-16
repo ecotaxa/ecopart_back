@@ -2,6 +2,7 @@ import express from 'express'
 import { Request, Response } from 'express'
 
 import { MiddlewareAuth } from '../interfaces/middleware/auth'
+import { CustomRequest } from '../../domain/entities/auth'
 import { ListImportFoldersUseCase } from '../../domain/interfaces/use-cases/file_system/list-import-folders'
 import { GetImportFolderMetadataUseCase } from '../../domain/interfaces/use-cases/file_system/get-import-folder-metadata'
 
@@ -59,11 +60,13 @@ export default function FileSystemRouter(
     router.get('/import_folders', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const folder_path = (req.query.folder_path as string) || '';
-            const folders = await listImportFoldersUseCase.execute(folder_path);
+            const folders = await listImportFoldersUseCase.execute((req as CustomRequest).token, folder_path);
             res.status(200).send(folders)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            res.status(500).send({ errors: ["Cannot list import folders"] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Invalid folder path") res.status(400).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot list import folders"] })
         }
     })
 
@@ -128,11 +131,13 @@ export default function FileSystemRouter(
                 res.status(400).send({ errors: ["Missing folder_path query parameter"] });
                 return;
             }
-            const metadata = await getImportFolderMetadataUseCase.execute(folder_path);
+            const metadata = await getImportFolderMetadataUseCase.execute((req as CustomRequest).token, folder_path);
             res.status(200).send(metadata);
         } catch (err) {
             console.log(new Date().toISOString(), err);
-            if (err.message === 'Invalid folder path') {
+            if (err.message === "User cannot be used") {
+                res.status(403).send({ errors: [err.message] });
+            } else if (err.message === 'Invalid folder path') {
                 res.status(400).send({ errors: ["Invalid folder path"] });
             } else {
                 res.status(500).send({ errors: ["Cannot read import folder metadata"] });

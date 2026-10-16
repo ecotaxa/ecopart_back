@@ -7,7 +7,7 @@ export class MockPrivilegeRepository implements PrivilegeRepository {
     getContact(): Promise<PrivilegeResponseModel> {
         throw new Error("Method not implemented for privilege mock getContact");
     }
-    isManager(): unknown {
+    isManager(): Promise<boolean> {
         throw new Error("Method not implemented for privilege mock isManager");
     }
     ensurePrivilegeCoherence(): void {
