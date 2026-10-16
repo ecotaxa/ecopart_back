@@ -1,4 +1,5 @@
 import path from "path";
+import { isInsideFolder } from "../../utils/path-containment";
 import { ProjectRequestCreationModel, PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../entities/project";
 import { UserUpdateModel } from "../../entities/user";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
@@ -31,6 +32,11 @@ export class CreateProject implements CreateProjectUseCase {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
+        // Checked before anything is created, EcoTaxa project included: the backup copies and zips this folder
+        if (!isInsideFolder(this.DATA_STORAGE_IMPORT, path.join(this.DATA_STORAGE_IMPORT, public_project.root_folder_path))) {
+            throw new Error("Root folder path must stay inside the import folder");
+        }
+
         // Set default depth offset if not provided
         this.setDefaultDepthOffset(public_project);
 
@@ -45,9 +51,6 @@ export class CreateProject implements CreateProjectUseCase {
 
         // Prepend import storage path to root_folder_path for internal storage
         public_project_with_ecotaxa_proj_info.root_folder_path = path.join(this.DATA_STORAGE_IMPORT, public_project_with_ecotaxa_proj_info.root_folder_path);
-        // A source folder belongs to one project: a second project on the same folder would give
-        // its managers the data of the first one, whatever that project's privacy and privileges.
-        await this.ensureRootFolderIsFree(public_project_with_ecotaxa_proj_info.root_folder_path);
 
         // Format the provided information
         const project: ProjectRequestCreationModel = this.projectRepository.formatProjectRequestCreationModel(public_project_with_ecotaxa_proj_info, instrument);
@@ -141,11 +144,6 @@ export class CreateProject implements CreateProjectUseCase {
             throw new Error("Cant find created privileges, please check members, managers and contact");
         }
         return privileges;
-    }
-
-    private async ensureRootFolderIsFree(root_folder_path: string): Promise<void> {
-        const owners = await this.projectRepository.getProjectsByRootFolderPath(root_folder_path);
-        if (owners.length > 0) throw new Error("Root folder already used by another project");
     }
 
     // Create the project root folder

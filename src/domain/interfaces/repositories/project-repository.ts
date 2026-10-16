@@ -24,6 +24,4 @@ export interface ProjectRepository {
     getDistinctShips(): Promise<string[]>;
     // Every project's privacy inputs, to tell which ones a user outside them may look into.
     listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]>;
-    // The projects importing from this folder (stored path, with the import prefix); one at most is expected.
-    getProjectsByRootFolderPath(root_folder_path: string): Promise<ProjectResponseModel[]>;
 }

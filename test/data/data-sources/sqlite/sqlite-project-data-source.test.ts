@@ -266,12 +266,21 @@ describe('SQLiteProjectDataSource', () => {
             expect(getAllOutput.items[0].operator_email).toEqual("edited_user@email.com");
             expect(getAllOutput.items[0].operator_name).toEqual("Edited name");
         });
+        test('rejects an update key that is not a plain column name', async () => {
+            const injected = { project_id: 1, "project_title = 'x', root_folder_path": "y" } as any
+            await expect(dataSource.updateOne(injected)).rejects.toThrow("Invalid column name");
+        });
     });
 
     describe('getOne', () => {
         test('init the db', async () => {
             // Test initializing the database
             expect(dataSource).toBeDefined();
+        });
+        test('rejects a key that is not a plain column name instead of running it as SQL', async () => {
+            // The audit reproduction: this key turned the lookup of project 5678 into "project_id = 1 OR ...".
+            const injected = { "project_id = 1 OR project.project_id": 0, project_id: 5678 } as any
+            await expect(dataSource.getOne(injected)).rejects.toThrow("Invalid column name");
         });
         test('get one by project_id : no matchs', async () => {
             // Call the getOne method

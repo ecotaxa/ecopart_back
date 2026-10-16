@@ -80,9 +80,6 @@ export class MockProjectRepository implements ProjectRepository {
     listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]> {
         throw new Error("Method not implemented : listProjectsPrivacy");
     }
-    getProjectsByRootFolderPath(): Promise<ProjectResponseModel[]> {
-        throw new Error("Method not implemented : getProjectsByRootFolderPath");
-    }
 
 }
 

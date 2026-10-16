@@ -28,8 +28,10 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'Tasks', description: 'Background task management' },
         { name: 'Instrument Models', description: 'Instrument model reference data' },
         { name: 'EcoTaxa Instances', description: 'EcoTaxa instance management' },
+        { name: 'File System', description: 'File system operations' },
         { name: 'Admin', description: 'Administration and application statistics' },
         { name: 'Broadcast Messages', description: 'Application-wide message shown to users, managed by admins' },
+        { name: 'Version', description: 'Version of the running API' },
     ],
     components: {
         securitySchemes: {
@@ -59,3 +61,9 @@ const options: swaggerJsdoc.Options = {
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
+
+// The served documentation shows the version actually running; openapi.json, generated from the
+// source, keeps the fixed value above so that it stays the same from one generation to the next.
+export function setServedApiVersion(version: string): void {
+    (swaggerSpec as { info: { version: string } }).info.version = version;
+}

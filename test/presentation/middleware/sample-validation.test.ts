@@ -241,7 +241,7 @@ describe("Project Router", () => {
         });
 
         test.each([
-            ["Logged user cannot regenerate pivots in this project", 401],
+            ["Logged user cannot regenerate pivots in this project", 403],
             ["Cannot find project", 404],
             ["Samples not found in this project: ghost", 404],
             ["Pivots only exist for UVP5 projects", 422],

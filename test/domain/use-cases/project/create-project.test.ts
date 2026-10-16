@@ -27,7 +27,6 @@ beforeEach(async () => {
     mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
     DATA_STORAGE_FS_STORAGE = "data_storage/files_system_storage/"
     DATA_STORAGE_IMPORT = "data_storage/ecopart_data_to_import/"
-    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([])
 
 })
 
@@ -200,18 +199,17 @@ test("Create project but something went wrong when fetching created privileges",
     expect(mockProjectRepository.createProject).toHaveBeenCalledWith(projectRequestCreationModelForRepository);
     expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
 });
-test("refuses a source folder that another project already imports from, whoever asks", async () => {
-    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
-    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockResolvedValue(instrument_model_response)
-    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockResolvedValue()
-    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockReturnValue()
-    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([projectResponseModel])
+test("Refuses a root folder outside the import folder before creating anything", async () => {
+    const InputData: PublicProjectRequestCreationModel = { ...projectRequestCreationModel, root_folder_path: "../sqlite_db" }
+    const current_user: UserUpdateModel = { user_id: 1 }
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName")
     jest.spyOn(mockProjectRepository, "createProject")
 
     const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_IMPORT)
 
-    await expect(createProjectUseCase.execute({ user_id: 1 }, { ...projectRequestCreationModel, ecotaxa_project_id: null, new_ecotaxa_project: false })).rejects.toThrow("Root folder already used by another project")
-
-    expect(mockProjectRepository.getProjectsByRootFolderPath).toHaveBeenCalledWith(DATA_STORAGE_IMPORT + projectRequestCreationModel.root_folder_path)
-    expect(mockProjectRepository.createProject).toHaveBeenCalledTimes(0)
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrow("Root folder path must stay inside the import folder");
+    expect(mockInstrumentModelRepository.getInstrumentByName).toBeCalledTimes(0);
+    expect(mockProjectRepository.createProject).toBeCalledTimes(0);
 });

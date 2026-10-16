@@ -30,33 +30,23 @@ async function rebuildSampleTable(db: SQLiteDatabaseWrapper, max_pressure_defini
     }
     // The AUTOINCREMENT counter goes with the dropped table: restore it so no sample_id is reused.
     const [sequence] = await allSQL<{ seq: number }>(db, `SELECT seq FROM sqlite_sequence WHERE name = 'sample';`);
-    const [{ foreign_keys }] = await allSQL<{ foreign_keys: number }>(db, `PRAGMA foreign_keys;`);
 
-    await runSQL(db, `PRAGMA foreign_keys = OFF;`);
-    try {
-        await runSQL(db, `BEGIN;`);
-        try {
-            await runSQL(db, create_sample_new);
-            await runSQL(db, `INSERT INTO sample_new SELECT * FROM sample;`);
-            await runSQL(db, `DROP TABLE sample;`);
-            await runSQL(db, `ALTER TABLE sample_new RENAME TO sample;`);
-            if (sequence) {
-                const [current] = await allSQL<{ seq: number }>(db, `SELECT seq FROM sqlite_sequence WHERE name = 'sample';`);
-                await runSQL(db, `DELETE FROM sqlite_sequence WHERE name = 'sample';`);
-                await runSQL(db, `INSERT INTO sqlite_sequence (name, seq) VALUES ('sample', ?);`, [Math.max(sequence.seq, current?.seq ?? 0)]);
-            }
-            await runSQL(db, `COMMIT;`);
-        } catch (error) {
-            await runSQL(db, `ROLLBACK;`).catch(() => undefined);
-            throw error;
-        }
-    } finally {
-        await runSQL(db, `PRAGMA foreign_keys = ${foreign_keys ? "ON" : "OFF"};`);
+    // The migration runner wraps this in a transaction, with foreign keys switched off (foreignKeysOff)
+    await runSQL(db, create_sample_new);
+    await runSQL(db, `INSERT INTO sample_new SELECT * FROM sample;`);
+    await runSQL(db, `DROP TABLE sample;`);
+    await runSQL(db, `ALTER TABLE sample_new RENAME TO sample;`);
+    if (sequence) {
+        const [current] = await allSQL<{ seq: number }>(db, `SELECT seq FROM sqlite_sequence WHERE name = 'sample';`);
+        await runSQL(db, `DELETE FROM sqlite_sequence WHERE name = 'sample';`);
+        await runSQL(db, `INSERT INTO sqlite_sequence (name, seq) VALUES ('sample', ?);`, [Math.max(sequence.seq, current?.seq ?? 0)]);
     }
 }
 
 export const migration: Migration = {
     id: "027_make_max_pressure_nullable",
+    // up and down rebuild the sample table
+    foreignKeysOff: true,
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         if (!(await maxPressureIsNotNull(db))) return;

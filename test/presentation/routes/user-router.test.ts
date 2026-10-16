@@ -347,7 +347,7 @@ describe("User Router", () => {
             const expectedResponse = { errors: ["Cannot create user"] }
 
 
-            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Valid user already exist")))
+            jest.spyOn(mockCreateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Valid user already exists")))
 
             const response = await request(server).post("/users").send(InputData)
 
@@ -496,7 +496,7 @@ describe("User Router", () => {
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot update this property or user")))
             const response = await request(server).patch("/users/2").send(user_to_update)
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -699,11 +699,11 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /users fail for Logged user cannot delete this users hould return 401", async () => {
+        test("DELETE /users fail for Logged user cannot delete this users hould return 403", async () => {
             const expectedResponse = { errors: ["Logged user cannot delete this user"] }
             jest.spyOn(mockDeleteUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot delete this user")))
             const response = await request(server).delete("/users/1")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
@@ -767,7 +767,7 @@ describe("User Router", () => {
 
             jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /user/:user_id/ecotaxa_account fail for User cannot be usedt", async () => {
@@ -787,7 +787,7 @@ describe("User Router", () => {
 
             jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /user/:user_id/ecotaxa_account fail for Ecotaxa instance not found ", async () => {
@@ -870,7 +870,7 @@ describe("User Router", () => {
             jest.spyOn(mockLogoutEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).delete("/users/1/ecotaxa_account/:ecotaxa_account_id").send()
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id fail for User cannot be used", async () => {
@@ -974,7 +974,7 @@ describe("User Router", () => {
             const response = await request(server).get("/users/1/ecotaxa_account")
 
             expect(response.body).toStrictEqual(expectedResponse)
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
         });
         test("GET /users/:user_id/ecotaxa_account fail for Unauthorized sort_by", async () => {
             const OutputError = new Error("Unauthorized sort_by")

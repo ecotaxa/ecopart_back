@@ -178,6 +178,16 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         })
     }
 
+    async updateToken(ecotaxa_account_id: number, ecotaxa_account_token: string): Promise<number> {
+        const sql = "UPDATE ecotaxa_account SET ecotaxa_account_token = (?) WHERE ecotaxa_account_id = (?)";
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, [ecotaxa_account_token, ecotaxa_account_id], function (err) {
+                if (err) reject(err);
+                else resolve(this.changes);
+            });
+        })
+    }
+
     async getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null> {
         const sql = "SELECT * FROM ecotaxa_instance WHERE ecotaxa_instance_id = (?)";
         const params = [ecotaxa_instance_id];

@@ -36,4 +36,9 @@ WORKDIR /src
 COPY --from=deps /src/node_modules ./node_modules
 COPY --from=build /src/dist ./dist
 
+# The git tag the image is built from (passed by the tag workflow), served by GET /version.
+# Declared last so that a new version does not invalidate the cached layers above.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 CMD ["node", "dist/main.js"]

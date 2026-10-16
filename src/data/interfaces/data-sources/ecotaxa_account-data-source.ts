@@ -6,6 +6,7 @@ export interface EcotaxaAccountDataSource {
     getOne(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel | null>;
     getAll(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>>;
     deleteOne(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number>;
+    updateToken(ecotaxa_account_id: number, ecotaxa_account_token: string): Promise<number>;
     getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null>;
     getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]>;
     createEcoTaxaInstance(instance: EcotaxaInstanceRequestCreationModel): Promise<number>;

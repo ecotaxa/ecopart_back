@@ -104,6 +104,24 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(OutputData)
         });
 
+        test.each(["../sqlite_db", "a/../../b", "..\\windows"])("Refuses root_folder_path %s", async (root_folder_path) => {
+            jest.spyOn(mockCreateProjectUseCase, "execute")
+
+            const response = await request(server).post("/projects").send({ ...projectRequestCreationModel, root_folder_path })
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors).toEqual([expect.objectContaining({ path: "root_folder_path", msg: "Root Folder Path must stay inside the import folder." })])
+            expect(mockCreateProjectUseCase.execute).toBeCalledTimes(0)
+        });
+
+        test("Accepts a root_folder_path with dots that are not a parent segment", async () => {
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(projectResponseModel))
+
+            const response = await request(server).post("/projects").send({ ...projectRequestCreationModel, root_folder_path: "remote/uvp5..2014/run.1" })
+
+            expect(response.status).toBe(201)
+        });
+
         test("Sanitize email and organisation", async () => {
             //TODO affine test on sanitized data
             const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel_withDataToSanitize

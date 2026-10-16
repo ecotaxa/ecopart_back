@@ -3,6 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
 // Shared row → PublicSampleModel mapper. Used by getOne() and getAll().
@@ -210,7 +211,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(sample)) {
             params.push(value)
-            placeholders = placeholders + "sample." + key + "=(?) AND "
+            placeholders = placeholders + "sample." + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
@@ -485,7 +486,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             } else {
                 params.push(value)
             }
-            placeholders = placeholders + key + "=(?),"
+            placeholders = placeholders + sqlIdentifier(key) + "=(?),"
         }
         // Remove last ,
         placeholders = placeholders.slice(0, -1);
@@ -513,7 +514,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         for (const [key, value] of Object.entries(data)) {
             if (value === undefined) continue;
             setParams.push(typeof value === "boolean" ? (value ? 1 : 0) : value);
-            setPlaceholders += `${key} = (?),`;
+            setPlaceholders += `${sqlIdentifier(key)} = (?),`;
         }
         setPlaceholders = setPlaceholders.slice(0, -1);
 
@@ -522,7 +523,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         for (const [key, value] of Object.entries(filter)) {
             if (value === undefined) continue;
             whereParams.push(value);
-            wherePlaceholders += `${key} = (?) AND `;
+            wherePlaceholders += `${sqlIdentifier(key)} = (?) AND `;
         }
         wherePlaceholders = wherePlaceholders.slice(0, -5);
 
@@ -546,7 +547,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(sampleType)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
@@ -585,7 +586,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(ecotaxaImportStatus)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
@@ -623,7 +624,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(visualQCStatus)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);

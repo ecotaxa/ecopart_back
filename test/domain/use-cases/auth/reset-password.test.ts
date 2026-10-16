@@ -4,13 +4,17 @@ import { UserResponseModel } from "../../../../src/domain/entities/user";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { ResetPassword } from '../../../../src/domain/use-cases/auth/reset-password'
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockAuthRepository } from "../../../mocks/auth-mock";
 
 describe("Change password Use Case", () => {
     let mockUserRepository: UserRepository;
+    let mockAuthRepository: MockAuthRepository;
 
     beforeEach(async () => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
+        mockAuthRepository = new MockAuthRepository()
+        jest.spyOn(mockAuthRepository, "revokeUserSessions").mockImplementation(() => Promise.resolve(0))
     })
     describe("reset password request SUCCESS", () => {
         test("sucess test case", async () => {
@@ -58,13 +62,15 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             await reset_password.execute(InputData);
 
             expect(mockUserRepository.verifyResetPasswordToken).toHaveBeenCalledWith(InputData.reset_password_token);
             expect(mockUserRepository.ensureUserCanBeUsed).toHaveBeenCalledWith(1);
             expect(mockUserRepository.getUser).toHaveBeenCalledWith({ user_id: 1, reset_password_code: decoded_token.reset_password_code });
             expect(mockUserRepository.changePassword).toHaveBeenCalledWith({ ...preexistant_user, ...InputData });
+            // Every open session of that user ends
+            expect(mockAuthRepository.revokeUserSessions).toHaveBeenCalledWith(preexistant_user.user_id);
         });
 
     })
@@ -82,7 +88,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }
@@ -125,7 +131,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }
@@ -153,7 +159,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }
@@ -196,7 +202,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }
@@ -255,7 +261,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }
@@ -313,7 +319,7 @@ describe("Change password Use Case", () => {
             jest.spyOn(mockUserRepository, "changePassword").mockImplementation(() => Promise.resolve(nb_of_updated_user))
 
 
-            const reset_password = new ResetPassword(mockUserRepository)
+            const reset_password = new ResetPassword(mockUserRepository, mockAuthRepository)
             try {
                 await reset_password.execute(InputData);
             }

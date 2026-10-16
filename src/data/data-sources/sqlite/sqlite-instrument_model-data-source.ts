@@ -2,6 +2,7 @@ import { InstrumentModelRequestCreationModel, InstrumentModelRequestModel, Instr
 import { InstrumentModelDataSource } from "../../interfaces/data-sources/instrument_model-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { sqlIdentifier } from "./sql-identifier"
 
 // const DB_TABLE = "instrument"
 export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSource {
@@ -128,7 +129,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
     }
 
     // Returns the number of lines updates
-    updateOne(instrument: InstrumentModelUpdateModel): Promise<number> {
+    async updateOne(instrument: InstrumentModelUpdateModel): Promise<number> {
         const { instrument_model_id, ...instrumentData } = instrument; // Destructure the instrument object
 
         const params: any[] = []
@@ -137,7 +138,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
 
             params.push(value)
 
-            placeholders = placeholders + key + "=(?),"
+            placeholders = placeholders + sqlIdentifier(key) + "=(?),"
         }
         placeholders = placeholders.slice(0, -1);
         params.push(instrument_model_id)
@@ -162,7 +163,7 @@ export class SQLiteInstrumentModelDataSource implements InstrumentModelDataSourc
         // generate sql and params
         for (const [key, value] of Object.entries(instrument_model)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);

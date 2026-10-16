@@ -46,7 +46,10 @@ export class BackupProject implements BackupProjectUseCase {
         }
 
         // start the task
-        this.startBackupProjectTask(task, project, skip_already_imported);
+        // Fire-and-forget: failures are recorded on the task inside; only a failure to record one (task deleted
+        // meanwhile, database unavailable) reaches this catch, which keeps it from stopping the server.
+        this.startBackupProjectTask(task, project, skip_already_imported)
+            .catch((error) => console.log(new Date().toISOString(), `Backup task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }

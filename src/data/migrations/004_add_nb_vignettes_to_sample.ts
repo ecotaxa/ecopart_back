@@ -8,7 +8,7 @@ export const migration: Migration = {
         await runSQL(db, `ALTER TABLE sample ADD COLUMN nb_vignettes INTEGER NOT NULL DEFAULT 0;`);
     },
 
-    async down(db: SQLiteDatabaseWrapper): Promise<void> {
+    async down(_db: SQLiteDatabaseWrapper): Promise<void> {
 
     },
 };

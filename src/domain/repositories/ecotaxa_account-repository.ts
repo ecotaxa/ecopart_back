@@ -16,6 +16,8 @@ import { ECOTAXA_BIOTA_TAXO_ID } from "../constants/ecotaxa-living-taxo";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
 import { Agent } from "http";
+import { TokenCipherWrapper } from "../../infra/cryptography/token-cipher-wrapper";
+import { AesGcmTokenCipher } from "../../infra/cryptography/aes-gcm-token-cipher";
 
 export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     ecotaxa_accountDataSource: EcotaxaAccountDataSource
@@ -26,6 +28,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
     generic_ecotaxa_account_email: string
     insecureHttpsAgent: Agent | undefined
+    tokenCipher: TokenCipherWrapper
+    private unreadable_token_reported = new Set<number>()
 
     // TODO Define the mapping between EcoTaxa and EcoPart instruments in a .env or conf file 
     // ecopart ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']
@@ -50,9 +54,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         };
     }
 
-    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string, ECOTAXA_ALLOW_SELF_SIGNED_CERT: boolean = false) {
+    // Without a cipher (tests, harnesses), tokens are stored in clear as before; main.ts passes the configured one.
+    constructor(ecotaxa_accountDataSource: EcotaxaAccountDataSource, GENERIC_ECOTAXA_ACCOUNT_EMAIL: string, NODE_ENV: string, ECOTAXA_ALLOW_SELF_SIGNED_CERT: boolean = false, tokenCipher: TokenCipherWrapper = new AesGcmTokenCipher('')) {
         this.generic_ecotaxa_account_email = GENERIC_ECOTAXA_ACCOUNT_EMAIL
         this.ecotaxa_accountDataSource = ecotaxa_accountDataSource
+        this.tokenCipher = tokenCipher
         // Skipping TLS verification is now an explicit opt-in instead of "anything that is not
         // PROD". `NODE_ENV !== "PROD"` silently disabled certificate checks on every staging,
         // test and CI environment — including ones talking to a real EcoTaxa over the network.
@@ -364,7 +370,71 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return ecotaxa_account?.ecotaxa_account_ecopart_user_id == user_id || false;
     }
     async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
-        return await this.ecotaxa_accountDataSource.create(private_ecotaxa_account_to_create);
+        return await this.ecotaxa_accountDataSource.create({
+            ...private_ecotaxa_account_to_create,
+            ecotaxa_account_token: this.tokenCipher.encrypt(private_ecotaxa_account_to_create.ecotaxa_account_token),
+        });
+    }
+
+    // Every account read from the data source goes through here, so callers always get a usable token. A token
+    // that cannot be decrypted (key changed or removed) becomes empty: EcoTaxa then refuses it like an expired one,
+    // and the user logs in to EcoTaxa again, instead of every listing of accounts failing.
+    private withReadableToken(ecotaxa_account: EcotaxaAccountResponseModel): EcotaxaAccountResponseModel {
+        try {
+            return { ...ecotaxa_account, ecotaxa_account_token: this.tokenCipher.decrypt(ecotaxa_account.ecotaxa_account_token) };
+        } catch (error) {
+            if (!this.unreadable_token_reported.has(ecotaxa_account.ecotaxa_account_id)) {
+                this.unreadable_token_reported.add(ecotaxa_account.ecotaxa_account_id);
+                console.log(new Date().toISOString(), `EcoTaxa account ${ecotaxa_account.ecotaxa_account_id}: token cannot be decrypted (${(error as Error).message}), the user must log in to EcoTaxa again`);
+            }
+            return { ...ecotaxa_account, ecotaxa_account_token: "" };
+        }
+    }
+
+    // Run at startup: encrypts the tokens saved in clear (before a key was configured) and counts those the
+    // current key cannot read. Without a key it only counts.
+    async encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }> {
+        let encrypted = 0;
+        let unreadable = 0;
+        const limit = 1000;
+        for (let page = 1; ; page++) {
+            const result = await this.ecotaxa_accountDataSource.getAll({ filter: [], sort_by: [], page, limit });
+            for (const ecotaxa_account of result.items) {
+                const stored = ecotaxa_account.ecotaxa_account_token;
+                if (this.tokenCipher.isEncrypted(stored)) {
+                    try {
+                        this.tokenCipher.decrypt(stored);
+                    } catch {
+                        unreadable++;
+                    }
+                } else if (this.tokenCipher.enabled) {
+                    await this.ecotaxa_accountDataSource.updateToken(ecotaxa_account.ecotaxa_account_id, this.tokenCipher.encrypt(stored));
+                    encrypted++;
+                }
+            }
+            if (page * limit >= result.total) break;
+        }
+        return { encrypted, unreadable };
+    }
+
+    // Called when an EcoPart user is deleted: their EcoTaxa tokens must not outlive the account. The generic
+    // account is kept: it is found by its EcoTaxa e-mail, not by its owner, and EcoTaxa cleanups rely on it.
+    async deleteEcotaxaAccountsOfUser(ecopart_user_id: number): Promise<number> {
+        const accounts = await this.ecotaxa_accountDataSource.getAll({
+            filter: [{ field: "ecotaxa_account_ecopart_user_id", operator: "=", value: ecopart_user_id }],
+            sort_by: [],
+            page: 1,
+            limit: 10000,
+        });
+        let deleted = 0;
+        for (const ecotaxa_account of accounts.items) {
+            if (ecotaxa_account.ecotaxa_account_user_email === this.generic_ecotaxa_account_email) continue;
+            deleted += await this.ecotaxa_accountDataSource.deleteOne({
+                ecotaxa_account_id: ecotaxa_account.ecotaxa_account_id,
+                ecotaxa_account_ecopart_user_id: ecopart_user_id,
+            });
+        }
+        return deleted;
     }
     async connectToEcotaxaInstance(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel> {
         const instance_url = await this.getInstanceURL(ecotaxa_account_to_create.ecotaxa_instance_id)
@@ -401,7 +471,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             limit: 1
         };
         const ecotaxa_account = await this.ecotaxa_accountDataSource.getAll(options);
-        return ecotaxa_account.total === 0 ? null : ecotaxa_account.items[0];
+        return ecotaxa_account.total === 0 ? null : this.withReadableToken(ecotaxa_account.items[0]);
     }
     formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel {
         return {
@@ -516,7 +586,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
         }
 
-        return await this.ecotaxa_accountDataSource.getAll(options);
+        const result = await this.ecotaxa_accountDataSource.getAll(options);
+        return { ...result, items: result.items.map((ecotaxa_account) => this.withReadableToken(ecotaxa_account)) };
     }
     async ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void> {
         const { new_ecotaxa_project, ecotaxa_project_id, ecotaxa_instance_id, ecotaxa_account_id } = public_project;

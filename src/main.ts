@@ -11,6 +11,9 @@ import { MiddlewareTaskValidation } from './presentation/middleware/task-validat
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
+import { errorHandler, notFoundHandler } from './presentation/middleware/error-handlers'
+import { bodyEmail, limitAttempts } from './presentation/middleware/rate-limit'
+import { AesGcmTokenCipher } from './infra/cryptography/aes-gcm-token-cipher'
 
 import UserRouter from './presentation/routers/user-router'
 import AuthRouter from './presentation/routers/auth-router'
@@ -22,6 +25,8 @@ import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
 import AdminRouter from './presentation/routers/admin-router'
 import BroadcastMessageRouter from './presentation/routers/broadcast_message-router'
+import VersionRouter from './presentation/routers/version-router'
+import { setServedApiVersion } from './presentation/openapi/swagger-definition'
 
 import { SearchUsers } from './domain/use-cases/user/search-users'
 import { CreateUser } from './domain/use-cases/user/create-user'
@@ -34,6 +39,7 @@ import { ChangePassword } from './domain/use-cases/auth/change-password'
 import { ValidUser } from './domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from './domain/use-cases/auth/reset-password-request'
 import { ResetPassword } from './domain/use-cases/auth/reset-password'
+import { LogoutUser } from './domain/use-cases/auth/logout'
 import { DeleteUser } from './domain/use-cases/user/delete-user'
 import { CreateProject } from './domain/use-cases/project/create-project'
 import { DeleteProject } from './domain/use-cases/project/delete-project'
@@ -103,6 +109,7 @@ import { DeleteBroadcastMessage } from './domain/use-cases/broadcast_message/del
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLiteUserSessionDataSource } from './data/data-sources/sqlite/sqlite-user-session-data-source'
 import { SQLiteInstrumentModelDataSource } from './data/data-sources/sqlite/sqlite-instrument_model-data-source'
 import { SQLiteProjectDataSource } from './data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLitePrivilegeDataSource } from './data/data-sources/sqlite/sqlite-privilege-data-source'
@@ -126,6 +133,12 @@ import { MigrationManager } from './data/migrations/migration-manager'
 import { MigrationLogger } from './data/migrations/migration-logger'
 
 sqlite3.verbose()
+
+// Background tasks catch their own failures. A rejection nobody handled is logged instead of stopping the
+// server, which would interrupt every task it runs.
+process.on('unhandledRejection', (reason) => {
+    console.log(new Date().toISOString(), 'Unhandled promise rejection:', reason)
+})
 
 const config = {
     DBSOURCE_NAME: process.env.DBSOURCE_NAME || '',
@@ -154,6 +167,7 @@ const config = {
 
     NODE_ENV: process.env.NODE_ENV || '',
     ECOTAXA_ALLOW_SELF_SIGNED_CERT: (process.env.ECOTAXA_ALLOW_SELF_SIGNED_CERT || '').toLowerCase() === 'true',
+    ECOTAXA_TOKEN_ENCRYPTION_KEY: process.env.ECOTAXA_TOKEN_ENCRYPTION_KEY || '',
 
     GENERIC_ECOTAXA_ACCOUNT_EMAIL: process.env.GENERIC_ECOTAXA_ACCOUNT_EMAIL || '',
     TEST_MAIL_DEFAULT_RECIPIENT: process.env.TEST_MAIL_DEFAULT_RECIPIENT || '',
@@ -163,26 +177,37 @@ const config = {
     ECOPART_USER_PASSWORD_HASH: process.env.ECOPART_USER_PASSWORD_HASH || '',
     ECOPART_USER_ORGANISATION: process.env.ECOPART_USER_ORGANISATION || '',
     ECOPART_USER_COUNTRY: process.env.ECOPART_USER_COUNTRY || '',
-    ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || ''
+    ECOPART_USER_PLANNED_USAGE: process.env.ECOPART_USER_PLANNED_USAGE || '',
+
+    // Set by the Docker image from the git tag it is built from
+    APP_VERSION: process.env.APP_VERSION || 'dev'
 
 }
-async function getSQLiteDS() {
-    const db = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => {
-        if (err) {
-            // Cannot open database
-            console.error(err.message)
-            throw err
-        } else {
-            console.log('Connected to the SQLite database.')
-        }
-    });
-    // Enable foreign keys in sqlite
-    db.get("PRAGMA foreign_keys = ON")
+async function getSQLiteDS(): Promise<sqlite3.Database> {
+    const db = await new Promise<sqlite3.Database>((resolve, reject) => {
+        const database: sqlite3.Database = new sqlite3.Database(path.resolve(config.DBSOURCE_FOLDER, config.DBSOURCE_NAME), (err) => err ? reject(err) : resolve(database))
+    })
+    console.log('Connected to the SQLite database.')
+
+    // Foreign keys are a per-connection setting: awaited so that no other statement can run before it
+    await new Promise<void>((resolve, reject) => db.run("PRAGMA foreign_keys = ON", (err) => err ? reject(err) : resolve()))
+    // The migration CLI opens its own connection: wait for a lock instead of failing at once with SQLITE_BUSY
+    db.configure("busyTimeout", 5000)
 
     return db
 }
 
 (async () => {
+    console.log(new Date().toISOString(), `EcoPart API version ${config.APP_VERSION}`)
+    setServedApiVersion(config.APP_VERSION)
+
+    // Without these nobody can log in: refuse to start rather than fail on every request
+    const missing_secrets = (['ACCESS_TOKEN_SECRET', 'REFRESH_TOKEN_SECRET'] as const).filter(name => !config[name])
+    if (missing_secrets.length > 0) throw new Error(`Missing required configuration: ${missing_secrets.join(', ')}`)
+    for (const name of ['VALIDATION_TOKEN_SECRET', 'RESET_PASSWORD_TOKEN_SECRET'] as const) {
+        if (!config[name]) console.log(new Date().toISOString(), `${name} is empty: account validation or password reset e-mails will fail`)
+    }
+
     // Ensure required directories exist
     const requiredFolders = [
         config.DATA_STORAGE_FOLDER,
@@ -245,7 +270,14 @@ async function getSQLiteDS() {
 
     })
     const user_repo = new UserRepositoryImpl(user_dataSource, bcryptAdapter, jwtAdapter, config.VALIDATION_TOKEN_SECRET, config.RESET_PASSWORD_TOKEN_SECRET)
-    const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET)
+    const auth_repo = new AuthRepositoryImpl(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET, new SQLiteUserSessionDataSource(db))
+    // Housekeeping only: a failure is logged and does not stop the server
+    try {
+        const purged_sessions = await auth_repo.purgeEndedSessions()
+        if (purged_sessions > 0) console.log(new Date().toISOString(), `${purged_sessions} ended login session(s) removed`)
+    } catch (error) {
+        console.log(new Date().toISOString(), 'Cannot remove the ended login sessions:', error)
+    }
     const search_repo = new SearchRepositoryImpl()
     const instrument_model_repo = new InstrumentModelRepositoryImpl(instrument_model_dataSource)
     const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER, config.DATA_STORAGE_IMPORT)
@@ -256,7 +288,19 @@ async function getSQLiteDS() {
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
     if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
-    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT)
+    // Throws at startup when the key is set but malformed
+    const ecotaxa_token_cipher = new AesGcmTokenCipher(config.ECOTAXA_TOKEN_ENCRYPTION_KEY)
+    const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT, ecotaxa_token_cipher)
+    // Tokens saved before a key was configured are encrypted now; without a key they stay in clear, as before.
+    // A failure here is logged and does not stop the server: it only delays the encryption to the next start.
+    if (!ecotaxa_token_cipher.enabled) console.log(new Date().toISOString(), 'ECOTAXA_TOKEN_ENCRYPTION_KEY is not set: EcoTaxa tokens are stored in clear')
+    try {
+        const ecotaxa_tokens = await ecotaxa_account_repo.encryptStoredTokens()
+        if (ecotaxa_tokens.encrypted > 0) console.log(new Date().toISOString(), `${ecotaxa_tokens.encrypted} EcoTaxa token(s) saved in clear are now encrypted`)
+        if (ecotaxa_tokens.unreadable > 0) console.log(new Date().toISOString(), `${ecotaxa_tokens.unreadable} EcoTaxa token(s) cannot be decrypted with the current key: those users must log in to EcoTaxa again`)
+    } catch (error) {
+        console.log(new Date().toISOString(), 'Cannot encrypt the stored EcoTaxa tokens:', error)
+    }
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
@@ -270,7 +314,7 @@ async function getSQLiteDS() {
             new ResendMigrationEmails(user_repo, transporter, mailerAdapter),
             new UpdateUser(user_repo),
             new ValidUser(user_repo),
-            new DeleteUser(user_repo, privilege_repo),
+            new DeleteUser(user_repo, privilege_repo, ecotaxa_account_repo),
             new LoginEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo, privilege_repo),
@@ -282,10 +326,11 @@ async function getSQLiteDS() {
         new MiddlewareAuthValidation(),
         new LoginUser(user_repo, auth_repo),
         new RefreshToken(user_repo, auth_repo),
-        new ChangePassword(user_repo),
+        new ChangePassword(user_repo, auth_repo),
         new ResetPasswordRequest(user_repo, transporter, mailerAdapter),
-        new ResetPassword(user_repo),
-        new SearchUsers(user_repo, search_repo, privilege_repo)
+        new ResetPassword(user_repo, auth_repo),
+        new SearchUsers(user_repo, search_repo, privilege_repo),
+        new LogoutUser(auth_repo)
     )
     const instrumentModelMiddleWare = InstrumentModelRouter(
         new GetOneInstrumentModel(instrument_model_repo),
@@ -336,6 +381,12 @@ async function getSQLiteDS() {
         new CancelTask(task_repo, user_repo)
     )
 
+    // Registered before the routers. Password guessing on login, and e-mail flooding through registration and
+    // reset requests (both send a mail), counted per target e-mail.
+    server.post("/auth/login", limitAttempts({ max: 10, window_ms: 15 * 60 * 1000, key: bodyEmail }))
+    server.post("/auth/password/reset", limitAttempts({ max: 5, window_ms: 60 * 60 * 1000, key: bodyEmail }))
+    server.post("/users", limitAttempts({ max: 5, window_ms: 60 * 60 * 1000, key: bodyEmail }))
+
     server.use("/users", userMiddleWare)
     server.use("/auth", authMiddleWare)
     server.use("/instrument_models", instrumentModelMiddleWare)
@@ -371,6 +422,16 @@ async function getSQLiteDS() {
     ))
 
 
+    server.use("/version", VersionRouter(config.APP_VERSION))
+
+    // Registered after every router: unknown routes and uncaught errors get a JSON answer, never an HTML stack trace
+    server.use(notFoundHandler)
+    server.use(errorHandler)
+
     server.listen(config.PORT_LOCAL, () => console.log("Running on ", config.BASE_URL_LOCAL, config.PORT_LOCAL))
 
-})()
+})().catch((error) => {
+    // Configuration, database or migration failure: exit so the container restarts and the failure is visible
+    console.log(new Date().toISOString(), 'Startup failed:', error)
+    process.exit(1)
+})

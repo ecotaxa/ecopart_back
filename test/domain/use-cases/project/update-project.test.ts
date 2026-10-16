@@ -41,7 +41,6 @@ beforeEach(() => {
     mockPrivilegeRepository = new MockPrivilegeRepository()
     mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
     mockSampleRepository = new MockSampleRepository()
-    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([])
 })
 
 test("Current_user is deleted or invalid", async () => {
@@ -593,35 +592,18 @@ test("Member cannot update the project metadata: editing a project is managing i
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
 });
 
-test("Manager cannot move the project onto a source folder another project imports from", async () => {
+test("Refuses a root folder outside the import folder before any write", async () => {
+    const current_user: UserUpdateModel = { user_id: 1 }
+    const project_to_update: PublicProjectUpdateModel = { ...projectUpdateModel, root_folder_path: "../../etc" }
+
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementationOnce(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
     jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([{ ...projectResponseModel, project_id: 2 }])
     jest.spyOn(mockProjectRepository, "standardUpdateProject")
 
     const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
 
-    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, root_folder_path: "taken" })).rejects.toThrow("Root folder already used by another project")
-
-    expect(mockProjectRepository.getProjectsByRootFolderPath).toHaveBeenCalledWith("data_storage/ecopart_data_to_import/taken")
+    await expect(updateProjectUseCase.execute(current_user, project_to_update)).rejects.toThrow("Root folder path must stay inside the import folder");
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
-});
-
-test("Manager may keep the project on its own source folder", async () => {
-    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
-    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
-    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(false))
-    jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockProjectRepository, "getProjectsByRootFolderPath").mockResolvedValue([projectResponseModel])
-    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
-    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
-    jest.spyOn(mockProjectRepository, "toPublicProject").mockReturnValue(projectResponseModel)
-
-    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
-
-    // The route hands the id over as a string: the project must still recognise its own folder
-    await expect(updateProjectUseCase.execute({ user_id: 1 }, { project_id: "1" as unknown as number, root_folder_path: "root_folder_path" })).resolves.toStrictEqual(projectResponseModel)
-    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(1)
 });

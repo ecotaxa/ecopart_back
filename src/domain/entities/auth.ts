@@ -14,9 +14,22 @@ export interface AuthJwtResponseModel {
 
 export interface AuthJwtRefreshedResponseModel {
     jwt: string;
+    jwt_refresh: string;
 }
 
-export interface DecodedToken extends UserResponseModel, JwtPayload { }
+// sid: the login session the token belongs to (absent from tokens issued before sessions existed)
+export interface DecodedToken extends UserResponseModel, JwtPayload {
+    sid?: string;
+}
+
+// One row per login: the refresh token is only accepted while its session is neither revoked nor expired.
+export interface UserSessionModel {
+    session_id: string;
+    user_id: number;
+    session_creation_utc_date_time: string;
+    session_expiration_utc_date_time: string;
+    session_revocation_utc_date_time: string | null;
+}
 
 export interface CustomRequest extends Request {
     token: DecodedToken;

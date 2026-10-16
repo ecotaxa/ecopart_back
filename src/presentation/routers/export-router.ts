@@ -135,9 +135,9 @@ export default function ExportRouter(
      *       200:
      *         description: Task created. Poll the task and download the file once done.
      *       401:
-     *         description: User not authorized for one of the projects the requested samples belong to.
+     *         description: Missing or invalid access token.
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not authorized for one of the projects the requested samples belong to. The logged user is not allowed to perform this action.
      *       404:
      *         description: Sample or project not found — no sample resolved, or some requested ids do not exist.
      *       409:
@@ -163,7 +163,7 @@ export default function ExportRouter(
             console.log(new Date().toISOString(), err)
             const msg: string = err?.message || "";
             if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
-            else if (msg.startsWith("Logged user cannot export raw data")) res.status(401).send({ errors: [msg] })
+            else if (msg.startsWith("Logged user cannot export raw data")) res.status(403).send({ errors: [msg] })
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated")) res.status(409).send({ errors: [msg] })
             else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
@@ -258,9 +258,9 @@ export default function ExportRouter(
      *       200:
      *         description: Task created. Poll the task and download the file once done.
      *       401:
-     *         description: User not allowed to export from one of the projects the requested samples belong to.
+     *         description: Missing or invalid access token.
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. User not allowed to export from one of the projects the requested samples belong to. The logged user is not allowed to perform this action.
      *       404:
      *         description: Sample or project not found — no sample resolved, or some requested ids do not exist.
      *       409:
@@ -286,7 +286,7 @@ export default function ExportRouter(
             console.log(new Date().toISOString(), err)
             const msg: string = err?.message || "";
             if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
-            else if (msg.startsWith("Logged user cannot export binned data")) res.status(401).send({ errors: [msg] })
+            else if (msg.startsWith("Logged user cannot export binned data")) res.status(403).send({ errors: [msg] })
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated") || msg.startsWith("Sample(s) without calibration") || msg.startsWith("Sample(s) without pivot") || msg.startsWith("Instrument not supported by the binned export")) res.status(409).send({ errors: [msg] })
             else if (msg.startsWith("sample_ids must") || msg.startsWith("bin_mode must") || msg.startsWith("bin_size_m must") || msg.startsWith("bin_size_h must")) res.status(422).send({ errors: [msg] })

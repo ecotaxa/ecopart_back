@@ -10,6 +10,8 @@ npm run dev:watch        # run the API with ts-node + nodemon (src/main.ts)
 npm run dev:build        # clean + tsc + copy assets
 npm run tsc              # type-check / compile only
 npx tsc --noEmit         # fast type-check, no output (use this to verify changes)
+npm run typecheck        # same, src and tests together (CI runs it)
+npm run lint             # eslint on src: errors fail, warnings (no-explicit-any) are tolerated
 npm run test-CI          # run the full jest suite once with coverage (CI mode)
 npx jest <path>          # run a single test file
 npx jest -t "<name>"     # run tests matching a name
@@ -93,7 +95,8 @@ root). There is no DI container.
    (`presentation/routers/*-router.ts`) with OpenAPI annotations.
 6. Wire everything in `main.ts`; mount the router with `server.use(...)`.
 7. DB change? add a migration `src/data/migrations/NNN_*.ts` (idempotent `up`, reversible
-   `down`; seed lookup tables with `INSERT OR IGNORE`).
+   `down`; seed lookup tables with `INSERT OR IGNORE`). Each one runs in a transaction: no
+   `BEGIN`/`COMMIT`/`PRAGMA foreign_keys` inside; set `foreignKeysOff: true` when it rebuilds a table.
 8. Update mocks in `test/mocks/` for any new interface methods, then add tests.
 
 ## Conventions observed in this codebase
@@ -138,6 +141,6 @@ root). There is no DI container.
   (`capturedProjectId`, sample ids, etc. are set by earlier phases), so a single phase cannot
   be run in isolation with `-t`. UVP5 raw LPM artifacts are `<sample>_work.zip` +
   `<sample>_meta_conf.zip`; UVP6 are `<sample>_Particule.zip` (+ `<sample>_Images.zip`).
-- Always run `npx tsc --noEmit` (and the relevant jest file) before declaring a change done.
-  Note: three pre-existing arg-count errors in `project-router`/`*-validation` tests are
-  unrelated to current work — don't be alarmed by them, but don't add new ones.
+- Always run `npm run typecheck` (and the relevant jest file) before declaring a change done.
+  It is clean on src and tests: keep it that way.
+- No `.env` is needed for unit tests: `test/setup-env.ts` gives the test JWT secrets the values CI uses.

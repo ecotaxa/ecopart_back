@@ -30,10 +30,12 @@ export class LoginUser implements LoginUserUseCase {
             // If founded user email is not verified
             if (!full_user.valid_email) throw new Error("User email not verified");
 
-            // Get authorisation access and refresh tokens
-            const tokens = { jwt: this.authRepository.generateAccessToken(full_user), jwt_refresh: this.authRepository.generateRefreshToken(full_user) }
+            // One session per login: logging out or changing the password revokes it
+            const session_id = await this.authRepository.createSession(full_user.user_id)
+            const tokens = { jwt: this.authRepository.generateAccessToken(full_user, session_id), jwt_refresh: this.authRepository.generateRefreshToken(full_user, session_id) }
 
-            return { ...full_user, ...tokens }
+            const { confirmation_code, reset_password_code, ...user_without_codes } = full_user
+            return { ...user_without_codes, ...tokens }
 
         } else throw new Error("Invalid credentials");
     }

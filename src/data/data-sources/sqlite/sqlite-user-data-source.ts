@@ -3,6 +3,7 @@ import { AuthUserCredentialsModel, } from "../../../domain/entities/auth";
 import { UserDataSource } from "../../interfaces/data-sources/user-data-source";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { sqlIdentifier } from "./sql-identifier"
 
 // const DB_TABLE = "user"
 export class SQLiteUserDataSource implements UserDataSource {
@@ -201,7 +202,7 @@ export class SQLiteUserDataSource implements UserDataSource {
     }
 
     // Returns the number of lines updates
-    updateOne(user: UserUpdateModel): Promise<number> {
+    async updateOne(user: UserUpdateModel): Promise<number> {
         const { user_id, ...userData } = user; // Destructure the user object
 
         const params: any[] = []
@@ -212,7 +213,7 @@ export class SQLiteUserDataSource implements UserDataSource {
             } else {
                 params.push(value)
             }
-            placeholders = placeholders + key + "=(?),"
+            placeholders = placeholders + sqlIdentifier(key) + "=(?),"
         }
         placeholders = placeholders.slice(0, -1);
         params.push(user_id)
@@ -237,7 +238,7 @@ export class SQLiteUserDataSource implements UserDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(user)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
