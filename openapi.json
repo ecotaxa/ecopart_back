@@ -6512,7 +6512,7 @@
       },
       "delete": {
         "summary": "Delete task",
-        "description": "Delete a task (admin only).",
+        "description": "Delete a finished task (admin only): `DONE`, `ERROR` or `CANCELLED`.\n\nA `PENDING`, `RUNNING` or `CANCELLING` task may still have work running: it is cancelled\n(`POST /tasks/{task_id}/cancel`), not deleted, and the request answers 409.\n",
         "tags": [
           "Tasks"
         ],
@@ -6559,6 +6559,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task is not finished, it must be cancelled first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "errors": [
+                    "Task 42 is still RUNNING: cancel it before deleting it."
+                  ]
                 }
               }
             }

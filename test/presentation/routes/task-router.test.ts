@@ -274,6 +274,14 @@ describe('TaskRouter', () => {
             expect(deleteTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("failed with 409 if the task is not finished", async () => {
+            const expectedResponse = { errors: ["Task 1 is still RUNNING: cancel it before deleting it."] }
+            jest.spyOn(deleteTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task 1 is still RUNNING: cancel it before deleting it.") })
+            const response = await request(server).delete("/tasks/1")
+            expect(response.status).toBe(409)
+            expect(deleteTaskUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
     });
     describe("Tests for POST /:task_id/cancel", () => {
         test("Should return 200 with the cancelled task", async () => {

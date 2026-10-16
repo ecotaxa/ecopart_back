@@ -214,6 +214,63 @@ describe('task repository (integration)', () => {
         })
     })
 
+    describe('deletion', () => {
+        test('an unfinished task is refused with its current status, a finished one is deleted', async () => {
+            const task_id = await newTask()
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still PENDING: cancel it before deleting it.`)
+            await taskRepo.startTask({ task_id })
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still RUNNING: cancel it before deleting it.`)
+            await taskRepo.cancelTask(task_id)
+            await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still CANCELLING: cancel it before deleting it.`)
+            expect(await statusOf(task_id)).toBe(TasksStatus.Cancelling)
+
+            const task_folder = path.join(tmp_dir, 'tasks', `${task_id}`)
+            expect(fs.existsSync(path.join(task_folder, `task_log_${task_id}.log`))).toBe(true)
+
+            await taskRepo.failedTask(task_id, new Error('cancelled'))
+            expect(await taskRepo.deleteTask({ task_id })).toBe(1)
+            expect(await taskRepo.getOneTask({ task_id })).toBeNull()
+            expect(fs.existsSync(task_folder)).toBe(false)
+        })
+
+        test('a log stored in a former storage folder goes with its folder, a log elsewhere goes alone', async () => {
+            const moved_id = await newTask()
+            await taskRepo.failedTask(moved_id, new Error('boom'))
+            const former_folder = path.join(tmp_dir, 'former', 'tasks', `${moved_id}`)
+            fs.mkdirSync(former_folder, { recursive: true })
+            fs.writeFileSync(path.join(former_folder, `ecopart_export_raw_${moved_id}.zip`), 'zip')
+            await taskDs.updateOne({ task_id: moved_id, task_log_file_path: path.join(former_folder, `task_log_${moved_id}.log`) })
+
+            expect(await taskRepo.deleteTask({ task_id: moved_id })).toBe(1)
+            expect(fs.existsSync(former_folder)).toBe(false)
+            expect(fs.existsSync(path.join(tmp_dir, 'tasks', `${moved_id}`))).toBe(false)
+
+            const elsewhere_id = await newTask()
+            await taskRepo.failedTask(elsewhere_id, new Error('boom'))
+            const elsewhere = path.join(tmp_dir, 'elsewhere')
+            fs.mkdirSync(elsewhere)
+            fs.writeFileSync(path.join(elsewhere, 'task.log'), 'log')
+            fs.writeFileSync(path.join(elsewhere, 'other.txt'), 'other')
+            await taskDs.updateOne({ task_id: elsewhere_id, task_log_file_path: path.join(elsewhere, 'task.log') })
+
+            expect(await taskRepo.deleteTask({ task_id: elsewhere_id })).toBe(1)
+            expect(fs.readdirSync(elsewhere)).toEqual(['other.txt'])
+        })
+
+        test('the delete is conditional on the status it was decided from', async () => {
+            const task_id = await newTask()
+            const task = await taskRepo.getOneTask({ task_id })
+            // The task started meanwhile: a delete expecting PENDING is a no-op
+            await taskRepo.startTask({ task_id })
+            expect(await taskDs.deleteOne({ task_id }, task!.task_status_id)).toBe(0)
+            expect(await statusOf(task_id)).toBe(TasksStatus.Running)
+        })
+
+        test('a task that no longer exists deletes nothing', async () => {
+            expect(await taskRepo.deleteTask({ task_id: 999 })).toBe(0)
+        })
+    })
+
     describe('active tasks', () => {
         test('hasActiveTask only sees pending, running or cancelling tasks of the given types and project', async () => {
             const backup = await newTask(TaskType.Import_Backup, project_1)

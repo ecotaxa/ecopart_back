@@ -4,7 +4,7 @@ import { UserRequestModel } from "../../../domain/entities/user";
 
 export interface TaskDataSource {
     create(task: PrivateTaskRequestCreationModel): Promise<number>;
-    deleteOne(task: PrivateTaskRequestModel): Promise<number>;
+    deleteOne(task: PrivateTaskRequestModel, expected_status_id?: number): Promise<number>;
     deleteAll(task: PrivateTaskRequestModel): Promise<number>;
     getAll(options: PreparedSearchOptions, visible_to?: TaskVisibilityModel): Promise<SearchResult<TaskResponseModel>>;
     getTasksByUser(user: UserRequestModel): Promise<number[]>
