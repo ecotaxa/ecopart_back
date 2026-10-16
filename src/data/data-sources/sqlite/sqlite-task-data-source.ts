@@ -3,6 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel, TaskVisibilityModel } from "../../../domain/entities/task";
 import { UserRequestModel } from "../../../domain/entities/user";
+import { sqlIdentifier } from "./sql-identifier"
 
 // SQL for `column IN (values)`, pushing the bound values onto `params`. A null or undefined value
 // matches NULL (which `IN` alone never does), and an empty list matches nothing.
@@ -245,7 +246,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(task)) {
             params.push(value)
-            placeholders = placeholders + "task." + key + "=(?) AND "
+            placeholders = placeholders + "task." + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);
@@ -475,7 +476,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(taskData)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?),"
+            placeholders = placeholders + sqlIdentifier(key) + "=(?),"
         }
         // remove last ,
         placeholders = placeholders.slice(0, -1);

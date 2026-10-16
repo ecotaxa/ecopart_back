@@ -22,6 +22,8 @@ export interface EcotaxaAccountRepository {
     getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number): Promise<EcotaxaAccountResponseModel | null>;
     formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel;
     deleteEcotaxaAccount(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number>;
+    deleteEcotaxaAccountsOfUser(ecopart_user_id: number): Promise<number>;
+    encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }>;
     standardGetEcotaxaAccountsModels(options: PreparedSearchOptions): Promise<SearchResult<EcotaxaAccountResponseModel>>;
     getOneEcoTaxaInstance(ecotaxa_instance_id: number): Promise<EcotaxaInstanceModel | null>;
     getAllEcoTaxaInstances(): Promise<EcotaxaInstanceModel[]>;

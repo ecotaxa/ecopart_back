@@ -35,10 +35,15 @@ const config = {
 
 // ──────────────── helpers ────────────────
 
-function getTimestamp(): string {
-    const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+// Migrations run in alphabetical order and are all numbered NNN_. A timestamp prefix would sort after
+// every numbered one, so a later NNN_ migration would run before an older timestamped one.
+function getNextMigrationNumber(): string {
+    const numbers = fs.readdirSync(MIGRATIONS_DIR)
+        .map((file) => /^(\d{3})_/.exec(file))
+        .filter((match): match is RegExpExecArray => match !== null)
+        .map((match) => parseInt(match[1], 10));
+    const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 0;
+    return next.toString().padStart(3, "0");
 }
 
 function openDatabase(): Promise<sqlite3.Database> {
@@ -76,10 +81,10 @@ async function createMigration(name: string): Promise<void> {
 
     // Sanitize name
     const safeName = name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
-    const timestamp = getTimestamp();
-    const filename = `${timestamp}_${safeName}.ts`;
+    const number = getNextMigrationNumber();
+    const filename = `${number}_${safeName}.ts`;
     const filepath = path.join(MIGRATIONS_DIR, filename);
-    const migrationId = `${timestamp}_${safeName}`;
+    const migrationId = `${number}_${safeName}`;
 
     const template = `import { Migration } from "./migration-manager";
 import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapper";
@@ -95,6 +100,8 @@ function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: any[] = []): Pro
 
 export const migration: Migration = {
     id: "${migrationId}",
+    // Runs in a transaction. Uncomment when up or down rebuilds a table (copy, DROP, RENAME):
+    // foreignKeysOff: true,
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         // TODO: Write your migration here

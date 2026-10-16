@@ -3,12 +3,17 @@ import { check, validationResult, query } from 'express-validator';
 import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-validation';
 
 
+// The path is joined to the import folder: a ".." segment would let it point anywhere on the server.
+const isRelativeToImportFolder = (value: string): boolean => !value.split(/[\\/]/).includes('..')
+
 export class MiddlewareProjectValidation implements IMiddlewareProjectValidation {
     rulesProjectRequestCreationModel = [
         // Root Folder Path Validation
         check('root_folder_path')
             .trim()
-            .not().isEmpty().withMessage('Root Folder Path is required.'),
+            .not().isEmpty().withMessage('Root Folder Path is required.')
+            .bail()
+            .custom(isRelativeToImportFolder).withMessage('Root Folder Path must stay inside the import folder.'),
 
         // Project Title Validation
         check('project_title')
@@ -180,7 +185,9 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Root Folder Path Validation
         check('root_folder_path').optional()
             .trim()
-            .not().isEmpty().withMessage('Root Folder Path value cannot be empty.'),
+            .not().isEmpty().withMessage('Root Folder Path value cannot be empty.')
+            .bail()
+            .custom(isRelativeToImportFolder).withMessage('Root Folder Path must stay inside the import folder.'),
         // Project Title Validation
         check('project_title').optional()
             .trim()

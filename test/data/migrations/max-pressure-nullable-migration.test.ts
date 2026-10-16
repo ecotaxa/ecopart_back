@@ -3,6 +3,7 @@ import fs from "fs";
 
 import { SQLiteDatabaseWrapper } from "../../../src/data/interfaces/data-sources/database-wrapper";
 import { migration } from "../../../src/data/migrations/027_make_max_pressure_nullable";
+import { MigrationManager } from "../../../src/data/migrations/migration-manager";
 
 const TEST_DB = "TEST_DB_MAX_PRESSURE_NULLABLE_MIGRATION";
 
@@ -96,5 +97,16 @@ describe("027_make_max_pressure_nullable", () => {
 
         expect(await maxPressureNotNull()).toBe(1);
         expect(await allSQL(wrapper(), `SELECT COUNT(*) AS nb FROM sample;`)).toEqual([{ nb: 2 }]);
+    });
+
+    test("run by the migration runner, the rebuild keeps rows that reference a sample", async () => {
+        await runSQL(wrapper(), `CREATE TABLE sample_child (id INTEGER PRIMARY KEY, sample_id INTEGER NOT NULL REFERENCES sample(sample_id) ON DELETE CASCADE);`);
+        await runSQL(wrapper(), `INSERT INTO sample_child (id, sample_id) VALUES (1, 1), (2, 2);`);
+
+        await new MigrationManager(wrapper()).runMigrations([migration]);
+
+        expect(await maxPressureNotNull()).toBe(0);
+        expect(await allSQL(wrapper(), `SELECT id, sample_id FROM sample_child ORDER BY id;`)).toEqual([{ id: 1, sample_id: 1 }, { id: 2, sample_id: 2 }]);
+        expect(await allSQL(wrapper(), `PRAGMA foreign_keys;`)).toEqual([{ foreign_keys: 1 }]);
     });
 });

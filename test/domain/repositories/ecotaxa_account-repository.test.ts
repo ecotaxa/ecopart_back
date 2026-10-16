@@ -117,7 +117,7 @@ describe("EcotaxaAccount Repository", () => {
                 page: 1,
                 limit: 1
             })
-            expect(result).toBe(ecotaxaAccountResponseModel_1)
+            expect(result).toStrictEqual(ecotaxaAccountResponseModel_1)
         })
         test("Should return null if ecotaxa account not found", async () => {
             const ecotaxa_account_id = 1
@@ -210,7 +210,7 @@ describe("EcotaxaAccount Repository", () => {
             const result = await ecotaxa_accountRepository.standardGetEcotaxaAccountsModels(options)
 
             expect(mockEcotaxaAccountDataSource.getAll).toBeCalledWith(options)
-            expect(result).toBe(searchhResultEcotaxaAccountResponseModel)
+            expect(result).toStrictEqual(searchhResultEcotaxaAccountResponseModel)
         });
         test("Should get ecotaxa accounts with good filters", async () => {
             const options: PreparedSearchOptions = {
@@ -232,7 +232,7 @@ describe("EcotaxaAccount Repository", () => {
             const result = await ecotaxa_accountRepository.standardGetEcotaxaAccountsModels(options)
 
             expect(mockEcotaxaAccountDataSource.getAll).toBeCalledWith(options)
-            expect(result).toBe(searchhResultEcotaxaAccountResponseModel)
+            expect(result).toStrictEqual(searchhResultEcotaxaAccountResponseModel)
         });
         test("Should throw an error if unauthorized params", async () => {
             const options: PreparedSearchOptions = {

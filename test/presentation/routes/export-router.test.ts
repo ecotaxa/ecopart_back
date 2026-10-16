@@ -82,7 +82,7 @@ describe("ExportRouter — POST /exports/raw", () => {
         // the messages thrown in export-raw-data.ts.
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
-            ["Logged user cannot export raw data from project 3", 401],
+            ["Logged user cannot export raw data from project 3", 403],
             ["No samples found", 404],
             ["Sample(s) not found: 42", 404],
             ["Cannot find project", 404],
@@ -234,7 +234,7 @@ describe("ExportRouter — POST /exports/binned", () => {
         // Must stay in sync with the messages thrown in export-binned-data.ts.
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
-            ["Logged user cannot export binned data from project 3", 401],
+            ["Logged user cannot export binned data from project 3", 403],
             ["No samples found", 404],
             ["Sample(s) not found: 42", 404],
             ["Cannot find project", 404],

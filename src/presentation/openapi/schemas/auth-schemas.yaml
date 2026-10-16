@@ -19,33 +19,6 @@ components:
         - email
         - password
 
-    AuthJwtResponse:
-      type: object
-      description: JWT token pair returned on successful login.
-      properties:
-        jwt:
-          type: string
-          description: JWT access token.
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-        jwt_refresh:
-          type: string
-          description: JWT refresh token.
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-      required:
-        - jwt
-        - jwt_refresh
-
-    AuthJwtRefreshedResponse:
-      type: object
-      description: Refreshed JWT access token.
-      properties:
-        jwt:
-          type: string
-          description: New JWT access token.
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-      required:
-        - jwt
-
     ChangePasswordRequest:
       type: object
       description: Request to change the current user password.

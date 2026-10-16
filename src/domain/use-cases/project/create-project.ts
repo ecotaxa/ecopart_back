@@ -1,4 +1,5 @@
 import path from "path";
+import { isInsideFolder } from "../../utils/path-containment";
 import { ProjectRequestCreationModel, PublicProjectRequestCreationModel, PublicProjectResponseModel } from "../../entities/project";
 import { UserUpdateModel } from "../../entities/user";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
@@ -30,6 +31,11 @@ export class CreateProject implements CreateProjectUseCase {
     async execute(current_user: UserUpdateModel, public_project: PublicProjectRequestCreationModel): Promise<PublicProjectResponseModel> {
         // Check if current_user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
+
+        // Checked before anything is created, EcoTaxa project included: the backup copies and zips this folder
+        if (!isInsideFolder(this.DATA_STORAGE_IMPORT, path.join(this.DATA_STORAGE_IMPORT, public_project.root_folder_path))) {
+            throw new Error("Root folder path must stay inside the import folder");
+        }
 
         // Set default depth offset if not provided
         this.setDefaultDepthOffset(public_project);

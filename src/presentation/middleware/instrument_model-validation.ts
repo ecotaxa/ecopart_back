@@ -8,7 +8,8 @@ export class MiddlewareInstrumentModelValidation implements IMiddlewareInstrumen
             .isInt({ min: 1 }).withMessage('Page must be a number and must be greater than 0.'),
         query('limit').default(10)
             .isInt({ min: 1 }).withMessage('Limit must be a number and must be greater than 0.'),
-        query('sort_by').default("asc(user_id)"),
+        // A column of instrument_model: the repository refuses any other, and the request then failed with a 500
+        query('sort_by').default("asc(instrument_model_id)"),
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {

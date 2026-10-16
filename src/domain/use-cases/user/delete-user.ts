@@ -1,14 +1,17 @@
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
+import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { DeleteUserUseCase } from "../../interfaces/use-cases/user/delete-user";
 
 export class DeleteUser implements DeleteUserUseCase {
     userRepository: UserRepository
     privilegeRepository: PrivilegeRepository
-    constructor(userRepository: UserRepository, privilegeRepository: PrivilegeRepository) {
+    ecotaxaAccountRepository: EcotaxaAccountRepository
+    constructor(userRepository: UserRepository, privilegeRepository: PrivilegeRepository, ecotaxaAccountRepository: EcotaxaAccountRepository) {
         this.userRepository = userRepository
         this.privilegeRepository = privilegeRepository
+        this.ecotaxaAccountRepository = ecotaxaAccountRepository
     }
 
     async execute(current_user: UserUpdateModel, user_to_update: UserUpdateModel): Promise<void> {
@@ -28,11 +31,13 @@ export class DeleteUser implements DeleteUserUseCase {
 
         // Check that current_user is admin or is the user to update
         if (await this.userRepository.isAdmin(current_user.user_id) || current_user.user_id == user_to_update.user_id) {
+            // Their EcoTaxa tokens go first: an anonymised user must not keep working EcoTaxa credentials
+            await this.ecotaxaAccountRepository.deleteEcotaxaAccountsOfUser(user_to_update_exist.user_id)
             nb_of_deleted_user = await this.userRepository.deleteUser(user_to_update)
             if (nb_of_deleted_user == 0) throw new Error("Cannot delete user");
             await this.privilegeRepository.deletePrivileges({ user_id: user_to_update.user_id })
         } else {
-            throw new Error("Logged user cannot delet this user");
+            throw new Error("Logged user cannot delete this user");
         }
 
     }

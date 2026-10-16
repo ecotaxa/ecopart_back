@@ -3,6 +3,8 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 
 export const migration: Migration = {
     id: "002_add_last_backup_date_to_project",
+    // down rebuilds the project table
+    foreignKeysOff: true,
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, `ALTER TABLE project ADD COLUMN last_backup_date TIMESTAMP DEFAULT NULL;`);
@@ -11,8 +13,6 @@ export const migration: Migration = {
     async down(db: SQLiteDatabaseWrapper): Promise<void> {
         // SQLite does not support DROP COLUMN before version 3.35.
         // Recreate the project table without the last_backup_date column.
-        await runSQL(db, "PRAGMA foreign_keys = OFF;");
-
         await runSQL(db, `ALTER TABLE project RENAME TO project_old;`);
 
         await runSQL(db, `
@@ -68,6 +68,5 @@ export const migration: Migration = {
         `);
 
         await runSQL(db, `DROP TABLE project_old;`);
-        await runSQL(db, "PRAGMA foreign_keys = ON;");
     }
 };

@@ -26,6 +26,13 @@ export interface Migration {
     up(db: SQLiteDatabaseWrapper): Promise<void>;
     /** Revert the migration (downgrade) */
     down(db: SQLiteDatabaseWrapper): Promise<void>;
+    /**
+     * Set when the migration rebuilds a table (copy, DROP, RENAME). Every migration runs in a transaction,
+     * and SQLite ignores PRAGMA foreign_keys inside one: the runner switches foreign keys off before the
+     * transaction, checks that the migration created no foreign key violation, then switches them back.
+     * Without it, dropping a parent table would cascade-delete its child rows.
+     */
+    foreignKeysOff?: boolean;
 }
 
 /**
@@ -104,6 +111,41 @@ export class MigrationManager {
     }
 
     /**
+     * Runs one migration step and its _migrations record in a single transaction: a step that fails
+     * halfway leaves the database exactly as it was, instead of a half-applied schema.
+     */
+    private async inTransaction(migration: Migration, step: () => Promise<void>): Promise<void> {
+        const foreignKeysOff = migration.foreignKeysOff === true;
+        const foreignKeysWereOn = foreignKeysOff && (await this.allSQL<{ foreign_keys: number }>("PRAGMA foreign_keys"))[0]?.foreign_keys === 1;
+        if (foreignKeysOff) await this.runSQL("PRAGMA foreign_keys = OFF");
+        try {
+            await this.runSQL("BEGIN");
+            try {
+                // Rows already violating a foreign key before the migration are not its doing: only new ones fail it.
+                const before = foreignKeysOff ? await this.foreignKeyViolations() : new Set<string>();
+                await step();
+                if (foreignKeysOff) {
+                    const created = [...await this.foreignKeyViolations()].filter((violation) => !before.has(violation));
+                    if (created.length > 0) {
+                        throw new Error(`${migration.id} would leave ${created.length} foreign key violation(s), first: ${created[0]}`);
+                    }
+                }
+                await this.runSQL("COMMIT");
+            } catch (err) {
+                await this.runSQL("ROLLBACK").catch(() => undefined);
+                throw err;
+            }
+        } finally {
+            if (foreignKeysWereOn) await this.runSQL("PRAGMA foreign_keys = ON");
+        }
+    }
+
+    private async foreignKeyViolations(): Promise<Set<string>> {
+        const rows = await this.allSQL<{ table: string; rowid: number; parent: string; fkid: number }>("PRAGMA foreign_key_check");
+        return new Set(rows.map((row) => `${row.table} row ${row.rowid} -> ${row.parent} (fk ${row.fkid})`));
+    }
+
+    /**
      * Remove a migration record (used during rollback).
      */
     private async markAsReverted(id: string): Promise<void> {
@@ -173,8 +215,10 @@ export class MigrationManager {
         for (const migration of pending) {
             try {
                 this.logger.logMigrationApplying(migration.id);
-                await migration.up(this.db);
-                await this.markAsApplied(migration.id);
+                await this.inTransaction(migration, async () => {
+                    await migration.up(this.db);
+                    await this.markAsApplied(migration.id);
+                });
                 justApplied.push(migration.id);
                 this.logger.logMigrationApplied(migration.id);
             } catch (err) {
@@ -199,8 +243,10 @@ export class MigrationManager {
 
         for (const migration of pending) {
             this.logger.logMigrationApplying(migration.id);
-            await migration.up(this.db);
-            await this.markAsApplied(migration.id);
+            await this.inTransaction(migration, async () => {
+                await migration.up(this.db);
+                await this.markAsApplied(migration.id);
+            });
             justApplied.push(migration.id);
             this.logger.logMigrationApplied(migration.id);
         }
@@ -237,8 +283,10 @@ export class MigrationManager {
         for (const migration of toRollback) {
             try {
                 this.logger.logRollbackApplying(migration.id);
-                await migration.down(this.db);
-                await this.markAsReverted(migration.id);
+                await this.inTransaction(migration, async () => {
+                    await migration.down(this.db);
+                    await this.markAsReverted(migration.id);
+                });
                 rolledBack.push(migration.id);
                 this.logger.logRollbackApplied(migration.id);
             } catch (err) {

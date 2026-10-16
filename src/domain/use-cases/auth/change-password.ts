@@ -1,12 +1,15 @@
 import { ChangeCredentialsModel, DecodedToken } from "../../entities/auth"
 import { UserRepository } from "../../interfaces/repositories/user-repository";
+import { AuthRepository } from "../../interfaces/repositories/auth-repository";
 import { ChangePasswordUseCase } from "../../interfaces/use-cases/auth/change-password";
 
 export class ChangePassword implements ChangePasswordUseCase {
     userRepository: UserRepository
+    authRepository: AuthRepository
 
-    constructor(userRepository: UserRepository) {
+    constructor(userRepository: UserRepository, authRepository: AuthRepository) {
         this.userRepository = userRepository
+        this.authRepository = authRepository
     }
 
     async execute(current_user: DecodedToken, credentials: ChangeCredentialsModel): Promise<void> {
@@ -34,5 +37,10 @@ export class ChangePassword implements ChangePasswordUseCase {
         } else {
             throw new Error("Logged user cannot update this property or user");
         }
+
+        // The other sessions of that user end: whoever knew the old password is logged out. The session that
+        // changed its own password is kept, the user stays logged in where they are.
+        const changes_own_password = current_user.user_id == credentials.user_id
+        await this.authRepository.revokeUserSessions(credentials.user_id, changes_own_password ? current_user.sid : undefined)
     }
 }

@@ -398,7 +398,7 @@ describe("Project Router", () => {
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot update this property or project")))
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -492,11 +492,11 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("DELETE /projects fail for Logged user cannot delete this users should return 401", async () => {
+        test("DELETE /projects fail for Logged user cannot delete this users should return 403", async () => {
             const expectedResponse = { errors: ["Logged user cannot delete this project"] }
             jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot delete this project")))
             const response = await request(server).delete("/projects/1")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
@@ -523,11 +523,11 @@ describe("Project Router", () => {
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        test("POST /projects/:project_id/backup fail for Logged user cannot list importable samples in this project should return 401", async () => {
+        test("POST /projects/:project_id/backup fail for Logged user cannot list importable samples in this project should return 403", async () => {
             const expectedResponse = { errors: ["Logged user cannot list importable samples in this project"] }
             jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot list importable samples in this project")))
             const response = await request(server).post("/projects/1/backup")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /projects/:project_id/backup fail for Cannot find project to backup should return 404", async () => {
@@ -631,11 +631,11 @@ describe("Project Router", () => {
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        test("POST /projects/:project_id/export fail for Logged user cannot list importable samples in this project should return 401", async () => {
+        test("POST /projects/:project_id/export fail for Logged user cannot list importable samples in this project should return 403", async () => {
             const expectedResponse = { errors: ["Logged user cannot list importable samples in this project"] }
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot list importable samples in this project")))
             const response = await request(server).post("/projects/1/backup/export")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /projects/:project_id/export fail for Cannot find project to export should return 404", async () => {
@@ -725,11 +725,11 @@ describe("Project Router", () => {
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        test("GET /projects/:project_id/samples/can_be_imported fail for Logged user cannot list importable samples in this project should return 401", async () => {
+        test("GET /projects/:project_id/samples/can_be_imported fail for Logged user cannot list importable samples in this project should return 403", async () => {
             const expectedResponse = { errors: ["Logged user cannot list importable samples in this project"] }
             jest.spyOn(mockListImportableSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot list importable samples in this project")))
             const response = await request(server).get("/projects/1/samples/can_be_imported")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("GET /projects/:project_id/samples/can_be_imported fail for Cannot find project should return 404", async () => {
@@ -788,8 +788,8 @@ describe("Project Router", () => {
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        // Logged user cannot list importable samples in this project 401
-        test("POST /projects/:project_id/samples/import fail for Logged user cannot list importable samples in this and should return error 401", async () => {
+        // Logged user cannot list importable samples in this project 403
+        test("POST /projects/:project_id/samples/import fail for Logged user cannot list importable samples in this and should return error 403", async () => {
             const expectedResponse = {
                 success: false,
                 errors: {
@@ -798,7 +798,7 @@ describe("Project Router", () => {
             }
             jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot list importable samples in this project")))
             const response = await request(server).post("/projects/1/samples/import")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot find project 404
@@ -1221,11 +1221,11 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Logged user cannot delete sample
-        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete sample should return 401", async () => {
-            const expectedResponse = { errors: ["Logged user cannot delete sample"] }
-            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete sample")))
+        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete sample should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot delete this sample"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete this sample")))
             const response = await request(server).delete("/projects/1/samples/1")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot delete sample

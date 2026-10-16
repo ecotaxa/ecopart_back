@@ -3,10 +3,11 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 
 export const migration: Migration = {
     id: "005_make_gamma_nullable",
+    // up rebuilds the sample table
+    foreignKeysOff: true,
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         // SQLite does not support ALTER COLUMN, so we recreate the table.
-        await runSQL(db, `PRAGMA foreign_keys = OFF;`);
 
         await runSQL(db, `
             CREATE TABLE 'sample_new' (
@@ -85,10 +86,8 @@ export const migration: Migration = {
         await runSQL(db, `INSERT INTO sample_new SELECT * FROM sample;`);
         await runSQL(db, `DROP TABLE sample;`);
         await runSQL(db, `ALTER TABLE sample_new RENAME TO sample;`);
-
-        await runSQL(db, `PRAGMA foreign_keys = ON;`);
     },
 
-    async down(db: SQLiteDatabaseWrapper): Promise<void> {
+    async down(_db: SQLiteDatabaseWrapper): Promise<void> {
     },
 };
