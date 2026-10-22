@@ -2113,7 +2113,7 @@ export default function ProjectRouter(
      *       | `sample_name` | string | |
      *       | `comment` | string | |
      *       | `instrument_serial_number` | string | |
-     *       | `max_pressure` | number | |
+     *       | `max_pressure` | number | decibar for every instrument (UVP5 datfile centibar ÷ 10); null without a readable pressure |
      *       | `station_id` | string | |
      *       | `sampling_utc_date_time` | string (ISO date) | |
      *       | `latitude` | number | |

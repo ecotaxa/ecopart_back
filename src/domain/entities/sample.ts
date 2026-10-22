@@ -4,7 +4,7 @@ export interface SampleRequestCreationModel {
     sample_name: string;                       // Sample name
     comment: string;                           // Optional comment
     instrument_serial_number: string;          // Instrument serial number
-    max_pressure: number | null;               // Maximum pressure (in relevant unit); null when the particle file has no readable pressure
+    max_pressure: number | null;               // Maximum pressure (decibar, raw × instrument_settings_acq_pressure_gain); null when the particle file has no readable pressure
     station_id: string;                        // Station identifier
     sampling_utc_date_time: string;                     // Sampling date in ISO format
     latitude: number;                          // Latitude (in decimal degrees) [DD.DDDD] (- for South)
@@ -129,7 +129,7 @@ export interface SampleRequestModel {
     sample_name?: string;                       // Sample name
     comment?: string;                           // Optional comment
     instrument_serial_number?: string;          // Instrument serial number
-    max_pressure?: number;                      // Maximum pressure (in relevant unit)
+    max_pressure?: number;                      // Maximum pressure (decibar)
     station_id?: string;                        // Station identifier
     sampling_utc_date_time?: string;                     // Sampling date in ISO format
     latitude?: number;                          // Latitude (in decimal degrees) [DD.DDDD] (- for South)
@@ -353,7 +353,7 @@ export interface MetadataIniSampleModel {
     instrument_settings_aa: number;
     instrument_settings_exp: number;
     instrument_settings_image_volume_l: number;
-    instrument_settings_pixel_size_mm: number;                               // /!\ UVP6 metadata.ini gives it in µm, not mm
+    instrument_settings_pixel_size_mm: number;                               // mm (UVP6 metadata.ini gives µm, divided by 1000)
     instrument_settings_depth_offset_m: number | undefined;                  // dropped unless 0 <= value < 100 (legacy sanity range)
     instrument_settings_particule_minimum_area_pixels: number | undefined;   // UVP6: from ACQ_CONF.Limit_lpm_detection_size (µm ESD)
     instrument_settings_vignette_minimum_area_pixels: number | undefined;    // UVP6: from ACQ_CONF.Vignetting_lower_limit_size (µm ESD)
@@ -395,7 +395,7 @@ export interface SampleFromMetaHeaderModel {
 
 }
 export interface SampleFromWorkDatfileModel {
-    max_pressure: number | null,                // null when no datfile line has a readable pressure. maxpressure work/profileid/profileid_datfile.txt : 9;        20120520080214_203;        ***00150***;00356;003
+    max_pressure: number | null,                // decibar (datfile centibar ÷ 10); null when no datfile line has a readable pressure. maxpressure work/profileid/profileid_datfile.txt : 9;        20120520080214_203;        ***00150***;00356;003
 }
 export interface SampleFromWorkHDRModel {
     instrument_settings_acq_gain: number,                                       // Gain
