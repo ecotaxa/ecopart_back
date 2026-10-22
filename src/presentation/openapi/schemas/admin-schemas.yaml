@@ -99,11 +99,25 @@ components:
           description: Project counts grouped by instrument model name (label "UNKNOWN" when unset), sorted by count desc.
           items:
             $ref: "#/components/schemas/LabelCount"
+        by_privacy:
+          type: array
+          description: >-
+            Project counts by privacy level, computed at request time from each project's creation date and
+            privacy, visible and public durations. Always the four labels private, visible, public, open, in
+            that order, including those with a count of 0.
+          items:
+            $ref: "#/components/schemas/LabelCount"
+          example:
+            - { label: private, count: 5 }
+            - { label: visible, count: 3 }
+            - { label: public, count: 2 }
+            - { label: open, count: 2 }
       required:
         - total
         - backed_up
         - linked_to_ecotaxa
         - by_instrument
+        - by_privacy
 
     AdminTasksStats:
       type: object

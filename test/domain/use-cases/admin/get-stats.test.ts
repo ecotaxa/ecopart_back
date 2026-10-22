@@ -18,7 +18,7 @@ describe("GetStats Use Case", () => {
         generated_at: "2026-07-20T09:00:00.000Z",
         totals: {
             users: { total: 42, admins: 2, validated_email: 38, pending_validation: 4, deleted: 5, distinct_organisations: 9 },
-            projects: { total: 12, backed_up: 7, linked_to_ecotaxa: 10, by_instrument: [{ label: "UVP6LP", count: 8 }] },
+            projects: { total: 12, backed_up: 7, linked_to_ecotaxa: 10, by_instrument: [{ label: "UVP6LP", count: 8 }], by_privacy: [{ label: "private", count: 5 }, { label: "visible", count: 3 }, { label: "public", count: 2 }, { label: "open", count: 2 }] },
             tasks: { total: 130, exports: 30, imports: 60, running: 1, failed: 4, by_type: [{ label: "EXPORT", count: 30 }], by_status: [{ label: "DONE", count: 125 }] },
             samples: { total: 540, imported_to_ecotaxa: 300, by_qc_status: [{ label: "VALIDATED", count: 480 }] },
             storage: { total_size_bytes: 123456789 },

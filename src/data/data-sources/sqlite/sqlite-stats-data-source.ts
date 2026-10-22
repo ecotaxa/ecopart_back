@@ -1,5 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import {
+    ProjectPrivacyInputsRow,
     ProjectSizingRow,
     StatsCreationSeriesRow,
     StatsDataSource,
@@ -117,6 +118,12 @@ export class SQLiteStatsDataSource implements StatsDataSource {
             },
             top_organisations: topOrgs.map((r: any): OrganisationCount => ({ organisation: r.organisation, users: n(r.cnt) })),
         };
+    }
+
+    getProjectsPrivacyInputs(): Promise<ProjectPrivacyInputsRow[]> {
+        return this.queryAll<ProjectPrivacyInputsRow>(
+            `SELECT project_creation_utc_date_time, privacy_duration, visible_duration, public_duration
+             FROM project;`, []);
     }
 
     async getEarliestActivityDate(): Promise<string | null> {

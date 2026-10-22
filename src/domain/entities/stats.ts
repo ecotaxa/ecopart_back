@@ -40,6 +40,7 @@ export interface ProjectsStats {
     backed_up: number;             // last_backup_utc_date_time IS NOT NULL
     linked_to_ecotaxa: number;     // ecotaxa_project_id IS NOT NULL
     by_instrument: LabelCount[];
+    by_privacy: LabelCount[];      // private | visible | public | open, all four in that order (count 0 kept)
 }
 
 export interface TasksStats {
