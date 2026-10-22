@@ -752,9 +752,10 @@ export class SampleRepositoryImpl implements SampleRepository {
             if (maxPressure === null || pressure > maxPressure) maxPressure = pressure;
         }
 
-        // Assign to work_datfile_content
+        // The datfile pressure is in centibar; max_pressure is stored in decibar like the UVP6 one
+        // (raw × instrument_settings_acq_pressure_gain 0.1). Written ÷ 10: 9894 × 0.1 = 989.4000000000001.
         work_datfile_content.sample_metadata = {
-            max_pressure: maxPressure,
+            max_pressure: maxPressure === null ? null : maxPressure / 10,
         };
 
         const sample: SampleFromWorkDatfileModel = {
@@ -885,6 +886,11 @@ export class SampleRepositoryImpl implements SampleRepository {
         return parsed >= 0 && parsed < 100 ? parsed : undefined;
     }
 
+    private parseUvp6PixelSizeMm(value_um: unknown): number | undefined {
+        const parsed = this.parseOptionalFloat(value_um);
+        return parsed === undefined ? undefined : parsed / 1000;
+    }
+
     // Area in pixels of the smallest detected/saved object, from its ESD limit.
     // Port of legacy EcoPart `calcpixelfromesd_aa_exp` (py/part_app/tasks/importcommon.py):
     //   area_px = floor(round((π / aa) × (esd_mm / 2)² ^ (1 / exp), 3))
@@ -971,10 +977,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_settings_aa: ini_content.HW_CONF['Aa'] as number,
             instrument_settings_exp: ini_content.HW_CONF['Exp'] as number,
             instrument_settings_image_volume_l: ini_content.HW_CONF['Image_volume'] as number,
-            // /!\ `HW_CONF.Pixel_Size` is in MICROMETRE on the UVP6 (73 on real data), while the
-            // UVP5 config file gives millimetre (0.118). Kept raw, as legacy EcoPart does with its
-            // single `acq_pixel` column — the per-instrument unit is documented in the export README.
-            instrument_settings_pixel_size_mm: ini_content.HW_CONF['Pixel_Size'] as number,
+            // `HW_CONF.Pixel_Size` is in micrometre on the UVP6 (73 on real data); stored in mm like
+            // the UVP5 one (0.118), which legacy EcoPart did not do.
+            instrument_settings_pixel_size_mm: this.parseUvp6PixelSizeMm(ini_content.HW_CONF['Pixel_Size']) as number,
             // Legacy guards this one: an offset is only trusted when 0 <= value < 100
             // (`uvp_sample_import.py` CreateOrUpdateSample), anything else is left empty so the
             // project-level offset applies instead.

@@ -71,7 +71,7 @@ export default function ExportRouter(
      *       - `sample_integration_time`: UVP5 only in the extended meta-header format — empty for the 21-column
      *         format shipped by Zooprocess. Filled for the UVP6 (`metadata.ini` `integrationtime`), empty when
      *         that value is `nan` (depth-mode samples).
-     *       - `instrument_settings_process_datetime`: always empty — no UVP file carries the Zooprocess date
+     *       - `instrument_settings_process_utc_date_time`: always empty — no UVP file carries the Zooprocess date
      *         (it is a manual field in legacy EcoPart and EcoPart has no editing screen for it yet).
      *       - `instrument_settings_depth_offset_m`: not carried by the UVP5 files (set it at project level);
      *         on the UVP6 an out-of-range value (`< 0` or `>= 100`) is discarded, as in legacy EcoPart.
@@ -80,10 +80,8 @@ export default function ExportRouter(
      *         without images.
      *       - `ctd_latitude` / `ctd_longitude`: the start position read from the CTD file `LAT`/`LON` columns;
      *         empty without an imported CTD or when the file has no position (UVP5 files have none).
-     *       - **Units are instrument-dependent on two columns**: `sample_max_pressure` is raw (centibar for the
-     *         UVP5, decibar for the UVP6 — multiply by `instrument_settings_acq_pressure_gain` to normalise) and
-     *         `instrument_settings_pixel_size_mm` is mm on the UVP5 but µm on the UVP6. `instrument_settings_aa`
-     *         is likewise 10^6 times larger on the UVP6. See the archive README, column by column.
+     *       - **Units are instrument-dependent**: `instrument_settings_aa` is 10^6 times larger on the UVP6.
+     *         See the archive README, column by column.
      *       - The header values *inside* the copied `lpm` / `instrument_config` artifacts are still the original
      *         acquisition values and can disagree with `metadata/samples.tsv` (re-processed lat/long, ISO-normalised
      *         dates, serial-number convention).

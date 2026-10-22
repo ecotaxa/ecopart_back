@@ -58,8 +58,8 @@ describe("parseIniContent (UVP6 metadata.ini)", () => {
         expect(sample.instrument_settings_image_volume_l).toBe(0.53);
         expect(sample.instrument_settings_aa).toBe(2300);
         expect(sample.instrument_settings_exp).toBe(1.136);
-        // Kept raw, in µm on the UVP6 — the unit is instrument-dependent, see the export README.
-        expect(sample.instrument_settings_pixel_size_mm).toBe(73);
+        // HW_CONF.Pixel_Size is in µm (73), stored in mm like the UVP5 one.
+        expect(sample.instrument_settings_pixel_size_mm).toBe(0.073);
         expect(sample.instrument_settings_acq_pressure_gain).toBe(1);
         expect(sample.instrument_settings_images_post_process).toBe("uvpapp");
     });
@@ -211,20 +211,24 @@ Ratio=3
 });
 
 describe("parseWorkDatfile (UVP5 work/<sample>_datfile.txt)", () => {
-    test("max_pressure is the largest value of the third column", () => {
+    test("max_pressure is the largest value of the third column, converted from centibar to decibar", () => {
         const datfile = [
             "1;20200806221354_536;12;0;0;21;!;0;0;0;0",
             "2;20200806221355_036;57;0;0;21;!;0;0;0;0",
             "3;20200806221355_536;43;0;0;21;!;0;0;0;0",
         ].join("\n");
 
-        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(57);
+        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(5.7);
+    });
+
+    test("max_pressure in decibar carries no float noise", () => {
+        expect(repo.parseWorkDatfile("1;20200806221354_536;9894;0").max_pressure).toBe(989.4);
     });
 
     test("a long profile does not overflow the stack", () => {
         const datfile = Array.from({ length: 200000 }, (_, i) => `${i + 1};20200806221354_536;${i};0`).join("\n");
 
-        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(199999);
+        expect(repo.parseWorkDatfile(datfile).max_pressure).toBe(19999.9);
     });
 
     test("max_pressure is null, not -Infinity, when no line has a readable pressure", () => {
