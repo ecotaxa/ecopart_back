@@ -9,12 +9,17 @@ import {
     exportedSizeClasses,
     formatNumber,
     minimumAreaPx,
+    particleCells,
     particleColumns,
     particleRows,
+    particleNoValueColumns,
+    particleTableColumns,
     PARTICLE_CONTEXT_COLUMNS,
+    PARTICLE_NOT_APPLICABLE_COLUMNS,
     PIXEL_COLUMNS,
     visibleSizeClasses,
 } from "../../../../src/domain/use-cases/export/binned-computation";
+import { serialize } from "../../../../src/domain/use-cases/export/tsv";
 
 const T0 = Date.UTC(2024, 5, 12, 10, 20, 0);
 
@@ -387,6 +392,85 @@ describe("particles.tsv", () => {
         expect(union).toContain(17);
         expect(union).toHaveLength(29);
         expect(exportedSizeClasses([uvp5z])).not.toContain(17);
+    });
+
+    test("typed cells: numbers and dates, null for an empty cell, NA where no value exists; the TSV row is their text", () => {
+        const typed = (bin_index: number) => Object.fromEntries(columns.map((c, i) => [c, particleCells(42, binned, binned.bins[bin_index], classes)[i]]));
+
+        expect(typed(0)).toMatchObject({
+            ecopart_sample_id: 42,
+            subsample_depth_start: 0,
+            subsample_depth_stop: 5,
+            subsample_nb_images: 1,
+            subsample_water_volume: 0.5,
+            subsample_qcflag: 0,
+            count_1px: 10,
+            count_50p8um_64um: 10,
+            concentration_50p8um_64um: 20,
+            intensity_50p8um_64um: 20,
+            intensity_80p6um_102um: "NA",
+            count_40p3um_50p8um: "NA",
+        });
+        expect(typed(0).subsample_utc_date_time_start).toEqual(new Date(T0));
+        expect(typed(1)).toMatchObject({ subsample_utc_date_time_start: null, subsample_water_volume: 0, count_1px: "NA", count_50p8um_64um: "NA" });
+        for (const bin of binned.bins) {
+            const cells = particleCells(42, binned, bin, classes);
+            expect(particleRows(42, binned, classes)[bin.index]).toEqual(cells.map((cell) => serialize(cell, formatNumber)));
+        }
+    });
+
+    test("no column holds both kinds of absence: null only where the column does not apply, NA only where no value exists", () => {
+        const uvp5 = { ...UVP6, instrument_model: "UVP5HD", aa: 0.0026, exp: 1.2284, particle_minimum_area_px: 2 };
+        const samples = [
+            // Depth bins with an empty bin: times without value, pixel and class cells NA.
+            binned,
+            // Time bins with a bin left without images: no mean depth there, never a depth stop.
+            computeBinnedSample({ ...UVP6, is_depth_profile: false }, sequence([
+                img(2, [[1, 1, 10]], { image_time_ms: Date.UTC(2024, 5, 12, 10, 20, 0) }),
+                img(3, [[1, 1, 10]], { image_time_ms: Date.UTC(2024, 5, 12, 11, 40, 0) }),
+            ]), { axis: "time", step: 0.5 }),
+            // A UVP5: no black image count, no 1 px count below its minimum area.
+            computeBinnedSample(uvp5, sequence([img(1, [[2, 3, 20]])]), { axis: "depth", step: 5 }),
+        ];
+        const empty_in = new Set<string>();
+        const na_in = new Set<string>();
+        for (const sample of samples) {
+            for (const bin of sample.bins) {
+                particleCells(1, sample, bin, classes).forEach((cell, i) => {
+                    if (cell === null) empty_in.add(columns[i]);
+                    if (cell === "NA") na_in.add(columns[i]);
+                });
+            }
+        }
+
+        expect([...empty_in]).toEqual(expect.arrayContaining(["subsample_utc_date_time_start", "subsample_utc_date_time_stop", "subsample_depth_start", "subsample_depth_stop"]));
+        expect([...na_in]).toEqual(expect.arrayContaining(["count_1px", "nb_black_images", "count_40p3um_50p8um", "intensity_80p6um_102um"]));
+        expect([...empty_in].filter((c) => !PARTICLE_NOT_APPLICABLE_COLUMNS.includes(c))).toEqual([]);
+        expect([...na_in].filter((c) => !particleNoValueColumns(classes).includes(c))).toEqual([]);
+        expect(PARTICLE_NOT_APPLICABLE_COLUMNS.filter((c) => particleNoValueColumns(classes).includes(c))).toEqual([]);
+        expect([...PARTICLE_NOT_APPLICABLE_COLUMNS, ...particleNoValueColumns(classes)].every((c) => columns.includes(c))).toBe(true);
+    });
+
+    test("column types: identifiers, counts and flags are integers, measures doubles, bin times timestamps", () => {
+        const types = Object.fromEntries(particleTableColumns(classes).map((c) => [c.name, c.type]));
+
+        expect(particleTableColumns(classes).map((c) => c.name)).toEqual(columns);
+        expect(types).toMatchObject({
+            ecopart_sample_id: "integer",
+            subsample_utc_date_time_start: "timestamp",
+            subsample_utc_date_time_stop: "timestamp",
+            subsample_depth_start: "double",
+            subsample_nb_images: "integer",
+            subsample_water_volume: "double",
+            subsample_qcflag: "integer",
+            count_1px: "integer",
+            nb_black_images: "integer",
+            count_50p8um_64um: "integer",
+            concentration_50p8um_64um: "double",
+            biovolume_50p8um_64um: "double",
+            intensity_50p8um_64um: "double",
+            qcflag_50p8um_64um: "integer",
+        });
     });
 
     test("numbers keep twelve significant digits", () => {
