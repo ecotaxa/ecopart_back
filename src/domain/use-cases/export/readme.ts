@@ -1,8 +1,11 @@
 // Consumer-facing README emitted at the root of every raw-data export ZIP.
-// Generated from the same column-name constants used by the TSV emitters so the docs
+// Generated from the same column constants used by the table writers so the docs
 // and the file contents cannot drift apart.
 
 import { RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
+import { ExportTableFormat } from "../../entities/export";
+import { TableColumn } from "./table";
+import { PROJECT_COLUMNS, SAMPLE_COLUMNS } from "./export-metadata";
 
 export const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     // [column, description, origine]
@@ -48,7 +51,7 @@ export const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     // [column, description, origine]
     // The `origine` column gives the per-instrument source. Format: "UVP5: <source>. UVP6: <source>."
     // — or a single line for fields that don't depend on the instrument.
-    ["ecopart_project_id", "Parent project identifier (same value as in `projects.tsv`).", "EcoPart DB."],
+    ["ecopart_project_id", "Parent project identifier (same value as in the projects table).", "EcoPart DB."],
     ["ecopart_sample_id", "Unique numeric ID for the sample in EcoPart.", "EcoPart DB (auto-increment at sample import)."],
     ["sample_name", "Textual sample ID as filled in during deployment (not necessarily unique at the level of this export).", "UVP5: `meta/uvp5_header_sn*.txt` `profileid`. UVP6: `metadata.ini` `sample_metadata.sample_name`."],
     ["sample_comment", "Free-text comment captured at acquisition.", "UVP5: `meta/uvp5_header_sn*.txt` `comment`. UVP6: `metadata.ini` `sample_metadata.comment`."],
@@ -117,22 +120,32 @@ export const SAMPLE_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["number_of_black", "Number of black (lights-off) images at import — noise reference.", "UVP6: counted at import from rows in `particules.csv` where the light flag is `0:1`. UVP5: always `0` by design (UVP5 doesn't acquire black frames)."],
 ];
 
-export function formatTable(rows: Array<[string, string, string]>): string {
-    const lines = ["| column | description | origine |", "|---|---|---|"];
+// The type of each column comes from the table definition the writer uses, so it cannot drift.
+export function formatTable(rows: Array<[string, string, string]>, columns: TableColumn[]): string {
+    const types = new Map(columns.map(column => [column.name, column.type]));
+    const lines = ["| column | type | description | origine |", "|---|---|---|---|"];
     const escape = (s: string) => s.replace(/\|/g, "\\|");
     for (const [name, desc, origine] of rows) {
-        lines.push(`| \`${name}\` | ${escape(desc)} | ${escape(origine)} |`);
+        lines.push(`| \`${name}\` | ${types.get(name) ?? ""} | ${escape(desc)} | ${escape(origine)} |`);
     }
     return lines.join("\n");
 }
 
-export function renderReadme(export_types: RawExportType[]): string {
+// How the generated tables are written, as every product's README states it.
+export function tableConventions(format: ExportTableFormat): string {
+    if (format === "parquet") {
+        return "Every table is an Apache Parquet file (Snappy compression). Its columns are typed as the tables below state: `string` (UTF-8 text, kept as stored), `integer` (64-bit), `double`, `boolean` and `timestamp` (UTC, millisecond precision). A missing value is a null cell. Read them with `arrow::read_parquet()` in R, `pandas.read_parquet()` or `polars.read_parquet()` in Python, `read_parquet()` in DuckDB.";
+    }
+    return "Every TSV is UTF-8, tab-separated, with one header row. Cells with embedded tabs/CR/LF are sanitised to a single space (no quoting). Booleans serialise as `true` / `false`; missing values are empty cells. Timestamps are ISO 8601 UTC.";
+}
+
+export function renderReadme(export_types: RawExportType[], format: ExportTableFormat = "tsv"): string {
     const has = (t: RawExportType) => export_types.includes(t);
     const parts: string[] = [];
 
     parts.push("# EcoPart raw data export");
     parts.push("");
-    parts.push("This archive bundles raw data + metadata for the samples you exported. Every TSV is UTF-8, tab-separated, with one header row. Cells with embedded tabs/CR/LF are sanitised to a single space (no quoting). Booleans serialise as `true` / `false`; missing values are empty cells. Timestamps are ISO 8601 UTC.");
+    parts.push(`This archive bundles raw data + metadata for the samples you exported. ${tableConventions(format)}`);
     parts.push("");
     parts.push("## Contents");
     parts.push("");
@@ -141,8 +154,8 @@ export function renderReadme(export_types: RawExportType[]): string {
     parts.push("├── README.md");
     if (has("metadata")) {
         parts.push("├── metadata/");
-        parts.push("│   ├── projects.tsv");
-        parts.push("│   └── samples.tsv");
+        parts.push(`│   ├── projects.${format}`);
+        parts.push(`│   └── samples.${format}`);
     }
     if (has("lpm")) {
         parts.push("├── lpm/<project_id>/<sample_name>/                 UVP5: <sample>_work.zip — UVP6: <sample>_Particule.zip");
@@ -163,17 +176,17 @@ export function renderReadme(export_types: RawExportType[]): string {
     parts.push("");
 
     if (has("metadata")) {
-        parts.push("## `metadata/projects.tsv`");
+        parts.push(`## \`metadata/projects.${format}\``);
         parts.push("");
         parts.push("One row per distinct project across the exported samples.");
         parts.push("");
-        parts.push(formatTable(PROJECT_COLUMN_DESCRIPTIONS));
+        parts.push(formatTable(PROJECT_COLUMN_DESCRIPTIONS, PROJECT_COLUMNS));
         parts.push("");
-        parts.push("## `metadata/samples.tsv`");
+        parts.push(`## \`metadata/samples.${format}\``);
         parts.push("");
         parts.push("One row per exported sample, ordered by `(ecopart_project_id, ecopart_sample_id)`.");
         parts.push("");
-        parts.push(formatTable(SAMPLE_COLUMN_DESCRIPTIONS));
+        parts.push(formatTable(SAMPLE_COLUMN_DESCRIPTIONS, SAMPLE_COLUMNS));
         parts.push("");
     }
 
@@ -186,7 +199,7 @@ export function renderReadme(export_types: RawExportType[]): string {
         parts.push("");
         parts.push("A sample with no particle artifact on disk is skipped with a warning line in the task log.");
         parts.push("");
-        parts.push("⚠️ The values inside these files are the original acquisition values: they can disagree with `metadata/samples.tsv` (re-processed latitude/longitude, ISO-normalised dates, corrected acquisition settings), and **the project's descent filter is not applied to them** — the ascent images EcoPart discards when it computes its own histograms are still present here.");
+        parts.push("⚠️ The values inside these files are the original acquisition values: they can disagree with `metadata/samples." + format + "` (re-processed latitude/longitude, ISO-normalised dates, corrected acquisition settings), and **the project's descent filter is not applied to them** — the ascent images EcoPart discards when it computes its own histograms are still present here.");
         parts.push("");
     }
 
@@ -202,7 +215,7 @@ export function renderReadme(export_types: RawExportType[]): string {
         parts.push("");
         parts.push("Instrument configuration and original acquisition headers: `<sample_name>_meta_conf.zip`, **UVP5 only** (`config/cruise_info.txt`, `config/process_install_config.txt`, `config/uvp5_settings/uvp5_configuration_data.txt`, `meta/uvp5_header_sn*.txt`, plus whatever backup headers the source folder contained under `meta/old/`). The UVP6 keeps its configuration inside `metadata.ini`, shipped with `lpm/`, so a UVP6 sample produces nothing here.");
         parts.push("");
-        parts.push("These are the files the values in `metadata/samples.tsv` were parsed from — read the TSV for the values EcoPart actually stored, and these for the untouched originals.");
+        parts.push("These are the files the values in `metadata/samples." + format + "` were parsed from — read that table for the values EcoPart actually stored, and these for the untouched originals.");
         parts.push("");
     }
 

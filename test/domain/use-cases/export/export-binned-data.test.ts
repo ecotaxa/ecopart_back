@@ -24,6 +24,8 @@ import { sampleModel_1 } from "../../../entities/sample";
 import { private_projectResponseModel } from "../../../entities/project";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
+import { readParquet } from "../../../helpers/parquet";
+import { zipEntryBuffer } from "../../../helpers/zip";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 const TASK_ID = TaskResponseModel_1.task_id;
@@ -257,6 +259,15 @@ describe("ExportBinnedData", () => {
             await expect(exportOf()).rejects.toThrow(`Instrument not supported by the binned export: ${sampleModel_1.sample_name} (LISST)`);
         });
 
+        test("an unknown table format is refused before any lookup", async () => {
+            given([sample()], [project()]);
+
+            await expect(exportOf({ format: "csv" as any })).rejects.toThrow("format must be one of: tsv, parquet");
+
+            expect(mockSampleRepository.getSamplesByIds).toBeCalledTimes(0);
+            expect(mockTaskRepository.createTask).toBeCalledTimes(0);
+        });
+
         test("creates an EXPORT task, not tied to a project, with the binning it will apply", async () => {
             given([sample()], [project()]);
 
@@ -267,7 +278,7 @@ describe("ExportBinnedData", () => {
                 task_type: TaskType.Export,
                 task_status: "PENDING",
                 task_owner_id: 1,
-                task_params: { sample_ids: [7], bin_mode: "auto", bin_size_m: 5, bin_size_h: 1, skip_not_validated: false },
+                task_params: { sample_ids: [7], bin_mode: "auto", bin_size_m: 5, bin_size_h: 1, skip_not_validated: false, format: "tsv" },
             });
         });
     });
@@ -330,6 +341,55 @@ describe("ExportBinnedData", () => {
             expect(entries["README.md"]).toContain("depth bins of 5 m");
             expect(progress_messages.some((m) => m.includes(`${sampleModel_1.sample_name}: 3 depth bin(s) of 5 m from 2 image(s) used`))).toBe(true);
             expect(mockSampleRepository.getPivotImages).toBeCalledWith(1, sampleModel_1.sample_name, "UVP5HD");
+        });
+
+        test("format=parquet: the three tables are typed Parquet files, where NA and the empty cell are both null", async () => {
+            given([sample()], [project()]);
+
+            await exportOf({ format: "parquet" });
+            const outcome = await task_finished;
+
+            expect(outcome).toEqual({ outcome: "finished", detail: `http://localhost:3000/api/tasks/${TASK_ID}/file` });
+            expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({ task_params: expect.objectContaining({ format: "parquet" }) }));
+            const entries = await zipEntries(zip_path());
+            expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.parquet", "metadata/samples.parquet", "particles.parquet"]);
+
+            const particles = await readParquet(await zipEntryBuffer(zip_path(), "particles.parquet"));
+            expect(particles.columns.slice(0, 2)).toEqual([
+                { name: "ecopart_sample_id", type: "INT64", converted_type: undefined, logical_type: undefined, repetition_type: "OPTIONAL" },
+                { name: "subsample_utc_date_time_start", type: "INT64", converted_type: "TIMESTAMP_MILLIS", logical_type: { type: "TIMESTAMP", isAdjustedToUTC: true, unit: "MILLIS" }, repetition_type: "OPTIONAL" },
+            ]);
+            expect(particles.columns.find((c) => c.name === "count_80p6um_102um")?.type).toBe("INT64");
+            expect(particles.columns.find((c) => c.name === "concentration_80p6um_102um")?.type).toBe("DOUBLE");
+            expect(particles.rows.map((r) => [r.subsample_depth_start, r.subsample_depth_stop, r.subsample_nb_images])).toEqual([[0, 5, BigInt(1)], [5, 10, BigInt(0)], [10, 15, BigInt(1)]]);
+            expect(particles.rows[0]).toMatchObject({
+                ecopart_sample_id: BigInt(7),
+                subsample_utc_date_time_start: new Date(Date.UTC(2020, 7, 6, 22, 0, 0)),
+                subsample_water_volume: 1.12,
+                subsample_qcflag: BigInt(0),
+                nb_black_images: null,
+                count_1px: null,
+                count_2px: BigInt(10),
+                count_80p6um_102um: BigInt(10),
+                intensity_80p6um_102um: 20,
+                qcflag_80p6um_102um: BigInt(0),
+            });
+            expect(particles.rows[0].concentration_80p6um_102um).toBeCloseTo(10 / 1.12, 12);
+            expect(particles.rows[1]).toMatchObject({ subsample_water_volume: 0, subsample_utc_date_time_start: null, count_80p6um_102um: null, qcflag_80p6um_102um: BigInt(0) });
+            expect(particles.rows[2]).toMatchObject({ count_102um_128um: BigInt(4), intensity_102um_128um: 40 });
+
+            const samples_table = await readParquet(await zipEntryBuffer(zip_path(), "metadata/samples.parquet"));
+            expect(samples_table.rows[0]).toMatchObject({ ecopart_sample_id: BigInt(7), sample_name: sampleModel_1.sample_name });
+
+            expect(entries["README.md"]).toContain("└── particles.parquet");
+            expect(entries["README.md"]).toContain("Every table is an Apache Parquet file");
+            expect(entries["README.md"]).toContain("a null cell in `count_1px`, `count_2px`, `nb_black_images` and in the size-class blocks is the `NA` of the TSV form");
+            expect(entries["README.md"]).toContain("a null cell in `subsample_utc_date_time_start`, `subsample_utc_date_time_stop`, `subsample_depth_start`, `subsample_depth_stop` is the empty cell of the TSV form");
+            expect(entries["README.md"]).toContain("No column can hold both kinds of absence");
+            expect(entries["README.md"]).toContain("## `particles.parquet`");
+            expect(entries["README.md"]).toContain("| `subsample_water_volume` | double |");
+            expect(entries["README.md"]).not.toContain(".tsv");
+            expect(log_messages.some((m) => m.includes("particles.tsv"))).toBe(false);
         });
 
         test("time bins when the request forces them", async () => {

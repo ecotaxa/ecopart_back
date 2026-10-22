@@ -4,6 +4,8 @@ import { BINNED_MAX_BINS_PER_SAMPLE, NA } from "../../constants/binned-export";
 import { PART_DET_CLASS_LIMITS_MM, SIZE_CLASS_COUNT, sizeClassOfEsd, sizeClassSuffix } from "../../constants/size-classes";
 import { selectUsedImages } from "../sample/qc-graphs-builder";
 import { hasImageFlag, imageIdAt, imageTimeAt, rawPressureAt, toPerImageColumns } from "../../utils/per-image-columns";
+import { serialize } from "./tsv";
+import type { TableColumn, TableColumnType, TableValue } from "./table";
 
 /* Binned export (product 1), pure computation: per sample and per bin, the particle counts,
  * concentrations, biovolumes and mean grey of each size class, from the sample's UVP6-format pivot.
@@ -325,7 +327,7 @@ function roundTo(value: number, decimals: number): number {
     return Math.round(value * factor) / factor;
 }
 
-/* ─── particles.tsv ─── */
+/* ─── the particle table ─── */
 
 export const PARTICLE_CONTEXT_COLUMNS = [
     "ecopart_sample_id",
@@ -344,6 +346,27 @@ export const PIXEL_COLUMNS = ["count_1px", "count_2px", "nb_black_images"];
 
 export const SIZE_CLASS_BLOCKS = ["count", "concentration", "biovolume", "intensity", "qcflag"] as const;
 
+// Types of the columns: identifiers, counts and the Argo flags are integers; bounds, volume and
+// the concentration, biovolume and intensity blocks are doubles; the bin times are timestamps.
+export const PARTICLE_CONTEXT_COLUMN_TYPES: Record<string, TableColumnType> = {
+    ecopart_sample_id: "integer",
+    subsample_utc_date_time_start: "timestamp",
+    subsample_utc_date_time_stop: "timestamp",
+    subsample_depth_start: "double",
+    subsample_depth_stop: "double",
+    subsample_nb_images: "integer",
+    subsample_water_volume: "double",
+    subsample_qcflag: "integer",
+};
+export const PIXEL_COLUMN_TYPE: TableColumnType = "integer";
+export const SIZE_CLASS_BLOCK_TYPES: Record<typeof SIZE_CLASS_BLOCKS[number], TableColumnType> = {
+    count: "integer",
+    concentration: "double",
+    biovolume: "double",
+    intensity: "double",
+    qcflag: "integer",
+};
+
 // The classes written: those visible on at least one exported sample (one table for every
 // instrument, Q27 provisional), NA where a sample cannot see one.
 export function exportedSizeClasses(visible_per_sample: boolean[][]): number[] {
@@ -354,48 +377,71 @@ export function exportedSizeClasses(visible_per_sample: boolean[][]): number[] {
     return classes;
 }
 
-export function particleColumns(class_indexes: number[]): string[] {
+export function particleTableColumns(class_indexes: number[]): TableColumn[] {
     return [
-        ...PARTICLE_CONTEXT_COLUMNS,
-        ...PIXEL_COLUMNS,
-        ...SIZE_CLASS_BLOCKS.flatMap((block) => class_indexes.map((class_index) => `${block}_${sizeClassSuffix(class_index)}`)),
+        ...PARTICLE_CONTEXT_COLUMNS.map((name) => ({ name, type: PARTICLE_CONTEXT_COLUMN_TYPES[name] })),
+        ...PIXEL_COLUMNS.map((name) => ({ name, type: PIXEL_COLUMN_TYPE })),
+        ...SIZE_CLASS_BLOCKS.flatMap((block) => class_indexes.map((class_index) => ({ name: `${block}_${sizeClassSuffix(class_index)}`, type: SIZE_CLASS_BLOCK_TYPES[block] }))),
     ];
 }
 
-// One row per bin, cells in the order of `particleColumns`.
+export function particleColumns(class_indexes: number[]): string[] {
+    return particleTableColumns(class_indexes).map((column) => column.name);
+}
+
+// Where a row can lack a value, and what the lack means. The two never share a column (a test
+// holds `particleCells` to it), so a null cell of the Parquet form is as telling as the TSV's `NA`
+// against its empty cell: the column says which one it stands for.
+// Empty cell, the column does not apply to the row: the times of a depth bin crossed without any
+// image that adds volume, the mean depth of a time bin without pressure, `subsample_depth_stop`
+// of a time bin.
+export const PARTICLE_NOT_APPLICABLE_COLUMNS = ["subsample_utc_date_time_start", "subsample_utc_date_time_stop", "subsample_depth_start", "subsample_depth_stop"];
+// `NA`, no value exists: a class the sample cannot see, a bin without imaged volume, a mean grey
+// without particle, black images on an instrument that never acquires any.
+export function particleNoValueColumns(class_indexes: number[]): string[] {
+    return [...PIXEL_COLUMNS, ...SIZE_CLASS_BLOCKS.flatMap((block) => class_indexes.map((class_index) => `${block}_${sizeClassSuffix(class_index)}`))];
+}
+
+// One row per bin, cells in the order of `particleColumns`: numbers and dates, null for a cell
+// that does not apply, the `NA` token where no value exists.
+export function particleCells(sample_id: number, sample: BinnedSample, bin: SampleBin, class_indexes: number[]): TableValue[] {
+    const volume = bin.water_volume_l;
+    const sampled = volume > 0;
+    const pixelCount = (area_px: number, count: number): TableValue => sample.minimum_area_px > area_px || !sampled ? NA : count;
+    const classCell = (block: typeof SIZE_CLASS_BLOCKS[number], class_index: number): TableValue => {
+        if (!sample.visible_classes[class_index]) return NA;
+        // No QC is performed yet: Argo flag 0 (M10).
+        if (block === "qcflag") return 0;
+        if (!sampled) return NA;
+        const count = bin.counts[class_index];
+        if (block === "count") return count;
+        if (block === "concentration") return count / volume;
+        if (block === "biovolume") return bin.biovolumes_mm3[class_index] / volume;
+        return bin.grey_weights[class_index] > 0 ? bin.grey_sums[class_index] / bin.grey_weights[class_index] : NA;
+    };
+    return [
+        sample_id,
+        timeValue(bin.time_start_ms),
+        timeValue(bin.time_stop_ms),
+        bin.depth_start_m,
+        bin.depth_stop_m,
+        bin.nb_images,
+        volume,
+        0,
+        pixelCount(1, bin.count_1px),
+        pixelCount(2, bin.count_2px),
+        sample.black_images_recorded ? bin.nb_black_images : NA,
+        ...SIZE_CLASS_BLOCKS.flatMap((block) => class_indexes.map((class_index) => classCell(block, class_index))),
+    ];
+}
+
+// The TSV cells of a bin: numbers with twelve significant digits, `NA` as such, empty for null.
 export function particleRows(sample_id: number, sample: BinnedSample, class_indexes: number[]): string[][] {
     return sample.bins.map((bin) => particleRow(sample_id, sample, bin, class_indexes));
 }
 
 export function particleRow(sample_id: number, sample: BinnedSample, bin: SampleBin, class_indexes: number[]): string[] {
-    const volume = bin.water_volume_l;
-    const sampled = volume > 0;
-    const pixelCount = (area_px: number, count: number) => sample.minimum_area_px > area_px || !sampled ? NA : String(count);
-    const classCell = (block: typeof SIZE_CLASS_BLOCKS[number], class_index: number): string => {
-        if (!sample.visible_classes[class_index]) return NA;
-        // No QC is performed yet: Argo flag 0 (M10).
-        if (block === "qcflag") return "0";
-        if (!sampled) return NA;
-        const count = bin.counts[class_index];
-        if (block === "count") return String(count);
-        if (block === "concentration") return formatNumber(count / volume);
-        if (block === "biovolume") return formatNumber(bin.biovolumes_mm3[class_index] / volume);
-        return bin.grey_weights[class_index] > 0 ? formatNumber(bin.grey_sums[class_index] / bin.grey_weights[class_index]) : NA;
-    };
-    return [
-        String(sample_id),
-        formatTime(bin.time_start_ms),
-        formatTime(bin.time_stop_ms),
-        bin.depth_start_m === null ? "" : formatNumber(bin.depth_start_m),
-        bin.depth_stop_m === null ? "" : formatNumber(bin.depth_stop_m),
-        String(bin.nb_images),
-        formatNumber(volume),
-        "0",
-        pixelCount(1, bin.count_1px),
-        pixelCount(2, bin.count_2px),
-        sample.black_images_recorded ? String(bin.nb_black_images) : NA,
-        ...SIZE_CLASS_BLOCKS.flatMap((block) => class_indexes.map((class_index) => classCell(block, class_index))),
-    ];
+    return particleCells(sample_id, sample, bin, class_indexes).map((cell) => serialize(cell, formatNumber));
 }
 
 // Twelve significant digits: enough for any measured quantity, and no `0.30000000000000004`.
@@ -403,6 +449,6 @@ export function formatNumber(value: number): string {
     return String(Number(value.toPrecision(12)));
 }
 
-function formatTime(ms: number | null): string {
-    return ms === null ? "" : new Date(ms).toISOString();
+function timeValue(ms: number | null): Date | null {
+    return ms === null ? null : new Date(ms);
 }

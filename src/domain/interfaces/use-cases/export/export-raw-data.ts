@@ -1,3 +1,4 @@
+import { ExportTableFormat } from "../../../entities/export";
 import { PublicTaskResponseModel } from "../../../entities/task";
 import { UserUpdateModel } from "../../../entities/user";
 
@@ -13,6 +14,9 @@ export interface ExportRawDataRequestModel {
     // Opt-out of the all-or-nothing visual-QC gate: when true, samples that are not VALIDATED are
     // dropped from the export (and named in the task log) instead of aborting it. Defaults to false.
     skip_not_validated?: boolean;
+    // Format of the tables EcoPart generates (`metadata/`): "tsv" (default) or "parquet". The
+    // files copied as imported are not converted.
+    format?: ExportTableFormat;
 }
 
 export interface ExportRawDataUseCase {

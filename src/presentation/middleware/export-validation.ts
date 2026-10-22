@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
 import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from '../../domain/constants/binned-export';
+import { EXPORT_TABLE_FORMATS } from '../../domain/constants/export-format';
 
 const ALLOWED_EXPORT_TYPES = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
 const ALLOWED_BIN_MODES = ["auto", "depth", "time"];
@@ -25,6 +26,9 @@ export class MiddlewareExportValidation implements IMiddlewareExportValidation {
         check("skip_not_validated")
             .optional()
             .isBoolean().withMessage('skip_not_validated must be a boolean.'),
+        check("format")
+            .optional()
+            .isIn(EXPORT_TABLE_FORMATS).withMessage(`format must be one of: ${EXPORT_TABLE_FORMATS.join(", ")}.`),
         check("ecotaxa_exclude_not_living")
             .if((_value: any, { req }: any) => Array.isArray(req.body?.export_types) && req.body.export_types.includes("ecotaxa"))
             .exists().withMessage('ecotaxa_exclude_not_living is required when ecotaxa export is selected.')
@@ -59,6 +63,9 @@ export class MiddlewareExportValidation implements IMiddlewareExportValidation {
             .optional()
             .isBoolean().withMessage('skip_not_validated must be a boolean.')
             .toBoolean(),
+        check("format")
+            .optional()
+            .isIn(EXPORT_TABLE_FORMATS).withMessage(`format must be one of: ${EXPORT_TABLE_FORMATS.join(", ")}.`),
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
