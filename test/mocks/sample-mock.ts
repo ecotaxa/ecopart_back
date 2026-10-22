@@ -1,4 +1,4 @@
-import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
+import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, Uvp5WorkFilesCheckModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
 import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
@@ -103,6 +103,9 @@ export class MockSampleRepository implements SampleRepository {
     }
     getSourceMaxPressure(): Promise<number | null> {
         throw new Error("Method not implemented for getSourceMaxPressure");
+    }
+    checkUvp5WorkFiles(): Promise<Uvp5WorkFilesCheckModel> {
+        throw new Error("Method not implemented for checkUvp5WorkFiles");
     }
     setSampleVisualQc(): Promise<number> {
         throw new Error("Method not implemented for setSampleVisualQc");

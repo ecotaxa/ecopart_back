@@ -153,9 +153,10 @@ export class ImportSamples implements ImportSamplesUseCase {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/4 sample validation : start");
         await this.ensureSamplesAreBothInHeadersAndInDataFolder(samples, samples_names_to_import, project);
         this.ensureSamplesPassQcLvl1(samples, samples_names_to_import);
+        await log(`Step 1/4 sample validation : ${samples_names_to_import.length} sample(s) to import out of ${samples.length} importable`);
+        await this.ensureWorkFilesArePresent(task_id, log, project, samples_names_to_import);
         await this.ensureDepthProfilesHavePressure(project, samples_names_to_import);
         //TODO LATER add more validation
-        await log(`Step 1/4 sample validation : ${samples_names_to_import.length} sample(s) to import out of ${samples.length} importable`);
         const samples_by_name = new Map(samples.map(sample => [sample.sample_name, sample]));
         for (const sample_name of samples_names_to_import) {
             const sample = samples_by_name.get(sample_name);
@@ -180,12 +181,36 @@ export class ImportSamples implements ImportSamplesUseCase {
 
     ensureSamplesPassQcLvl1(samples: PublicHeaderSampleResponseModel[], samples_names_to_import: string[]) {
         const samples_by_name = new Map(samples.map(sample => [sample.sample_name, sample]));
-        const failing_samples = samples_names_to_import.filter(name => {
-            const sample = samples_by_name.get(name);
-            return sample && !sample.qc_lvl1;
-        });
+        const failing_samples = samples_names_to_import
+            .map(name => samples_by_name.get(name))
+            .filter((sample): sample is PublicHeaderSampleResponseModel => sample !== undefined && !sample.qc_lvl1);
         if (failing_samples.length > 0) {
-            throw new Error("Samples failed QC level 1 (source data missing): " + failing_samples.join(", "));
+            throw new Error("Samples failed QC level 1 (source data missing): " + failing_samples.map(sample => `${sample.sample_name} (${sample.qc_lvl1_comment})`).join(", "));
+        }
+    }
+
+    // UVP5: steps 3/4 and the pivot read the datfile, HDR*.txt and the .bru from the copy of the work
+    // entry, and the copy of a tar.zst takes hours on a long deployment: they are looked for first,
+    // in every sample, so that all the incomplete samples are reported at once.
+    async ensureWorkFilesArePresent(task_id: number, log: TaskLogger, project: ProjectResponseModel, samples_names_to_import: string[]): Promise<void> {
+        if (!project.instrument_model.startsWith('UVP5')) return;
+        const incomplete: string[] = [];
+        for (const sample_name of samples_names_to_import) {
+            await this.taskRepository.throwIfCancelled(task_id);
+            let reason: string | null;
+            try {
+                const check = await this.sampleRepository.checkUvp5WorkFiles(project.root_folder_path, sample_name);
+                const source = `${check.work_source} (${check.files_count} files)`;
+                reason = check.missing.length > 0 ? `${source} has no ${check.missing.join(", ")}` : null;
+                await log(`Step 1/4 sample validation : ${sample_name} : ${reason ?? `work files found in ${source}`}`);
+            } catch (error) {
+                reason = `its work entry cannot be read: ${(error as Error).message}`;
+                await log(`Step 1/4 sample validation : ${sample_name} : ${reason}`);
+            }
+            if (reason !== null) incomplete.push(`${sample_name} (${reason})`);
+        }
+        if (incomplete.length > 0) {
+            throw new Error("Samples with missing work files: " + incomplete.join(", ") + ". Only the work entry of each sample is read: add the files there, then relaunch the import.");
         }
     }
 

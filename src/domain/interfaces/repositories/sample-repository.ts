@@ -1,4 +1,4 @@
-import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, Uvp5WorkFilesCheckModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
 import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
@@ -11,8 +11,9 @@ export interface SampleRepository {
     createSample(sample: SampleRequestCreationModel): Promise<number>;
     createManySamples(samples: SampleRequestCreationModel[]): Promise<number[]>;
     ensureFolderExists(root_folder_path: string): Promise<void>;
-    // vignettes_of: count the vignettes of these samples only, the others report 0 (all when omitted).
-    listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, vignettes_of?: string[]): Promise<PublicHeaderSampleResponseModel[]>;
+    // inspected: only these samples have their vignettes counted and their own metadata checked for
+    // qc_lvl1, the others report 0 vignettes (all when omitted).
+    listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, inspected?: string[]): Promise<PublicHeaderSampleResponseModel[]>;
     // Reason, per sample name, why listImportableSamples leaves it out.
     explainNotImportableSamples(root_folder_path: string, dest_folder: string, project_id: number, samples_names: string[]): Promise<Map<string, string>>;
     UVP6copySamplesToImportFolder(source_folder: string, dest_folder: string, samples_names_to_import: string[], log: TaskLogger): Promise<void>
@@ -60,6 +61,9 @@ export interface SampleRepository {
     // Pre-import variant: max raw pressure of the particle file in the project source folder, null
     // when no line has a readable pressure.
     getSourceMaxPressure(root_folder_path: string, sample_name: string, instrument_model: string): Promise<number | null>;
+    // UVP5 pre-import check: which of the files read after the copy (datfile, HDR*.txt, .bru) the
+    // work entry of the sample lacks. Only the work entry is looked at.
+    checkUvp5WorkFiles(root_folder_path: string, sample_name: string): Promise<Uvp5WorkFilesCheckModel>;
     // Records a visual-QC decision (status + validator + timestamp + optional comment).
     setSampleVisualQc(sample_id: number, visual_qc_status_id: number, visual_qc_validator_user_id: number, comment: string | null, validated_at: string): Promise<number>;
 
