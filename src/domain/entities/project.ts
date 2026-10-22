@@ -192,17 +192,3 @@ export interface MigrateEcotaxaProjectResponseModel {
     unmatched_samples: string[];
     ecotaxa_only_samples: string[];
 }
-
-// // FOR acess permissions LATER
-// export interface ProjectVisibility {
-//     visibility_id: number;
-//     visibility_name: ProjectVisibilityStatus;
-//     visibility_creation_date: string;
-// }
-// // TODO ENUM TO CREATE IN DB
-// export enum ProjectVisibilityStatus {
-//     Private = "Private",
-//     Visible = "Visible",
-//     Public = "Public",
-//     Public_plus = "Public+"
-// }
