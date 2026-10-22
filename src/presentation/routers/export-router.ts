@@ -71,8 +71,6 @@ export default function ExportRouter(
      *       - `sample_integration_time`: UVP5 only in the extended meta-header format — empty for the 21-column
      *         format shipped by Zooprocess. Filled for the UVP6 (`metadata.ini` `integrationtime`), empty when
      *         that value is `nan` (depth-mode samples).
-     *       - `instrument_settings_process_utc_date_time`: always empty — no UVP file carries the Zooprocess date
-     *         (it is a manual field in legacy EcoPart and EcoPart has no editing screen for it yet).
      *       - `instrument_settings_depth_offset_m`: not carried by the UVP5 files (set it at project level);
      *         on the UVP6 an out-of-range value (`< 0` or `>= 100`) is discarded, as in legacy EcoPart.
      *       - `instrument_settings_process_gamma` / `instrument_settings_process_vignette_resize_factor`: read from

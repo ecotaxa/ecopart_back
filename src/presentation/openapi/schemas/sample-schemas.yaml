@@ -107,9 +107,6 @@ components:
           description: |
             Factor converting the raw pressure of the LPM data files to decibar (`raw × pressure_gain = decibar`):
             `0.1` for UVP5, `1` for UVP6. Omitted when not set.
-        instrument_settings_process_datetime:
-          type: string
-          description: Process date and time in ISO format.
         instrument_settings_process_gamma:
           type: number
           description: Process gamma value.
