@@ -17,7 +17,7 @@ import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
 import { parseCtdRows } from "../utils/ctd-rows";
 import { CtdRows } from "../entities/ctd";
-import { ExploreSampleQuery, ExploreSampleRow } from "../entities/explore";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../entities/explore";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
@@ -2309,6 +2309,18 @@ export class SampleRepositoryImpl implements SampleRepository {
         } catch (error) {
             throw new Error(`Cannot read the CTD file of sample ${sample_name} (${(error as Error).message})`);
         }
+    }
+
+    async getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]> {
+        return await this.sampleDataSource.getEcoTaxaStats(sample_ids);
+    }
+
+    async saveEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void> {
+        if (stats.length > 0) await this.sampleDataSource.upsertEcoTaxaStats(stats);
+    }
+
+    async listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
+        return await this.sampleDataSource.listEcoTaxaImportedSamples();
     }
 
     async updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number> {

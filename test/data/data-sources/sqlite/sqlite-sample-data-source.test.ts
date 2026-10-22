@@ -4,7 +4,7 @@ import path from 'path'
 import { MigrationManager } from '../../../../src/data/migrations/migration-manager'
 import { SQLiteSampleDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-sample-data-source'
 import { sampleRequestCreationModel_1 } from '../../../entities/sample'
-import { ExploreSampleQuery } from '../../../../src/domain/entities/explore'
+import { ExploreSampleQuery, StoredEcoTaxaStats } from '../../../../src/domain/entities/explore'
 import { SampleRequestCreationModel } from '../../../../src/domain/entities/sample'
 
 const DBFILE = 'TEST_DB_SOURCE_SAMPLE'
@@ -288,6 +288,100 @@ describe('SQLiteSampleDataSource', () => {
             expect(await names({ date_from: '2012-05-20', date_to: '2012-05-20' })).toEqual(['legacy_uvp5'])
             expect(await names({ months: [4, 6] })).toEqual(['iso_sample', 'legacy_uvp6'])
             expect(await names({ hour_range: [14, 15] })).toEqual(['legacy_uvp6'])
+        })
+    })
+
+    describe('EcoTaxa stats (table sample_ecotaxa_stats)', () => {
+        // A project of its own: other describes flag samples as imported in EcoTaxa too.
+        const P_STATS = 9006
+        let with_id: number
+        let without_id: number
+        let not_imported: number
+
+        const stats = (sample_id: number, ecotaxa_sample_id: number, overrides: Partial<StoredEcoTaxaStats> = {}): StoredEcoTaxaStats => ({
+            sample_id, ecotaxa_sample_id, nb_unclassified: 1, nb_validated: 2, nb_dubious: 3, nb_predicted: 4, used_taxa: [1, 2, 3],
+            fetched_utc_date_time: '2026-10-21T08:00:00.000Z', ...overrides,
+        })
+        const rawRows = (sample_id: number): Promise<any[]> => new Promise((resolve, reject) =>
+            db.all('SELECT * FROM sample_ecotaxa_stats WHERE sample_id = ?', [sample_id], (e, rows) => e ? reject(e) : resolve(rows)))
+
+        beforeAll(async () => {
+            const create = async (sample_name: string, columns: Record<string, unknown>): Promise<number> => {
+                const id = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_STATS })
+                await run(db, `UPDATE sample SET ${Object.keys(columns).map(name => `${name} = ?`).join(', ')} WHERE sample_id = ?`, [...Object.values(columns), id])
+                return id
+            }
+            with_id = await create('stats_with_id', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: 7001 })
+            without_id = await create('stats_without_id', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: null })
+            not_imported = await create('stats_not_imported', { ecotaxa_sample_imported: 0, ecotaxa_sample_id: 7003 })
+        })
+
+        test('upsertEcoTaxaStats inserts, then replaces the row of the same sample', async () => {
+            await dataSource.upsertEcoTaxaStats([stats(with_id, 7001)])
+            expect(await dataSource.getEcoTaxaStats([with_id])).toEqual([stats(with_id, 7001)])
+
+            const refreshed = stats(with_id, 7002, { nb_validated: 20, nb_predicted: 0, used_taxa: [], fetched_utc_date_time: '2026-10-22T08:00:00.000Z' })
+            await dataSource.upsertEcoTaxaStats([refreshed])
+
+            expect(await dataSource.getEcoTaxaStats([with_id])).toEqual([refreshed])
+            expect(await rawRows(with_id)).toHaveLength(1)
+        })
+
+        test('upsertEcoTaxaStats writes several samples at once, and nothing for an empty list', async () => {
+            await dataSource.upsertEcoTaxaStats([])
+            await dataSource.upsertEcoTaxaStats([stats(with_id, 7001), stats(not_imported, 7003, { used_taxa: [45072] })])
+
+            const rows = (await dataSource.getEcoTaxaStats([not_imported, with_id])).sort((a, b) => a.sample_id - b.sample_id)
+            expect(rows).toEqual([stats(with_id, 7001), stats(not_imported, 7003, { used_taxa: [45072] })].sort((a, b) => a.sample_id - b.sample_id))
+        })
+
+        test('used_taxa is kept as a comma-separated list: "1,2,3" reads [1, 2, 3], "" reads []', async () => {
+            await dataSource.upsertEcoTaxaStats([stats(with_id, 7001, { used_taxa: [1, 2, 3] }), stats(without_id, 7002, { used_taxa: [] })])
+            expect((await rawRows(with_id))[0].used_taxa).toBe('1,2,3')
+            expect((await rawRows(without_id))[0].used_taxa).toBe('')
+
+            const rows = await dataSource.getEcoTaxaStats([with_id, without_id])
+            expect(rows.find(row => row.sample_id === with_id)?.used_taxa).toEqual([1, 2, 3])
+            expect(rows.find(row => row.sample_id === without_id)?.used_taxa).toEqual([])
+        })
+
+        test('getEcoTaxaStats: nothing for an empty list or samples without stats', async () => {
+            await expect(dataSource.getEcoTaxaStats([])).resolves.toEqual([])
+            await expect(dataSource.getEcoTaxaStats([424242])).resolves.toEqual([])
+        })
+
+        test('listEcoTaxaImportedSamples: only the samples imported in EcoTaxa, with the date of their stats or null', async () => {
+            await run(db, 'DELETE FROM sample_ecotaxa_stats WHERE sample_id IN (?, ?, ?)', [with_id, without_id, not_imported])
+            await dataSource.upsertEcoTaxaStats([stats(with_id, 7001, { fetched_utc_date_time: '2026-10-20T06:00:00.000Z' }), stats(not_imported, 7003)])
+
+            const listed = await dataSource.listEcoTaxaImportedSamples()
+
+            expect(listed.filter(sample => sample.project_id === P_STATS)).toEqual([
+                { sample_id: with_id, sample_name: 'stats_with_id', project_id: P_STATS, ecotaxa_sample_id: 7001, fetched_utc_date_time: '2026-10-20T06:00:00.000Z' },
+                { sample_id: without_id, sample_name: 'stats_without_id', project_id: P_STATS, ecotaxa_sample_id: null, fetched_utc_date_time: null },
+            ])
+            expect(listed.some(sample => sample.sample_id === not_imported)).toBe(false)
+            // Samples of the other describes, flagged imported there, are listed too.
+            expect(listed.some(sample => sample.sample_name === 'pacific_003')).toBe(true)
+            const ids = listed.map(sample => sample.sample_id)
+            expect(ids).toEqual([...ids].sort((a, b) => a - b))
+        })
+
+        test('deleting a sample deletes its stats (foreign keys on, as in production)', async () => {
+            // The suite runs with foreign keys off (its fixture points at a project and a user it does not
+            // seed); the application turns them on at start, so this case does as well, for itself only.
+            const doomed = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name: 'stats_deleted', project_id: P_STATS })
+            await dataSource.upsertEcoTaxaStats([stats(doomed, 7009)])
+            expect(await rawRows(doomed)).toHaveLength(1)
+            await run(db, 'PRAGMA foreign_keys = ON')
+            try {
+                await run(db, 'DELETE FROM sample WHERE sample_id = ?', [doomed])
+            } finally {
+                await run(db, 'PRAGMA foreign_keys = OFF')
+            }
+
+            expect(await rawRows(doomed)).toEqual([])
+            await expect(dataSource.getEcoTaxaStats([doomed])).resolves.toEqual([])
         })
     })
 })

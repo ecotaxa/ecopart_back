@@ -1,7 +1,7 @@
 import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
 import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
-import { ExploreSampleRow } from "../../src/domain/entities/explore";
+import { EcoTaxaImportedSample, ExploreSampleRow, StoredEcoTaxaStats } from "../../src/domain/entities/explore";
 import { CtdRows } from "../../src/domain/entities/ctd";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
 import { PivotImages, SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
@@ -129,6 +129,15 @@ export class MockSampleRepository implements SampleRepository {
     }
     updateParticleStats(): Promise<number> {
         throw new Error("Method not implemented for updateParticleStats");
+    }
+    getEcoTaxaStats(): Promise<StoredEcoTaxaStats[]> {
+        throw new Error("Method not implemented for getEcoTaxaStats");
+    }
+    saveEcoTaxaStats(): Promise<void> {
+        throw new Error("Method not implemented for saveEcoTaxaStats");
+    }
+    listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
+        throw new Error("Method not implemented for listEcoTaxaImportedSamples");
     }
 }
 

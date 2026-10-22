@@ -3,7 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { ExploreSampleQuery, ExploreSampleRow } from "../../../domain/entities/explore";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
 import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
@@ -531,6 +531,42 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         });
         for (const row of rows) counts.set(row.project_id, row.nb);
         return counts;
+    }
+
+    async getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]> {
+        if (sample_ids.length === 0) return [];
+        const sql = `SELECT * FROM sample_ecotaxa_stats WHERE sample_id IN (${sample_ids.map(() => "(?)").join(",")});`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, sample_ids, (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({
+            sample_id: row.sample_id,
+            ecotaxa_sample_id: row.ecotaxa_sample_id,
+            nb_unclassified: row.nb_unclassified,
+            nb_validated: row.nb_validated,
+            nb_dubious: row.nb_dubious,
+            nb_predicted: row.nb_predicted,
+            used_taxa: String(row.used_taxa ?? "").split(",").filter(id => id !== "").map(Number),
+            fetched_utc_date_time: row.fetched_utc_date_time,
+        }));
+    }
+
+    async upsertEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void> {
+        const sql = `INSERT OR REPLACE INTO sample_ecotaxa_stats
+            (sample_id, ecotaxa_sample_id, nb_unclassified, nb_validated, nb_dubious, nb_predicted, used_taxa, fetched_utc_date_time)
+            VALUES ((?), (?), (?), (?), (?), (?), (?), (?));`;
+        for (const stat of stats) {
+            await new Promise<void>((resolve, reject) => this.db.run(sql, [
+                stat.sample_id, stat.ecotaxa_sample_id, stat.nb_unclassified, stat.nb_validated, stat.nb_dubious, stat.nb_predicted,
+                stat.used_taxa.join(","), stat.fetched_utc_date_time,
+            ], (err) => err ? reject(err) : resolve()));
+        }
+    }
+
+    async listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
+        const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id, sample.ecotaxa_sample_id, stats.fetched_utc_date_time
+            FROM sample LEFT JOIN sample_ecotaxa_stats stats ON stats.sample_id = sample.sample_id
+            WHERE sample.ecotaxa_sample_imported = 1 ORDER BY sample.sample_id;`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({ sample_id: row.sample_id, sample_name: row.sample_name, project_id: row.project_id, ecotaxa_sample_id: row.ecotaxa_sample_id ?? null, fetched_utc_date_time: row.fetched_utc_date_time ?? null }));
     }
 
     async getEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {

@@ -176,6 +176,28 @@ export interface ExploreEcoTaxaSummary {
     categories: string[];
     classification: ClassificationShares;
     nb_samples_with_stats: number;
+    partial: boolean;                         // some samples have no stats yet: they are being read from EcoTaxa, ask again later
+    nb_samples_pending: number;
+}
+
+// The EcoTaxa classification counts of a sample as EcoPart keeps them (table sample_ecotaxa_stats).
+export interface StoredEcoTaxaStats {
+    sample_id: number;
+    ecotaxa_sample_id: number;
+    nb_unclassified: number;
+    nb_validated: number;
+    nb_dubious: number;
+    nb_predicted: number;
+    used_taxa: number[];
+    fetched_utc_date_time: string;
+}
+
+// A sample imported in EcoTaxa, as the daily refresh of the stats lists them.
+export interface EcoTaxaImportedSample {
+    sample_id: number;
+    sample_name: string;
+    project_id: number;
+    ecotaxa_sample_id: number | null;
 }
 
 export interface ExploreEcoTaxaResponse {

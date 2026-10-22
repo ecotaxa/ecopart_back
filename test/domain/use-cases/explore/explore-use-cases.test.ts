@@ -38,7 +38,7 @@ describe("Explore use cases", () => {
         privilegeRepository = new MockPrivilegeRepository();
         sampleRepository = new MockSampleRepository();
         repositories = { userRepository, projectRepository, privilegeRepository, sampleRepository };
-        ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository);
+        ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository, projectRepository);
         jest.spyOn(userRepository, "ensureUserCanBeUsed").mockResolvedValue();
         jest.spyOn(userRepository, "isAdmin").mockResolvedValue(false);
         jest.spyOn(projectRepository, "listProjects").mockResolvedValue([OPEN, PRIVATE, PUBLIC_TWIN]);
@@ -135,7 +135,13 @@ describe("Explore use cases", () => {
     });
 
     describe("GetExploreEcoTaxa", () => {
-        const summary = (nb: number): ExploreEcoTaxaSummary => ({ categories: ["Copepoda"], classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 }, nb_samples_with_stats: nb });
+        const summary = (nb: number, nb_samples_pending = 0): ExploreEcoTaxaSummary => ({
+            categories: ["Copepoda"],
+            classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 },
+            nb_samples_with_stats: nb,
+            partial: nb_samples_pending > 0,
+            nb_samples_pending,
+        });
 
         test("summarises all the samples and the exportable ones", async () => {
             jest.spyOn(ecotaxa, "summaryOf").mockResolvedValueOnce(summary(3)).mockResolvedValueOnce(summary(1));
@@ -146,6 +152,15 @@ describe("Explore use cases", () => {
             expect(ecotaxa.summaryOf).toBeCalledTimes(2);
             expect(ecotaxa.summaryOf).toHaveBeenNthCalledWith(1, SAMPLES, expect.any(Map), false);
             expect(ecotaxa.summaryOf).toHaveBeenNthCalledWith(2, [SAMPLES[0]], expect.any(Map), false);
+        });
+
+        test("a summary still being read from EcoTaxa is passed on as partial", async () => {
+            jest.spyOn(ecotaxa, "summaryOf").mockResolvedValueOnce(summary(1, 2)).mockResolvedValueOnce(summary(1));
+
+            const response = await new GetExploreEcoTaxa(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+
+            expect(response.all).toMatchObject({ partial: true, nb_samples_pending: 2 });
+            expect(response.exportable).toMatchObject({ partial: false, nb_samples_pending: 0 });
         });
 
         test("passes the 'exclude not living' criterion", async () => {

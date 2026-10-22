@@ -2,7 +2,7 @@ import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestMod
 import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
-import { ExploreSampleQuery, ExploreSampleRow } from "../../entities/explore";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
 import { CtdRows } from "../../entities/ctd";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { TaskLogger } from "./task-repository";
@@ -85,6 +85,10 @@ export interface SampleRepository {
     getCtdRows(project_id: number, sample_name: string, ctd_file_extension: string): Promise<CtdRows>;
     // Particle statistics of a sample (nb_particles, extreme areas), written after its pivot is read.
     updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number>;
+    // EcoTaxa classification counts kept per sample, read and refreshed by the Explore EcoTaxa service.
+    getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]>;
+    saveEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void>;
+    listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]>;
 }
 
 // A sample's pivot read in two passes, so that a mooring of millions of images is never held in

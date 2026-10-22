@@ -1,6 +1,6 @@
 import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { ExploreSampleQuery, ExploreSampleRow } from "../../../domain/entities/explore";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //SampleTypeModel, SampleTypeRequestModel, SampleRequestModel, SampleUpdateModel, SampleResponseModel, QualityCheckStatusRequestModel, QualityCheckStatusModel 
 export interface SampleDataSource {
@@ -19,4 +19,9 @@ export interface SampleDataSource {
     getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]>;
     // Samples per project (one GROUP BY); null covers every project. Projects without samples are absent.
     countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>>;
+    // EcoTaxa classification counts kept per sample (table sample_ecotaxa_stats).
+    getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]>;
+    upsertEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void>;
+    // Every sample imported in EcoTaxa, with the date its stats were last read (null when never).
+    listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]>;
 }

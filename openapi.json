@@ -1598,6 +1598,13 @@
           },
           "nb_samples_with_stats": {
             "type": "integer"
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Some samples have no stats yet: they are being read from EcoTaxa in the background, ask again later."
+          },
+          "nb_samples_pending": {
+            "type": "integer"
           }
         }
       },

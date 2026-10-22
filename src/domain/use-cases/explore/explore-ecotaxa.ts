@@ -1,14 +1,20 @@
 import { ECOTAXA_BIOTA_TAXO_ID } from "../../constants/ecotaxa-living-taxo";
 import { EcoTaxaTaxon } from "../../entities/ecotaxa_account";
-import { ClassificationShares, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow } from "../../entities/explore";
+import { ClassificationShares, EcoTaxaImportedSample, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { EcoTaxaThrottle } from "./ecotaxa-throttle";
 import { ExploreProjectContext } from "./explore-selection";
 
 /* What the Explore page asks EcoTaxa: the classification counts of the samples (stats), the names of
  * the taxa they use, and a few random object images. Every call goes through the generic account of
- * the instance. Results are cached in memory for a while: exploring is iterative, the same samples
- * come back request after request. */
+ * the instance and the shared throttle.
+ *
+ * The stats are the costly part (EcoTaxa scans every object of the samples asked), so EcoPart keeps
+ * them in its database: a request is served from there, refreshes synchronously only a few missing
+ * or stale samples, and hands the rest to a background queue, answering `partial` meanwhile. A daily
+ * sweep refreshes every sample older than a day, gently, so that the queue rarely has much to do. */
 
 export interface EcoTaxaSampleStat {
     ecotaxa_sample_id: number;
@@ -26,16 +32,28 @@ interface InstanceAccess {
 }
 
 interface SampleOnInstance {
-    sample: ExploreSampleRow;
+    sample: EcoTaxaImportedSample;
     ecotaxa_project_id: number;
     access: InstanceAccess;
 }
 
-export const ECOTAXA_STATS_TTL_MS = 10 * 60 * 1000;
-export const ECOTAXA_STATS_BATCH = 200;
+// A project as the service needs it: its EcoTaxa link.
+export type EcoTaxaProjectLink = { project_id: number; ecotaxa_project_id: number | null; ecotaxa_instance_id: number | null };
+
+export const ECOTAXA_STATS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+// Memory caches (instance access, object totals of the images, names looked up) live this long; taxa names never change.
+export const ECOTAXA_CACHE_TTL_MS = 10 * 60 * 1000;
+// EcoTaxa reads every object of the samples asked: small batches keep each query short.
+export const ECOTAXA_STATS_BATCH = 50;
+// Beyond this many samples to refresh, a request answers with what it has and queues the rest.
+export const ECOTAXA_SYNC_REFRESH_LIMIT = 100;
+export const ECOTAXA_MAX_IN_FLIGHT = 2;
+// The queue breathes between two batches, the sweep between two as well: EcoTaxa's own users first.
+export const ECOTAXA_QUEUE_PAUSE_MS = 500;
+export const ECOTAXA_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const ECOTAXA_SWEEP_FIRST_DELAY_MS = 60 * 1000;
 export const EXPLORE_IMAGES_DEFAULT = 4;
 export const EXPLORE_IMAGES_MAX = 12;
-// Objects fetched from EcoTaxa in one window, from which the random images are drawn.
 const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
 
 const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
@@ -71,66 +89,84 @@ export function classificationSharesOf(stats: EcoTaxaSampleStat[]): Classificati
     };
 }
 
+export function toSampleStat(stored: StoredEcoTaxaStats): EcoTaxaSampleStat {
+    return { ecotaxa_sample_id: stored.ecotaxa_sample_id, used_taxa: stored.used_taxa, nb_unclassified: stored.nb_unclassified, nb_validated: stored.nb_validated, nb_dubious: stored.nb_dubious, nb_predicted: stored.nb_predicted };
+}
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
 export class ExploreEcoTaxaService {
-    private readonly stats_cache = new Map<string, { at: number; stat: EcoTaxaSampleStat }>();
     private readonly taxa_cache = new Map<string, EcoTaxaTaxon>();
     private readonly totals_cache = new Map<string, { at: number; total: number }>();
     private readonly access_cache = new Map<number, { at: number; access: InstanceAccess | null }>();
     // EcoTaxa projects whose sample names were looked up: a name EcoTaxa does not know is not asked again for a while.
     private readonly resolved_projects = new Map<number, number>();
+    private readonly throttle: EcoTaxaThrottle;
+    // The background refresh: samples waiting, by id, drained by one worker at a time.
+    private readonly queue = new Map<number, SampleOnInstance>();
+    private draining: Promise<void> | null = null;
+    private sweep_timer: NodeJS.Timeout | null = null;
 
     constructor(
         private readonly ecotaxaAccountRepository: EcotaxaAccountRepository,
         private readonly sampleRepository: SampleRepository,
+        private readonly projectRepository: ProjectRepository,
         private readonly now: () => number = () => Date.now(),
         private readonly random: () => number = Math.random,
-    ) { }
+        throttle: EcoTaxaThrottle = new EcoTaxaThrottle(ECOTAXA_MAX_IN_FLIGHT),
+        private readonly pause: (ms: number) => Promise<void> = sleep,
+    ) {
+        this.throttle = throttle;
+    }
+
+    /* ─── instances and sample ids ─── */
+
+    private async accessOf(instance_id: number): Promise<InstanceAccess | null> {
+        const now = this.now();
+        const cached = this.access_cache.get(instance_id);
+        if (cached && now - cached.at < ECOTAXA_CACHE_TTL_MS) return cached.access;
+        let access: InstanceAccess | null = null;
+        try {
+            const [instance, account] = await Promise.all([
+                this.ecotaxaAccountRepository.getOneEcoTaxaInstance(instance_id),
+                this.ecotaxaAccountRepository.getEcotaxaGenericAccountForInstance(instance_id),
+            ]);
+            if (instance) access = { instance_id, base_url: instance.ecotaxa_instance_url, token: account.ecotaxa_account_token };
+        } catch (error) {
+            console.log(new Date().toISOString(), `Explore: EcoTaxa instance ${instance_id} unavailable`, (error as Error).message);
+        }
+        this.access_cache.set(instance_id, { at: now, access });
+        return access;
+    }
 
     // The samples imported in EcoTaxa, with the access to their instance; the ids EcoPart never
     // stored (samples imported through EcoPart, which only the migration path numbered) are resolved
     // from the EcoTaxa project and written back, once.
-    private async samplesOnInstances(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): Promise<SampleOnInstance[]> {
+    private async samplesOnInstances(samples: (EcoTaxaImportedSample & { ecotaxa_sample_imported?: boolean })[], links: Map<number, EcoTaxaProjectLink>): Promise<SampleOnInstance[]> {
         const now = this.now();
-        const accessOf = async (instance_id: number): Promise<InstanceAccess | null> => {
-            const cached = this.access_cache.get(instance_id);
-            if (cached && now - cached.at < ECOTAXA_STATS_TTL_MS) return cached.access;
-            let access: InstanceAccess | null = null;
-            try {
-                const [instance, account] = await Promise.all([
-                    this.ecotaxaAccountRepository.getOneEcoTaxaInstance(instance_id),
-                    this.ecotaxaAccountRepository.getEcotaxaGenericAccountForInstance(instance_id),
-                ]);
-                if (instance) access = { instance_id, base_url: instance.ecotaxa_instance_url, token: account.ecotaxa_account_token };
-            } catch (error) {
-                console.log(new Date().toISOString(), `Explore: EcoTaxa instance ${instance_id} unavailable`, (error as Error).message);
-            }
-            this.access_cache.set(instance_id, { at: now, access });
-            return access;
-        };
-
         const result: SampleOnInstance[] = [];
         const unresolved = new Map<number, SampleOnInstance[]>();
         for (const sample of samples) {
-            if (!sample.ecotaxa_sample_imported) continue;
-            const project = projects.get(sample.project_id)?.project;
-            if (!project || project.ecotaxa_project_id === null || project.ecotaxa_instance_id === null) continue;
-            const access = await accessOf(project.ecotaxa_instance_id);
+            if (sample.ecotaxa_sample_imported === false) continue;
+            const link = links.get(sample.project_id);
+            if (!link || link.ecotaxa_project_id === null || link.ecotaxa_instance_id === null) continue;
+            const access = await this.accessOf(link.ecotaxa_instance_id);
             if (!access) continue;
-            const entry = { sample, ecotaxa_project_id: project.ecotaxa_project_id, access };
+            const entry = { sample, ecotaxa_project_id: link.ecotaxa_project_id, access };
             if (sample.ecotaxa_sample_id !== null) result.push(entry);
             else {
-                const list = unresolved.get(project.project_id) ?? [];
+                const list = unresolved.get(link.project_id) ?? [];
                 list.push(entry);
-                unresolved.set(project.project_id, list);
+                unresolved.set(link.project_id, list);
             }
         }
         for (const entries of unresolved.values()) {
             const { access, ecotaxa_project_id } = entries[0];
             const looked_up = this.resolved_projects.get(ecotaxa_project_id);
-            if (looked_up !== undefined && now - looked_up < ECOTAXA_STATS_TTL_MS) continue;
+            if (looked_up !== undefined && now - looked_up < ECOTAXA_CACHE_TTL_MS) continue;
             this.resolved_projects.set(ecotaxa_project_id, now);
             try {
-                const by_name = new Map((await this.ecotaxaAccountRepository.api_ecotaxa_get_samples_in_project(access.base_url, access.token, ecotaxa_project_id)).map(s => [s.orig_id, s.sampleid]));
+                const by_name = new Map((await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_get_samples_in_project(access.base_url, access.token, ecotaxa_project_id))).map(s => [s.orig_id, s.sampleid]));
                 for (const entry of entries) {
                     const ecotaxa_sample_id = by_name.get(entry.sample.sample_name);
                     if (ecotaxa_sample_id === undefined) continue;
@@ -145,38 +181,38 @@ export class ExploreEcoTaxaService {
         return result;
     }
 
-    // The EcoTaxa stats of the samples, by sample id; samples whose instance does not answer are absent.
-    async statsOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): Promise<Map<number, EcoTaxaSampleStat>> {
-        return this.statsOfEntries(await this.samplesOnInstances(samples, projects));
+    private static linksOf(projects: Map<number, ExploreProjectContext>): Map<number, EcoTaxaProjectLink> {
+        return new Map(Array.from(projects.values()).map(context => [context.project.project_id, context.project]));
     }
 
-    private async statsOfEntries(entries: SampleOnInstance[]): Promise<Map<number, EcoTaxaSampleStat>> {
+    /* ─── stats: the database first, EcoTaxa for what is missing or stale ─── */
+
+    // Reads EcoTaxa for these samples, in small batches through the throttle, and keeps the answers.
+    private async fetchStats(entries: SampleOnInstance[]): Promise<Map<number, EcoTaxaSampleStat>> {
         const stats = new Map<number, EcoTaxaSampleStat>();
-        const to_fetch = new Map<number, SampleOnInstance[]>();
-        const now = this.now();
+        const by_instance = new Map<number, SampleOnInstance[]>();
         for (const entry of entries) {
-            const cached = this.stats_cache.get(`${entry.access.instance_id}:${entry.sample.ecotaxa_sample_id}`);
-            if (cached && now - cached.at < ECOTAXA_STATS_TTL_MS) {
-                stats.set(entry.sample.sample_id, cached.stat);
-                continue;
-            }
-            const list = to_fetch.get(entry.access.instance_id) ?? [];
+            const list = by_instance.get(entry.access.instance_id) ?? [];
             list.push(entry);
-            to_fetch.set(entry.access.instance_id, list);
+            by_instance.set(entry.access.instance_id, list);
         }
-        for (const list of to_fetch.values()) {
+        for (const list of by_instance.values()) {
             const access = list[0].access;
             const by_ecotaxa_id = new Map(list.map(entry => [entry.sample.ecotaxa_sample_id as number, entry.sample]));
             for (let i = 0; i < list.length; i += ECOTAXA_STATS_BATCH) {
                 const batch = list.slice(i, i + ECOTAXA_STATS_BATCH).map(entry => entry.sample.ecotaxa_sample_id as number);
                 try {
-                    for (const row of await this.ecotaxaAccountRepository.api_ecotaxa_get_sample_stats(access.base_url, access.token, batch)) {
+                    const rows = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_get_sample_stats(access.base_url, access.token, batch));
+                    const fetched_utc_date_time = new Date(this.now()).toISOString();
+                    const stored: StoredEcoTaxaStats[] = [];
+                    for (const row of rows) {
                         const sample = by_ecotaxa_id.get(row.sample_id);
                         if (!sample) continue;
                         const stat: EcoTaxaSampleStat = { ecotaxa_sample_id: row.sample_id, used_taxa: row.used_taxa ?? [], nb_unclassified: row.nb_unclassified, nb_validated: row.nb_validated, nb_dubious: row.nb_dubious, nb_predicted: row.nb_predicted };
-                        this.stats_cache.set(`${access.instance_id}:${row.sample_id}`, { at: now, stat });
                         stats.set(sample.sample_id, stat);
+                        stored.push({ sample_id: sample.sample_id, ...stat, fetched_utc_date_time });
                     }
+                    await this.sampleRepository.saveEcoTaxaStats(stored);
                 } catch (error) {
                     console.log(new Date().toISOString(), `Explore: EcoTaxa sample stats unavailable on instance ${access.instance_id}`, (error as Error).message);
                 }
@@ -185,7 +221,64 @@ export class ExploreEcoTaxaService {
         return stats;
     }
 
-    // The samples whose classification state is the asked one; samples without EcoTaxa stats are left out.
+    private enqueue(entries: SampleOnInstance[]): void {
+        for (const entry of entries) if (!this.queue.has(entry.sample.sample_id)) this.queue.set(entry.sample.sample_id, entry);
+        if (this.draining === null && this.queue.size > 0) this.draining = this.drain();
+    }
+
+    // The worker releases its place inside its own body: whatever is queued once it has left the
+    // loop finds the place free and starts a new worker.
+    private async drain(): Promise<void> {
+        try {
+            while (this.queue.size > 0) {
+                const batch = Array.from(this.queue.values()).slice(0, ECOTAXA_STATS_BATCH);
+                for (const entry of batch) this.queue.delete(entry.sample.sample_id);
+                await this.fetchStats(batch);
+                if (this.queue.size > 0) await this.pause(ECOTAXA_QUEUE_PAUSE_MS);
+            }
+        } catch (error) {
+            console.log(new Date().toISOString(), "Explore: EcoTaxa stats refresh queue stopped", error);
+        } finally {
+            this.draining = null;
+        }
+    }
+
+    // The work the background refresh still has to do.
+    get queued(): number { return this.queue.size; }
+
+    // Waits for the queue to be drained (tests, shutdown).
+    async idle(): Promise<void> { await this.draining; }
+
+    // Stats of the entries: from the database when read less than a day ago; otherwise read from
+    // EcoTaxa now when they are few (`sync_limit`), else queued, with the stale ones served meanwhile.
+    private async statsOfEntries(entries: SampleOnInstance[], sync_limit: number): Promise<{ stats: Map<number, EcoTaxaSampleStat>; pending: number }> {
+        const stats = new Map<number, EcoTaxaSampleStat>();
+        const stored = await this.sampleRepository.getEcoTaxaStats(entries.map(entry => entry.sample.sample_id));
+        const by_sample = new Map(stored.map(row => [row.sample_id, row]));
+        const now = this.now();
+        const to_refresh: SampleOnInstance[] = [];
+        for (const entry of entries) {
+            const row = by_sample.get(entry.sample.sample_id);
+            const fresh = row !== undefined && row.ecotaxa_sample_id === entry.sample.ecotaxa_sample_id && now - Date.parse(row.fetched_utc_date_time) < ECOTAXA_STATS_STALE_AFTER_MS;
+            if (row) stats.set(entry.sample.sample_id, toSampleStat(row));
+            if (!fresh) to_refresh.push(entry);
+        }
+        if (to_refresh.length === 0) return { stats, pending: 0 };
+        if (to_refresh.length <= sync_limit) {
+            for (const [sample_id, stat] of await this.fetchStats(to_refresh)) stats.set(sample_id, stat);
+            return { stats, pending: 0 };
+        }
+        this.enqueue(to_refresh);
+        return { stats, pending: to_refresh.filter(entry => !stats.has(entry.sample.sample_id)).length };
+    }
+
+    async statsOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): Promise<Map<number, EcoTaxaSampleStat>> {
+        const entries = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        return (await this.statsOfEntries(entries, ECOTAXA_SYNC_REFRESH_LIMIT)).stats;
+    }
+
+    // The samples whose classification state is the asked one; samples without any stats yet are
+    // left out (they are being read in the background).
     async filterByClassificationState(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, filters: ExploreFilters): Promise<ExploreSampleRow[]> {
         if (filters.classification_state === "all") return samples;
         const stats = await this.statsOf(samples, projects);
@@ -199,7 +292,7 @@ export class ExploreEcoTaxaService {
         const missing = Array.from(taxon_ids).filter(id => !this.taxa_cache.has(`${access.instance_id}:${id}`));
         if (missing.length > 0) {
             try {
-                for (const taxon of await this.ecotaxaAccountRepository.api_ecotaxa_get_taxa(access.base_url, access.token, missing)) {
+                for (const taxon of await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_get_taxa(access.base_url, access.token, missing))) {
                     this.taxa_cache.set(`${access.instance_id}:${taxon.id}`, taxon);
                 }
             } catch (error) {
@@ -210,8 +303,8 @@ export class ExploreEcoTaxaService {
     }
 
     async summaryOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, exclude_not_living: boolean): Promise<ExploreEcoTaxaSummary> {
-        const entries = await this.samplesOnInstances(samples, projects);
-        const stats = await this.statsOfEntries(entries);
+        const entries = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const { stats, pending } = await this.statsOfEntries(entries, ECOTAXA_SYNC_REFRESH_LIMIT);
         const taxa_by_instance = new Map<number, { access: InstanceAccess; ids: Set<number> }>();
         for (const entry of entries) {
             const stat = stats.get(entry.sample.sample_id);
@@ -232,24 +325,62 @@ export class ExploreEcoTaxaService {
             categories: Array.from(categories).sort((a, b) => a.localeCompare(b)),
             classification: classificationSharesOf(stats_list),
             nb_samples_with_stats: stats_list.filter(stat => totalOf(stat) > 0).length,
+            partial: pending > 0,
+            nb_samples_pending: pending,
         };
     }
+
+    /* ─── the daily sweep ─── */
+
+    // Queues every sample imported in EcoTaxa whose stats are older than a day, or absent.
+    async sweep(): Promise<number> {
+        const now = this.now();
+        const samples = (await this.sampleRepository.listEcoTaxaImportedSamples())
+            .filter(sample => sample.fetched_utc_date_time === null || now - Date.parse(sample.fetched_utc_date_time) >= ECOTAXA_STATS_STALE_AFTER_MS);
+        if (samples.length === 0) return 0;
+        const links = new Map<number, EcoTaxaProjectLink>((await this.projectRepository.listProjects()).map(project => [project.project_id, project]));
+        const entries = await this.samplesOnInstances(samples, links);
+        this.enqueue(entries);
+        return entries.length;
+    }
+
+    // Starts the sweep: once after a delay, then every day. Timers never keep the process alive.
+    startSweeper(): void {
+        if (this.sweep_timer) return;
+        const run = () => this.sweep()
+            .then(count => { if (count > 0) console.log(new Date().toISOString(), `Explore: EcoTaxa stats of ${count} sample(s) queued for refresh`); })
+            .catch(error => console.log(new Date().toISOString(), "Explore: EcoTaxa stats sweep failed", error));
+        const first = setTimeout(() => {
+            run();
+            this.sweep_timer = setInterval(run, ECOTAXA_SWEEP_INTERVAL_MS);
+            this.sweep_timer.unref();
+        }, ECOTAXA_SWEEP_FIRST_DELAY_MS);
+        first.unref();
+        this.sweep_timer = first;
+    }
+
+    stopSweeper(): void {
+        if (this.sweep_timer) clearTimeout(this.sweep_timer);
+        this.sweep_timer = null;
+    }
+
+    /* ─── images ─── */
 
     private async totalObjectsOf(entry: SampleOnInstance): Promise<number> {
         const key = `${entry.access.instance_id}:${entry.sample.ecotaxa_sample_id}`;
         const cached = this.totals_cache.get(key);
         const now = this.now();
-        if (cached && now - cached.at < ECOTAXA_STATS_TTL_MS) return cached.total;
-        const page = await this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
+        if (cached && now - cached.at < ECOTAXA_CACHE_TTL_MS) return cached.total;
+        const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
             filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: [], window_start: 0, window_size: 1,
-        });
+        }));
         this.totals_cache.set(key, { at: now, total: page.total_ids });
         return page.total_ids;
     }
 
     // `count` random objects of random samples, one object per draw; a sample without object is dropped.
     async randomImagesOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, count: number): Promise<ExploreImage[]> {
-        const pool = await this.samplesOnInstances(samples, projects);
+        const pool = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
         const images: ExploreImage[] = [];
         const seen = new Set<number>();
         let attempts = 0;
@@ -260,9 +391,9 @@ export class ExploreEcoTaxaService {
             try {
                 const total = await this.totalObjectsOf(entry);
                 if (total === 0) { pool.splice(index, 1); continue; }
-                const page = await this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
+                const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
                     filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: IMAGE_FIELDS, window_start: Math.floor(this.random() * total), window_size: 1,
-                });
+                }));
                 const object_id = page.object_ids[0];
                 const details = page.details[0] ?? [];
                 if (object_id === undefined || seen.has(object_id) || typeof details[0] !== "string") continue;

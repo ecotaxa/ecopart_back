@@ -49,7 +49,7 @@ describe("GetExploreGraphs", () => {
         privilegeRepository = new MockPrivilegeRepository();
         sampleRepository = new MockSampleRepository();
         repositories = { userRepository, projectRepository, privilegeRepository, sampleRepository };
-        ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository);
+        ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository, projectRepository);
         particleBins = new ExploreParticleBins(sampleRepository);
         useCase = new GetExploreGraphs(repositories, ecotaxa, particleBins);
 
