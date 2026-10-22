@@ -5,6 +5,7 @@ import { MiddlewareAuth } from '../interfaces/middleware/auth'
 import { IMiddlewareAdminValidation } from '../middleware/admin-validation'
 
 import { GetStatsUseCase } from '../../domain/interfaces/use-cases/admin/get-stats'
+import { ComputeParticleStatsUseCase } from '../../domain/interfaces/use-cases/sample/compute-particle-stats'
 import { CustomRequest } from '../../domain/entities/auth'
 import { StatsGranularity } from '../../domain/entities/stats'
 
@@ -12,6 +13,7 @@ export default function AdminRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareAdminValidation: IMiddlewareAdminValidation,
     getStatsUseCase: GetStatsUseCase,
+    computeParticleStatsUseCase: ComputeParticleStatsUseCase,
 ) {
     const router = express.Router()
 
@@ -97,6 +99,72 @@ export default function AdminRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access statistics") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get statistics"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /admin/samples/particle-stats:
+     *   post:
+     *     summary: Compute the particle statistics of samples (admin only)
+     *     description: |
+     *       Starts an asynchronous task (returns a Task immediately; poll the task for progress) that
+     *       reads the pivot of each sample and stores its particle statistics: `nb_particles` and the
+     *       smallest and largest particle areas in pixels (`particle_min_area_px`, `particle_max_area_px`).
+     *       They count the particles of the images the sample uses (operator window, descent filter on a
+     *       depth profile when the project enables it), lit and not over-exposed, whose area reaches the
+     *       sample's minimum particle area: the particles of the binned export.
+     *
+     *       The import and the pivot regeneration compute them; this endpoint covers the samples imported
+     *       before. Without `project_ids`, every project is considered; an unknown project id is skipped.
+     *       A sample that already has its statistics is kept, unless `force` is true. A sample of an
+     *       instrument other than UVP5 or UVP6, and a UVP5 sample without pivot, are skipped. A failing
+     *       sample does not stop the others: the task finishes with the number of samples computed,
+     *       skipped and failed. Reserved to administrators; the task belongs to no project.
+     *     tags: [Admin]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ComputeParticleStatsRequest'
+     *     responses:
+     *       200:
+     *         description: Particle statistics task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: Not authenticated.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       403:
+     *         description: Authenticated user is not allowed (not an admin, or account cannot be used).
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       404:
+     *         description: The task could not be created (task type or status not found, task not found).
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       422:
+     *         description: Validation error.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ValidationErrorResponse' } } }
+     *       500:
+     *         description: Internal server error.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     */
+    router.post('/samples/particle-stats', middlewareAuth.auth, middlewareAdminValidation.rulesComputeParticleStats, async (req: Request, res: Response) => {
+        try {
+            const task = await computeParticleStatsUseCase.execute((req as CustomRequest).token, { project_ids: req.body.project_ids, force: req.body.force });
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            const msg: string = err?.message || "";
+            if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
+            else if (msg === "Logged user cannot compute particle stats") res.status(403).send({ errors: [msg] })
+            else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
+            else res.status(500).send({ errors: ["Cannot compute particle stats"] })
         }
     })
 

@@ -1,5 +1,6 @@
 import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { ExploreSampleQuery, ExploreSampleRow } from "../../../domain/entities/explore";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //SampleTypeModel, SampleTypeRequestModel, SampleRequestModel, SampleUpdateModel, SampleResponseModel, QualityCheckStatusRequestModel, QualityCheckStatusModel 
 export interface SampleDataSource {
@@ -14,4 +15,8 @@ export interface SampleDataSource {
     getSampleType(sampleType: SampleTypeRequestModel): Promise<SampleTypeModel | null>;
     getVisualQCStatus(visualQCStatus: VisualQualityCheckStatusRequestModel): Promise<VisualQualityCheckStatusModel | null>;
     deleteOneEcoTaxaSample(sample: SampleIdModel): Promise<number>;
+    // The light rows of the Explore selection, every matching sample, ordered by id.
+    getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]>;
+    // Samples per project (one GROUP BY); null covers every project. Projects without samples are absent.
+    countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>>;
 }

@@ -387,3 +387,20 @@ components:
         - generated_at
         - totals
         - period
+
+    # ────────────────────────── particle statistics ──────────────────────────
+    ComputeParticleStatsRequest:
+      type: object
+      description: Samples whose particle statistics the task computes (POST /admin/samples/particle-stats).
+      properties:
+        project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: Projects whose samples are computed. Empty or absent = every project; an unknown id is skipped.
+          example: [12, 14]
+        force:
+          type: boolean
+          default: false
+          description: Also recompute the samples that already have their particle statistics.

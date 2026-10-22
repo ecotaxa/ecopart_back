@@ -591,6 +591,11 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         return await this.projectDataSource.getDistinctShips();
     }
 
+    async listProjects(): Promise<ProjectResponseModel[]> {
+        const projects = await this.projectDataSource.getAll({ filter: [], sort_by: [], page: 1, limit: Number.MAX_SAFE_INTEGER });
+        return projects.items;
+    }
+
     async listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]> {
         const projects = await this.projectDataSource.getAll({ filter: [], sort_by: [], page: 1, limit: Number.MAX_SAFE_INTEGER });
         return projects.items.map(project => ({

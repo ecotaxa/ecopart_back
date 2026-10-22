@@ -3,6 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
+import { ExploreSampleQuery, ExploreSampleRow } from "../../../domain/entities/explore";
 import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
@@ -97,8 +98,54 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         ctd_importator_email: ctd_email ?? null,
         nb_vignettes: row.nb_vignettes ?? 0,
         nb_black: row.nb_black ?? 0,
+        nb_particles: row.nb_particles ?? null,
+        particle_min_area_px: row.particle_min_area_px ?? null,
+        particle_max_area_px: row.particle_max_area_px ?? null,
     };
 }
+
+function mapRowToExploreSample(row: any): ExploreSampleRow {
+    return {
+        sample_id: row.sample_id,
+        sample_name: row.sample_name,
+        project_id: row.project_id,
+        latitude: row.latitude ?? null,
+        longitude: row.longitude ?? null,
+        sampling_utc_date_time: row.sampling_utc_date_time,
+        max_pressure: row.max_pressure ?? null,
+        sample_type_label: row.sample_type_label,
+        visual_qc_status_label: row.visual_qc_status_label,
+        ctd_imported: !!row.ctd_imported,
+        ctd_file_extension: row.ctd_file_extension ?? null,
+        ecotaxa_sample_imported: !!row.ecotaxa_sample_imported,
+        ecotaxa_sample_id: row.ecotaxa_sample_id ?? null,
+        nb_vignettes: row.nb_vignettes ?? 0,
+        nb_particles: row.nb_particles ?? null,
+        particle_min_area_px: row.particle_min_area_px ?? null,
+        particle_max_area_px: row.particle_max_area_px ?? null,
+        filter_first_image: row.filter_first_image ?? null,
+        filter_last_image: row.filter_last_image ?? null,
+        instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m ?? null,
+        instrument_settings_image_volume_l: row.instrument_settings_image_volume_l,
+        instrument_settings_aa: row.instrument_settings_aa,
+        instrument_settings_exp: row.instrument_settings_exp,
+        instrument_settings_particule_minimum_area_pixels: row.instrument_settings_particule_minimum_area_pixels ?? null,
+    };
+}
+
+// The sample's reference position: the CTD one when chosen and present, the particle file's otherwise.
+const EXPLORE_LATITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_latitude ELSE sample.latitude END";
+const EXPLORE_LONGITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_longitude ELSE sample.longitude END";
+// Samples imported before the ISO conversion keep their UVP date formats, "20120520080213" (UVP5) and
+// "20230406-144332-820" (UVP6): read as ISO date-times, like the ones written since.
+const DIGITS = (n: number) => "[0-9]".repeat(n);
+const EXPLORE_SAMPLING_TIME = `CASE
+    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(14)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 9, 2) || ':' || substr(sample.sampling_utc_date_time, 11, 2) || ':' || substr(sample.sampling_utc_date_time, 13, 2) || 'Z'
+    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(8)}-${DIGITS(6)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 10, 2) || ':' || substr(sample.sampling_utc_date_time, 12, 2) || ':' || substr(sample.sampling_utc_date_time, 14, 2) || 'Z'
+    ELSE sample.sampling_utc_date_time END`;
+const EXPLORE_MINUTE_OF_DAY = `(CAST(strftime('%H', ${EXPLORE_SAMPLING_TIME}) AS INTEGER) * 60 + CAST(strftime('%M', ${EXPLORE_SAMPLING_TIME}) AS INTEGER))`;
+
+const escapeLike = (fragment: string) => fragment.replace(/[\\%_]/g, (c) => "\\" + c);
 
 // const DB_TABLE = "sample"
 export class SQLiteSampleDataSource implements SampleDataSource {
@@ -128,6 +175,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             sample.instrument_settings_integration_time,
             sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
             sample.nb_vignettes, sample.nb_black,
+            sample.nb_particles ?? null, sample.particle_min_area_px ?? null, sample.particle_max_area_px ?? null,
             // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time
             // (see sqlite-task-data-source about why we no longer rely on DEFAULT CURRENT_TIMESTAMP).
             new Date().toISOString(),
@@ -152,6 +200,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             instrument_settings_integration_time,
             visual_qc_validator_user_id, sample_type_id, project_id,
             nb_vignettes, nb_black,
+            nb_particles, particle_min_area_px, particle_max_area_px,
             sample_creation_utc_date_time
         ) VALUES  (` + placeholders + `);`;
 
@@ -392,6 +441,96 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 }
             });
         })
+    }
+
+    // One query for the Explore selection: fixed, parameterised clauses, no column name from the caller.
+    async getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]> {
+        const clauses: string[] = ["sample_type.sample_type_label = (?)"];
+        const params: any[] = [query.sample_type_label];
+        if (query.project_ids !== null) {
+            if (query.project_ids.length === 0) return [];
+            clauses.push(`sample.project_id IN (${query.project_ids.map(() => "(?)").join(",")})`);
+            params.push(...query.project_ids);
+        }
+        if (query.bounds) {
+            const { north, south, east, west } = query.bounds;
+            clauses.push(`${EXPLORE_LATITUDE} BETWEEN (?) AND (?)`);
+            params.push(south, north);
+            if (west <= east) {
+                clauses.push(`${EXPLORE_LONGITUDE} BETWEEN (?) AND (?)`);
+                params.push(west, east);
+            } else {
+                // The box crosses the antimeridian.
+                clauses.push(`(${EXPLORE_LONGITUDE} >= (?) OR ${EXPLORE_LONGITUDE} <= (?))`);
+                params.push(west, east);
+            }
+        }
+        if (query.date_from) { clauses.push(`date(${EXPLORE_SAMPLING_TIME}) >= date(?)`); params.push(query.date_from); }
+        if (query.date_to) { clauses.push(`date(${EXPLORE_SAMPLING_TIME}) <= date(?)`); params.push(query.date_to); }
+        if (query.months.length > 0) {
+            clauses.push(`CAST(strftime('%m', ${EXPLORE_SAMPLING_TIME}) AS INTEGER) IN (${query.months.map(() => "(?)").join(",")})`);
+            params.push(...query.months);
+        }
+        if (query.sample_names.length > 0) {
+            clauses.push(`(${query.sample_names.map(() => "sample.sample_name LIKE (?) ESCAPE '\\'").join(" OR ")})`);
+            params.push(...query.sample_names.map(fragment => `%${escapeLike(fragment)}%`));
+        }
+        if (query.hour_range) {
+            const [from, to] = query.hour_range.map(hour => Math.round(hour * 60));
+            if (from <= to) {
+                clauses.push(`${EXPLORE_MINUTE_OF_DAY} BETWEEN (?) AND (?)`);
+            } else {
+                // The range crosses midnight.
+                clauses.push(`(${EXPLORE_MINUTE_OF_DAY} >= (?) OR ${EXPLORE_MINUTE_OF_DAY} <= (?))`);
+            }
+            params.push(from, to);
+        }
+        if (query.pressure_range) {
+            // A sample covers [0, max_pressure]: it is kept when that overlaps the range.
+            clauses.push("sample.max_pressure IS NOT NULL AND sample.max_pressure >= (?)");
+            params.push(query.pressure_range[0]);
+        }
+        if (query.ctd_only) clauses.push("sample.ctd_imported = 1");
+        if (query.ecotaxa_imported_only) clauses.push("sample.ecotaxa_sample_imported = 1");
+
+        const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id,
+                ${EXPLORE_LATITUDE} AS latitude, ${EXPLORE_LONGITUDE} AS longitude,
+                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
+                sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
+                sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
+                sample.nb_vignettes, sample.nb_particles, sample.particle_min_area_px, sample.particle_max_area_px,
+                sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_depth_offset_m,
+                sample.instrument_settings_image_volume_l, sample.instrument_settings_aa, sample.instrument_settings_exp,
+                sample.instrument_settings_particule_minimum_area_pixels
+            FROM sample
+            JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
+            JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
+            WHERE ${clauses.join(" AND ")}
+            ORDER BY sample.sample_id;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) reject(err);
+                else resolve((rows ?? []).map(row => mapRowToExploreSample(row)));
+            });
+        });
+    }
+
+    // Samples per project in one query; null: every project.
+    async countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>> {
+        const counts = new Map<number, number>();
+        let sql = "SELECT project_id, COUNT(*) AS nb FROM sample";
+        const params: any[] = [];
+        if (project_ids !== null) {
+            if (project_ids.length === 0) return counts;
+            sql += ` WHERE project_id IN (${project_ids.map(() => "(?)").join(",")})`;
+            params.push(...project_ids);
+        }
+        sql += " GROUP BY project_id;";
+        const rows = await new Promise<any[]>((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows ?? []));
+        });
+        for (const row of rows) counts.set(row.project_id, row.nb);
+        return counts;
     }
 
     async getEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {

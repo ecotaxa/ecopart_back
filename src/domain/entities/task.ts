@@ -19,6 +19,8 @@ export enum TaskType {
     Import_EcoTaxa = "IMPORT_ECO_TAXA",
     Export_Raw = "EXPORT_RAW",
     Regenerate_Pivot = "REGENERATE_PIVOT",
+    // Particle counts and extreme areas of the samples imported before they were stored (POST /admin/samples/particle-stats).
+    Compute_Particle_Stats = "COMPUTE_PARTICLE_STATS",
 }
 
 /* CREATION */

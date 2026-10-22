@@ -19,6 +19,7 @@ import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportBinnedDataRequestModel, ExportBinnedDataUseCase } from "../../interfaces/use-cases/export/export-binned-data";
 import { BinAxis, BinnedSampleBuilder, BinnedSampleSettings, exportedSizeClasses, formatNumber, particleCells, particleTableColumns, sampleVisibleSizeClasses } from "./binned-computation";
+import { binnedSampleSettingsOf } from "./binned-settings";
 import { renderBinnedReadme } from "./binned-readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { ProjectAccessPolicy } from "../project/project-access";
@@ -180,22 +181,6 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         if (without_pivot.length > 0) throw new Error(`Sample(s) without pivot: ${without_pivot.join(", ")}. Run the pivot regeneration of their project.`);
     }
 
-    private settingsOf(sample: PublicSampleModel, project: ProjectResponseModel): BinnedSampleSettings {
-        return {
-            sample_name: sample.sample_name,
-            instrument_model: project.instrument_model,
-            is_depth_profile: sample.sample_type_label === "Depth",
-            descent_filter_enabled: project.enable_descent_filter,
-            filter_first_image: sample.filter_first_image ?? null,
-            filter_last_image: sample.filter_last_image ?? null,
-            depth_offset_m: project.override_depth_offset ?? sample.instrument_settings_depth_offset_m ?? null,
-            image_volume_l: sample.instrument_settings_image_volume_l,
-            aa: sample.instrument_settings_aa,
-            exp: sample.instrument_settings_exp,
-            particle_minimum_area_px: sample.instrument_settings_particule_minimum_area_pixels ?? null,
-        };
-    }
-
     private axisOf(sample: PublicSampleModel, bin_mode: BinnedExportBinMode): BinAxis {
         if (bin_mode !== "auto") return bin_mode;
         return sample.sample_type_label === "Depth" ? "depth" : "time";
@@ -232,7 +217,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
 
             // The columns only depend on each sample's calibration, so they are known before any
             // file is read and the rows can be written sample by sample.
-            const settings_by_id = new Map(samples.map(s => [s.sample_id, this.settingsOf(s, projects_by_id.get(s.project_id) as ProjectResponseModel)]));
+            const settings_by_id = new Map(samples.map(s => [s.sample_id, binnedSampleSettingsOf(s, projects_by_id.get(s.project_id) as ProjectResponseModel)]));
             const class_indexes = exportedSizeClasses(samples.map(s => sampleVisibleSizeClasses(settings_by_id.get(s.sample_id) as BinnedSampleSettings)));
 
             await this.taskRepository.throwIfCancelled(task_id);

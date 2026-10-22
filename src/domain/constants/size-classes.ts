@@ -31,3 +31,28 @@ export function sizeClassSuffix(class_index: number): string {
     const upper = class_index === SIZE_CLASS_COUNT - 1 ? "inf" : toUm(PART_DET_CLASS_LIMITS_MM[class_index + 1]);
     return `${toUm(PART_DET_CLASS_LIMITS_MM[class_index])}_${upper}`;
 }
+
+// Reduced size classes of legacy EcoPart (`PartRedClassLimit`): 16 bounds giving 15 classes, each the
+// union of three consecutive detailed classes (every third detailed bound is a reduced bound). The
+// Explore graphs plot these, the binned export keeps the detailed ones.
+export const PART_RED_CLASS_LIMITS_MM: readonly number[] = [
+    0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.02, 2.05, 4.1, 8.19, 16.4, 10e7,
+];
+
+export const REDUCED_CLASS_COUNT = PART_RED_CLASS_LIMITS_MM.length - 1;
+
+export const DETAILED_CLASSES_PER_REDUCED = SIZE_CLASS_COUNT / REDUCED_CLASS_COUNT;
+
+// The detailed classes a reduced class is made of.
+export function detailedClassesOf(reduced_index: number): number[] {
+    return Array.from({ length: DETAILED_CLASSES_PER_REDUCED }, (_, i) => reduced_index * DETAILED_CLASSES_PER_REDUCED + i);
+}
+
+// Legacy `GetClassLimitTxt`: "64-128 µm", "1.02-2.05 mm", ">16.4 mm" for the open class.
+export function sizeClassLabel(limits: readonly number[], class_index: number): string {
+    const count = limits.length - 1;
+    const g4 = (mm: number) => Number(mm.toPrecision(4)).toString();
+    if (class_index >= count - 1) return `>${g4(limits[count - 1])} mm`;
+    const [low, high] = [limits[class_index], limits[class_index + 1]];
+    return high < 1 ? `${g4(low * 1000)}-${g4(high * 1000)} µm` : `${g4(low)}-${g4(high)} mm`;
+}

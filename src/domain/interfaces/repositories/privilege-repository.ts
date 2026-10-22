@@ -16,5 +16,7 @@ export interface PrivilegeRepository {
     getContact(project: ProjectRequestModel): Promise<PrivilegeResponseModel>;
     createPrivileges(publicPrivilege: PublicPrivilege): Promise<number>;
     getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege | null>;
+    // The same for many projects in one query; projects without privileges are absent from the map.
+    getPublicPrivilegesOfProjects(project_ids: number[]): Promise<Map<number, PublicPrivilege>>;
     deletePrivileges(privilege: PrivilegeRequestModel): Promise<number>
 }

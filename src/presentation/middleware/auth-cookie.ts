@@ -55,6 +55,23 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
     };
 
     /**
+    * Optional authentication: a request without an access cookie goes on anonymous (no token on the
+    * request), one with a valid cookie carries its decoded token, one with an invalid or expired cookie
+    * is refused like `auth`, so that the client refreshes it and retries instead of browsing as anonymous.
+    */
+    auth_optional = async (req: Request, res: Response, next: NextFunction) => {
+        const token = req.cookies?.access_token;
+        if (!token) return next();
+        try {
+            const decoded = this.jwt.verify(token, this.SECRET_KEY_ACCESS);
+            (req as CustomRequest).token = (decoded as DecodedToken);
+            next();
+        } catch (err) {
+            return res.status(401).send({ errors: ['Token invalid or expired. Please authenticate.'] })
+        }
+    };
+
+    /**
     * Middleware function to authenticate using refresh token stored in an HTTP-only cookie
     * @param {Request} req - Express request object.
     * @param {Response} res - Express response object.

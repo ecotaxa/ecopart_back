@@ -1,6 +1,8 @@
 import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleResponseModel, PublicSampleModel, SampleTypeModel, VisualQualityCheckStatusModel } from "../../src/domain/entities/sample";
 import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
+import { ExploreSampleRow } from "../../src/domain/entities/explore";
+import { CtdRows } from "../../src/domain/entities/ctd";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
 import { PivotImages, SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
 
@@ -115,6 +117,18 @@ export class MockSampleRepository implements SampleRepository {
     }
     getPivotImages(): Promise<PivotImages> {
         throw new Error("Method not implemented for getPivotImages");
+    }
+    getExploreSamples(): Promise<ExploreSampleRow[]> {
+        throw new Error("Method not implemented for getExploreSamples");
+    }
+    getPivotFileStamp(): Promise<string | null> {
+        throw new Error("Method not implemented for getPivotFileStamp");
+    }
+    getCtdRows(): Promise<CtdRows> {
+        throw new Error("Method not implemented for getCtdRows");
+    }
+    updateParticleStats(): Promise<number> {
+        throw new Error("Method not implemented for updateParticleStats");
     }
 }
 

@@ -16,6 +16,9 @@ import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 import { listImportableSamplesResult, sampleRequestCreationModel_1 } from "../../../entities/sample";
 import { Uvp5PivotReport } from "../../../../src/domain/entities/pivot";
 import { SampleSourceQcMetadata } from "../../../../src/domain/entities/sample-qc-graph";
+import { PivotImageRecord } from "../../../../src/domain/entities/binned-export";
+import { PivotImages } from "../../../../src/domain/interfaces/repositories/sample-repository";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
@@ -35,6 +38,19 @@ const pivotReport: Uvp5PivotReport = {
     duplicate_image_ids: 0,
     integrity_mismatches: 0,
 };
+
+// A pivot read in two passes from records already in memory.
+function pivotOf(records: PivotImageRecord[]): PivotImages {
+    return { columns: toPerImageColumns(records), rows: async function* () { yield* records; } };
+}
+
+// One lit image per [raw_pressure, area_px, nb_particles].
+function pivotLines(lines: Array<[number, number, number]>): PivotImages {
+    return pivotOf(lines.map(([raw_pressure, area_px, nb_particles], i) => ({
+        image_index: i, image_id: `img${i}`, raw_pressure, image_time_ms: Date.UTC(2020, 7, 6, 22, 0, i), light_on: true,
+        spectrum_counts: { [area_px]: nb_particles }, blocks: [{ area_px, nb_particles, grey_mean: 10 }],
+    })));
+}
 
 const sourceMetadata = (sample_type_label: string): SampleSourceQcMetadata => ({
     filter_first_image: "1",
@@ -61,6 +77,10 @@ beforeEach(async () => {
     // Step 1/4 reads the sample type and the max pressure of every sample from the source folder.
     jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(sourceMetadata("Depth"));
     jest.spyOn(mockSampleRepository, "getSourceMaxPressure").mockResolvedValue(150);
+
+    // Step 3/4 reads the particle statistics of every sample from its pivot (an empty one by default).
+    jest.spyOn(mockSampleRepository, "getSampleType").mockResolvedValue({ sample_type_id: 1, sample_type_label: "Depth", sample_type_description: "Depth profile" });
+    jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => pivotOf([]));
 })
 
 
@@ -683,7 +703,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
-                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(9);
+                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(11);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
                 expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(1);
                 expect(mockTaskRepository.failedTask).toBeCalledTimes(1);
@@ -776,7 +796,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
-                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(10);
+                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(12);
                 expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(2);
                 expect(mockSampleRepository.formatSampleToImport).toBeCalledWith(expect.objectContaining({ sample_name: "perle3_001" }), "UVP5HD", projectResponseModel.root_folder_path);
                 expect(mockSampleRepository.generateUvp5Pivot).toBeCalledWith(projectResponseModel.project_id, sampleRequestCreationModel_1, "UVP5HD", projectResponseModel.root_folder_path);
@@ -823,7 +843,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.startTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.ensureFolderExists).toBeCalledTimes(1);
                 expect(mockSampleRepository.listImportableSamples).toBeCalledTimes(1);
-                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(7);
+                expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(9);
                 expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 70, "Step 3/4 pivot construction : skipped, a UVP6 particules.zip is already in the pivot format");
                 expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(0);
                 expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(1);
@@ -848,6 +868,7 @@ describe("Delete Sample Use Case", () => {
             jest.spyOn(mockSampleRepository, "UVP5copySamplesToImportFolder").mockResolvedValue();
             jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
             const generate = jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(pivotReport);
+            const read_pivot = jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => pivotLines([[10, 3, 5], [20, 80, 1]]));
             const create = jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
             jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
@@ -855,6 +876,7 @@ describe("Delete Sample Use Case", () => {
             await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5HD", projectResponseModel, { user_id: 1 });
 
             const report_line = "perle3_001: 10 frames written, 2 outside [firstimage, endimg], 0 without particle, 0 .bru frames without pressure, 0 duplicate image ids, 0 integrity mismatches";
+            const stats_line = "Step 3/4 particle statistics : Mooring_0N_23W_201910_850m: 6 particle(s) counted, areas from 3 to 80 px";
             expect(progress.mock.calls.map(([, pct, msg]) => [pct, msg])).toEqual([
                 [10, "Step 1/4 sample validation : start"],
                 [20, "Step 1/4 sample validation : done"],
@@ -864,11 +886,14 @@ describe("Delete Sample Use Case", () => {
                 [63, "Step 3/4 pivot construction : " + report_line],
                 [70, "Step 3/4 pivot construction : " + report_line],
                 [70, "Step 3/4 pivot construction : done"],
+                [72, stats_line],
+                [74, stats_line],
                 [75, "Step 4/4 samples db creation : start"],
                 [100, "Step 4/4 samples db creation done"],
             ]);
             expect(generate).toBeCalledTimes(2);
-            expect(generate.mock.invocationCallOrder[1]).toBeLessThan(create.mock.invocationCallOrder[0]);
+            expect(generate.mock.invocationCallOrder[1]).toBeLessThan(read_pivot.mock.invocationCallOrder[0]);
+            expect(read_pivot.mock.invocationCallOrder[1]).toBeLessThan(create.mock.invocationCallOrder[0]);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
         });
 
@@ -1142,5 +1167,92 @@ describe("Delete Sample Use Case", () => {
             expect(getStatus).toBeCalledTimes(0);
             expect(setQc).toBeCalledTimes(0);
         });
+    });
+});
+describe("particle statistics at import", () => {
+    const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M", enable_descent_filter: true };
+    const samples = ["perle3_001", "Mooring_0N_23W_201910_850m"];
+    const loggedMessages = () => (mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message);
+    // The third image goes back up: the descent filter drops it on a depth profile.
+    const yoyo = () => pivotLines([[1, 2, 3], [10, 5, 1], [6, 40, 7], [12, 9, 2]]);
+
+    beforeEach(() => {
+        jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
+        jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
+        jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+        jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+        jest.spyOn(mockSampleRepository, "UVP6copySamplesToImportFolder").mockResolvedValue();
+        jest.spyOn(mockSampleRepository, "countBlackParticulesUvp6").mockResolvedValue(0);
+        // One sample of each type: perle3_001 a depth profile (type 1), the mooring a time series (type 2).
+        jest.spyOn(mockSampleRepository, "formatSampleToImport").mockImplementation(async (base) =>
+            ({ ...sampleRequestCreationModel_1, sample_name: base.sample_name as string, sample_type_id: base.sample_name === "perle3_001" ? 1 : 2 }));
+        jest.spyOn(mockSampleRepository, "getSampleType").mockImplementation(async ({ sample_type_id }) =>
+            ({ sample_type_id: sample_type_id as number, sample_type_label: sample_type_id === 1 ? "Depth" : "Time", sample_type_description: "" }));
+        jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+        jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder").mockResolvedValue([]);
+        jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
+        jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+        jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+    });
+
+    test("reads each sample's pivot and creates the samples with their statistics, over the images they use", async () => {
+        jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => yoyo());
+
+        await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+        expect(mockSampleRepository.getPivotImages).toBeCalledTimes(2);
+        expect(mockSampleRepository.getPivotImages).toBeCalledWith(uvp6_project.project_id, "perle3_001", "UVP6M");
+        expect(mockSampleRepository.getPivotImages).toBeCalledWith(uvp6_project.project_id, "Mooring_0N_23W_201910_850m", "UVP6M");
+        expect(mockSampleRepository.getSampleType).toBeCalledWith({ sample_type_id: 1 });
+        expect(mockSampleRepository.getSampleType).toBeCalledWith({ sample_type_id: 2 });
+        // The descent filter of the project drops the image that goes back up, on the depth profile only.
+        expect(mockSampleRepository.createManySamples).toBeCalledWith([
+            expect.objectContaining({ sample_name: "perle3_001", nb_particles: 6, particle_min_area_px: 2, particle_max_area_px: 9 }),
+            expect.objectContaining({ sample_name: "Mooring_0N_23W_201910_850m", nb_particles: 13, particle_min_area_px: 2, particle_max_area_px: 40 }),
+        ]);
+        expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 72, "Step 3/4 particle statistics : perle3_001: 6 particle(s) counted, areas from 2 to 9 px");
+        expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 74, "Step 3/4 particle statistics : Mooring_0N_23W_201910_850m: 13 particle(s) counted, areas from 2 to 40 px");
+        expect(loggedMessages().filter((message: string) => message.includes("WARNING"))).toHaveLength(0);
+        expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+    });
+
+    test("a pivot that cannot be read leaves the statistics empty with a warning, the import goes on", async () => {
+        jest.spyOn(mockSampleRepository, "getPivotImages")
+            .mockRejectedValueOnce(new Error("Cannot read the particle file of sample perle3_001 (no such file)"))
+            .mockImplementationOnce(async () => yoyo());
+
+        await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+        expect(loggedMessages()).toContain("Step 3/4 particle statistics : perle3_001 : WARNING particle statistics not computed, left empty (Cannot read the particle file of sample perle3_001 (no such file))");
+        expect(mockSampleRepository.createManySamples).toBeCalledWith([
+            expect.objectContaining({ sample_name: "perle3_001", nb_particles: null, particle_min_area_px: null, particle_max_area_px: null }),
+            expect.objectContaining({ sample_name: "Mooring_0N_23W_201910_850m", nb_particles: 13 }),
+        ]);
+        expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
+        expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
+        expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+    });
+
+    test("an unknown sample type is a warning too, the pivot is not read", async () => {
+        jest.spyOn(mockSampleRepository, "getSampleType").mockResolvedValue(null);
+
+        await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+        expect(loggedMessages().filter((message: string) => message.includes("WARNING particle statistics not computed, left empty (Sample type not found)"))).toHaveLength(2);
+        expect(mockSampleRepository.getPivotImages).toBeCalledTimes(0);
+        expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+    });
+
+    test("a cancellation during the statistics removes the copied sources and creates no sample", async () => {
+        const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+        // before the copy, after the copy, before the first statistics, then before the second
+        jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
+
+        await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+        expect(mockSampleRepository.getPivotImages).toBeCalledTimes(1);
+        expect(mockSampleRepository.createManySamples).toBeCalledTimes(0);
+        expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledWith(expect.any(String), samples);
+        expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, cancelled);
     });
 });

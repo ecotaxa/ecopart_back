@@ -23,6 +23,7 @@ components:
             - IMPORT_ECO_TAXA
             - EXPORT_RAW
             - REGENERATE_PIVOT
+            - COMPUTE_PARTICLE_STATS
           example: "IMPORT"
         task_status_id:
           type: integer
