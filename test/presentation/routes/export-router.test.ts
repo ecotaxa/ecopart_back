@@ -75,6 +75,17 @@ describe("ExportRouter — POST /exports/raw", () => {
                 { sample_ids: [7, 9], export_types: ["metadata", "ecotaxa"], ecotaxa_exclude_not_living: true },
             );
         });
+
+        test("the table format is optional and forwarded", async () => {
+            jest.spyOn(exportRawDataUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+
+            const response = await request(server)
+                .post("/exports/raw")
+                .send({ sample_ids: [1], export_types: ["metadata"], format: "parquet" });
+
+            expect(response.status).toBe(200);
+            expect(exportRawDataUseCase.execute).toBeCalledWith(expect.anything(), expect.objectContaining({ format: "parquet" }));
+        });
     });
 
     describe("domain errors are mapped to status codes", () => {
@@ -89,6 +100,7 @@ describe("ExportRouter — POST /exports/raw", () => {
             ["Cannot find task", 404],
             ["Task type not found", 404],
             ["Sample(s) not validated: omer2_1, omer2_2", 409],
+            ["format must be one of: tsv, parquet", 422],
             ["Cannot create log file", 500],
         ];
 
@@ -123,6 +135,7 @@ describe("ExportRouter — POST /exports/raw", () => {
             ["export_types unknown value", { sample_ids: [1], export_types: ["vignettes"] }],
             ["ecotaxa selected without ecotaxa_exclude_not_living", { sample_ids: [1], export_types: ["ecotaxa"] }],
             ["ecotaxa_exclude_not_living not a boolean", { sample_ids: [1], export_types: ["ecotaxa"], ecotaxa_exclude_not_living: "yes please" }],
+            ["format unknown", { sample_ids: [1], export_types: ["metadata"], format: "csv" }],
         ];
 
         test.each(invalid_bodies)("%s", async (_label, body) => {
@@ -202,13 +215,13 @@ describe("ExportRouter — POST /exports/binned", () => {
 
         const response = await request(server)
             .post("/exports/binned")
-            .send({ sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true });
+            .send({ sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true, format: "parquet" });
 
         expect(response.status).toBe(200);
         expect(response.body).toStrictEqual(JSON.parse(JSON.stringify(TaskResponseModel_1)));
         expect(exportBinnedDataUseCase.execute).toBeCalledWith(
             expect.objectContaining({ user_id: 1 }),
-            { sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true },
+            { sample_ids: [7, 9], bin_mode: "depth", bin_size_m: 2.5, bin_size_h: 0.5, skip_not_validated: true, format: "parquet" },
         );
     });
 
@@ -244,6 +257,7 @@ describe("ExportRouter — POST /exports/binned", () => {
             ["Sample(s) without pivot: s1c1. Run the pivot regeneration of their project.", 409],
             ["Instrument not supported by the binned export: lisst_1 (LISST)", 409],
             ["bin_size_m must be between 1 and 100", 422],
+            ["format must be one of: tsv, parquet", 422],
             ["Cannot create log file", 500],
         ];
 
@@ -278,6 +292,7 @@ describe("ExportRouter — POST /exports/binned", () => {
             ["bin_size_h below 0.5 h", { sample_ids: [1], bin_size_h: 0.25 }],
             ["bin_size_h above 24 h", { sample_ids: [1], bin_size_h: 48 }],
             ["skip_not_validated not a boolean", { sample_ids: [1], skip_not_validated: "oui" }],
+            ["format unknown", { sample_ids: [1], format: "xlsx" }],
         ];
 
         test.each(invalid_bodies)("%s", async (_label, body) => {

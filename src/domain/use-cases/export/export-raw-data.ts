@@ -5,6 +5,8 @@ import { UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicSampleModel, RawFileCategory } from "../../entities/sample";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { ExportTableFormat } from "../../entities/export";
+import { DEFAULT_EXPORT_TABLE_FORMAT, EXPORT_TABLE_FORMATS } from "../../constants/export-format";
 
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
@@ -49,7 +51,7 @@ export class ExportRawData implements ExportRawDataUseCase {
     async execute(current_user: UserUpdateModel, request: ExportRawDataRequestModel): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
-        const { sample_ids, export_types } = this.validateRequest(request);
+        const { sample_ids, export_types, format } = this.validateRequest(request);
         const ecotaxa_exclude_not_living = !!request.ecotaxa_exclude_not_living;
         const skip_not_validated = !!request.skip_not_validated;
 
@@ -91,7 +93,7 @@ export class ExportRawData implements ExportRawDataUseCase {
             task_status: TasksStatus.Pending,
             task_owner_id: current_user.user_id,
             // Cross-project export: keep task_project_id unset.
-            task_params: { sample_ids, export_types, ecotaxa_exclude_not_living, skip_not_validated },
+            task_params: { sample_ids, export_types, ecotaxa_exclude_not_living, skip_not_validated, format },
         } as PublicTaskRequestCreationModel);
 
         const task = await this.taskRepository.getOneTask({ task_id });
@@ -99,12 +101,12 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         // Fire-and-forget — the route returns the task immediately and the frontend polls.
         const export_started_at = new Date();
-        this.runExport(task, samples, projects_by_id, export_types, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated);
+        this.runExport(task, samples, projects_by_id, export_types, format, ecotaxa_exclude_not_living, export_started_at, skipped_not_validated);
 
         return this.taskRepository.toPublicTask(task);
     }
 
-    private validateRequest(request: ExportRawDataRequestModel): { sample_ids: number[]; export_types: RawExportType[] } {
+    private validateRequest(request: ExportRawDataRequestModel): { sample_ids: number[]; export_types: RawExportType[]; format: ExportTableFormat } {
         if (!Array.isArray(request.sample_ids) || request.sample_ids.length === 0) {
             throw new Error("sample_ids must be a non-empty array");
         }
@@ -120,7 +122,9 @@ export class ExportRawData implements ExportRawDataUseCase {
             if (!EXPORT_TYPES.includes(t)) throw new Error(`Unknown export type: ${t}`);
             if (!export_types.includes(t)) export_types.push(t);
         }
-        return { sample_ids, export_types };
+        const format = request.format ?? DEFAULT_EXPORT_TABLE_FORMAT;
+        if (!EXPORT_TABLE_FORMATS.includes(format)) throw new Error(`format must be one of: ${EXPORT_TABLE_FORMATS.join(", ")}`);
+        return { sample_ids, export_types, format };
     }
 
     private async ensureUserCanAccess(current_user: UserUpdateModel, project_id: number): Promise<void> {
@@ -135,6 +139,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
         export_types: RawExportType[],
+        format: ExportTableFormat,
         ecotaxa_exclude_not_living: boolean,
         export_started_at: Date,
         skipped_not_validated: string[],
@@ -173,7 +178,7 @@ export class ExportRawData implements ExportRawDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
                 if (export_type === "metadata") {
-                    await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, export_types.includes("ecotaxa"));
+                    await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, export_types.includes("ecotaxa"), format);
                 } else if (export_type === "lpm" || export_type === "images" || export_type === "instrument_config") {
                     await this.writeArtifacts(task, work_folder, samples, projects_by_id, ARTIFACT_STEPS[export_type]);
                 } else if (export_type === "ctd") {
@@ -187,7 +192,7 @@ export class ExportRawData implements ExportRawDataUseCase {
 
             // Consumer-facing documentation, generated from the same column constants the
             // emitters use — so the README can't drift from the actual file contents.
-            await fsPromises.writeFile(path.join(work_folder, "README.md"), renderReadme(export_types));
+            await fsPromises.writeFile(path.join(work_folder, "README.md"), renderReadme(export_types, format));
 
             await this.taskRepository.throwIfCancelled(task_id);
             await zipFolder(work_folder, zip_path);

@@ -42,9 +42,11 @@ export default function ExportRouter(
      *          are **skipped with a warning line in the task log**, not failed.
      *
      *       ### Archive contents per export type
-     *       - `metadata` → `metadata/projects.tsv` (one row per distinct project) + `metadata/samples.tsv`
-     *         (one row per sample, ordered by `(ecopart_project_id, ecopart_sample_id)`). Tab-separated UTF-8,
-     *         one header row, cells sanitised of tabs/CR/LF, booleans as `true`/`false`, timestamps ISO 8601 UTC.
+     *       - `metadata` → `metadata/projects.<format>` (one row per distinct project) + `metadata/samples.<format>`
+     *         (one row per sample, ordered by `(ecopart_project_id, ecopart_sample_id)`), in the `format` requested:
+     *         `tsv` (default; tab-separated UTF-8, one header row, cells sanitised of tabs/CR/LF, booleans as
+     *         `true`/`false`, timestamps ISO 8601 UTC) or `parquet` (typed columns, null for a missing value,
+     *         Snappy compression). The other export types copy files as imported, whatever the format.
      *       - `lpm` → `lpm/<project_id>/<sample_name>/…` the per-sample **particle data**, copied exactly as
      *         imported: UVP5 → `<sample>_work.zip` (datfile + HDR + bru); UVP6 → `<sample>_Particule.zip`
      *         (`particules.csv` + `metadata.ini`). Nothing else — vignettes and instrument configuration have
@@ -62,8 +64,8 @@ export default function ExportRouter(
      *         constrains it to the **biota** subtree (`taxo=1&taxochild=Y`). Unlike the skips above, an EcoTaxa
      *         API failure **fails the whole task**.
      *
-     *       A `README.md` documenting every column is always generated at the root of the archive, from the same
-     *       column constants the TSV writers use, so it cannot drift from the actual file contents.
+     *       A `README.md` documenting every column and its type is always generated at the root of the archive, from
+     *       the same column constants the table writers use, so it cannot drift from the actual file contents.
      *
      *       ### Known issues / columns still empty
      *       - `sample_integration_time`: UVP5 only in the extended meta-header format — empty for the 21-column
@@ -131,6 +133,13 @@ export default function ExportRouter(
      *                   VALIDATED aborts the export with 409. True: those samples are dropped from the archive and
      *                   listed in the task log, and the export proceeds with the validated ones. 409 is still
      *                   returned when no validated sample remains.
+     *               format:
+     *                 type: string
+     *                 enum: [tsv, parquet]
+     *                 default: tsv
+     *                 description: >
+     *                   Format of the tables EcoPart generates (`metadata/projects`, `metadata/samples`). The files
+     *                   copied as imported (lpm, images, instrument_config, ctd, ecotaxa) are not converted.
      *     responses:
      *       200:
      *         description: Task created. Poll the task and download the file once done.
@@ -157,6 +166,7 @@ export default function ExportRouter(
                 export_types: req.body.export_types,
                 ecotaxa_exclude_not_living: req.body.ecotaxa_exclude_not_living,
                 skip_not_validated: req.body.skip_not_validated,
+                format: req.body.format,
             });
             res.status(200).send(task)
         } catch (err) {
@@ -166,6 +176,7 @@ export default function ExportRouter(
             else if (msg.startsWith("Logged user cannot export raw data")) res.status(401).send({ errors: [msg] })
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated")) res.status(409).send({ errors: [msg] })
+            else if (msg.startsWith("format must")) res.status(422).send({ errors: [msg] })
             else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export raw data"] })
@@ -205,14 +216,17 @@ export default function ExportRouter(
      *       - Every bin between the first and the last image used is written, an empty one with a zero volume.
      *
      *       ### Archive contents
-     *       - `metadata/projects.tsv`, `metadata/samples.tsv` — identical to the raw export's.
-     *       - `particles.tsv` — one row per bin: 8 context columns, a pixel block (`count_1px`, `count_2px` and the
+     *       - `metadata/projects.<format>`, `metadata/samples.<format>` — identical to the raw export's.
+     *       - `particles.<format>` — one row per bin: 8 context columns, a pixel block (`count_1px`, `count_2px` and the
      *         number of black images `nb_black_images`), then one block per quantity (`count_`, `concentration_`,
      *         `biovolume_`, `intensity_`, `qcflag_`) with one column per size class, named by its bounds in µm
      *         (`concentration_50p8um_64um`). Only the classes visible on
      *         at least one exported sample get columns. `NA` marks a value that does not exist (a class the sample
-     *         cannot see, a bin without imaged volume, a mean grey without particle); `0` is a counted zero.
-     *       - `README.md` — every column, the conventions and the computation, generated from the writer's constants.
+     *         cannot see, a bin without imaged volume, a mean grey without particle); `0` is a counted zero. With
+     *         `format=parquet` the columns are typed and both `NA` and the empty cell are null, each in its own
+     *         columns (none holds both), as the README states.
+     *       - `README.md` — every column with its type, the conventions and the computation, generated from the
+     *         writer's constants.
      *
      *       The ZIP is downloadable at `/api/tasks/{task_id}/file` once the task reaches the `DONE` status.
      *     tags: [Exports]
@@ -254,6 +268,14 @@ export default function ExportRouter(
      *                 description: >
      *                   Opt-out of the all-or-nothing visual-QC gate, as for `/exports/raw`. 409 is still returned
      *                   when no validated sample remains.
+     *               format:
+     *                 type: string
+     *                 enum: [tsv, parquet]
+     *                 default: tsv
+     *                 description: >
+     *                   Format of the three tables (`metadata/projects`, `metadata/samples`, `particles`): `tsv`
+     *                   (default) or `parquet` (typed columns, Snappy compression, null where the TSV has `NA` or an
+     *                   empty cell; no column holds both, see the README).
      *     responses:
      *       200:
      *         description: Task created. Poll the task and download the file once done.
@@ -280,6 +302,7 @@ export default function ExportRouter(
                 bin_size_m: req.body.bin_size_m,
                 bin_size_h: req.body.bin_size_h,
                 skip_not_validated: req.body.skip_not_validated,
+                format: req.body.format,
             });
             res.status(200).send(task)
         } catch (err) {
@@ -289,7 +312,7 @@ export default function ExportRouter(
             else if (msg.startsWith("Logged user cannot export binned data")) res.status(401).send({ errors: [msg] })
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated") || msg.startsWith("Sample(s) without calibration") || msg.startsWith("Sample(s) without pivot") || msg.startsWith("Instrument not supported by the binned export")) res.status(409).send({ errors: [msg] })
-            else if (msg.startsWith("sample_ids must") || msg.startsWith("bin_mode must") || msg.startsWith("bin_size_m must") || msg.startsWith("bin_size_h must")) res.status(422).send({ errors: [msg] })
+            else if (msg.startsWith("sample_ids must") || msg.startsWith("bin_mode must") || msg.startsWith("bin_size_m must") || msg.startsWith("bin_size_h must") || msg.startsWith("format must")) res.status(422).send({ errors: [msg] })
             else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export binned data"] })

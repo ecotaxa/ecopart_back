@@ -22,6 +22,9 @@ import { private_projectResponseModel } from "../../../entities/project";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
+import { SAMPLE_COLUMNS } from "../../../../src/domain/use-cases/export/export-metadata";
+import { readParquet } from "../../../helpers/parquet";
+import { zipEntryBuffer } from "../../../helpers/zip";
 
 /*
  * Tests of the *background* half of the use case: the archive `runExport` actually produces.
@@ -231,6 +234,59 @@ describe("ExportRawData — produced archive", () => {
             expect(entries).toContain("README.md");
             // Nothing else: an export of `metadata` alone must not create the other folders.
             expect(entries.filter(e => e.startsWith("lpm/") || e.startsWith("ctd/") || e.startsWith("ecotaxa/"))).toEqual([]);
+        });
+
+        test("format=parquet writes both tables as typed Parquet files, documented as such in the README", async () => {
+            const outcome = await runExport(samples, ["metadata"], [project({ project_id: 1 })], { format: "parquet" });
+
+            expect(outcome).toEqual({ outcome: "finished", detail: `http://localhost:3000/api/tasks/${TASK_ID}/file` });
+            expect((await zipEntries(zip_path())).sort()).toEqual(["README.md", "metadata/projects.parquet", "metadata/samples.parquet"]);
+
+            const samples_table = await readParquet(await zipEntryBuffer(zip_path(), "metadata/samples.parquet"));
+            expect(samples_table.columns.map(c => c.name)).toEqual(SAMPLE_COLUMNS.map(c => c.name));
+            expect(samples_table.rows.map(r => r.ecopart_sample_id)).toEqual([BigInt(3), BigInt(7)]);
+            const row = samples_table.rows[1];
+            expect(row).toMatchObject({
+                ecopart_project_id: BigInt(1),
+                sample_name: sampleModel_1.sample_name,
+                sample_latitude: 42.52702,
+                ecotaxa_sample_imported: false,
+                number_of_black: BigInt(0),
+                ctd_import_utc_date_time: null,
+            });
+            expect(row.sample_import_utc_date_time).toEqual(new Date(sampleModel_1.sample_creation_utc_date_time));
+            // The fixture's sampling date is not a readable date: text in a TSV, no value here.
+            expect(row.sampling_utc_date_time).toBeNull();
+
+            const projects_table = await readParquet(await zipEntryBuffer(zip_path(), "metadata/projects.parquet"));
+            expect(projects_table.rows).toHaveLength(1);
+            expect(projects_table.rows[0]).toMatchObject({
+                ecopart_project_id: BigInt(1),
+                project_total_samples: BigInt(10),
+                project_total_samples_exported: BigInt(2),
+                project_enable_descent_filter: true,
+                project_override_depth_offset: 1,
+                project_managers: "John Smith <john@example.org>",
+            });
+            expect(projects_table.rows[0].project_export_utc_date_time).toBeInstanceOf(Date);
+
+            const readme = await zipEntryContent(zip_path(), "README.md");
+            expect(readme).toContain("Every table is an Apache Parquet file");
+            expect(readme).toContain("│   ├── projects.parquet");
+            expect(readme).toContain("## `metadata/samples.parquet`");
+            expect(readme).toContain("| `ecopart_sample_id` | integer |");
+            expect(readme).toContain("| `ecotaxa_sample_imported` | boolean |");
+            expect(readme).not.toContain(".tsv");
+        });
+
+        test("the TSV README documents the type of each column too", async () => {
+            await runExport(samples, ["metadata"], [project({ project_id: 1 })]);
+
+            const readme = await zipEntryContent(zip_path(), "README.md");
+            expect(readme).toContain("Every TSV is UTF-8");
+            expect(readme).toContain("## `metadata/samples.tsv`");
+            expect(readme).toContain("| `sampling_utc_date_time` | timestamp |");
+            expect(readme).not.toContain(".parquet");
         });
 
         test("every row has exactly one cell per header column, and headers are unique", async () => {

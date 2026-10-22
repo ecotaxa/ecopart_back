@@ -176,6 +176,7 @@ describe("ExportRawDataUseCase", () => {
             ["export_types missing", { sample_ids: [1] }, "export_types must be a non-empty array"],
             ["export_types empty", { sample_ids: [1], export_types: [] }, "export_types must be a non-empty array"],
             ["export_types unknown value", { sample_ids: [1], export_types: ["particles"] }, "Unknown export type: particles"],
+            ["format unknown", { sample_ids: [1], export_types: ["metadata"], format: "csv" }, "format must be one of: tsv, parquet"],
         ];
 
         test.each(invalid)("rejects %s", async (_label, request, expectedMessage) => {
@@ -184,6 +185,21 @@ describe("ExportRawDataUseCase", () => {
             // Validation runs before any lookup, so nothing downstream is touched.
             expect(mockSampleRepository.getSamplesByIds).toBeCalledTimes(0);
             expect(mockTaskRepository.createTask).toBeCalledTimes(0);
+        });
+
+        test("the table format asked for lands in the created task", async () => {
+            jest.spyOn(mockSampleRepository, "getSamplesByIds").mockImplementation(() => Promise.resolve([validated(sampleModel_1)]));
+            jest.spyOn(mockUserRepository, "isAdmin").mockImplementation(() => Promise.resolve(true));
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(private_projectResponseModel));
+            jest.spyOn(mockTaskRepository, "createTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1.task_id));
+            jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1));
+            stubBackgroundWork();
+
+            await exportRawDataUseCase.execute(current_user, { sample_ids: [1], export_types: ["metadata"], format: "parquet" });
+
+            expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
+                task_params: expect.objectContaining({ format: "parquet" }),
+            }));
         });
 
         test("duplicate export types are deduplicated in the created task", async () => {
@@ -292,7 +308,7 @@ describe("ExportRawDataUseCase", () => {
 
                 expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
                 expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
-                    task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true },
+                    task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true, format: "tsv" },
                 }));
                 // Only the validated sample's project is authorized/resolved.
                 expect(mockProjectRepository.getProject).toBeCalledTimes(1);
@@ -352,6 +368,7 @@ describe("ExportRawDataUseCase", () => {
                     export_types: ["metadata", "ecotaxa"],
                     ecotaxa_exclude_not_living: true,
                     skip_not_validated: false,
+                    format: "tsv",
                 },
             }));
             // Cross-project export: the task is deliberately not tied to a single project.

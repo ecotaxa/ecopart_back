@@ -40,6 +40,7 @@
     "express-validator": "^7.0.1",
     "fs": "^0.0.1-security",
     "fzstd": "^0.1.1",
+    "hyparquet-writer": "^0.16.12",
     "i18n-iso-countries": "^7.7.0",
     "jsonwebtoken": "^9.0.1",
     "node-fetch": "^3.3.2",
