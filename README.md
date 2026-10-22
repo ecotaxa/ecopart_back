@@ -179,6 +179,17 @@ One-time setup on the preprod server:
    image tags only exist for versions published *after* this change, so `v0.0.66` and earlier are
    not promotable — only `:latest` was pushed for those.
 
+### Checking which version a server runs
+
+The tag workflow bakes the git tag into the image (`APP_VERSION`). On any server:
+
+```bash
+curl <API_URL>/version                                # {"version":"v0.0.78"}
+docker compose logs api | grep "EcoPart API version"  # printed at every start
+```
+
+The Swagger page (`/api-docs`) shows the same version. Preprod reports the tag it was promoted from, since promotion re-points `:preprod` without rebuilding. An image built locally, or a run outside Docker, reports `dev`.
+
 ### Production Procedure
 
 The test/production server runs the **frontend and backend together** from a single
@@ -334,6 +345,62 @@ When you add or modify an endpoint, add/update the `@openapi` annotation above i
 ### Link with EcoTaxa
 You can configure GENERIC_ECOTAXA_ACCOUNT_EMAIL in the .env file. Applicative accounts are created with this email in every EcoTaxa instances. You should then loggin to ecopart user that uses the same email as GENERIC_ECOTAXA_ACCOUNT_EMAIL and loggin for every instances to the related applicative ecotaxa account. For now you should reconnect to theses accounts every 30 day. We are working on an EcoTaxa feature to ease this process trough a refresh token or longer token.
 
+#### EcoTaxa tokens at rest
+
+The EcoTaxa token of every linked account is stored in the database. With `ECOTAXA_TOKEN_ENCRYPTION_KEY` set, these tokens are stored encrypted (AES-256-GCM), so a copy of the database (backup, local copy) does not give working EcoTaxa access. Without the variable, tokens are stored in clear as before, and the startup log says so.
+
+##### Enabling the encryption on a server
+
+Do this once on each server (test, preprod, production), in the directory that holds its `docker-compose.yml` and `.env` (`/ecotaxadev2/ecopart/new_ecopart` for test, `/home/ecopart/ecopart_pre_prod` for preprod).
+
+1. **Generate a key**, one per server, on any machine:
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+   Keep it wherever the other secrets of that server are kept. Never commit it, and never reuse the key of another server.
+
+2. **Add it to the server `.env`**:
+
+   ```bash
+   ECOTAXA_TOKEN_ENCRYPTION_KEY = <the generated key>
+   ```
+
+   Doing this before the version that supports encryption is deployed is harmless: older versions ignore the variable.
+
+3. **Recreate the backend container** so that it reads the new `.env` (a plain `restart` keeps the old environment):
+
+   ```bash
+   docker compose up -d --force-recreate api
+   ```
+
+4. **Check the startup log**:
+
+   ```bash
+   docker compose logs api | grep "EcoTaxa token"
+   ```
+
+   - On the first start with the key: `N EcoTaxa token(s) saved in clear are now encrypted`. Later starts print nothing.
+   - `ECOTAXA_TOKEN_ENCRYPTION_KEY is not set` means the variable did not reach the container: check the `.env` and step 3.
+   - `cannot be decrypted with the current key` means the key differs from the one the tokens were encrypted with (see below).
+   - A malformed key stops the server at startup with `ECOTAXA_TOKEN_ENCRYPTION_KEY must be 32 bytes encoded in base64`.
+
+5. **Optionally, check the database** from the host (requires `sqlite3`, path valid when `DBSOURCE_FOLDER` keeps its default `data_storage/sqlite_db/`). The count must be 0:
+
+   ```bash
+   sqlite3 data_storage/sqlite_db/<DBSOURCE_NAME> "SELECT count(*) FROM ecotaxa_account WHERE ecotaxa_account_token NOT LIKE 'enc:v1:%';"
+   ```
+
+Local development needs no key: leave the variable empty.
+
+##### Good to know
+
+- **Changing or losing the key** makes the stored tokens unreadable. EcoPart then treats them like expired tokens, and the startup log counts them. Each user logs out of the EcoTaxa account in the EcoTaxa accounts tab of their EcoPart profile, then logs in again. Do the same for the generic accounts, from the EcoPart user that owns them (see above).
+- **Rolling back** to a version older than this feature has the same effect, because the older code cannot read encrypted tokens.
+- **Copying a database** to another server or to a development machine leaves its tokens unreadable there, unless the source server's key is used. That is the intended protection: accounts log in to EcoTaxa again on the copy.
+- **Deleting an EcoPart user** also deletes their EcoTaxa accounts, except the generic account (`GENERIC_ECOTAXA_ACCOUNT_EMAIL`), which EcoPart itself uses.
+
 ### Database
 
 EcoPart uses **SQLite** as its database. The database file location is configured via the `DBSOURCE_FOLDER` and `DBSOURCE_NAME` environment variables in the `.env` file.
@@ -393,7 +460,7 @@ Four npm scripts are available to manage migrations:
 
 | Command                            | Description                                  |
 | ---------------------------------- | -------------------------------------------- |
-| `npm run migrate:create -- <name>` | Create a new timestamped migration file      |
+| `npm run migrate:create -- <name>` | Create the next numbered migration file      |
 | `npm run migrate:up`               | Run all pending migrations                   |
 | `npm run migrate:down`             | Rollback the last applied migration          |
 | `npm run migrate:status`           | Show which migrations are applied or pending |
@@ -404,7 +471,7 @@ Four npm scripts are available to manage migrations:
 npm run migrate:create -- add_column_to_project
 ```
 
-This generates a file like `20260213143000_add_column_to_project.ts` in `src/data/migrations/` with `up` and `down` stubs ready to fill in.
+This generates the next numbered file, for example `029_add_column_to_project.ts`, in `src/data/migrations/` with `up` and `down` stubs ready to fill in.
 
 #### Example Migration
 
@@ -422,7 +489,7 @@ function runSQL(db: SQLiteDatabaseWrapper, sql: string, params: any[] = []): Pro
 }
 
 export const migration: Migration = {
-    id: "20260213143000_add_column_to_project",
+    id: "029_add_column_to_project",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, "ALTER TABLE project ADD COLUMN status TEXT DEFAULT 'active';");
@@ -437,7 +504,9 @@ export const migration: Migration = {
 
 #### Important Notes
 
-- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a timestamp.
+- Each migration runs **in a transaction**, together with its record in `_migrations`: a migration that fails halfway leaves the database as it was, and the server does not start. Do not write `BEGIN`, `COMMIT` or `PRAGMA foreign_keys` in a migration.
+- A migration that **rebuilds a table** (create a copy, `DROP`, `RENAME`) declares `foreignKeysOff: true`. SQLite ignores `PRAGMA foreign_keys` inside a transaction, so the runner switches foreign keys off before it, checks that the migration created no foreign key violation, then switches them back. Without the flag, dropping a parent table would cascade-delete its child rows.
+- Migrations run **in alphabetical order** by filename, which is why filenames are prefixed with a three-digit number (`000_` to `029_` today). Two branches that each add a migration may pick the same number: renumber one of them before merging.
 - The initial migration (`000_initial_schema.ts`) captures the full existing schema using `CREATE TABLE IF NOT EXISTS`, making it safe on both fresh and existing databases.
 - Migrations are executed inside the application startup flow (in `src/main.ts`), so deploying a new version with new migration files is enough — no manual step is required.
 - For production rollbacks, use `npm run migrate:down` from the server or connect via the CLI tool at `tools/migrate.ts`.

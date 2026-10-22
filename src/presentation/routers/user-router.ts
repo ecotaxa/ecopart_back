@@ -283,7 +283,7 @@ export default function UsersRouter(
             res.status(201).send({ message: "User sucessfully created." })
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Valid user already exist") res.status(403).send({ errors: ["Cannot create user"] })
+            if (err.message === "Valid user already exists") res.status(403).send({ errors: ["Cannot create user"] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot update preexistent user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find updated preexistent user") res.status(404).send({ errors: [err.message] })
@@ -587,13 +587,13 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/PublicUser'
      *       401:
-     *         description: Unauthorized to update this user or property.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used or is deleted.
+     *         description: User cannot be used or is deleted. Unauthorized to update this user or property. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -623,7 +623,7 @@ export default function UsersRouter(
             res.status(200).send(updated_user)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Logged user cannot update this property or user") res.status(401).send({ errors: [err.message] })
+            if (err.message === "Logged user cannot update this property or user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find updated user") res.status(404).send({ errors: [err.message] })
@@ -727,13 +727,13 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: Logged user cannot delete this user.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used or is deleted.
+     *         description: User cannot be used or is deleted. Logged user cannot delete this user. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -753,7 +753,8 @@ export default function UsersRouter(
      */
     router.delete('/:user_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteUserUseCase.execute((req as CustomRequest).token, { ...req.body, user_id: req.params.user_id })
+            // Only the id: the data source builds its WHERE clause from the keys it receives
+            await deleteUserUseCase.execute((req as CustomRequest).token, { user_id: req.params.user_id as any })
             if ((req as CustomRequest).token.user_id == parseInt(req.params.user_id)) {
                 res
                     .clearCookie("access_token")
@@ -764,7 +765,7 @@ export default function UsersRouter(
                 res.status(200).send({ message: "User successfully deleted" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Logged user cannot delete this user") res.status(401).send({ errors: [err.message] })
+            if (err.message === "Logged user cannot delete this user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find user to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
@@ -809,7 +810,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used or EcoTaxa login forbidden.
+     *         description: User cannot be used or EcoTaxa login forbidden. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -840,9 +841,9 @@ export default function UsersRouter(
             res.status(200).send(ecotaxa_account)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Logged user cannot login to this ecotaxa account") res.status(401).send({ errors: [err.message] })
+            if (err.message === "Logged user cannot login to this ecotaxa account") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "User cannot add account to the desired ecopart user") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "User cannot add account to the desired ecopart user") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa instance not found ")) res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance id should be a number") res.status(401).send({ errors: [err.message] })
             else if (err.message === "Cannot create ecotaxa account") res.status(500).send({ errors: [err.message] })
@@ -881,13 +882,13 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: Unauthorized to delete this account.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used or cannot logout.
+     *         description: User cannot be used or cannot logout. Unauthorized to delete this account. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -918,7 +919,7 @@ export default function UsersRouter(
             res.status(200).send({ message: "You have been logged out from ecotaxa account" });
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Logged user cannot delete this ecotaxa account") res.status(401).send({ errors: [err.message] })
+            if (err.message === "Logged user cannot delete this ecotaxa account") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot logout from the requested ecotaxa account") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
@@ -964,7 +965,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
@@ -986,7 +987,7 @@ export default function UsersRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("User cannot get requested ecotaxa accounts")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("User cannot get requested ecotaxa accounts")) res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized sort_by")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Unauthorized order_by")) res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get ecotaxa accounts for user : " + req.params.user_id] })

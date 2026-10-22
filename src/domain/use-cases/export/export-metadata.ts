@@ -14,7 +14,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { buildImageFilteringMetadata } from "../sample/qc-graphs-builder";
-import { computeProjectPrivacy } from "./project-privacy";
+import { computeProjectPrivacy } from "../../utils/project-privacy";
 import { dateValue, TableColumn, TableValue, writeTable } from "./table";
 
 // `metadata/projects` and `metadata/samples`, identical in every export product: the raw export

@@ -7,6 +7,7 @@ import { InstrumentModelRepository } from "../../interfaces/repositories/instrum
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchProjectsUseCase } from "../../interfaces/use-cases/project/search-project";
 import { ProjectResponseModel, PublicProjectResponseModel } from "../../entities/project";
+import { ProjectRole, restrictProjectView } from "./project-access";
 
 export class SearchProject implements SearchProjectsUseCase {
     userRepository: UserRepository
@@ -28,8 +29,11 @@ export class SearchProject implements SearchProjectsUseCase {
         // Ensure the current user is valid and not deleted
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
+        const user_is_admin = await this.userRepository.isAdmin(current_user.user_id);
+
         // Prepare search options
         let prepared_options: PreparedSearchOptions = this.prepareSearchOptions(options, filters);
+        this.refuseProbingOfHiddenFields(user_is_admin, prepared_options);
 
         // Apply additional filters
         prepared_options = await this.applyAdditionalFilters(current_user, prepared_options);
@@ -37,8 +41,8 @@ export class SearchProject implements SearchProjectsUseCase {
         // Fetch projects based on prepared search options
         const result: SearchResult<ProjectResponseModel> = await this.projectRepository.standardGetProjects(prepared_options);
 
-        // Map projects to public project response models
-        const projects = await this.mapToPublicProjects(result);
+        // Map projects to public project response models, as seen from the user's role on each
+        const projects = await this.mapToPublicProjects(current_user, user_is_admin, result);
 
         // Format search info
         const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, prepared_options);
@@ -46,6 +50,14 @@ export class SearchProject implements SearchProjectsUseCase {
         return { search_info, projects };
     }
 
+
+    // The import folder is hidden from users outside a project (restrictProjectView): filtering or
+    // sorting on it would let them read it back one character at a time.
+    private refuseProbingOfHiddenFields(user_is_admin: boolean, options: PreparedSearchOptions): void {
+        if (user_is_admin) return;
+        const probes = options.filter.some(f => f.field === "root_folder_path") || options.sort_by.some(s => s.sort_by === "root_folder_path");
+        if (probes) throw new Error("Unauthorized or unexisting parameters : root_folder_path");
+    }
 
     // Prepares the search options by formatting filters and sort options.
     private prepareSearchOptions(options: SearchOptions, filters: FilterSearchOptions[]): PreparedSearchOptions {
@@ -171,12 +183,16 @@ export class SearchProject implements SearchProjectsUseCase {
         return userIds;
     }
 
-    // Maps projects to public project response models.
-    private async mapToPublicProjects(result: SearchResult<ProjectResponseModel>): Promise<PublicProjectResponseModel[]> {
+    // Maps projects to public project response models. Every logged-in user may list every project,
+    // but a project is only shown in full to admins and to its own members and managers.
+    private async mapToPublicProjects(current_user: UserUpdateModel, user_is_admin: boolean, result: SearchResult<ProjectResponseModel>): Promise<PublicProjectResponseModel[]> {
+        if (result.items.length === 0) return [];
+        const granted_project_ids = new Set(user_is_admin ? [] : await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id }));
         return Promise.all(result.items.map(async project => {
             const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: project.project_id });
             if (!privileges) throw new Error("Cannot find privileges");
-            return this.projectRepository.toPublicProject(project, privileges);
+            const role: ProjectRole = user_is_admin ? "admin" : granted_project_ids.has(project.project_id) ? "member" : "user";
+            return restrictProjectView(this.projectRepository.toPublicProject(project, privileges), role);
         }));
     }
 }

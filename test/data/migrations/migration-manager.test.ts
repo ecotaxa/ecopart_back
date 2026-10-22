@@ -234,6 +234,99 @@ describe("MigrationManager", () => {
         });
     });
 
+    describe("transactions", () => {
+        test("a migration that fails halfway leaves no trace", async () => {
+            const halfway: Migration = {
+                id: "004_fails_halfway",
+                async up(d: SQLiteDatabaseWrapper) {
+                    await runSQL(d, "CREATE TABLE created_before_failure (id INTEGER PRIMARY KEY);");
+                    await runSQL(d, "INSERT INTO created_before_failure (id) VALUES (1);");
+                    await runSQL(d, "ALTER TABLE nonexistent_table ADD COLUMN foo TEXT;");
+                },
+                async down() { /* noop */ },
+            };
+            await manager.runMigrations([migrationA]);
+
+            await expect(manager.runMigrations([halfway])).rejects.toThrow("no such table");
+
+            const tables = await allSQL(db, "SELECT name FROM sqlite_master WHERE name = 'created_before_failure'");
+            expect(tables).toEqual([]);
+            expect(await manager.getAppliedMigrations()).toEqual(["001_create_test_table"]);
+            // The connection is usable afterwards: no transaction left open
+            await manager.runMigrations([migrationB]);
+            expect(await manager.getAppliedMigrations()).toEqual(["001_create_test_table", "002_add_email_to_test_table"]);
+        });
+
+        const parentAndChild: Migration = {
+            id: "005_parent_and_child",
+            async up(d: SQLiteDatabaseWrapper) {
+                await runSQL(d, "CREATE TABLE parent (id INTEGER PRIMARY KEY, label TEXT);");
+                await runSQL(d, "CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER NOT NULL REFERENCES parent(id) ON DELETE CASCADE);");
+                await runSQL(d, "INSERT INTO parent (id, label) VALUES (1, 'a'), (2, 'b');");
+                await runSQL(d, "INSERT INTO child (id, parent_id) VALUES (10, 1), (20, 2);");
+            },
+            async down() { /* noop */ },
+        };
+        const rebuildParent = (id: string, foreignKeysOff: boolean, extra = ""): Migration => ({
+            id,
+            foreignKeysOff,
+            async up(d: SQLiteDatabaseWrapper) {
+                await runSQL(d, "CREATE TABLE parent_new (id INTEGER PRIMARY KEY, label TEXT NOT NULL DEFAULT '');");
+                await runSQL(d, `INSERT INTO parent_new SELECT id, label FROM parent ${extra};`);
+                await runSQL(d, "DROP TABLE parent;");
+                await runSQL(d, "ALTER TABLE parent_new RENAME TO parent;");
+            },
+            async down() { /* noop */ },
+        });
+
+        test("foreignKeysOff: rebuilding a parent table keeps its child rows and restores foreign keys", async () => {
+            await manager.runMigrations([parentAndChild]);
+
+            await manager.runMigrations([rebuildParent("006_rebuild_parent", true)]);
+
+            expect(await allSQL(db, "SELECT id, parent_id FROM child ORDER BY id")).toEqual([{ id: 10, parent_id: 1 }, { id: 20, parent_id: 2 }]);
+            expect(await allSQL(db, "PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+        });
+
+        test("without foreignKeysOff, the same rebuild cascade-deletes the child rows: the reason for the switch", async () => {
+            await manager.runMigrations([parentAndChild]);
+
+            await manager.runMigrations([rebuildParent("006_rebuild_parent", false)]);
+
+            expect(await allSQL(db, "SELECT id FROM child")).toEqual([]);
+        });
+
+        test("foreignKeysOff: a rebuild that would orphan child rows is rolled back", async () => {
+            await manager.runMigrations([parentAndChild]);
+
+            await expect(manager.runMigrations([rebuildParent("006_lossy_rebuild", true, "WHERE id = 1")])).rejects.toThrow("would leave 1 foreign key violation(s)");
+
+            expect(await allSQL(db, "SELECT id FROM parent ORDER BY id")).toEqual([{ id: 1 }, { id: 2 }]);
+            expect(await manager.getAppliedMigrations()).not.toContain("006_lossy_rebuild");
+            expect(await allSQL(db, "PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+        });
+
+        test("foreignKeysOff: violations that existed before the migration do not block it", async () => {
+            await manager.runMigrations([parentAndChild]);
+            await runSQL(db, "PRAGMA foreign_keys = OFF;");
+            await runSQL(db, "INSERT INTO child (id, parent_id) VALUES (30, 99);");
+            await runSQL(db, "PRAGMA foreign_keys = ON;");
+
+            await manager.runMigrations([rebuildParent("006_rebuild_parent", true)]);
+
+            expect(await allSQL(db, "SELECT id FROM child ORDER BY id")).toEqual([{ id: 10 }, { id: 20 }, { id: 30 }]);
+        });
+
+        test("foreignKeysOff leaves foreign keys off when they were off before", async () => {
+            await runSQL(db, "PRAGMA foreign_keys = OFF;");
+            await manager.runMigrations([parentAndChild]);
+
+            await manager.runMigrations([rebuildParent("006_rebuild_parent", true)]);
+
+            expect(await allSQL(db, "PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
+        });
+    });
+
     describe("loadMigrationsFromDirectory", () => {
         test("should return empty array for nonexistent directory", () => {
             const migrations = manager.loadMigrationsFromDirectory("/tmp/nonexistent_dir_12345");

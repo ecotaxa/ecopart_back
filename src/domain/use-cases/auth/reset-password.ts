@@ -1,13 +1,16 @@
 import { UserRepository } from "../../interfaces/repositories/user-repository";
+import { AuthRepository } from "../../interfaces/repositories/auth-repository";
 import { ResetPasswordUseCase } from "../../interfaces/use-cases/auth/reset-password";
 import { DecodedToken, ResetCredentialsModel } from "../../entities/auth";
 import { UserResponseModel } from "../../entities/user";
 
 export class ResetPassword implements ResetPasswordUseCase {
     userRepository: UserRepository
+    authRepository: AuthRepository
 
-    constructor(userRepository: UserRepository) {
+    constructor(userRepository: UserRepository, authRepository: AuthRepository) {
         this.userRepository = userRepository
+        this.authRepository = authRepository
     }
     async execute(credentials: ResetCredentialsModel): Promise<void> {
         let nb_of_updated_user: number = 0
@@ -34,6 +37,9 @@ export class ResetPassword implements ResetPasswordUseCase {
         // Change the password
         nb_of_updated_user = await this.userRepository.changePassword({ ...preexistant_user, ...credentials })
         if (nb_of_updated_user == 0) throw new Error("Cannot change password");
+
+        // A reset is often a sign the account was at risk: every open session of that user ends
+        await this.authRepository.revokeUserSessions(preexistant_user.user_id)
 
         // For a migrated legacy user setting their password for the first time, record that
         // it is now set so the migration email is not re-sent to them.

@@ -15,8 +15,8 @@ export class RefreshToken implements RefreshTokenUseCase {
 
     async execute(userAuth: DecodedToken): Promise<AuthJwtRefreshedResponseModel> {
 
-        // Get full user based on decoded token user's email
-        const full_user = await this.userRepository.getUser({ email: userAuth.email })
+        // Get full user by id: an admin can change an email, and the address may then belong to someone else
+        const full_user = await this.userRepository.getUser({ user_id: userAuth.user_id })
 
         // If cannot find user
         if (full_user === null) throw new Error("Cannot find user");
@@ -24,8 +24,16 @@ export class RefreshToken implements RefreshTokenUseCase {
         // If founded user is deleted or invalid
         await this.userRepository.ensureUserCanBeUsed(full_user.user_id);
 
-        // Get authorisation access token //TODO CHECK if generated token based on public user
-        const refreshed_token = { jwt: this.authRepository.generateAccessToken(full_user) }
-        return refreshed_token
+        // A revoked (logout, password change) or expired session cannot be refreshed any more
+        await this.authRepository.ensureSessionIsActive(userAuth.sid, full_user.user_id);
+        const session_id = userAuth.sid as string
+
+        // Each refresh pushes the end of the session back and reissues the refresh token for the same session,
+        // so an active user stays logged in and several tabs refreshing at once keep working
+        await this.authRepository.extendSession(session_id);
+        return {
+            jwt: this.authRepository.generateAccessToken(full_user, session_id),
+            jwt_refresh: this.authRepository.generateRefreshToken(full_user, session_id),
+        }
     }
 }

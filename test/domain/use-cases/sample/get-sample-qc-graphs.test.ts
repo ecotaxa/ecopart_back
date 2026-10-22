@@ -51,6 +51,8 @@ beforeEach(() => {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
     jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false);
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+    // A project whose privacy inputs are unreadable stays private, so the privilege above is needed
+    jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP" } as any);
 });
 
 describe("GetSampleQcGraphs", () => {
@@ -159,7 +161,26 @@ describe("GetSampleQcGraphs", () => {
 
     test("stops when the user lacks project access", async () => {
         jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
+        const getSample = jest.spyOn(mockSampleRepository, "getSample");
         await expect(useCase.execute(current_user, 1, 10)).rejects.toThrow("Logged user cannot access this project");
+        expect(getSample).toBeCalledTimes(0);
+    });
+
+    test("a user outside a visible project gets the graphs without any privilege lookup", async () => {
+        jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP", project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as any);
+        jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub());
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
+
+        const res = await useCase.execute(current_user, 1, 10);
+
+        expect(res.sample_id).toBe(10);
+        expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0);
+    });
+
+    test("stops when the project does not exist", async () => {
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(null);
+        await expect(useCase.execute(current_user, 1, 10)).rejects.toThrow("Cannot find project");
     });
 
     test("rejects a sample that does not belong to the project", async () => {

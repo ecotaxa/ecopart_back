@@ -51,6 +51,7 @@ import { ChangePassword } from '../../src/domain/use-cases/auth/change-password'
 import { ValidUser } from '../../src/domain/use-cases/user/valid-user'
 import { ResetPasswordRequest } from '../../src/domain/use-cases/auth/reset-password-request'
 import { ResetPassword } from '../../src/domain/use-cases/auth/reset-password'
+import { LogoutUser } from '../../src/domain/use-cases/auth/logout'
 import { DeleteUser } from '../../src/domain/use-cases/user/delete-user'
 import { LoginEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
@@ -105,6 +106,7 @@ import { SampleRepositoryImpl } from '../../src/domain/repositories/sample-repos
 import { TaskRepositoryImpl } from '../../src/domain/repositories/task-repository'
 
 import { SQLiteUserDataSource } from '../../src/data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLiteUserSessionDataSource } from '../../src/data/data-sources/sqlite/sqlite-user-session-data-source'
 import { SQLitePrivilegeDataSource } from '../../src/data/data-sources/sqlite/sqlite-privilege-data-source'
 import { SQLiteEcotaxaAccountDataSource } from '../../src/data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
 import { SQLiteInstrumentModelDataSource } from '../../src/data/data-sources/sqlite/sqlite-instrument_model-data-source'
@@ -257,7 +259,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
         const fsAdapter = new FsAdapter()
 
         const userRepo = new UserRepositoryImpl(userDS, bcryptAdapter, jwtAdapter, VALIDATION_TOKEN_SECRET, RESET_PASSWORD_TOKEN_SECRET)
-        const authRepo = new AuthRepositoryImpl(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET)
+        const authRepo = new AuthRepositoryImpl(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET, new SQLiteUserSessionDataSource(db))
         const searchRepo = new SearchRepositoryImpl()
         const privilegeRepo = new PrivilegeRepositoryImpl(privilegeDS)
         const ecotaxaAccountRepo = new EcotaxaAccountRepositoryImpl(ecotaxaAccountDS, GENERIC_ECOTAXA_ACCOUNT_EMAIL, NODE_ENV)
@@ -276,7 +278,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new ResendMigrationEmails(userRepo, transporter, mailerAdapter),
             new UpdateUser(userRepo),
             new ValidUser(userRepo),
-            new DeleteUser(userRepo, privilegeRepo),
+            new DeleteUser(userRepo, privilegeRepo, ecotaxaAccountRepo),
             new LoginEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new LogoutEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new SearchUsers(userRepo, searchRepo, privilegeRepo),
@@ -289,10 +291,11 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new MiddlewareAuthValidation(),
             new LoginUser(userRepo, authRepo),
             new RefreshToken(userRepo, authRepo),
-            new ChangePassword(userRepo),
+            new ChangePassword(userRepo, authRepo),
             new ResetPasswordRequest(userRepo, transporter, mailerAdapter),
-            new ResetPassword(userRepo),
-            new SearchUsers(userRepo, searchRepo, privilegeRepo)
+            new ResetPassword(userRepo, authRepo),
+            new SearchUsers(userRepo, searchRepo, privilegeRepo),
+            new LogoutUser(authRepo)
         )
 
         const projectMiddleware = ProjectRouter(
@@ -309,7 +312,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new ListImportableSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage),
             new DeleteSample(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
-            new SearchSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new SearchSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo, projectRepo),
             new ListImportableEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
             new DeleteEcoTaxaSamples(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
@@ -324,7 +327,7 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new SetSampleVisualQc(userRepo, sampleRepo, privilegeRepo),
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
-            new GetSample(userRepo, sampleRepo, privilegeRepo),
+            new GetSample(userRepo, sampleRepo, privilegeRepo, projectRepo),
             new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
         )
 

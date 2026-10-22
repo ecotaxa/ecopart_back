@@ -3,6 +3,7 @@ import { PrivilegeDataSource } from "../../interfaces/data-sources/privilege-dat
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { PrivilegeRequestCreationModel, PrivilegeRequestModel, PrivilegeResponseModel } from "../../../domain/entities/privilege";
+import { sqlIdentifier } from "./sql-identifier"
 // import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
 // const DB_TABLE = "instrument"
@@ -187,7 +188,7 @@ export class SQLitePrivilegeDataSource implements PrivilegeDataSource {
         // generate sql and params
         for (const [key, value] of Object.entries(privilege)) {
             params.push(value)
-            placeholders = placeholders + key + "=(?) AND "
+            placeholders = placeholders + sqlIdentifier(key) + "=(?) AND "
         }
         // remove last AND
         placeholders = placeholders.slice(0, -4);

@@ -1,7 +1,7 @@
 import { UserUpdateModel } from "../../../../src/domain/entities/user";
 import { SearchOptions, SearchResult } from "../../../../src/domain/entities/search";
 import { EcoTaxaSampleSummary } from "../../../../src/domain/entities/sample";
-import { PublicProjectResponseModel } from "../../../../src/domain/entities/project";
+import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { SampleRepository } from "../../../../src/domain/interfaces/repositories/sample-repository";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
@@ -25,7 +25,7 @@ let useCase: SearchEcoTaxaSamples;
 
 const current_user: UserUpdateModel = { user_id: 1 };
 const baseOptions: SearchOptions = { page: 1, limit: 10, sort_by: "" };
-const project = { project_id: 10, ecotaxa_instance_id: 3 } as PublicProjectResponseModel;
+const project = { project_id: 10, ecotaxa_instance_id: 3 } as ProjectResponseModel;
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -155,7 +155,7 @@ describe("SearchEcoTaxaSamples use case", () => {
     test("throws when project is not linked to an EcoTaxa instance", async () => {
         jest.spyOn(userRepo, "ensureUserCanBeUsed").mockResolvedValueOnce(undefined);
         jest.spyOn(userRepo, "isAdmin").mockResolvedValueOnce(true);
-        jest.spyOn(projectRepo, "getProject").mockResolvedValueOnce({ project_id: 10, ecotaxa_instance_id: null } as PublicProjectResponseModel);
+        jest.spyOn(projectRepo, "getProject").mockResolvedValueOnce({ project_id: 10, ecotaxa_instance_id: null } as ProjectResponseModel);
 
         await expect(useCase.execute(current_user, baseOptions, [], 10))
             .rejects.toThrow("Project is not linked to an EcoTaxa instance");

@@ -1,4 +1,5 @@
 import path from "path";
+import { isInsideFolder } from "../../utils/path-containment";
 import { MinimalUserModel, UserUpdateModel } from "../../entities/user";
 import { ProjectResponseModel, ProjectUpdateModel, PublicProjectRequestCreationModel, PublicProjectResponseModel, PublicProjectUpdateModel } from "../../entities/project";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
@@ -6,9 +7,10 @@ import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { UpdateProjectUseCase } from "../../interfaces/use-cases/project/update-project";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
-import { PrivilegeRequestModel, PublicPrivilege } from "../../entities/privilege";
+import { PublicPrivilege } from "../../entities/privilege";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { ProjectAccessPolicy } from "./project-access";
 
 export class UpdateProject implements UpdateProjectUseCase {
     userRepository: UserRepository
@@ -18,6 +20,7 @@ export class UpdateProject implements UpdateProjectUseCase {
     ecotaxa_accountRepository: EcotaxaAccountRepository;
     sampleRepository: SampleRepository;
     DATA_STORAGE_IMPORT: string
+    private readonly access: ProjectAccessPolicy
 
     constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, sampleRepository: SampleRepository, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
@@ -27,6 +30,7 @@ export class UpdateProject implements UpdateProjectUseCase {
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
         this.sampleRepository = sampleRepository
         this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
+        this.access = new ProjectAccessPolicy(userRepository, privilegeRepository)
     }
 
     async execute(current_user: UserUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<PublicProjectResponseModel> {
@@ -35,7 +39,7 @@ export class UpdateProject implements UpdateProjectUseCase {
         // Ensure the project to delete exists
         const current_project = await this.ensureProjectExists(public_project_to_update);
         // Ensure user has the privilege to update the project
-        await this.ensureUserCanUpdate(current_user, public_project_to_update);
+        await this.ensureUserCanUpdate(current_user, current_project);
         // Prepare the project update model
         const project_to_update: ProjectUpdateModel = await this.prepareProjectUpdateModel(public_project_to_update);
         // Update the project
@@ -57,19 +61,11 @@ export class UpdateProject implements UpdateProjectUseCase {
         return projectExists;
     }
 
-    // Ensure user is admin or has privilege to update the project
-    private async ensureUserCanUpdate(current_user: UserUpdateModel, project: PublicProjectUpdateModel): Promise<void> {
-        const is_granted_params: PrivilegeRequestModel = { user_id: current_user.user_id, project_id: project.project_id }
-        const hasPrivilege = await this.privilegeRepository.isGranted(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
-        if (!hasPrivilege) {
+    // Editing a project, its metadata as much as its privileges, is managing it: only its managers
+    // and admins may (access matrix of the specification).
+    private async ensureUserCanUpdate(current_user: UserUpdateModel, project: ProjectResponseModel): Promise<void> {
+        if (!await this.access.can(current_user.user_id, project, "manage")) {
             throw new Error("Logged user cannot update this property or project");
-        }
-        // Only managers or admin can update privileges of a project
-        if (this.isPrivilegeUpdate(project)) {
-            const canUpdatePrivilege = await this.privilegeRepository.isManager(is_granted_params) || await this.userRepository.isAdmin(current_user.user_id);
-            if (!canUpdatePrivilege) {
-                throw new Error("Logged user cannot update privileges");
-            }
         }
     }
 
@@ -86,7 +82,10 @@ export class UpdateProject implements UpdateProjectUseCase {
                     // Else if not in members, managers and contact add it to project_to_update
                 } else if (key !== "members" && key !== "managers" && key !== "contact") {
                     if (key === "root_folder_path") {
-                        project_to_update[key] = path.join(this.DATA_STORAGE_IMPORT, public_project_to_update[key] as string);
+                        const root_folder_path = path.join(this.DATA_STORAGE_IMPORT, public_project_to_update[key] as string);
+                        // Checked before any write: the backup copies and zips this folder
+                        if (!isInsideFolder(this.DATA_STORAGE_IMPORT, root_folder_path)) throw new Error("Root folder path must stay inside the import folder");
+                        project_to_update[key] = root_folder_path;
                     } else {
                         project_to_update[key] = public_project_to_update[key];
                     }

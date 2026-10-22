@@ -9,7 +9,8 @@ export class JwtAdapter implements JwtWrapper {
     }
     // veryfy token
     verify(token: string, secretOrPublicKey: Secret, options?: VerifyOptions & { complete?: false }): JwtPayload | string {
-        return jwt.verify(token, secretOrPublicKey, options)
+        // Pinned so a token can never pick its own algorithm (HS256 is what sign() uses by default)
+        return jwt.verify(token, secretOrPublicKey, { ...options, algorithms: ['HS256'] })
     }
 }
 

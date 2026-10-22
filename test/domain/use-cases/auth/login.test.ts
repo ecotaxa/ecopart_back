@@ -4,16 +4,9 @@ import { AuthRepository } from "../../../../src/domain/interfaces/repositories/a
 import { LoginUser } from '../../../../src/domain/use-cases/auth/login'
 import { AuthJwtResponseModel, AuthUserCredentialsModel } from "../../../../src/domain/entities/auth";
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { MockAuthRepository } from "../../../mocks/auth-mock";
 
 describe("Create User Use Case", () => {
-    class MockAuthRepository implements AuthRepository {
-        generateAccessToken(): string {
-            throw new Error("Method not implemented for generateAccessToken");
-        }
-        generateRefreshToken(): string {
-            throw new Error("Method not implemented for generateRefreshToken");
-        }
-    }
 
     let mockUserRepository: UserRepository;
     let mockAuthRepository: AuthRepository;
@@ -22,6 +15,7 @@ describe("Create User Use Case", () => {
         jest.clearAllMocks();
         mockUserRepository = new MockUserRepository()
         mockAuthRepository = new MockAuthRepository()
+        jest.spyOn(mockAuthRepository, "createSession").mockImplementation(() => Promise.resolve("session-1"))
     })
 
     test("Should return loged user and auth tokens", async () => {
@@ -54,6 +48,39 @@ describe("Create User Use Case", () => {
         const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
         const result = await loginUserUseCase.execute(InputData);
         expect(result).toStrictEqual({ ...OutputUserData, ...OutputAuthData });
+        // One session per login, carried by both tokens
+        expect(mockAuthRepository.createSession).toBeCalledWith(1);
+        expect(mockAuthRepository.generateAccessToken).toBeCalledWith(OutputUserData, "session-1");
+        expect(mockAuthRepository.generateRefreshToken).toBeCalledWith(OutputUserData, "session-1");
+    });
+
+    test("Should not return the confirmation and reset password codes", async () => {
+        const InputData: AuthUserCredentialsModel = {
+            email: "test@email.com",
+            password: "good_password"
+        }
+        const PublicPart = {
+            user_id: 1,
+            last_name: "Smith",
+            first_name: "John",
+            email: "john@gmail.com",
+            is_admin: false,
+            valid_email: true,
+            organisation: "LOV",
+            country: "France",
+            user_planned_usage: "usage",
+            user_creation_utc_date_time: '2023-08-01 10:30:00'
+        }
+        const UserWithCodes: UserResponseModel = { ...PublicPart, confirmation_code: "confirm-uuid", reset_password_code: "reset-uuid" }
+
+        jest.spyOn(mockUserRepository, "verifyUserLogin").mockImplementation(() => Promise.resolve(true))
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(() => Promise.resolve(UserWithCodes))
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+        jest.spyOn(mockAuthRepository, "generateAccessToken").mockImplementation(() => { return "access_token" })
+        jest.spyOn(mockAuthRepository, "generateRefreshToken").mockImplementation(() => { return "refresh_token" })
+        const loginUserUseCase = new LoginUser(mockUserRepository, mockAuthRepository)
+        const result = await loginUserUseCase.execute(InputData);
+        expect(result).toStrictEqual({ ...PublicPart, jwt: "access_token", jwt_refresh: "refresh_token" });
     });
 
     test("Should handle bad credentials and throw error", async () => {

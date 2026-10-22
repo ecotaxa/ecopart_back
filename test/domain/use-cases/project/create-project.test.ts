@@ -199,3 +199,17 @@ test("Create project but something went wrong when fetching created privileges",
     expect(mockProjectRepository.createProject).toHaveBeenCalledWith(projectRequestCreationModelForRepository);
     expect(mockProjectRepository.getProject).toHaveBeenCalledWith({ project_id: 1 });
 });
+test("Refuses a root folder outside the import folder before creating anything", async () => {
+    const InputData: PublicProjectRequestCreationModel = { ...projectRequestCreationModel, root_folder_path: "../sqlite_db" }
+    const current_user: UserUpdateModel = { user_id: 1 }
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName")
+    jest.spyOn(mockProjectRepository, "createProject")
+
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_IMPORT)
+
+    await expect(createProjectUseCase.execute(current_user, InputData)).rejects.toThrow("Root folder path must stay inside the import folder");
+    expect(mockInstrumentModelRepository.getInstrumentByName).toBeCalledTimes(0);
+    expect(mockProjectRepository.createProject).toBeCalledTimes(0);
+});

@@ -12,12 +12,20 @@ import { SearchRepository } from "../../../../src/domain/interfaces/repositories
 import { InstrumentModelRepository } from "../../../../src/domain/interfaces/repositories/instrument_model-repository";
 import { SearchOptions, FilterSearchOptions } from "../../../../src/domain/entities/search";
 import { sampleModel_1 } from "../../../entities/sample";
+import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
+import { ProjectResponseModel } from "../../../../src/domain/entities/project";
+import { MockProjectRepository } from "../../../mocks/project-mock";
+
+// Privacy inputs of a project that is still private, resp. already visible, in 2026
+const privateProject = (project_id: number) => ({ project_id, project_creation_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel);
+const visibleProject = (project_id: number) => ({ project_id, project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as ProjectResponseModel);
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
 let mockPrivilegeRepository: PrivilegeRepository;
 let mockSearchRepository: SearchRepository;
 let mockInstrumentRepository: InstrumentModelRepository;
+let mockProjectRepository: ProjectRepository;
 let searchSamplesUseCase: SearchSamples;
 
 beforeEach(async () => {
@@ -27,11 +35,14 @@ beforeEach(async () => {
     mockSearchRepository = new MockSearchRepository()
     mockInstrumentRepository = new MockInstrumentModelRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
+    mockProjectRepository = new MockProjectRepository()
 
-    searchSamplesUseCase = new SearchSamples(mockUserRepository, mockSampleRepository, mockSearchRepository, mockInstrumentRepository, mockPrivilegeRepository);
+    searchSamplesUseCase = new SearchSamples(mockUserRepository, mockSampleRepository, mockSearchRepository, mockInstrumentRepository, mockPrivilegeRepository, mockProjectRepository);
 
     jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true)
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(({ project_id }) => Promise.resolve(privateProject(project_id)))
+    jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue([])
 })
 
 describe("Search Task Use Case", () => {
@@ -413,6 +424,41 @@ describe("Search Task Use Case", () => {
             expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
             expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledWith({ user_id: 1 })
             expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [3, 5] }] }))
+        });
+        test("cross-project search by a non-admin also covers the projects that are visible to everyone", async () => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([3, 5])
+            jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue([privateProject(4), visibleProject(5), visibleProject(6)])
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            await searchSamplesUseCase.execute({ user_id: 1 }, { page: 1, limit: 10, sort_by: [] }, [])
+
+            expect(mockSampleRepository.standardGetSamples).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [3, 5, 6] }] }))
+        });
+        test("a user outside a visible project may search its samples, without any privilege lookup", async () => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false)
+            jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(visibleProject(1))
+            jest.spyOn(mockSearchRepository, "formatSortBy").mockImplementation(() => [])
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ total: 1, items: [sampleModel_1] })
+            jest.spyOn(mockSearchRepository, "formatSearchInfo").mockImplementation(() => ({ total: 1, limit: 10, total_on_page: 1, page: 1, pages: 1 }));
+
+            const result = await searchSamplesUseCase.execute({ user_id: 1 }, { page: 1, limit: 10, sort_by: [] }, [], 1)
+
+            expect(result.samples).toEqual([sampleModel_1])
+            expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: 1 })
+            expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
+        });
+        test("a project-scoped search of an unknown project is refused before any privilege lookup", async () => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(null)
+            jest.spyOn(mockSampleRepository, "standardGetSamples")
+
+            await expect(searchSamplesUseCase.execute({ user_id: 1 }, { page: 1, limit: 10, sort_by: [] }, [], 42)).rejects.toThrow("Cannot find project")
+            expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
+            expect(mockSampleRepository.standardGetSamples).toBeCalledTimes(0)
         });
         test("cross-project search by a non-admin without any project returns no sample", async () => {
             const current_user: UserUpdateModel = {

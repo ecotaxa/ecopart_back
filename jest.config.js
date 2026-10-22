@@ -2,11 +2,8 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.test.json',
-    },
-  },
+  // Gives the test secrets the values CI uses when there is no .env (fresh clone, new worktree)
+  setupFiles: ['<rootDir>/test/setup-env.ts'],
   coveragePathIgnorePatterns: [
     "/test/",
     "/src/infra/",
@@ -22,7 +19,7 @@ module.exports = {
     "/node_modules/(?!(node-fetch|data-uri-to-buffer|fetch-blob|formdata-polyfill|hyparquet|hyparquet-writer)/)"
   ],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
     '^.+\\.jsx?$': ['babel-jest', { presets: [['@babel/preset-env', { targets: { node: 'current' } }]] }],
   },
 };

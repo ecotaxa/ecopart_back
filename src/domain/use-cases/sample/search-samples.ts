@@ -7,6 +7,8 @@ import { InstrumentModelRepository } from "../../interfaces/repositories/instrum
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchSamplesUseCase } from "../../interfaces/use-cases/sample/search-samples";
 import { PublicSampleModel } from "../../entities/sample";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
+import { isProjectActionAllowed, privacyOf, ProjectAccessPolicy } from "../project/project-access";
 
 export class SearchSamples implements SearchSamplesUseCase {
     userRepository: UserRepository
@@ -14,13 +16,17 @@ export class SearchSamples implements SearchSamplesUseCase {
     searchRepository: SearchRepository
     instrumentModelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
+    projectRepository: ProjectRepository
+    private readonly access: ProjectAccessPolicy
 
-    constructor(userRepository: UserRepository, sampleRepository: SampleRepository, searchRepository: SearchRepository, instrumentModelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(userRepository: UserRepository, sampleRepository: SampleRepository, searchRepository: SearchRepository, instrumentModelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, projectRepository: ProjectRepository) {
         this.userRepository = userRepository
         this.sampleRepository = sampleRepository
         this.searchRepository = searchRepository
         this.instrumentModelRepository = instrumentModelRepository
         this.privilegeRepository = privilegeRepository
+        this.projectRepository = projectRepository
+        this.access = new ProjectAccessPolicy(userRepository, privilegeRepository)
     }
     async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[], project_id?: number): Promise<{ samples: PublicSampleModel[], search_info: SearchInfo }> {
 
@@ -36,14 +42,14 @@ export class SearchSamples implements SearchSamplesUseCase {
         // Apply additional filters
         prepared_options = await this.applyAdditionalFilters(current_user, prepared_options, project_id);
 
-        // A cross-project search only covers the projects the user can access
+        // A cross-project search only covers the projects whose samples the user may look into
         if (is_cross_project && !(await this.userRepository.isAdmin(current_user.user_id))) {
-            const granted_project_ids = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
-            // A user without any project gets no sample; do not rely on how the data source handles an empty IN
-            if (granted_project_ids.length === 0) {
+            const accessible_project_ids = await this.projectsOpenToFigures(current_user);
+            // A user without any such project gets no sample; do not rely on how the data source handles an empty IN
+            if (accessible_project_ids.length === 0) {
                 return { search_info: this.searchRepository.formatSearchInfo({ total: 0, items: [] }, prepared_options), samples: [] };
             }
-            prepared_options.filter.push({ field: "project_id", operator: "IN", value: granted_project_ids });
+            prepared_options.filter.push({ field: "project_id", operator: "IN", value: accessible_project_ids });
         }
 
         // Fetch samples based on prepared search options
@@ -56,12 +62,24 @@ export class SearchSamples implements SearchSamplesUseCase {
         return { search_info, samples };
     }
 
+    // Samples are "figures" in the access matrix: members and managers always, other users once
+    // the project is visible.
     private async ensureUserCanGet(current_user: UserUpdateModel, project_id: number): Promise<void> {
-        const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        const userHasPrivilege = await this.privilegeRepository.isGranted({ user_id: current_user.user_id, project_id });
-        if (!userIsAdmin && !userHasPrivilege) {
+        const project = await this.projectRepository.getProject({ project_id: Number(project_id) });
+        if (!project) throw new Error("Cannot find project");
+        if (!await this.access.can(current_user.user_id, project, "figures")) {
             throw new Error("Logged user cannot access this project");
         }
+    }
+
+    // The projects the user has a privilege on, plus those open enough for anyone to look into.
+    private async projectsOpenToFigures(current_user: UserUpdateModel): Promise<number[]> {
+        const granted_project_ids = await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id });
+        const now = new Date();
+        const visible_project_ids = (await this.projectRepository.listProjectsPrivacy())
+            .filter(project => isProjectActionAllowed("user", privacyOf(project, now), "figures"))
+            .map(project => project.project_id);
+        return Array.from(new Set([...granted_project_ids, ...visible_project_ids]));
     }
 
 

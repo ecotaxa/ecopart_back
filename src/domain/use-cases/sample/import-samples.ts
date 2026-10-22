@@ -55,7 +55,10 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
 
         // start the task
-        this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user, validated_samples);
+        // Fire-and-forget: failures are recorded on the task inside; only a failure to record one (task deleted
+        // meanwhile, database unavailable) reaches this catch, which keeps it from stopping the server.
+        this.startImportTask(task, samples_names_to_import, project.instrument_model, project, current_user, validated_samples)
+            .catch((error) => console.log(new Date().toISOString(), `Import task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
     }
