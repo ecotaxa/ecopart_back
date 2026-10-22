@@ -31,7 +31,6 @@ export interface SampleRequestCreationModel {
     instrument_settings_acq_erase_border: number | undefined;                // Acquisition erase border (0/1 boolean)
     instrument_settings_acq_threshold: number;                   // Acquisition threshold value
     instrument_settings_acq_pressure_gain?: number;              // Pressure gain to convert raw pressure to decibar in LPM data. UVP6 = 1; UVP5 = TODO (Marc confirms 0.1 or 10)
-    instrument_settings_process_datetime: string | undefined;                // Zooprocess processing datetime (UVP5sd/UVP5hd) — not currently populated at import
     instrument_settings_process_gamma: number | undefined                  // Process gamma value
     instrument_settings_process_vignette_resize_factor?: number; // Scale factor used to resize vignettes when saving them. UVP5SD=2, UVP5HD=1, UVP6=compute_vignettes.txt scale
     instrument_settings_images_post_process: string;             // Post-process software (Zooprocess for UVP5)
@@ -156,7 +155,6 @@ export interface SampleRequestModel {
     instrument_settings_acq_erase_border?: number | undefined;
     instrument_settings_acq_threshold?: number;
     instrument_settings_acq_pressure_gain?: number;
-    instrument_settings_process_datetime?: string | undefined;
     instrument_settings_process_gamma?: number;
     instrument_settings_process_vignette_resize_factor?: number;
     instrument_settings_images_post_process?: string;
@@ -347,7 +345,6 @@ export interface MetadataIniSampleModel {
     instrument_settings_acq_erase_border: number | undefined;
     instrument_settings_acq_threshold: number;
     instrument_settings_acq_pressure_gain?: number;                          // UVP6 = 1
-    instrument_settings_process_datetime: string | undefined;
     instrument_settings_process_vignette_resize_factor?: number;             // UVP6 from compute_vignettes scale factor
     instrument_settings_images_post_process: string;
     instrument_settings_aa: number;
