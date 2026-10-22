@@ -2,56 +2,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Readable } from "stream";
-import archiver from "archiver";
-import * as tar from "tar";
 
 import { SampleRepositoryImpl } from "../../../src/domain/repositories/sample-repository";
 import * as decodeModule from "../../../src/domain/utils/decode-uvp-text";
 import { recordsOf } from "../../entities/per-image-records";
 import { toPerImageColumns } from "../../../src/domain/utils/per-image-columns";
+import { writeTar, writeZip } from "../../helpers/archives";
 
 const STRING_TOO_LONG = "Cannot create a string longer than 0x1fffffe8 characters";
-
-function writeZip(zip_path: string, members: Record<string, string | Buffer>): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const output = fs.createWriteStream(zip_path);
-        const archive = archiver("zip");
-        output.on("close", () => resolve());
-        archive.on("error", reject);
-        archive.pipe(output);
-        for (const [name, content] of Object.entries(members)) archive.append(content, { name });
-        archive.finalize();
-    });
-}
-
-// A zstd frame of raw (stored) blocks: valid Zstandard without needing a compressor.
-function zstdRawFrame(content: Buffer): Buffer {
-    const header = Buffer.alloc(13);
-    header.writeUInt32LE(0xFD2FB528, 0);
-    header[4] = 0xE0; // single segment, 8-byte content size
-    header.writeBigUInt64LE(BigInt(content.length), 5);
-    const parts = [header];
-    const MAX_BLOCK = 128 * 1024;
-    for (let offset = 0; offset < content.length || offset === 0; offset += MAX_BLOCK) {
-        const block = content.subarray(offset, offset + MAX_BLOCK);
-        const block_header = Buffer.alloc(3);
-        block_header.writeUIntLE((block.length << 3) | (offset + MAX_BLOCK >= content.length ? 1 : 0), 0, 3);
-        parts.push(block_header, block);
-    }
-    return Buffer.concat(parts);
-}
-
-// Writes `members` under `folder` and packs them, in this order, into a .tar.zst.
-function writeTar(tar_zst_path: string, folder: string, members: Record<string, string | Buffer>, preservePaths = false): void {
-    for (const [name, content] of Object.entries(members)) {
-        fs.mkdirSync(path.dirname(path.join(folder, name)), { recursive: true });
-        fs.writeFileSync(path.join(folder, name), content);
-    }
-    const tar_path = `${tar_zst_path}.tar`;
-    tar.c({ sync: true, file: tar_path, cwd: folder, preservePaths }, Object.keys(members));
-    fs.writeFileSync(tar_zst_path, zstdRawFrame(fs.readFileSync(tar_path)));
-    fs.rmSync(tar_path);
-}
 
 describe("reading text from sample archives", () => {
     let tmp: string;
@@ -202,9 +160,12 @@ describe("reading text from sample archives", () => {
             for (const name of ["in_db", "in_storage", "new"]) {
                 fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", name), { recursive: true });
                 await writeZip(path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Images.zip`), { [`ecotaxa_${name}.tsv`]: TSV });
+                await writeZip(path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Particule.zip`), { "metadata.ini": "[sample_metadata]\n[HW_CONF]\nOperator_email=op@example.org\n[ACQ_CONF]\n" });
             }
             fs.mkdirSync(path.join(tmp, "storage", "1", "in_storage"), { recursive: true });
             getAll.mockResolvedValue({ items: [{ sample_name: "in_db" }], total: 1 });
+            // The metadata.ini read for qc_lvl1 must fit: the TSVs are counted as a stream anyway.
+            repo.max_text_file_bytes = 1000;
             const count = jest.spyOn(repo as any, "getImportableSampleImagesCount");
 
             const samples = await repo.listImportableSamples("uvp6_m1", "UVP6LP", path.join(tmp, "storage", "1"), 1);

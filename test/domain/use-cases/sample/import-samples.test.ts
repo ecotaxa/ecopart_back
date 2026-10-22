@@ -61,6 +61,8 @@ beforeEach(async () => {
     // Step 1/4 reads the sample type and the max pressure of every sample from the source folder.
     jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue(sourceMetadata("Depth"));
     jest.spyOn(mockSampleRepository, "getSourceMaxPressure").mockResolvedValue(150);
+    // and looks for the work files of every UVP5 sample there.
+    jest.spyOn(mockSampleRepository, "checkUvp5WorkFiles").mockImplementation(async (_root_folder_path, sample_name) => ({ work_source: `work/${sample_name}.tar.zst`, files_count: 3, missing: [] }));
 })
 
 
@@ -646,7 +648,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(3);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(5);
             });
             test("should throw an error and deleteSourcesFromProjectFolder if something went wrong during the import", async () => {
                 const current_user: UserUpdateModel = {
@@ -694,7 +696,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(1);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(5);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(7);
             });
         });
         describe("cancellation", () => {
@@ -729,8 +731,8 @@ describe("Delete Sample Use Case", () => {
 
             test("cancelled during the pivot construction : the copied sources are removed and no sample is created", async () => {
                 arrangeUvp5Import();
-                // before the copy, after the copy, then before the first pivot
-                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
+                // before the work files check of each sample, before the copy, after the copy, then before the first pivot
+                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
 
                 await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, ["perle3_001", "Mooring_0N_23W_201910_850m"], "UVP5SD", projectResponseModel, { user_id: 1 })
 
@@ -788,7 +790,7 @@ describe("Delete Sample Use Case", () => {
                 expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
                 expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
                 expect(mockTaskRepository.getTask).toBeCalledTimes(0);
-                expect(mockTaskRepository.logMessage).toBeCalledTimes(5);
+                expect(mockTaskRepository.logMessage).toBeCalledTimes(7);
             });
             test("should copy samples to import folder for any uvp6", async () => {
                 const current_user: UserUpdateModel = {
@@ -924,6 +926,8 @@ describe("Delete Sample Use Case", () => {
             expect(mockTaskRepository.logMessage).toBeCalledWith(TaskResponseModel_1.task_log_file_path, expect.any(String));
             expect(loggedMessages()).toEqual([
                 "Step 1/4 sample validation : 2 sample(s) to import out of 2 importable",
+                "Step 1/4 sample validation : perle3_001 : work files found in work/perle3_001.tar.zst (3 files)",
+                "Step 1/4 sample validation : Mooring_0N_23W_201910_850m : work files found in work/Mooring_0N_23W_201910_850m.tar.zst (3 files)",
                 "Step 1/4 sample validation : perle3_001 : raw file 20200313004656, images [2790, 15872], 0 vignettes",
                 "Step 1/4 sample validation : Mooring_0N_23W_201910_850m : raw file 20191012-000000_Merged-020, images [3432, 107843], 0 vignettes",
                 "Step 2/4 sample folders copy : perle3_001 (1/2) : work source work/perle3_001.zip (1.0 KB)",
@@ -958,7 +962,7 @@ describe("Delete Sample Use Case", () => {
             });
 
             test("after a cancellation : the cleanup lines say so, and an absent copy is reported", async () => {
-                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(new Error(TASK_CANCELLED_MESSAGE));
+                jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(new Error(TASK_CANCELLED_MESSAGE));
                 jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder").mockResolvedValue([]);
 
                 await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
@@ -1053,6 +1057,84 @@ describe("Delete Sample Use Case", () => {
             ]);
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+    });
+
+    describe("files read after the copy, checked at step 1/4", () => {
+        const loggedMessages = () => (mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message);
+        const samples = ["perle3_001", "Mooring_0N_23W_201910_850m"];
+
+        beforeEach(() => {
+            jest.spyOn(mockTaskRepository, "startTask").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "ensureFolderExists").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult);
+            jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "UVP5copySamplesToImportFolder").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "UVP6copySamplesToImportFolder").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "formatSampleToImport").mockResolvedValue(sampleRequestCreationModel_1);
+            jest.spyOn(mockSampleRepository, "countBlackParticulesUvp6").mockResolvedValue(0);
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(pivotReport);
+            jest.spyOn(mockSampleRepository, "createManySamples").mockResolvedValue([101, 202]);
+            jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder").mockResolvedValue([]);
+            jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+        });
+
+        test("refuses before any copy every UVP5 sample whose work entry lacks a file, all in one error", async () => {
+            jest.spyOn(mockSampleRepository, "checkUvp5WorkFiles")
+                .mockResolvedValueOnce({ work_source: "work/perle3_001.tar.zst", files_count: 2931, missing: ["HDR*.txt"] })
+                .mockRejectedValueOnce(new Error("end of central directory record signature not found"));
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+            expect(mockSampleRepository.checkUvp5WorkFiles).toBeCalledTimes(2);
+            expect(mockSampleRepository.checkUvp5WorkFiles).toBeCalledWith(projectResponseModel.root_folder_path, "Mooring_0N_23W_201910_850m");
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error(
+                "Samples with missing work files: perle3_001 (work/perle3_001.tar.zst (2931 files) has no HDR*.txt), "
+                + "Mooring_0N_23W_201910_850m (its work entry cannot be read: end of central directory record signature not found). "
+                + "Only the work entry of each sample is read: add the files there, then relaunch the import."));
+            expect(loggedMessages()).toEqual([
+                "Step 1/4 sample validation : 2 sample(s) to import out of 2 importable",
+                "Step 1/4 sample validation : perle3_001 : work/perle3_001.tar.zst (2931 files) has no HDR*.txt",
+                "Step 1/4 sample validation : Mooring_0N_23W_201910_850m : its work entry cannot be read: end of central directory record signature not found",
+            ]);
+            expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
+            expect(mockSampleRepository.createManySamples).toBeCalledTimes(0);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
+        });
+
+        test("does not look for work files in a UVP6 project", async () => {
+            const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M" };
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+            expect(mockSampleRepository.checkUvp5WorkFiles).toBeCalledTimes(0);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+
+        test("a sample failing QC level 1 is refused with its reason, before the work files are looked for", async () => {
+            jest.spyOn(mockSampleRepository, "listImportableSamples").mockResolvedValue(listImportableSamplesResult.map(sample => ({
+                ...sample, qc_lvl1: false, qc_lvl1_comment: "no op_email in config/cruise_info.txt",
+            })));
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error(
+                "Samples failed QC level 1 (source data missing): perle3_001 (no op_email in config/cruise_info.txt), Mooring_0N_23W_201910_850m (no op_email in config/cruise_info.txt)"));
+            expect(mockSampleRepository.checkUvp5WorkFiles).toBeCalledTimes(0);
+            expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
+        });
+
+        test("a cancellation stops the check between two samples", async () => {
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockRejectedValue(new Error(TASK_CANCELLED_MESSAGE));
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+            expect(mockSampleRepository.checkUvp5WorkFiles).toBeCalledTimes(1);
+            expect(mockSampleRepository.UVP5copySamplesToImportFolder).toBeCalledTimes(0);
+            expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error(TASK_CANCELLED_MESSAGE));
         });
     });
 

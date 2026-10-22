@@ -6,7 +6,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, Uvp5WorkFilesCheckModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
 import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -56,6 +56,14 @@ function parseIntAt(text: string, start: number, end: number): number {
 
 // Bounds the vignette count cache (a few hundred bytes per sample).
 const MAX_CACHED_VIGNETTE_COUNTS = 10_000;
+// Bounds the UVP6 operator email cache, same order of size.
+const MAX_CACHED_OPERATOR_EMAIL_CHECKS = 10_000;
+
+// A value step 4/4 can store in a required text column: a non-blank text. The UVP6 INI parser turns
+// an empty value into the number 0.
+function isFilledText(value: unknown): boolean {
+    return typeof value === "string" && value.trim() !== "";
+}
 
 
 export class SampleRepositoryImpl implements SampleRepository {
@@ -72,6 +80,8 @@ export class SampleRepositoryImpl implements SampleRepository {
     max_text_file_bytes = buffer_constants.MAX_STRING_LENGTH;
     // Vignette counts per TSV source file, see getImportableSampleImagesCount.
     private vignette_counts = new Map<string, { size: number, mtime_ms: number, count: number }>();
+    // Operator email problem (null when none) per UVP6 particle archive, see uvp6OperatorEmailProblem.
+    private operator_email_checks = new Map<string, { size: number, mtime_ms: number, problem: string | null }>();
 
     constructor(sampleDataSource: SampleDataSource, DATA_STORAGE_FS_STORAGE: string) {
         this.sampleDataSource = sampleDataSource
@@ -1036,7 +1046,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
     }
 
-    async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, vignettes_of?: string[]): Promise<PublicHeaderSampleResponseModel[]> {
+    async listImportableSamples(root_folder_path: string, instrument_model: string, dest_folder: string, project_id: number, inspected?: string[]): Promise<PublicHeaderSampleResponseModel[]> {
         // List importable samples from root_folder_path
         const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
@@ -1057,16 +1067,87 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
 
         // Samples already in the project folder or in the database are left out before the vignette
-        // counts: those read one archive per sample, seconds for the TSV of a long deployment.
+        // counts and the metadata checks: those read one archive per sample, seconds for the TSV of a
+        // long deployment.
         const fs_imported_samples_name = await this.getSamplesFromFsStorage(dest_folder);
         const db_imported_samples_name = await this.getProjectSampleNames(project_id);
         const not_imported_samples = meta_header_samples.filter(sample =>
             !fs_imported_samples_name.includes(sample.profileId) && !db_imported_samples_name.includes(sample.profileId));
 
-        const counted_names = vignettes_of ? new Set(vignettes_of) : null;
-        const to_count = counted_names ? not_imported_samples.filter(sample => counted_names.has(sample.profileId)) : not_imported_samples;
-        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, to_count);
-        return this.setupSamples(not_imported_samples, source_samples, source_folder, sample_images_counts);
+        const inspected_names = inspected ? new Set(inspected) : null;
+        const to_inspect = inspected_names ? not_imported_samples.filter(sample => inspected_names.has(sample.profileId)) : not_imported_samples;
+        const sample_images_counts = await this.getImportableSamplesImagesCount(folderPath, instrument_model, to_inspect);
+        const source_problems = await this.findSourceProblems(
+            folderPath,
+            instrument_model,
+            not_imported_samples.map(sample => sample.profileId),
+            to_inspect.map(sample => sample.profileId).filter(name => source_samples.includes(name)),
+        );
+        return this.setupSamples(not_imported_samples, source_samples, source_folder, sample_images_counts, source_problems);
+    }
+
+    // Samples the import would refuse after the copy, with the reason. UVP5: the config files shared by
+    // every sample of the project, copied at step 2/4 and read at step 3/4. UVP6: the metadata.ini of
+    // each inspected sample. Both with the values step 4/4 requires from them.
+    private async findSourceProblems(folderPath: string, instrument_model: string, samples_names: string[], inspected_names: string[]): Promise<Map<string, string>> {
+        const problems = new Map<string, string>();
+        if (instrument_model.startsWith('UVP5')) {
+            const config_problems = await this.uvp5ConfigProblems(folderPath);
+            if (config_problems.length > 0) for (const sample_name of samples_names) problems.set(sample_name, config_problems.join(", "));
+        } else if (instrument_model.startsWith('UVP6')) {
+            for (const sample_name of inspected_names) {
+                const problem = await this.uvp6OperatorEmailProblem(folderPath, sample_name);
+                if (problem !== null) problems.set(sample_name, problem);
+            }
+        }
+        return problems;
+    }
+
+    // The config files UVP5copySamplesToImportFolder copies, with the key whose value fills a required
+    // column: sample.instrument_operator_email, sample.instrument_settings_pixel_size_mm.
+    private async uvp5ConfigProblems(folderPath: string): Promise<string[]> {
+        const config_files: { file: string, required?: { key: string, read: (content: string) => unknown } }[] = [
+            { file: 'config/cruise_info.txt', required: { key: 'op_email', read: (content) => this.parseCruiseInfo(content).instrument_operator_email } },
+            { file: 'config/uvp5_settings/uvp5_configuration_data.txt', required: { key: 'pixel', read: (content) => this.parseConfigurationData(content).instrument_settings_pixel_size_mm } },
+            { file: 'config/process_install_config.txt' },
+        ];
+        const problems: string[] = [];
+        for (const { file, required } of config_files) {
+            let content: string;
+            try {
+                content = decodeUvpText(await fsPromises.readFile(path.join(folderPath, file)));
+            } catch (error) {
+                problems.push((error as NodeJS.ErrnoException).code === 'ENOENT' ? `${file} not found` : `${file} cannot be read`);
+                continue;
+            }
+            if (required && !isFilledText(required.read(content))) problems.push(`no ${required.key} in ${file}`);
+        }
+        return problems;
+    }
+
+    // Read again only once the archive changes (size or modification time), like the vignette counts:
+    // the import tab lists every sample each time it opens.
+    private async uvp6OperatorEmailProblem(folderPath: string, sample_name: string): Promise<string | null> {
+        const archive = `ecodata/${sample_name}/${sample_name}_Particule.zip`;
+        const zip_path = path.join(folderPath, archive);
+        let stat: fs.Stats;
+        try {
+            stat = await fsPromises.stat(zip_path);
+        } catch {
+            return `${archive} not found`;
+        }
+        const cached = this.operator_email_checks.get(zip_path);
+        if (cached && cached.size === stat.size && cached.mtime_ms === stat.mtimeMs) return cached.problem;
+        let email: unknown;
+        try {
+            email = (await this.getSampleFromMetadataIni(path.join(folderPath, 'ecodata'), sample_name)).instrument_operator_email;
+        } catch {
+            return `metadata.ini cannot be read in ${archive}`;
+        }
+        const problem = isFilledText(email) ? null : `no Operator_email in the HW_CONF section of metadata.ini (${archive})`;
+        if (this.operator_email_checks.size >= MAX_CACHED_OPERATOR_EMAIL_CHECKS) this.operator_email_checks.clear();
+        this.operator_email_checks.set(zip_path, { size: stat.size, mtime_ms: stat.mtimeMs, problem });
+        return problem;
     }
 
     // Why each sample is left out of listImportableSamples. Skips the vignette counts, which read
@@ -1399,10 +1480,12 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     // Function to setup samples
-    async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string, sample_images_counts: Map<string, number>): Promise<PublicHeaderSampleResponseModel[]> {
-        // Flag qc samples to flase if not in both lists, and add qc message
+    async setupSamples(meta_header_samples: HeaderSampleModel[], samples: string[], folder: string, sample_images_counts: Map<string, number>, source_problems: Map<string, string> = new Map()): Promise<PublicHeaderSampleResponseModel[]> {
+        // Flag qc samples to false if not in both lists or with a source problem, and add qc message
         const samples_response: PublicHeaderSampleResponseModel[] = [];
         for (const sample of meta_header_samples) {
+            const in_source_folder = samples.includes(sample.profileId);
+            const problem = source_problems.get(sample.profileId);
             samples_response.push({
                 sample_name: sample.profileId,
                 raw_file_name: sample.filename,
@@ -1411,8 +1494,8 @@ export class SampleRepositoryImpl implements SampleRepository {
                 last_image: sample.endImg,
                 vignette_number: sample_images_counts.get(sample.profileId) ?? 0,
                 comment: sample.comment,
-                qc_lvl1: samples.includes(sample.profileId) ? true : false,
-                qc_lvl1_comment: samples.includes(sample.profileId) ? '' : 'Sample not found in ' + folder + ' folder'
+                qc_lvl1: in_source_folder && problem === undefined,
+                qc_lvl1_comment: !in_source_folder ? 'Sample not found in ' + folder + ' folder' : problem ?? ''
             });
         }
         return samples_response;
@@ -2536,6 +2619,55 @@ export class SampleRepositoryImpl implements SampleRepository {
         }
         // Plain folder: files sit directly under work/<sample>/.
         return decodeUvpText(await fsPromises.readFile(workDirFile));
+    }
+
+    // The files of the work entry read after the copy: the datfile and HDR*.txt by step 3/4, the .bru
+    // by the pivot. Only the work entry counts, a copy kept in raw/ or results/ is never imported. The
+    // names are those the copy lays out: macOS metadata left out, the common top folder of an archive
+    // stripped. A tar.zst has no index: the whole archive is decompressed, nothing is written.
+    async checkUvp5WorkFiles(root_folder_path: string, sample_name: string): Promise<Uvp5WorkFilesCheckModel> {
+        const root_abs = path.join(this.base_folder, root_folder_path);
+        const work_source = await this.uvp5WorkSource(root_abs, sample_name);
+        const files = await this.listWorkSourceFiles(work_source);
+        const missing: string[] = [];
+        if (!files.includes(`${sample_name}_datfile.txt`)) missing.push(`${sample_name}_datfile.txt`);
+        if (!files.some((name) => /^HDR[^/]*\.txt$/.test(name))) missing.push('HDR*.txt');
+        if (!files.includes(`${sample_name}.bru`)) missing.push(`${sample_name}.bru`);
+        return { work_source: path.relative(root_abs, work_source.path), files_count: files.length, missing };
+    }
+
+    // Same priority as UVP5copySamplesToImportFolder: tar.zst, then zip, then folder.
+    private async uvp5WorkSource(root_abs: string, sample_name: string): Promise<{ path: string, form: 'tar.zst' | 'zip' | 'folder' }> {
+        const tar_zst = path.join(root_abs, 'work', `${sample_name}.tar.zst`);
+        if (await this.pathExists(tar_zst)) return { path: tar_zst, form: 'tar.zst' };
+        const zip = path.join(root_abs, 'work', `${sample_name}.zip`);
+        if (await this.pathExists(zip)) return { path: zip, form: 'zip' };
+        return { path: path.join(root_abs, 'work', sample_name), form: 'folder' };
+    }
+
+    private async listWorkSourceFiles(work_source: { path: string, form: 'tar.zst' | 'zip' | 'folder' }): Promise<string[]> {
+        if (work_source.form === 'tar.zst') return this.normalizedArchiveFiles(await this.listTarZstFileNames(work_source.path));
+        if (work_source.form === 'zip') return this.normalizedArchiveFiles((await this.listZipEntryNames(work_source.path)).filter((name) => !name.endsWith('/')));
+        // A folder is zipped as it is: its files sit at the root of the copy.
+        return (await fsPromises.readdir(work_source.path, { withFileTypes: true })).filter((entry) => !entry.isDirectory()).map((entry) => entry.name);
+    }
+
+    // The paths extractZipNormalized / extractTarZstNormalized give the files of an archive.
+    private normalizedArchiveFiles(file_names: string[]): string[] {
+        const files = file_names.filter((name) => !this.isMacJunk(name));
+        const top_folder = this.commonTopFolder(files);
+        return files.map((name) => name.slice(top_folder.length));
+    }
+
+    private async listTarZstFileNames(tarZstPath: string): Promise<string[]> {
+        const names: string[] = [];
+        const parser = new tar.Parser();
+        parser.on('entry', (entry) => {
+            if (entry.type === 'File') names.push(entry.path);
+            entry.resume();
+        });
+        await pipelinePromise(fs.createReadStream(tarZstPath), createZstdDecompressStream(), parser);
+        return names;
     }
 
     // UVP5 source: the meta header is read from the project's meta/ folder (not yet zipped per sample).

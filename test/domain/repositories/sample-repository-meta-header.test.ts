@@ -39,16 +39,22 @@ describe("Meta header choice", () => {
         fs.rmSync(tmp, { recursive: true, force: true });
     });
 
-    function writeSourceProject(project: string, headers: Record<string, string>, data_folder: string, samples: string[]): void {
+    // A UVP6 sample gets a metadata.ini with its operator email, which qc_lvl1 requires.
+    async function writeSourceProject(project: string, headers: Record<string, string>, data_folder: string, samples: string[]): Promise<void> {
         fs.mkdirSync(path.join(tmp, project, "meta"), { recursive: true });
         for (const [name, content] of Object.entries(headers)) fs.writeFileSync(path.join(tmp, project, "meta", name), content);
-        for (const sample of samples) fs.mkdirSync(path.join(tmp, project, data_folder, sample), { recursive: true });
+        for (const sample of samples) {
+            fs.mkdirSync(path.join(tmp, project, data_folder, sample), { recursive: true });
+            if (data_folder === "ecodata") {
+                await writeZip(path.join(tmp, project, data_folder, sample, `${sample}_Particule.zip`), { "metadata.ini": "[sample_metadata]\n[HW_CONF]\nOperator_email=op@example.org\n[ACQ_CONF]\n" });
+            }
+        }
     }
 
     describe("listImportableSamples", () => {
         test("lists the samples of the canonical header, not those of another deployment's header next to it", async () => {
             const project = "uvp6_sn000171hf_20230720_wcb_1_test";
-            writeSourceProject(project, {
+            await writeSourceProject(project, {
                 "uvp6_header_sn000171hf_20230720_wcb_1.txt": header(row("wcb_1_001", 1), row("wcb_1_002", 1)),
                 "uvp6_header_sn000171hf_20230720_wcb_1_test.txt": header(row("wcb_1_test_001", 1)),
             }, "ecodata", ["wcb_1_test_001"]);
@@ -60,7 +66,7 @@ describe("Meta header choice", () => {
 
         test("lists the samples of the canonical header, not those of its copies", async () => {
             const project = "uvp6_sn000104lp_2020_WMO5906623_recovery_profiles_full";
-            writeSourceProject(project, {
+            await writeSourceProject(project, {
                 "uvp6_header_sn000104lp_2020_WMO5906623_recovery_profiles_full - Copy.txt": header(row("0000a", 1), row("0000p", 1)),
                 "uvp6_header_sn000104lp_2020_WMO5906623_recovery_profiles_full_copy20250306.txt": header(row("0000a", 1)),
                 "uvp6_header_sn000104lp_2020_WMO5906623_recovery_profiles_full.txt": header(row("0000a", 1), row("9999a", 2)),
@@ -73,7 +79,7 @@ describe("Meta header choice", () => {
 
         test("fails, naming the expected file, when meta/ has no canonical header", async () => {
             const project = "uvp6_sn000007lp_2019_seaglider_test_cscs";
-            writeSourceProject(project, {
+            await writeSourceProject(project, {
                 "uvp6_header_sn000007lp_2019_seaglider_test_cscs - Copie.txt": header(row("gid_09down", 1)),
             }, "ecodata", ["gid_09"]);
 
@@ -113,7 +119,7 @@ describe("Meta header choice", () => {
 
     test("the QC preview of a UVP5 source sample reads the canonical header", async () => {
         const project = "uvp5_sn201_hot";
-        writeSourceProject(project, {
+        await writeSourceProject(project, {
             "uvp5_header_sn201_hot - Copy.txt": header(row("s1", 1)),
             "uvp5_header_sn201_hot.txt": header(row("s1", 2)),
         }, "work", ["s1"]);

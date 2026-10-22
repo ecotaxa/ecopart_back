@@ -284,6 +284,13 @@ export interface PublicHeaderSampleResponseModel {
     vignette_number: number,
 }
 
+// The files the import reads from a UVP5 work entry after the copy, looked for before it.
+export interface Uvp5WorkFilesCheckModel {
+    work_source: string,            // work entry read, relative to the project folder: work/<sample>.tar.zst, work/<sample>.zip or work/<sample>
+    files_count: number,
+    missing: string[],              // among <sample>_datfile.txt, HDR*.txt, <sample>.bru
+}
+
 export interface HeaderSampleModel {
     cruise: string,
     ship: string,
