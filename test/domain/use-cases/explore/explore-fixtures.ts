@@ -1,4 +1,5 @@
 import { ExploreFilters, ExploreSampleRow } from "../../../../src/domain/entities/explore";
+import { ProjectStatsSampleRow } from "../../../../src/domain/entities/project-stats";
 import { ProjectPrivacyLevel, ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { PublicPrivilege } from "../../../../src/domain/entities/privilege";
 import { MinimalUserModel } from "../../../../src/domain/entities/user";
@@ -119,6 +120,27 @@ export function exploreFilters(overrides: Partial<ExploreFilters> = {}): Explore
         ecotaxa_imported_only: false,
         ecotaxa_exclude_not_living: false,
         classification_state: "all",
+        ...overrides,
+    };
+}
+
+// A light sample row of the project statistics: the Explore row plus the map, backup and
+// instrument-parameter fields.
+export function projectStatsSample(overrides: Partial<ProjectStatsSampleRow> = {}): ProjectStatsSampleRow {
+    return {
+        ...exploreSample(),
+        station_id: "st_001",
+        sample_latitude: 43.4,
+        sample_longitude: 7.87,
+        ctd_latitude: null,
+        ctd_longitude: null,
+        use_ctd_coordinates: false,
+        sample_creation_utc_date_time: "2024-07-01T09:00:00.000Z",
+        instrument_serial_number: "000008LP",
+        instrument_settings_pixel_size_mm: 0.088,
+        instrument_settings_acq_gain: 1,
+        instrument_settings_acq_threshold: 21,
+        instrument_settings_acq_exposure: 800,
         ...overrides,
     };
 }

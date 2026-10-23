@@ -155,6 +155,13 @@ components:
             fully_predicted: { type: number }
             partially_validated: { type: number }
             partially_predicted: { type: number }
+        objects:
+          type: object
+          description: The objects of the samples with EcoTaxa stats, by classification state.
+          properties:
+            total: { type: integer }
+            validated: { type: integer }
+            predicted: { type: integer }
         nb_samples_with_stats: { type: integer }
         partial: { type: boolean, description: "Some samples have no stats yet: they are being read from EcoTaxa in the background, ask again later." }
         nb_samples_pending: { type: integer }

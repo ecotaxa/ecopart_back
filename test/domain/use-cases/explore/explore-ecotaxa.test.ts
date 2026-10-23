@@ -492,6 +492,7 @@ describe("ExploreEcoTaxaService", () => {
             expect(summary).toEqual({
                 categories: [],
                 classification: { fully_validated: 0, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 },
+                objects: { total: 0, validated: 0, predicted: 0 },
                 nb_samples_with_stats: 0,
                 partial: true,
                 nb_samples_pending: ECOTAXA_SYNC_REFRESH_LIMIT + 1,
@@ -534,6 +535,7 @@ describe("ExploreEcoTaxaService", () => {
             expect(first).toEqual({
                 categories: ["Copepoda"],
                 classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 },
+                objects: { total: 400, validated: 400, predicted: 0 },
                 nb_samples_with_stats: 40,
                 partial: true,
                 nb_samples_pending: 110,
@@ -554,6 +556,7 @@ describe("ExploreEcoTaxaService", () => {
             expect(second).toEqual({
                 categories: ["Copepoda"],
                 classification: { fully_validated: 0, fully_predicted: 100, partially_validated: 0, partially_predicted: 0 },
+                objects: { total: 1500, validated: 0, predicted: 1500 },
                 nb_samples_with_stats: 150,
                 partial: false,
                 nb_samples_pending: 0,
@@ -818,6 +821,7 @@ describe("ExploreEcoTaxaService", () => {
             expect(summary).toEqual({
                 categories: ["Appendicularia", "Copepoda", "detritus"],
                 classification: { fully_validated: 50, fully_predicted: 50, partially_validated: 0, partially_predicted: 0 },
+                objects: { total: 42, validated: 30, predicted: 12 },
                 nb_samples_with_stats: 2,
                 partial: false,
                 nb_samples_pending: 0,
@@ -861,6 +865,7 @@ describe("ExploreEcoTaxaService", () => {
             await expect(service.summaryOf([exploreSample()], PROJECTS, true)).resolves.toEqual({
                 categories: [],
                 classification: { fully_validated: 0, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 },
+                objects: { total: 0, validated: 0, predicted: 0 },
                 nb_samples_with_stats: 0,
                 partial: false,
                 nb_samples_pending: 0,

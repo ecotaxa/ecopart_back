@@ -62,7 +62,7 @@ class MockGetExploreGraphs implements GetExploreGraphsUseCase {
 const PROJECTS: ExploreProjectOption[] = [{ project_id: 1, project_title: "Ligurian profiles", nb_samples: 30 }];
 const MAP: ExploreMapSample[] = [{ sample_id: 1, sample_name: "moose_001", project_id: 1, project_title: "Ligurian profiles", latitude: 43.4, longitude: 7.87, instrument_model: "UVP6LP", privacy_status: "open", is_my_project: false }];
 const SELECTION: ExploreSelectionResponse = { all: { summary: null, projects: [] }, exportable: { summary: null, projects: [] } };
-const SUMMARY = { categories: ["Copepoda"], classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 }, nb_samples_with_stats: 1, partial: false, nb_samples_pending: 0 };
+const SUMMARY = { categories: ["Copepoda"], classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 }, objects: { total: 30, validated: 30, predicted: 0 }, nb_samples_with_stats: 1, partial: false, nb_samples_pending: 0 };
 const ECOTAXA: ExploreEcoTaxaResponse = { all: SUMMARY, exportable: SUMMARY };
 const IMAGES: ExploreImage[] = [{ object_id: 42, image_url: "https://ecotaxa.obs-vlfr.fr/vault/1/42.jpg", sample_name: "moose_001", depth: 12.5, date: null }];
 const EMPTY = { keys: [], axis_labels: {}, series: {} };

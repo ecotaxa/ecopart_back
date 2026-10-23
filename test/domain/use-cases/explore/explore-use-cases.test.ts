@@ -138,6 +138,7 @@ describe("Explore use cases", () => {
         const summary = (nb: number, nb_samples_pending = 0): ExploreEcoTaxaSummary => ({
             categories: ["Copepoda"],
             classification: { fully_validated: 100, fully_predicted: 0, partially_validated: 0, partially_predicted: 0 },
+            objects: { total: nb * 10, validated: nb * 10, predicted: 0 },
             nb_samples_with_stats: nb,
             partial: nb_samples_pending > 0,
             nb_samples_pending,

@@ -1,6 +1,7 @@
 import { TaskResponseModel, PrivateTaskRequestCreationModel, PrivateTaskRequestModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel, TaskVisibilityModel } from "../../../domain/entities/task";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { UserRequestModel } from "../../../domain/entities/user";
+import { LabelCount } from "../../../domain/entities/stats";
 
 export interface TaskDataSource {
     create(task: PrivateTaskRequestCreationModel): Promise<number>;
@@ -12,4 +13,6 @@ export interface TaskDataSource {
     getAllType(options: PreparedSearchOptions): Promise<SearchResult<TaskTypeResponseModel>>
     getAllStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>>
     updateOne(task: PrivateTaskUpdateModel, expected_status_id?: number): Promise<number>
+    // Tasks of the project per type label (one GROUP BY), most frequent first.
+    countTasksByType(project_id: number): Promise<LabelCount[]>;
 }
