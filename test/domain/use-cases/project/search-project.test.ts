@@ -689,3 +689,76 @@ describe("what the list shows depends on the user's role on each project", () =>
         expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter }))
     })
 })
+
+describe("privacy_status is resolved to the projects at that level", () => {
+    const options: SearchOptions = { limit: 10, page: 1, sort_by: [] }
+    // Far from any boundary, so the levels do not depend on the day the tests run
+    const projects_privacy = [
+        { project_id: 1, project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 1200, visible_duration: 0, public_duration: 0 },
+        { project_id: 2, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 0 },
+        { project_id: 3, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 0, public_duration: 1200 },
+        { project_id: 4, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 1, visible_duration: 1, public_duration: 1 },
+    ]
+
+    beforeEach(() => {
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockSearchRepository, "formatSortBy").mockReturnValue([])
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
+        jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue(projects_privacy)
+        jest.spyOn(mockProjectRepository, "standardGetProjects").mockResolvedValue({ items: [], total: 0 })
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockReturnValue({ total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 })
+    })
+
+    test.each([
+        ["=", "private", [1]],
+        ["=", "visible", [2]],
+        ["=", "public", [3]],
+        ["=", "open", [4]],
+        ["IN", ["public", "open"], [3, 4]],
+    ])("operator %s with %j", async (operator, value, expected_ids) => {
+        const filters = [{ field: "privacy_status", operator, value }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] })
+    })
+
+    test("no project at that level gives an empty IN, not an unfiltered list", async () => {
+        jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue([projects_privacy[3]])
+        const filters = [{ field: "privacy_status", operator: "=", value: "private" }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [] }] }))
+    })
+
+    test("combines with for_managing as two project_id filters", async () => {
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1, 3])
+        const filters = [{ field: "for_managing", operator: "=", value: true }, { field: "privacy_status", operator: "=", value: "public" }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({
+            filter: [{ field: "project_id", operator: "IN", value: [1, 3] }, { field: "project_id", operator: "IN", value: [3] }]
+        }))
+    })
+
+    test.each([
+        ["=", "Open"],
+        ["=", "public+"],
+        ["IN", []],
+        ["IN", ["public", "nope"]],
+        ["LIKE", "pub%"],
+        ["<>", "private"],
+    ])("refuses operator %s with %j", async (operator, value) => {
+        const filters = [{ field: "privacy_status", operator, value }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await expect(searchProjectUseCase.execute({ user_id: 1 }, options, filters)).rejects.toThrow("privacy_status should be one of private, visible, public, open, or an array of them with IN")
+        expect(mockProjectRepository.listProjectsPrivacy).toBeCalledTimes(0)
+        expect(mockProjectRepository.standardGetProjects).toBeCalledTimes(0)
+    })
+})

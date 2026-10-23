@@ -111,6 +111,22 @@ describe('search filtering (integration)', () => {
                 [{ field: 'project_title', operator: 'LIKE', value: '%alpha%' }])
             expect(r.search_info.total).toEqual(2)
         })
+
+        test('privacy_status is computed per project: 3 private, 1 open, none public', async () => {
+            await run(db, `UPDATE project SET project_creation_utc_date_time = '1990-01-01T00:00:00Z' WHERE project_title = 'Gamma'`)
+
+            const privateOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: '=', value: 'private' }])
+            const openOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: 'IN', value: ['public', 'open'] }])
+            const publicOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: '=', value: 'public' }])
+
+            expect(privateOnes.search_info.total).toEqual(3)
+            expect(privateOnes.projects.map(p => p.privacy_status)).toEqual(['private', 'private', 'private'])
+            expect(openOnes.projects.map(p => p.project_title)).toEqual(['Gamma'])
+            expect(publicOnes.search_info.total).toEqual(0)
+        })
     })
 
     describe('tasks', () => {

@@ -6,8 +6,10 @@ import { ProjectRepository } from "../../interfaces/repositories/project-reposit
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchProjectsUseCase } from "../../interfaces/use-cases/project/search-project";
-import { ProjectResponseModel, PublicProjectResponseModel } from "../../entities/project";
-import { ProjectRole, restrictProjectView } from "./project-access";
+import { ProjectPrivacyLevel, ProjectResponseModel, PublicProjectResponseModel } from "../../entities/project";
+import { ProjectRole, privacyOf, restrictProjectView } from "./project-access";
+
+const PRIVACY_LEVELS: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
 
 export class SearchProject implements SearchProjectsUseCase {
     userRepository: UserRepository
@@ -72,6 +74,7 @@ export class SearchProject implements SearchProjectsUseCase {
             options = await this.applyInstrumentModelFilter(options);
             options = await this.applyManagingFilter(current_user, options);
             options = await this.applyContactFilter(options);
+            options = await this.applyPrivacyStatusFilter(options);
             options = await this.applyUserFilters(options, "managers")//, this.privilegeRepository.getProjectsByManagers);
             options = await this.applyUserFilters(options, "members")//, this.privilegeRepository.getProjectsByMembers);
             options = await this.applyUserFilters(options, "granted_users")//, this.privilegeRepository.getProjectsByUsers);
@@ -140,6 +143,30 @@ export class SearchProject implements SearchProjectsUseCase {
             options.filter.push({ field: "project_id", operator: "IN", value: projectIds });
         }
         return options;
+    }
+
+    // privacy_status is computed from the creation date and the durations, it has no column: resolved
+    // to the ids of the projects at that level right now.
+    private async applyPrivacyStatusFilter(options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
+        const privacyFilter = options.filter.find(f => f.field === "privacy_status");
+        if (privacyFilter) {
+            options.filter = options.filter.filter(f => f.field !== "privacy_status");
+            const levels = this.extractPrivacyLevels(privacyFilter);
+            const now = new Date();
+            const projectIds = (await this.projectRepository.listProjectsPrivacy())
+                .filter(project => levels.includes(privacyOf(project, now)))
+                .map(project => project.project_id);
+            options.filter.push({ field: "project_id", operator: "IN", value: projectIds });
+        }
+        return options;
+    }
+
+    private extractPrivacyLevels(filter: FilterSearchOptions): ProjectPrivacyLevel[] {
+        const values = filter.operator === "IN" ? filter.value : filter.operator === "=" ? [filter.value] : null;
+        if (!Array.isArray(values) || values.length === 0 || values.some(v => !PRIVACY_LEVELS.includes(v))) {
+            throw new Error(`privacy_status should be one of ${PRIVACY_LEVELS.join(", ")}, or an array of them with IN`);
+        }
+        return values;
     }
 
     // Applies user-based filters such as managers, members, and granted_users
