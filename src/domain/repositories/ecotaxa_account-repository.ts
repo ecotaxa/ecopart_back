@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject, EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaTaxon } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -986,11 +986,34 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
     // Get classification stats for a set of EcoTaxa samples
     // GET /api/samples/{sample_ids}/stats — returns one entry per sample id, with object counts by classification status
+    async api_ecotaxa_get_taxa(baseUrl: string, token: string, taxon_ids: number[]): Promise<EcoTaxaTaxon[]> {
+        if (taxon_ids.length === 0) return [];
+        const taxa = await this.http<EcoTaxaTaxon[]>(
+            `${baseUrl}api/taxon_set/query?ids=${taxon_ids.join("+")}`,
+            { method: "GET", headers: this.JSON_HEADERS(token) }
+        );
+        return taxa ?? [];
+    }
+
+    async api_ecotaxa_query_object_set(baseUrl: string, token: string, ecotaxa_project_id: number, query: EcoTaxaObjectSetQuery): Promise<EcoTaxaObjectSetPage> {
+        const params = new URLSearchParams();
+        if (query.fields.length > 0) params.set("fields", query.fields.join(","));
+        if (query.order_field) params.set("order_field", query.order_field);
+        if (query.window_start !== undefined) params.set("window_start", String(query.window_start));
+        if (query.window_size !== undefined) params.set("window_size", String(query.window_size));
+        const page = await this.http<EcoTaxaObjectSetPage>(
+            `${baseUrl}api/object_set/${ecotaxa_project_id}/query?${params.toString()}`,
+            { method: "POST", headers: this.JSON_HEADERS(token), body: JSON.stringify(query.filters) }
+        );
+        return { total_ids: page?.total_ids ?? 0, object_ids: page?.object_ids ?? [], details: page?.details ?? [] };
+    }
+
     async api_ecotaxa_get_sample_stats(baseUrl: string, token: string, ecotaxa_sample_ids: number[]): Promise<Array<{ sample_id: number; used_taxa: number[]; nb_unclassified: number; nb_validated: number; nb_dubious: number; nb_predicted: number; projid: number; }>> {
         if (ecotaxa_sample_ids.length === 0) return [];
         const ids = ecotaxa_sample_ids.join(",");
         const stats = await this.http<Array<{ sample_id: number; used_taxa: number[]; nb_unclassified: number; nb_validated: number; nb_dubious: number; nb_predicted: number; projid: number; }>>(
-            `${baseUrl}api/samples/${ids}/stats`,
+            // EcoTaxa route: sample_set/taxo_stats (the ids separated by any non-digit character).
+            `${baseUrl}api/sample_set/taxo_stats?sample_ids=${ids}`,
             {
                 method: "GET",
                 headers: this.JSON_HEADERS(token),

@@ -1,4 +1,7 @@
 import { Uvp5PivotReport } from "../../../../src/domain/entities/pivot";
+import { PivotImageRecord } from "../../../../src/domain/entities/binned-export";
+import { PivotImages } from "../../../../src/domain/interfaces/repositories/sample-repository";
+import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import { TaskType } from "../../../../src/domain/entities/task";
 import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
@@ -28,6 +31,15 @@ const current_user = { user_id: 1 };
 
 function report(sample_name: string): Uvp5PivotReport {
     return { sample_name, converter_version: UVP5_PIVOT_CONVERTER_VERSION, frames_written: 5, frames_outside_window: 0, empty_frames: 0, frames_without_pressure: 0, duplicate_image_ids: 0, integrity_mismatches: 0 };
+}
+
+// A pivot of three lit images going down, then back up: [raw_pressure, area_px, nb_particles].
+function pivot(): PivotImages {
+    const records: PivotImageRecord[] = [[1, 2, 3], [10, 30, 1], [6, 50, 4]].map(([raw_pressure, area_px, nb_particles], i) => ({
+        image_index: i, image_id: `img${i}`, raw_pressure, image_time_ms: Date.UTC(2020, 7, 6, 22, 0, i), light_on: true,
+        spectrum_counts: { [area_px]: nb_particles }, blocks: [{ area_px, nb_particles, grey_mean: 10 }],
+    }));
+    return { columns: toPerImageColumns(records), rows: async function* () { yield* records; } };
 }
 
 function allowUser(): void {
@@ -121,6 +133,57 @@ describe("RegeneratePivots", () => {
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue();
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue();
             jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue();
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
+            jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => pivot());
+            jest.spyOn(mockSampleRepository, "updateParticleStats").mockResolvedValue(1);
+        });
+
+        const loggedMessages = () => (mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message);
+
+        test("recomputes the particle statistics of a rebuilt pivot only", async () => {
+            jest.spyOn(mockSampleRepository, "getPivotConverterVersion")
+                .mockResolvedValueOnce(UVP5_PIVOT_CONVERTER_VERSION)
+                .mockResolvedValueOnce(null);
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(report("Mooring_0N_23W_201910_850m"));
+
+            await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
+
+            expect(mockSampleRepository.getPivotImages).toBeCalledTimes(1);
+            expect(mockSampleRepository.getPivotImages).toBeCalledWith(projectResponseModel.project_id, sampleModel_2.sample_name, projectResponseModel.instrument_model);
+            // sampleModel_2 is a time series: the descent filter of the project does not apply.
+            expect(mockSampleRepository.updateParticleStats).toBeCalledTimes(1);
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, { nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50 });
+            expect((mockSampleRepository.updateParticleStats as jest.Mock).mock.invocationCallOrder[0]).toBeGreaterThan((mockSampleRepository.generateUvp5Pivot as jest.Mock).mock.invocationCallOrder[0]);
+            expect(loggedMessages()).toEqual(["Particle statistics : Mooring_0N_23W_201910_850m: 8 particle(s) counted, areas from 2 to 50 px"]);
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+        });
+
+        test("the statistics of a depth profile follow the project's descent filter", async () => {
+            jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockResolvedValue(null);
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(report("perle3_001"));
+
+            await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1], false);
+
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_1.sample_id, { nb_particles: 4, particle_min_area_px: 2, particle_max_area_px: 30 });
+        });
+
+        test("statistics that cannot be computed are a warning: the previous ones are kept and the task goes on", async () => {
+            jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockResolvedValue(null);
+            jest.spyOn(mockSampleRepository, "generateUvp5Pivot")
+                .mockResolvedValueOnce(report("perle3_001"))
+                .mockResolvedValueOnce(report("Mooring_0N_23W_201910_850m"));
+            jest.spyOn(mockSampleRepository, "getPivotImages")
+                .mockRejectedValueOnce(new Error("Cannot read the particle file of sample perle3_001 (no such file)"))
+                .mockImplementationOnce(async () => pivot());
+
+            await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
+
+            expect(loggedMessages()).toContain("Particle statistics : perle3_001 : WARNING particle statistics not updated, the previous ones are kept (Cannot read the particle file of sample perle3_001 (no such file))");
+            expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(2);
+            expect(mockSampleRepository.updateParticleStats).toBeCalledTimes(1);
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, expect.objectContaining({ nb_particles: 8 }));
+            expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
+            expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
         });
 
         test("keeps a pivot already at the current converter version and builds the missing one", async () => {
@@ -171,6 +234,9 @@ describe("RegeneratePivots", () => {
             await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1, sampleModel_2], false);
 
             expect(mockSampleRepository.generateUvp5Pivot).toBeCalledTimes(2);
+            // Only the pivot that was rebuilt gets new statistics.
+            expect(mockSampleRepository.updateParticleStats).toBeCalledTimes(1);
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, expect.any(Object));
             expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
             expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id,
                 new Error("Pivot regeneration failed for 1 of 2 sample(s). Cannot build the UVP5 pivot of sample perle3_001: boom"));

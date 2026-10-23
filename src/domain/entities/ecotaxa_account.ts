@@ -77,3 +77,27 @@ export interface EcotaxaAccountUser {
 export interface EcoTaxaProject {
     highest_right: "Read" | "Annotate" | "Manage";
 }
+// GET api/taxon_set/query (EcoTaxa TaxonModel, the fields the Explore page uses).
+export interface EcoTaxaTaxon {
+    id: number;
+    name: string;
+    display_name: string;
+    id_lineage: number[];                     // ancestors' ids, self first
+    nb_objects: number;
+}
+
+// POST api/object_set/{project_id}/query: filters (ProjectFiltersModel, e.g. { samples: "12,13" }),
+// fields ("obj.depth_min,img.file_name,…") and a window of the result.
+export interface EcoTaxaObjectSetQuery {
+    filters: Record<string, string>;
+    fields: string[];
+    order_field?: string;
+    window_start?: number;
+    window_size?: number;
+}
+
+export interface EcoTaxaObjectSetPage {
+    total_ids: number;
+    object_ids: number[];
+    details: (string | number | null)[][];   // one row per object, in the order of the fields
+}

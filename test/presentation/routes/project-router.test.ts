@@ -60,6 +60,9 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         } as DecodedToken);
         next();
     }
+    auth_optional(_: Request, __: Response, next: NextFunction): void {
+        next()
+    }
     auth_refresh(): void {
         throw new Error("Method not implemented for auth_refresh");
     }

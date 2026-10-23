@@ -55,6 +55,24 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         return privileges.items
     }
 
+    async getPublicPrivilegesOfProjects(project_ids: number[]): Promise<Map<number, PublicPrivilege>> {
+        const result = new Map<number, PublicPrivilege>();
+        if (project_ids.length === 0) return result;
+        const privileges = await this.getPrivilegesByFilter([{ field: "project_id", operator: "IN", value: project_ids }]);
+        const toUser = (privilege: PrivilegeResponseModel) => ({ user_id: privilege.user_id, user_name: privilege.user_name, email: privilege.email });
+        for (const privilege of privileges.items) {
+            let entry = result.get(privilege.project_id);
+            if (!entry) {
+                entry = { project_id: privilege.project_id, members: [], managers: [], contact: undefined as unknown as PublicPrivilege["contact"] };
+                result.set(privilege.project_id, entry);
+            }
+            if (privilege.privilege_name === "member") entry.members.push(toUser(privilege));
+            if (privilege.privilege_name === "manager") entry.managers.push(toUser(privilege));
+            if (privilege.contact && !entry.contact) entry.contact = toUser(privilege);
+        }
+        return result;
+    }
+
     async getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege | null> {
 
         const privileges: PrivilegeResponseModel[] = await this.getPrivileges(project)

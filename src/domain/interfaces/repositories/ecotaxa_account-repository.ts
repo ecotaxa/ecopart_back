@@ -1,4 +1,4 @@
-import { EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
+import { EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaTaxon, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -32,4 +32,8 @@ export interface EcotaxaAccountRepository {
     ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void>;
     getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel>;
     exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string): Promise<void>;
+    // GET api/taxon_set/query: names and lineage of the given taxa.
+    api_ecotaxa_get_taxa(baseUrl: string, token: string, taxon_ids: number[]): Promise<EcoTaxaTaxon[]>;
+    // POST api/object_set/{project_id}/query: a window of the objects matching the filters, with the asked fields.
+    api_ecotaxa_query_object_set(baseUrl: string, token: string, ecotaxa_project_id: number, query: EcoTaxaObjectSetQuery): Promise<EcoTaxaObjectSetPage>;
 }

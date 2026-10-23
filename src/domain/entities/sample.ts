@@ -47,6 +47,10 @@ export interface SampleRequestCreationModel {
 
     nb_vignettes: number;                                   // Number of vignettes at import time
     nb_black: number;                                       // Number of black (lights-off) images at import — noise reference
+    // Particle statistics of the pivot (see SampleParticleStats), null until computed.
+    nb_particles?: number | null;
+    particle_min_area_px?: number | null;
+    particle_max_area_px?: number | null;
 
     visual_qc_validator_user_id: number;                    // Quality check validator user identifier
     sample_type_id: number;                                 // Sample type depth or time
@@ -82,7 +86,17 @@ export interface PrivateSampleModel extends SampleRequestCreationModel {
 
     nb_vignettes: number;                    // Number of vignettes at import time
     nb_black: number;                        // Number of black (lights-off) images at import — noise reference
+    nb_particles: number | null;             // Particles of the images the sample uses (window, descent filter), null until computed
+    particle_min_area_px: number | null;     // Smallest and largest particle areas counted, in pixels
+    particle_max_area_px: number | null;
 
+}
+// Particle statistics of a sample, from its pivot: computed at import, by the pivot regeneration and
+// by the COMPUTE_PARTICLE_STATS task, read by the Explore page.
+export interface SampleParticleStats {
+    nb_particles: number;
+    particle_min_area_px: number | null;     // null when the sample has no particle
+    particle_max_area_px: number | null;
 }
 export interface PublicSampleModel extends PrivateSampleModel {
     sample_type_label: string;                    // Sample type name

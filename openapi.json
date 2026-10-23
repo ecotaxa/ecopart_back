@@ -587,6 +587,29 @@
           "period"
         ]
       },
+      "ComputeParticleStatsRequest": {
+        "type": "object",
+        "description": "Samples whose particle statistics the task computes (POST /admin/samples/particle-stats).",
+        "properties": {
+          "project_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Projects whose samples are computed. Empty or absent = every project; an unknown id is skipped.",
+            "example": [
+              12,
+              14
+            ]
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also recompute the samples that already have their particle statistics."
+          }
+        }
+      },
       "AuthUserCredentials": {
         "type": "object",
         "description": "User login credentials.",
@@ -1120,6 +1143,605 @@
           "search_info",
           "items"
         ]
+      },
+      "ExploreFilters": {
+        "type": "object",
+        "description": "Criteria of the Explore selection. Empty arrays and nulls mean no constraint.",
+        "properties": {
+          "project_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "instrument_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bounds": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "north": {
+                "type": "number"
+              },
+              "south": {
+                "type": "number"
+              },
+              "east": {
+                "type": "number"
+              },
+              "west": {
+                "type": "number"
+              }
+            },
+            "description": "Bounding box in decimal degrees; west greater than east crosses the antimeridian."
+          },
+          "date_from": {
+            "type": "string",
+            "nullable": true,
+            "format": "date",
+            "description": "Sampling date range start (inclusive)."
+          },
+          "date_to": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Months of the year, whatever the year."
+          },
+          "sample_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sample name fragments, any of them."
+          },
+          "hour_range": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Hours of the day (UTC, 0-24); a start above the end crosses midnight."
+          },
+          "pressure_range": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Pressure range (dbar) the sample must partially cover."
+          },
+          "privacy_statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "private",
+                "visible",
+                "public",
+                "open"
+              ]
+            }
+          },
+          "my_projects": {
+            "type": "boolean",
+            "description": "Also keep the projects the caller is a member or a manager of."
+          },
+          "ctd_only": {
+            "type": "boolean"
+          },
+          "ecotaxa_imported_only": {
+            "type": "boolean"
+          },
+          "ecotaxa_exclude_not_living": {
+            "type": "boolean"
+          },
+          "classification_state": {
+            "type": "string",
+            "enum": [
+              "all",
+              "fully_predicted",
+              "fully_validated"
+            ]
+          }
+        }
+      },
+      "ExploreRequest": {
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "depth",
+              "time"
+            ],
+            "description": "The sample type explored."
+          },
+          "filters": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreFilters"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "ExploreImagesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExploreRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12,
+                "default": 4
+              }
+            }
+          }
+        ]
+      },
+      "ExploreGraphsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExploreRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "pressure_bin": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 5,
+                "description": "Depth bin in metres (dbar)."
+              },
+              "time_bin": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 24,
+                "default": 1,
+                "description": "Time bin in hours."
+              }
+            }
+          }
+        ]
+      },
+      "ExploreProjectOption": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer"
+          },
+          "project_title": {
+            "type": "string"
+          },
+          "nb_samples": {
+            "type": "integer"
+          }
+        }
+      },
+      "ExploreMapSample": {
+        "type": "object",
+        "properties": {
+          "sample_id": {
+            "type": "integer"
+          },
+          "sample_name": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "project_title": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "instrument_model": {
+            "type": "string"
+          },
+          "privacy_status": {
+            "type": "string",
+            "enum": [
+              "private",
+              "visible",
+              "public",
+              "open"
+            ]
+          },
+          "is_my_project": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExploreContact": {
+        "type": "object",
+        "properties": {
+          "user_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "description": "Empty for an anonymous caller."
+          }
+        }
+      },
+      "ExploreProjectRow": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer"
+          },
+          "project_title": {
+            "type": "string"
+          },
+          "instrument_model": {
+            "type": "string"
+          },
+          "ecotaxa_project_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "nb_selected_samples": {
+            "type": "integer"
+          },
+          "nb_samples": {
+            "type": "integer"
+          },
+          "privacy_status": {
+            "type": "string",
+            "enum": [
+              "private",
+              "visible",
+              "public",
+              "open"
+            ]
+          },
+          "is_my_project": {
+            "type": "boolean"
+          },
+          "contact": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreContact"
+              }
+            ],
+            "nullable": true
+          },
+          "managers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreContact"
+            }
+          }
+        }
+      },
+      "ExploreSummary": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "type": "object",
+            "properties": {
+              "projects": {
+                "type": "integer"
+              },
+              "samples": {
+                "type": "integer"
+              },
+              "particles": {
+                "type": "integer",
+                "description": "Sum of the samples' particle counts (unknown counts as 0)."
+              },
+              "images": {
+                "type": "integer",
+                "description": "Sum of the samples' vignette counts."
+              }
+            }
+          },
+          "sample_types": {
+            "type": "object",
+            "properties": {
+              "depth": {
+                "type": "integer"
+              },
+              "time": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          },
+          "pressure_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "description": "dbar"
+          },
+          "size_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "description": "ESD in µm of the smallest and largest particles counted."
+          },
+          "time_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "instruments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "max_pressure_histogram": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "max_pressure": {
+                  "type": "number",
+                  "description": "Upper edge of the 100 dbar bin."
+                },
+                "nb_profiles": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "latitude": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ExploreSelection": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExploreSummary"
+              }
+            ],
+            "nullable": true
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExploreProjectRow"
+            }
+          }
+        }
+      },
+      "ExploreSelectionResponse": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "$ref": "#/components/schemas/ExploreSelection"
+          },
+          "exportable": {
+            "$ref": "#/components/schemas/ExploreSelection"
+          }
+        }
+      },
+      "ExploreEcoTaxaSummary": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "classification": {
+            "type": "object",
+            "description": "Percentages of the samples with EcoTaxa stats, exclusive states.",
+            "properties": {
+              "fully_validated": {
+                "type": "number"
+              },
+              "fully_predicted": {
+                "type": "number"
+              },
+              "partially_validated": {
+                "type": "number"
+              },
+              "partially_predicted": {
+                "type": "number"
+              }
+            }
+          },
+          "nb_samples_with_stats": {
+            "type": "integer"
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Some samples have no stats yet: they are being read from EcoTaxa in the background, ask again later."
+          },
+          "nb_samples_pending": {
+            "type": "integer"
+          }
+        }
+      },
+      "ExploreEcoTaxaResponse": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "$ref": "#/components/schemas/ExploreEcoTaxaSummary"
+          },
+          "exportable": {
+            "$ref": "#/components/schemas/ExploreEcoTaxaSummary"
+          }
+        }
+      },
+      "ExploreImage": {
+        "type": "object",
+        "properties": {
+          "object_id": {
+            "type": "integer"
+          },
+          "image_url": {
+            "type": "string"
+          },
+          "sample_name": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "number",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        }
+      },
+      "ProfileSeries": {
+        "type": "object",
+        "properties": {
+          "sample_id": {
+            "type": "integer"
+          },
+          "sample_name": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "number",
+                  "description": "Bin centre, depth in m or epoch milliseconds."
+                },
+                "value": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "GraphDataset": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "axis_labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "series": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ProfileSeries"
+              }
+            }
+          }
+        }
+      },
+      "ExploreGraphs": {
+        "type": "object",
+        "properties": {
+          "abundance": {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          "biovolume": {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          "ctd": {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          "ecotaxa": {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "InstrumentModelResponse": {
         "type": "object",
@@ -2228,7 +2850,8 @@
               "IMPORT_CTD",
               "IMPORT_ECO_TAXA",
               "EXPORT_RAW",
-              "REGENERATE_PIVOT"
+              "REGENERATE_PIVOT",
+              "COMPUTE_PARTICLE_STATS"
             ],
             "example": "IMPORT"
           },
@@ -2635,6 +3258,92 @@
           },
           "403": {
             "description": "Authenticated user is not allowed (not an admin, or account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/samples/particle-stats": {
+      "post": {
+        "summary": "Compute the particle statistics of samples (admin only)",
+        "description": "Starts an asynchronous task (returns a Task immediately; poll the task for progress) that\nreads the pivot of each sample and stores its particle statistics: `nb_particles` and the\nsmallest and largest particle areas in pixels (`particle_min_area_px`, `particle_max_area_px`).\nThey count the particles of the images the sample uses (operator window, descent filter on a\ndepth profile when the project enables it), lit and not over-exposed, whose area reaches the\nsample's minimum particle area: the particles of the binned export.\n\nThe import and the pivot regeneration compute them; this endpoint covers the samples imported\nbefore. Without `project_ids`, every project is considered; an unknown project id is skipped.\nA sample that already has its statistics is kept, unless `force` is true. A sample of an\ninstrument other than UVP5 or UVP6, and a UVP5 sample without pivot, are skipped. A failing\nsample does not stop the others: the task finishes with the number of samples computed,\nskipped and failed. Reserved to administrators; the task belongs to no project.\n",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComputeParticleStatsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Particle statistics task created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated user is not allowed (not an admin, or account cannot be used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The task could not be created (task type or status not found, task not found).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3354,6 +4063,471 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/projects": {
+      "get": {
+        "summary": "Projects offered by the Explore project criterion",
+        "description": "Every project of the application with its number of samples, for the project filter of the\nExplore page. Anonymous callers are served too: the specification lets anyone see that a\nproject exists, so that access can be requested.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "The projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExploreProjectOption"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired (an absent cookie is accepted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/map": {
+      "post": {
+        "summary": "Samples of the Explore selection, for the map",
+        "description": "One point per sample matching the criteria (every sample of the application when `filters`\nis null), with its project's privacy status. `mode` selects the sample type: depth profiles\nor time series. Anonymous callers are served.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The samples to draw.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "samples": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExploreMapSample"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/selection": {
+      "post": {
+        "summary": "Statistics and projects of the Explore selection",
+        "description": "The \"Selected data stats\" tab (`all`: every matching sample, private projects included) and\nthe \"Exportable selection\" tab (`exportable`: the samples the caller may export, that is\nsamples with a validated visual QC whose project is public or open, or of which the caller\nis a member or a manager; always empty for an anonymous caller). Contact and manager\ne-mails are only served to logged-in callers. The EcoTaxa part of the tabs is served by\n`/explore/ecotaxa`.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The two selections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreSelectionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/ecotaxa": {
+      "post": {
+        "summary": "EcoTaxa categories and classification state of the Explore selection",
+        "description": "For the samples imported in EcoTaxa, through the generic EcoTaxa account of each instance:\nthe categories used (display names, the non-living ones left out when\n`filters.ecotaxa_exclude_not_living`) and the share of samples fully or partially validated\nor predicted. Samples whose EcoTaxa instance does not answer are left out.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The EcoTaxa summaries of the two selections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreEcoTaxaResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/images": {
+      "post": {
+        "summary": "Random object images of the Explore selection",
+        "description": "`count` (default 4, at most 12) objects drawn at random among random samples of the\nselection imported in EcoTaxa, with the URL of their image on the EcoTaxa instance. Call\nagain for another draw.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreImagesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The images.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExploreImage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/graphs": {
+      "post": {
+        "summary": "Curves of the Explore selection",
+        "description": "Particle abundance and biovolume per reduced size class, and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn; `warnings` tells what was left out. Login required.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreGraphsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The datasets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreGraphs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
                 }
               }
             }

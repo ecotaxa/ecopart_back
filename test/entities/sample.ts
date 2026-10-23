@@ -77,6 +77,9 @@ export const sampleModel_1: PublicSampleModel = {
     ctd_import_task_id: null,
     ctd_description: null,
     use_ctd_coordinates: false,
+    nb_particles: null,
+    particle_min_area_px: null,
+    particle_max_area_px: null,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -155,6 +158,9 @@ export const sampleModel_2: PublicSampleModel =
     ctd_import_task_id: null,
     ctd_description: null,
     use_ctd_coordinates: false,
+    nb_particles: null,
+    particle_min_area_px: null,
+    particle_max_area_px: null,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {

@@ -6,7 +6,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
-import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, Uvp5WorkFilesCheckModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../entities/sample";
+import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, SampleParticleStats, Uvp5WorkFilesCheckModel } from "../entities/sample";
 import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
 import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -15,6 +15,9 @@ import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
+import { parseCtdRows } from "../utils/ctd-rows";
+import { CtdRows } from "../entities/ctd";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../entities/explore";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
@@ -2362,6 +2365,54 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     // The UVP6-format particle file every computed product reads: the pivot built at import for a
     // UVP5 sample, the imported `_Particule.zip` for a UVP6. Pressures are in decibar in both.
+    private pivotZipPathOf(project_id: number, sample_name: string, instrument_model: string): string {
+        if (instrument_model.startsWith("UVP5")) return this.getPivotZipPath(project_id, sample_name);
+        if (instrument_model.startsWith("UVP6")) return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}_Particule.zip`);
+        throw new Error("Unknown instrument model");
+    }
+
+    async getPivotFileStamp(project_id: number, sample_name: string, instrument_model: string): Promise<string | null> {
+        try {
+            const stat = await fsPromises.stat(this.pivotZipPathOf(project_id, sample_name, instrument_model));
+            return `${stat.size}-${Math.round(stat.mtimeMs)}`;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+            throw error;
+        }
+    }
+
+    async getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]> {
+        return await this.sampleDataSource.getExploreSamples(query);
+    }
+
+    async getCtdRows(project_id: number, sample_name: string, ctd_file_extension: string): Promise<CtdRows> {
+        const file_path = this.getCTDFileAbsolutePath(project_id, sample_name, ctd_file_extension);
+        try {
+            return await parseCtdRows(readUvpTextLines(fs.createReadStream(file_path)));
+        } catch (error) {
+            throw new Error(`Cannot read the CTD file of sample ${sample_name} (${(error as Error).message})`);
+        }
+    }
+
+    async getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]> {
+        return await this.sampleDataSource.getEcoTaxaStats(sample_ids);
+    }
+
+    async saveEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void> {
+        if (stats.length > 0) await this.sampleDataSource.upsertEcoTaxaStats(stats);
+    }
+
+    async listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
+        return await this.sampleDataSource.listEcoTaxaImportedSamples();
+    }
+
+    async updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number> {
+        return await this.sampleDataSource.updateMany(
+            { nb_particles: stats.nb_particles, particle_min_area_px: stats.particle_min_area_px, particle_max_area_px: stats.particle_max_area_px },
+            { sample_id }
+        );
+    }
+
     async getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages> {
         let zip_path: string;
         if (instrument_model.startsWith("UVP5")) {
@@ -2745,22 +2796,10 @@ export class SampleRepositoryImpl implements SampleRepository {
         return path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}.${extension}`);
     }
 
-    async countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>> {
-        const counts = new Map<number, number>();
-        for (const project_id of project_ids) counts.set(project_id, 0);
-        if (project_ids.length === 0) return counts;
-
-        // standardGetSamples enforces a whitelist of filter fields including project_id, with IN support.
-        // We only need totals so we request page 1 limit 1 and read SearchResult.total.
-        for (const project_id of project_ids) {
-            const result = await this.sampleDataSource.getAll({
-                filter: [{ field: "project_id", operator: "=", value: project_id }],
-                sort_by: [],
-                page: 1,
-                limit: 1,
-            });
-            counts.set(project_id, result.total);
-        }
+    async countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>> {
+        const counts = await this.sampleDataSource.countSamplesPerProject(project_ids);
+        // Every asked project gets a count, 0 when it has no sample.
+        for (const project_id of project_ids ?? []) if (!counts.has(project_id)) counts.set(project_id, 0);
         return counts;
     }
 

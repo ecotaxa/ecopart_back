@@ -102,6 +102,7 @@ import { ExportBinnedData } from './domain/use-cases/export/export-binned-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
 import { GetStats } from './domain/use-cases/admin/get-stats'
+import { ComputeParticleStats } from './domain/use-cases/sample/compute-particle-stats'
 import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
 import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
 import { SetBroadcastMessage } from './domain/use-cases/broadcast_message/set-broadcast-message'
@@ -131,6 +132,16 @@ import fs from 'fs';
 import { SearchEcotaxaAccounts } from './domain/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { MigrationManager } from './data/migrations/migration-manager'
 import { MigrationLogger } from './data/migrations/migration-logger'
+import ExploreRouter from './presentation/routers/explore-router'
+import { MiddlewareExploreValidation } from './presentation/middleware/explore-validation'
+import { ExploreEcoTaxaService } from './domain/use-cases/explore/explore-ecotaxa'
+import { ExploreParticleBins } from './domain/use-cases/explore/explore-graphs'
+import { ListExploreProjects } from './domain/use-cases/explore/list-explore-projects'
+import { GetExploreMap } from './domain/use-cases/explore/get-explore-map'
+import { GetExploreSelection } from './domain/use-cases/explore/get-explore-selection'
+import { GetExploreEcoTaxa } from './domain/use-cases/explore/get-explore-ecotaxa'
+import { GetExploreImages } from './domain/use-cases/explore/get-explore-images'
+import { GetExploreGraphs } from './domain/use-cases/explore/get-explore-graphs'
 
 sqlite3.verbose()
 
@@ -411,7 +422,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     server.use("/admin", AdminRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareAdminValidation(),
-        new GetStats(user_repo, stats_repo)
+        new GetStats(user_repo, stats_repo),
+        new ComputeParticleStats(user_repo, project_repo, sample_repo, task_repo)
     ))
     server.use("/broadcast_messages", BroadcastMessageRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
@@ -422,6 +434,22 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     ))
 
 
+    // Explore: the selection, its stats and its curves over every project; anonymous callers served
+    // except on the graphs. The EcoTaxa service and the particle bins keep caches shared by every request.
+    const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
+    const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)
+    // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
+    explore_ecotaxa.startSweeper()
+    server.use("/explore", ExploreRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareExploreValidation(),
+        new ListExploreProjects(explore_repositories),
+        new GetExploreMap(explore_repositories, explore_ecotaxa),
+        new GetExploreSelection(explore_repositories, explore_ecotaxa),
+        new GetExploreEcoTaxa(explore_repositories, explore_ecotaxa),
+        new GetExploreImages(explore_repositories, explore_ecotaxa),
+        new GetExploreGraphs(explore_repositories, explore_ecotaxa, new ExploreParticleBins(sample_repo)),
+    ))
     server.use("/version", VersionRouter(config.APP_VERSION))
 
     // Registered after every router: unknown routes and uncaught errors get a JSON answer, never an HTML stack trace

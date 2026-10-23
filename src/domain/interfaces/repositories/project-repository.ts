@@ -24,4 +24,6 @@ export interface ProjectRepository {
     getDistinctShips(): Promise<string[]>;
     // Every project's privacy inputs, to tell which ones a user outside them may look into.
     listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]>;
+    // Every project of the application, full rows, in one query (Explore).
+    listProjects(): Promise<ProjectResponseModel[]>;
 }

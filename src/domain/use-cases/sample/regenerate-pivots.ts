@@ -1,6 +1,6 @@
 import { RegeneratePivotsOptions } from "../../entities/pivot";
 import { ProjectResponseModel } from "../../entities/project";
-import { PublicSampleModel } from "../../entities/sample";
+import { PublicSampleModel, SampleParticleStats } from "../../entities/sample";
 import { PreparedSearchOptions } from "../../entities/search";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import { UserUpdateModel } from "../../entities/user";
@@ -11,6 +11,8 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { RegeneratePivotsUseCase } from "../../interfaces/use-cases/sample/regenerate-pivots";
 import { describeUvp5PivotReport, UVP5_PIVOT_CONVERTER_VERSION } from "../../utils/uvp5-pivot-converter";
+import { binnedSampleSettingsOf } from "../export/binned-settings";
+import { computeParticleStats, describeParticleStats } from "./particle-stats";
 
 // Builds the UVP6 pivot of UVP5 samples imported before the pivot existed, and rebuilds the ones
 // written by an older converter version.
@@ -125,7 +127,9 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
                 } catch (error) {
                     failures.push((error as Error).message);
                     await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, (error as Error).message);
+                    continue;
                 }
+                await this.updateParticleStats(task, project, sample);
             }
             if (failures.length > 0) {
                 throw new Error(`Pivot regeneration failed for ${failures.length} of ${samples.length} sample(s). ${failures.join(" | ")}`);
@@ -134,5 +138,20 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
         } catch (error) {
             await this.taskRepository.failedTask(task_id, error as Error);
         }
+    }
+
+    // The particle statistics are read from the pivot just written. A failure keeps the previous
+    // ones and does not fail the regeneration: the COMPUTE_PARTICLE_STATS task can redo them.
+    private async updateParticleStats(task: TaskResponseModel, project: ProjectResponseModel, sample: PublicSampleModel): Promise<void> {
+        let stats: SampleParticleStats;
+        try {
+            const pivot = await this.sampleRepository.getPivotImages(project.project_id, sample.sample_name, project.instrument_model);
+            stats = await computeParticleStats(binnedSampleSettingsOf(sample, project), pivot);
+            await this.sampleRepository.updateParticleStats(sample.sample_id, stats);
+        } catch (error) {
+            await this.taskRepository.logMessage(task.task_log_file_path, `Particle statistics : ${sample.sample_name} : WARNING particle statistics not updated, the previous ones are kept (${(error as Error).message})`);
+            return;
+        }
+        await this.taskRepository.logMessage(task.task_log_file_path, "Particle statistics : " + describeParticleStats(sample.sample_name, stats));
     }
 }

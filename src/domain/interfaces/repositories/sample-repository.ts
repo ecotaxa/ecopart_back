@@ -1,7 +1,9 @@
-import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, Uvp5WorkFilesCheckModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel } from "../../entities/sample";
+import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, SampleParticleStats, Uvp5WorkFilesCheckModel } from "../../entities/sample";
 import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
+import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
+import { CtdRows } from "../../entities/ctd";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { TaskLogger } from "./task-repository";
 
@@ -39,7 +41,7 @@ export interface SampleRepository {
     getSamplesByIds(sample_ids: number[]): Promise<PublicSampleModel[]>;
     listRawFilesForSample(instrument_model: string, project_id: number, sample_name: string, category: RawFileCategory): Promise<string[]>;
     getCTDFileAbsolutePath(project_id: number, sample_name: string, ctd_file_extension: string): string;
-    countSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
+    countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>>;
     countEcotaxaSamplesPerProject(project_ids: number[]): Promise<Map<number, number>>;
     countBlackParticulesUvp6(file_system_storage_project_folder: string, sample_name: string): Promise<number>;
 
@@ -76,6 +78,21 @@ export interface SampleRepository {
     // The UVP6-format particle file the computed products read (the pivot for a UVP5 sample, the
     // imported particules.csv for a UVP6), read in two passes, see PivotImages.
     getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages>;
+
+    // Explore
+    // Every sample matching the query, as light rows (one query).
+    getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]>;
+    // Size and modification time of the sample's pivot ("<size>-<mtime_ms>"), null when it has none:
+    // a cache key that changes whenever the file is rewritten.
+    getPivotFileStamp(project_id: number, sample_name: string, instrument_model: string): Promise<string | null>;
+    // The rows of the sample's imported CTD file (see CtdRows).
+    getCtdRows(project_id: number, sample_name: string, ctd_file_extension: string): Promise<CtdRows>;
+    // Particle statistics of a sample (nb_particles, extreme areas), written after its pivot is read.
+    updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number>;
+    // EcoTaxa classification counts kept per sample, read and refreshed by the Explore EcoTaxa service.
+    getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]>;
+    saveEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void>;
+    listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]>;
 }
 
 // A sample's pivot read in two passes, so that a mooring of millions of images is never held in

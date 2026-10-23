@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
-import { query, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 
 export interface IMiddlewareAdminValidation {
     rulesGetStats: any[];
+    rulesComputeParticleStats: any[];
 }
 
 export class MiddlewareAdminValidation implements IMiddlewareAdminValidation {
@@ -29,6 +30,24 @@ export class MiddlewareAdminValidation implements IMiddlewareAdminValidation {
                 }
                 return true;
             }),
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
+    rulesComputeParticleStats = [
+        body('project_ids').optional()
+            .isArray().withMessage('project_ids must be an array.'),
+        body('project_ids.*')
+            .isInt({ gt: 0 }).withMessage('project_ids must contain positive integers.').bail()
+            .toInt(),
+        body('force').optional()
+            .isBoolean({ strict: true }).withMessage('force must be a boolean.').bail()
+            .toBoolean(true),
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {

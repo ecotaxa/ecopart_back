@@ -1,5 +1,5 @@
 
-import { PublicHeaderSampleResponseModel, SampleRequestCreationModel } from "../../entities/sample";
+import { PublicHeaderSampleResponseModel, SampleParticleStats, SampleRequestCreationModel } from "../../entities/sample";
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
@@ -13,6 +13,8 @@ import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseMo
 import path from "path";
 import { describeUvp5PivotReport } from "../../utils/uvp5-pivot-converter";
 import { cleanupLogPrefix } from "../../utils/task-cleanup";
+import { binnedSampleSettingsOf } from "../export/binned-settings";
+import { computeParticleStats, describeParticleStats } from "./particle-stats";
 
 export class ImportSamples implements ImportSamplesUseCase {
     sampleRepository: SampleRepository
@@ -135,6 +137,7 @@ export class ImportSamples implements ImportSamplesUseCase {
             // 3/4 Build the UVP5 pivots
             const vignette_count_map = new Map(importable_samples.map(s => [s.sample_name, s.vignette_number]));
             const formated_samples = await this.buildPivots(task_id, log, project, current_user.user_id, samples_names_to_import, vignette_count_map);
+            await this.computeParticleStats(task_id, log, project, formated_samples);
 
             // Last checkpoint: once the samples exist in the database the import completes
             await this.taskRepository.throwIfCancelled(task_id);
@@ -283,6 +286,42 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 70, "Step 3/4 pivot construction : done");
         return formated_samples;
+    }
+
+    // Particle statistics of every sample, read from its pivot (built above, or the UVP6 particules.zip
+    // itself), one sample at a time so that a single pivot is held in memory. A pivot that cannot be
+    // read leaves them NULL, for the COMPUTE_PARTICLE_STATS task to fill later: the import goes on.
+    async computeParticleStats(task_id: number, log: TaskLogger, project: ProjectResponseModel, formated_samples: SampleRequestCreationModel[]): Promise<void> {
+        const sample_type_labels = new Map<number, string>();
+        for (const [i, sample] of formated_samples.entries()) {
+            await this.taskRepository.throwIfCancelled(task_id);
+            let stats: SampleParticleStats;
+            try {
+                const sample_type_label = await this.sampleTypeLabel(sample.sample_type_id, sample_type_labels);
+                const pivot = await this.sampleRepository.getPivotImages(project.project_id, sample.sample_name, project.instrument_model);
+                stats = await computeParticleStats(binnedSampleSettingsOf({ ...sample, sample_type_label }, project), pivot);
+            } catch (error) {
+                sample.nb_particles = null;
+                sample.particle_min_area_px = null;
+                sample.particle_max_area_px = null;
+                await log(`Step 3/4 particle statistics : ${sample.sample_name} : WARNING particle statistics not computed, left empty (${(error as Error).message})`);
+                continue;
+            }
+            sample.nb_particles = stats.nb_particles;
+            sample.particle_min_area_px = stats.particle_min_area_px;
+            sample.particle_max_area_px = stats.particle_max_area_px;
+            const progress = 70 + Math.round(((i + 1) / formated_samples.length) * 4);
+            await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, "Step 3/4 particle statistics : " + describeParticleStats(sample.sample_name, stats));
+        }
+    }
+
+    private async sampleTypeLabel(sample_type_id: number, known: Map<number, string>): Promise<string> {
+        const cached = known.get(sample_type_id);
+        if (cached !== undefined) return cached;
+        const sample_type = await this.sampleRepository.getSampleType({ sample_type_id: sample_type_id });
+        if (!sample_type) throw new Error("Sample type not found");
+        known.set(sample_type_id, sample_type.sample_type_label);
+        return sample_type.sample_type_label;
     }
 
     private async formatSamplesToImport(log: TaskLogger, project: ProjectResponseModel, current_user_id: number, samples_names_to_import: string[], vignette_count_map: Map<string, number>): Promise<SampleRequestCreationModel[]> {

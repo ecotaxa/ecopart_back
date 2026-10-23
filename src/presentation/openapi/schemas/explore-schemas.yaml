@@ -1,0 +1,203 @@
+components:
+  schemas:
+    ExploreFilters:
+      type: object
+      description: Criteria of the Explore selection. Empty arrays and nulls mean no constraint.
+      properties:
+        project_ids: { type: array, items: { type: integer } }
+        instrument_models: { type: array, items: { type: string } }
+        bounds:
+          type: object
+          nullable: true
+          properties:
+            north: { type: number }
+            south: { type: number }
+            east: { type: number }
+            west: { type: number }
+          description: Bounding box in decimal degrees; west greater than east crosses the antimeridian.
+        date_from: { type: string, nullable: true, format: date, description: Sampling date range start (inclusive). }
+        date_to: { type: string, nullable: true, format: date }
+        months: { type: array, items: { type: integer, minimum: 1, maximum: 12 }, description: "Months of the year, whatever the year." }
+        sample_names: { type: array, items: { type: string }, description: "Sample name fragments, any of them." }
+        hour_range: { type: array, nullable: true, items: { type: number }, minItems: 2, maxItems: 2, description: "Hours of the day (UTC, 0-24); a start above the end crosses midnight." }
+        pressure_range: { type: array, nullable: true, items: { type: number }, minItems: 2, maxItems: 2, description: "Pressure range (dbar) the sample must partially cover." }
+        privacy_statuses: { type: array, items: { type: string, enum: [private, visible, public, open] } }
+        my_projects: { type: boolean, description: Also keep the projects the caller is a member or a manager of. }
+        ctd_only: { type: boolean }
+        ecotaxa_imported_only: { type: boolean }
+        ecotaxa_exclude_not_living: { type: boolean }
+        classification_state: { type: string, enum: [all, fully_predicted, fully_validated] }
+    ExploreRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [depth, time], description: The sample type explored. }
+        filters:
+          allOf: [{ $ref: '#/components/schemas/ExploreFilters' }]
+          nullable: true
+    ExploreImagesRequest:
+      allOf:
+        - $ref: '#/components/schemas/ExploreRequest'
+        - type: object
+          properties:
+            count: { type: integer, minimum: 1, maximum: 12, default: 4 }
+    ExploreGraphsRequest:
+      allOf:
+        - $ref: '#/components/schemas/ExploreRequest'
+        - type: object
+          properties:
+            pressure_bin: { type: number, minimum: 1, maximum: 100, default: 5, description: Depth bin in metres (dbar). }
+            time_bin: { type: number, minimum: 0.5, maximum: 24, default: 1, description: Time bin in hours. }
+    ExploreProjectOption:
+      type: object
+      properties:
+        project_id: { type: integer }
+        project_title: { type: string }
+        nb_samples: { type: integer }
+    ExploreMapSample:
+      type: object
+      properties:
+        sample_id: { type: integer }
+        sample_name: { type: string }
+        project_id: { type: integer }
+        project_title: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        instrument_model: { type: string }
+        privacy_status: { type: string, enum: [private, visible, public, open] }
+        is_my_project: { type: boolean }
+    ExploreContact:
+      type: object
+      properties:
+        user_name: { type: string }
+        email: { type: string, description: Empty for an anonymous caller. }
+    ExploreProjectRow:
+      type: object
+      properties:
+        project_id: { type: integer }
+        project_title: { type: string }
+        instrument_model: { type: string }
+        ecotaxa_project_name: { type: string, nullable: true }
+        nb_selected_samples: { type: integer }
+        nb_samples: { type: integer }
+        privacy_status: { type: string, enum: [private, visible, public, open] }
+        is_my_project: { type: boolean }
+        contact:
+          allOf: [{ $ref: '#/components/schemas/ExploreContact' }]
+          nullable: true
+        managers: { type: array, items: { $ref: '#/components/schemas/ExploreContact' } }
+    ExploreSummary:
+      type: object
+      properties:
+        counts:
+          type: object
+          properties:
+            projects: { type: integer }
+            samples: { type: integer }
+            particles: { type: integer, description: Sum of the samples' particle counts (unknown counts as 0). }
+            images: { type: integer, description: Sum of the samples' vignette counts. }
+        sample_types:
+          type: object
+          properties:
+            depth: { type: integer }
+            time: { type: integer }
+            total: { type: integer }
+        pressure_range:
+          type: object
+          nullable: true
+          properties: { min: { type: number }, max: { type: number } }
+          description: dbar
+        size_range:
+          type: object
+          nullable: true
+          properties: { min: { type: number }, max: { type: number } }
+          description: ESD in µm of the smallest and largest particles counted.
+        time_range:
+          type: object
+          nullable: true
+          properties: { start: { type: string, format: date-time }, end: { type: string, format: date-time } }
+        instruments:
+          type: array
+          items:
+            type: object
+            properties: { label: { type: string }, count: { type: integer } }
+        max_pressure_histogram:
+          type: array
+          items:
+            type: object
+            properties: { max_pressure: { type: number, description: Upper edge of the 100 dbar bin. }, nb_profiles: { type: integer } }
+        profiles:
+          type: array
+          items:
+            type: object
+            properties: { date: { type: string, format: date-time }, latitude: { type: number } }
+    ExploreSelection:
+      type: object
+      properties:
+        summary:
+          allOf: [{ $ref: '#/components/schemas/ExploreSummary' }]
+          nullable: true
+        projects: { type: array, items: { $ref: '#/components/schemas/ExploreProjectRow' } }
+    ExploreSelectionResponse:
+      type: object
+      properties:
+        all: { $ref: '#/components/schemas/ExploreSelection' }
+        exportable: { $ref: '#/components/schemas/ExploreSelection' }
+    ExploreEcoTaxaSummary:
+      type: object
+      properties:
+        categories: { type: array, items: { type: string } }
+        classification:
+          type: object
+          description: Percentages of the samples with EcoTaxa stats, exclusive states.
+          properties:
+            fully_validated: { type: number }
+            fully_predicted: { type: number }
+            partially_validated: { type: number }
+            partially_predicted: { type: number }
+        nb_samples_with_stats: { type: integer }
+        partial: { type: boolean, description: "Some samples have no stats yet: they are being read from EcoTaxa in the background, ask again later." }
+        nb_samples_pending: { type: integer }
+    ExploreEcoTaxaResponse:
+      type: object
+      properties:
+        all: { $ref: '#/components/schemas/ExploreEcoTaxaSummary' }
+        exportable: { $ref: '#/components/schemas/ExploreEcoTaxaSummary' }
+    ExploreImage:
+      type: object
+      properties:
+        object_id: { type: integer }
+        image_url: { type: string }
+        sample_name: { type: string }
+        depth: { type: number, nullable: true }
+        date: { type: string, nullable: true, format: date-time }
+    ProfileSeries:
+      type: object
+      properties:
+        sample_id: { type: integer }
+        sample_name: { type: string }
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              position: { type: number, description: "Bin centre, depth in m or epoch milliseconds." }
+              value: { type: number }
+    GraphDataset:
+      type: object
+      properties:
+        keys: { type: array, items: { type: string } }
+        axis_labels: { type: object, additionalProperties: { type: string } }
+        series:
+          type: object
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/ProfileSeries' }
+    ExploreGraphs:
+      type: object
+      properties:
+        abundance: { $ref: '#/components/schemas/GraphDataset' }
+        biovolume: { $ref: '#/components/schemas/GraphDataset' }
+        ctd: { $ref: '#/components/schemas/GraphDataset' }
+        ecotaxa: { $ref: '#/components/schemas/GraphDataset' }
+        warnings: { type: array, items: { type: string } }

@@ -3,6 +3,7 @@ import { UserResponseModel } from "../../src/domain/entities/user";
 import { EcotaxaAccountModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
+import { EcoTaxaObjectSetPage, EcoTaxaTaxon } from "../../src/domain/entities/ecotaxa_account";
 import { EcotaxaAccountRepository } from "../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 
 import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
@@ -194,6 +195,12 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     exportObjectSetGeneral(): Promise<void> {
         throw new Error("Method not implemented for exportObjectSetGeneral.");
     }
+    api_ecotaxa_get_taxa(): Promise<EcoTaxaTaxon[]> {
+        throw new Error("Method not implemented for api_ecotaxa_get_taxa.");
+    }
+    api_ecotaxa_query_object_set(): Promise<EcoTaxaObjectSetPage> {
+        throw new Error("Method not implemented for api_ecotaxa_query_object_set.");
+    }
 }
 export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     create(): Promise<number> {
@@ -251,6 +258,9 @@ export class MockValidUserUseCase implements ValidUserUseCase {
 
 export class MockMiddlewareAuth implements MiddlewareAuth {
     auth(_: Request, __: Response, next: NextFunction): void {
+        next()
+    }
+    auth_optional(_: Request, __: Response, next: NextFunction): void {
         next()
     }
     auth_refresh(): void {
