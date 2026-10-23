@@ -145,7 +145,7 @@ export class SearchProject implements SearchProjectsUseCase {
         return options;
     }
 
-    // privacy_status is computed from the creation date and the durations, it has no column: resolved
+    // privacy_status is computed from the oldest sample date and the durations, it has no column: resolved
     // to the ids of the projects at that level right now.
     private async applyPrivacyStatusFilter(options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
         const privacyFilter = options.filter.find(f => f.field === "privacy_status");

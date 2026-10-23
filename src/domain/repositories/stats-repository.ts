@@ -38,7 +38,7 @@ function sumWhereLabelIn(list: LabelCount[], labels: string[]): number {
 function countByPrivacy(projects: ProjectPrivacyInputsRow[], now: Date): LabelCount[] {
     const counts = new Map<ProjectPrivacyLevel, number>(PRIVACY_LEVELS.map(level => [level, 0]));
     for (const p of projects) {
-        const level = computeProjectPrivacy(p.project_creation_utc_date_time, p.privacy_duration, p.visible_duration, p.public_duration, now);
+        const level = computeProjectPrivacy(p.oldest_sample_utc_date_time, p.privacy_duration, p.visible_duration, p.public_duration, now);
         counts.set(level, (counts.get(level) ?? 0) + 1);
     }
     return PRIVACY_LEVELS.map(level => ({ label: level, count: counts.get(level) ?? 0 }));

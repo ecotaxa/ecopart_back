@@ -205,7 +205,7 @@
           },
           "by_privacy": {
             "type": "array",
-            "description": "Project counts by privacy level, computed at request time from each project's creation date and privacy, visible and public durations. Always the four labels private, visible, public, open, in that order, including those with a count of 0.",
+            "description": "Project counts by privacy level, computed at request time from each project's oldest sample date and privacy, visible and public durations (a project without any sample is private). Always the four labels private, visible, public, open, in that order, including those with a count of 0.",
             "items": {
               "$ref": "#/components/schemas/LabelCount"
             },
@@ -1498,6 +1498,12 @@
             "description": "Project creation date.",
             "example": "2024-01-15T10:30:00.000Z"
           },
+          "oldest_sample_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Acquisition date of the project's oldest sample (smallest `sampling_utc_date_time`), computed\nfrom the samples. The privacy delays run from it. Null while the project has no sample.\n",
+            "example": "2019-10-12T15:15:16Z"
+          },
           "privacy_status": {
             "type": "string",
             "enum": [
@@ -1506,7 +1512,7 @@
               "public",
               "open"
             ],
-            "description": "Current privacy status, computed from the creation date and the three durations below.\nFor a user without privilege on the project: `private` = metadata only, `visible` = samples\nand QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.\nMembers and managers are not bound by it.\n",
+            "description": "Current privacy status, computed from `oldest_sample_utc_date_time` and the three durations\nbelow (months). A project without any sample is `private`.\nFor a user without privilege on the project: `private` = metadata only, `visible` = samples\nand QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.\nMembers and managers are not bound by it.\n",
             "example": "visible"
           },
           "root_folder_path": {

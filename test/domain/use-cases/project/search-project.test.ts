@@ -694,10 +694,10 @@ describe("privacy_status is resolved to the projects at that level", () => {
     const options: SearchOptions = { limit: 10, page: 1, sort_by: [] }
     // Far from any boundary, so the levels do not depend on the day the tests run
     const projects_privacy = [
-        { project_id: 1, project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 1200, visible_duration: 0, public_duration: 0 },
-        { project_id: 2, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 0 },
-        { project_id: 3, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 0, public_duration: 1200 },
-        { project_id: 4, project_creation_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 1, visible_duration: 1, public_duration: 1 },
+        { project_id: 1, oldest_sample_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 1200, visible_duration: 0, public_duration: 0 },
+        { project_id: 2, oldest_sample_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 0 },
+        { project_id: 3, oldest_sample_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 0, public_duration: 1200 },
+        { project_id: 4, oldest_sample_utc_date_time: "1990-01-01T00:00:00Z", privacy_duration: 1, visible_duration: 1, public_duration: 1 },
     ]
 
     beforeEach(() => {

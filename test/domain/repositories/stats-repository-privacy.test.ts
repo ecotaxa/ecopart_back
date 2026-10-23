@@ -5,8 +5,10 @@ import sqlite3 from "sqlite3";
 import { MigrationManager } from "../../../src/data/migrations/migration-manager";
 import { SQLiteProjectDataSource } from "../../../src/data/data-sources/sqlite/sqlite-project-data-source";
 import { SQLiteStatsDataSource } from "../../../src/data/data-sources/sqlite/sqlite-stats-data-source";
+import { SQLiteSampleDataSource } from "../../../src/data/data-sources/sqlite/sqlite-sample-data-source";
 import { StatsRepositoryImpl } from "../../../src/domain/repositories/stats-repository";
 import { data_source_projectRequestCreationModel_2 } from "../../entities/project";
+import { sampleRequestCreationModel_1 } from "../../entities/sample";
 
 function run(db: sqlite3.Database, sql: string, params: unknown[] = []): Promise<void> {
     return new Promise((resolve, reject) => db.run(sql, params, (err) => err ? reject(err) : resolve()));
@@ -23,12 +25,15 @@ describe("Stats repository - projects by privacy (real SQLite)", () => {
     let workdir: string;
     let db: sqlite3.Database;
     let projects: SQLiteProjectDataSource;
+    let samples: SQLiteSampleDataSource;
     let repo: StatsRepositoryImpl;
 
-    async function addProject(created: string, durations: [number, number, number]): Promise<void> {
+    async function addProject(sampling_dates: string[], durations: [number, number, number]): Promise<void> {
         const [privacy_duration, visible_duration, public_duration] = durations;
-        const id = await projects.create({ ...data_source_projectRequestCreationModel_2, privacy_duration, visible_duration, public_duration });
-        await run(db, "UPDATE project SET project_creation_utc_date_time = ? WHERE project_id = ?", [created, id]);
+        const project_id = await projects.create({ ...data_source_projectRequestCreationModel_2, privacy_duration, visible_duration, public_duration });
+        for (const [i, sampling_utc_date_time] of sampling_dates.entries()) {
+            await samples.createOne({ ...sampleRequestCreationModel_1, project_id, sample_name: `s${project_id}_${i}`, sampling_utc_date_time });
+        }
     }
 
     beforeEach(async () => {
@@ -36,6 +41,7 @@ describe("Stats repository - projects by privacy (real SQLite)", () => {
         db = new sqlite3.Database(path.join(workdir, "test.db"));
         await new MigrationManager(db).runAllMigrations(path.resolve(__dirname, "../../../src/data/migrations"));
         projects = new SQLiteProjectDataSource(db);
+        samples = new SQLiteSampleDataSource(db);
         repo = new StatsRepositoryImpl(new SQLiteStatsDataSource(db));
     });
 
@@ -55,19 +61,20 @@ describe("Stats repository - projects by privacy (real SQLite)", () => {
         ]);
     });
 
-    test("counts each project at the level its creation date and durations give today", async () => {
-        await addProject(monthsAgo(1), [12, 12, 12]);
-        await addProject(monthsAgo(13), [12, 12, 12]);
-        await addProject(monthsAgo(30), [12, 12, 12]);
-        await addProject(monthsAgo(50), [12, 12, 12]);
-        await addProject(monthsAgo(40), [12, 12, 12]);
-        await addProject("not a date", [0, 0, 0]);
+    test("counts each project at the level its oldest sample date and durations give today", async () => {
+        await addProject([monthsAgo(1)], [12, 12, 12]);
+        await addProject([monthsAgo(1), monthsAgo(13)], [12, 12, 12]);
+        await addProject([monthsAgo(30)], [12, 12, 12]);
+        await addProject([monthsAgo(50)], [12, 12, 12]);
+        await addProject([monthsAgo(40), monthsAgo(2)], [12, 12, 12]);
+        await addProject(["not a date"], [0, 0, 0]);
+        await addProject([], [0, 0, 0]);
 
         const stats = await repo.getGlobalStats({});
 
-        expect(stats.totals.projects.total).toBe(6);
+        expect(stats.totals.projects.total).toBe(7);
         expect(stats.totals.projects.by_privacy).toStrictEqual([
-            { label: "private", count: 2 },
+            { label: "private", count: 3 },
             { label: "visible", count: 1 },
             { label: "public", count: 1 },
             { label: "open", count: 2 },

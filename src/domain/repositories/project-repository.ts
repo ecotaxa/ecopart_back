@@ -202,7 +202,8 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             managers: privileges.managers,
             contact: privileges.contact,
             project_creation_utc_date_time: project.project_creation_utc_date_time,
-            privacy_status: computeProjectPrivacy(project.project_creation_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, new Date()),
+            oldest_sample_utc_date_time: project.oldest_sample_utc_date_time,
+            privacy_status: computeProjectPrivacy(project.oldest_sample_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, new Date()),
             ecotaxa_project_id: project.ecotaxa_project_id,
             ecotaxa_project_name: project.ecotaxa_project_name,
             ecotaxa_instance_id: project.ecotaxa_instance_id,
@@ -595,7 +596,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         const projects = await this.projectDataSource.getAll({ filter: [], sort_by: [], page: 1, limit: Number.MAX_SAFE_INTEGER });
         return projects.items.map(project => ({
             project_id: project.project_id,
-            project_creation_utc_date_time: project.project_creation_utc_date_time,
+            oldest_sample_utc_date_time: project.oldest_sample_utc_date_time,
             privacy_duration: project.privacy_duration,
             visible_duration: project.visible_duration,
             public_duration: project.public_duration,

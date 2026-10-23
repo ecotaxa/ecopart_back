@@ -17,8 +17,8 @@ import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 
 // Privacy inputs of a project that is still private, resp. already visible, in 2026
-const privateProject = (project_id: number) => ({ project_id, project_creation_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel);
-const visibleProject = (project_id: number) => ({ project_id, project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as ProjectResponseModel);
+const privateProject = (project_id: number) => ({ project_id, oldest_sample_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel);
+const visibleProject = (project_id: number) => ({ project_id, oldest_sample_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as ProjectResponseModel);
 
 let mockUserRepository: UserRepository;
 let mockSampleRepository: SampleRepository;
