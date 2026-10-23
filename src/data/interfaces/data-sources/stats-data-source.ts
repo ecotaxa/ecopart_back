@@ -45,7 +45,7 @@ export interface ProjectSizingRow {
 // What a project's privacy level is computed from. The level depends on the current date, so the
 // domain computes it.
 export interface ProjectPrivacyInputsRow {
-    project_creation_utc_date_time: string;
+    oldest_sample_utc_date_time: string | null;
     privacy_duration: number;
     visible_duration: number;
     public_duration: number;

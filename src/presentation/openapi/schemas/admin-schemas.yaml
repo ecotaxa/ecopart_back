@@ -102,8 +102,8 @@ components:
         by_privacy:
           type: array
           description: >-
-            Project counts by privacy level, computed at request time from each project's creation date and
-            privacy, visible and public durations. Always the four labels private, visible, public, open, in
+            Project counts by privacy level, computed at request time from each project's oldest sample date
+            and privacy, visible and public durations (a project without any sample is private). Always the four labels private, visible, public, open, in
             that order, including those with a count of 0.
           items:
             $ref: "#/components/schemas/LabelCount"

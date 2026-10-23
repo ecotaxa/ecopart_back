@@ -36,12 +36,17 @@ describe("isProjectActionAllowed (privacy x role matrix of the specification)", 
 });
 
 describe("privacyOf", () => {
-    test("reads the status from the creation date and the three delays", () => {
-        const project = { project_id: 1, project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 2, visible_duration: 2, public_duration: 2 };
+    test("reads the status from the oldest sample date and the three delays", () => {
+        const project = { project_id: 1, oldest_sample_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 2, visible_duration: 2, public_duration: 2 };
         expect(privacyOf(project, new Date(Date.UTC(2026, 1, 15)))).toBe("private");
         expect(privacyOf(project, new Date(Date.UTC(2026, 3, 15)))).toBe("visible");
         expect(privacyOf(project, new Date(Date.UTC(2026, 5, 15)))).toBe("public");
         expect(privacyOf(project, new Date(Date.UTC(2026, 7, 15)))).toBe("open");
+    });
+
+    test("a project without any sample date stays private, whatever its delays", () => {
+        const project = { project_id: 1, oldest_sample_utc_date_time: null, privacy_duration: 0, visible_duration: 0, public_duration: 0 };
+        expect(privacyOf(project, new Date(Date.UTC(2026, 7, 15)))).toBe("private");
     });
 });
 
@@ -69,7 +74,7 @@ describe("ProjectAccessPolicy", () => {
     let policy: ProjectAccessPolicy;
     const now = new Date(Date.UTC(2026, 9, 15));
     const project = (privacy_duration: number, visible_duration = 0, public_duration = 0) =>
-        ({ project_id: 3, project_creation_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration, visible_duration, public_duration });
+        ({ project_id: 3, oldest_sample_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration, visible_duration, public_duration });
 
     beforeEach(() => {
         jest.clearAllMocks();

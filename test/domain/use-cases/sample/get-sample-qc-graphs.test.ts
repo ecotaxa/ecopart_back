@@ -168,7 +168,7 @@ describe("GetSampleQcGraphs", () => {
 
     test("a user outside a visible project gets the graphs without any privilege lookup", async () => {
         jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
-        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP", project_creation_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as any);
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP6LP", oldest_sample_utc_date_time: "2026-01-01T00:00:00Z", privacy_duration: 0, visible_duration: 1200, public_duration: 1 } as any);
         jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub());
         jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
 

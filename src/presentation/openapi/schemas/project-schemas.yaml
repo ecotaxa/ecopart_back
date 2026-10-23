@@ -256,11 +256,19 @@ components:
           type: string
           description: Project creation date.
           example: "2024-01-15T10:30:00.000Z"
+        oldest_sample_utc_date_time:
+          type: string
+          nullable: true
+          description: |
+            Acquisition date of the project's oldest sample (smallest `sampling_utc_date_time`), computed
+            from the samples. The privacy delays run from it. Null while the project has no sample.
+          example: "2019-10-12T15:15:16Z"
         privacy_status:
           type: string
           enum: [private, visible, public, open]
           description: |
-            Current privacy status, computed from the creation date and the three durations below.
+            Current privacy status, computed from `oldest_sample_utc_date_time` and the three durations
+            below (months). A project without any sample is `private`.
             For a user without privilege on the project: `private` = metadata only, `visible` = samples
             and QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.
             Members and managers are not bound by it.

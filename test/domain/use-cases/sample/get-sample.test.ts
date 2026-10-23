@@ -20,7 +20,7 @@ let useCase: GetSample;
 
 const current_user: UserUpdateModel = { user_id: 7 };
 const sample: PublicSampleModel = { ...sampleModel_1, sample_id: 10, project_id: 1 };
-const private_project = { project_id: 1, project_creation_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel;
+const private_project = { project_id: 1, oldest_sample_utc_date_time: "2026-10-01T00:00:00Z", privacy_duration: 1200, visible_duration: 1, public_duration: 1 } as ProjectResponseModel;
 const visible_project = { ...private_project, privacy_duration: 0, visible_duration: 1200 };
 
 beforeEach(() => {

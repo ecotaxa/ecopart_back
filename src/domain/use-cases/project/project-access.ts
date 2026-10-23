@@ -39,10 +39,10 @@ export function isProjectActionAllowed(role: ProjectRole, privacy: ProjectPrivac
     }
 }
 
-export type ProjectPrivacyInputs = Pick<ProjectResponseModel, "project_id" | "project_creation_utc_date_time" | "privacy_duration" | "visible_duration" | "public_duration">;
+export type ProjectPrivacyInputs = Pick<ProjectResponseModel, "project_id" | "oldest_sample_utc_date_time" | "privacy_duration" | "visible_duration" | "public_duration">;
 
 export function privacyOf(project: ProjectPrivacyInputs, now: Date = new Date()): ProjectPrivacyLevel {
-    return computeProjectPrivacy(project.project_creation_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, now);
+    return computeProjectPrivacy(project.oldest_sample_utc_date_time, project.privacy_duration, project.visible_duration, project.public_duration, now);
 }
 
 // What a project looks like from outside: the import folder on the server and the backup date are

@@ -15,6 +15,8 @@ import path from 'path'
 import { MigrationManager } from '../../../../src/data/migrations/migration-manager'
 import { SQLiteProjectDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLiteTaskDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-task-data-source'
+import { SQLiteSampleDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-sample-data-source'
+import { sampleRequestCreationModel_1 } from '../../../entities/sample'
 import { ProjectRepositoryImpl } from '../../../../src/domain/repositories/project-repository'
 import { TaskRepositoryImpl } from '../../../../src/domain/repositories/task-repository'
 import { SearchRepositoryImpl } from '../../../../src/domain/repositories/search-repository'
@@ -110,6 +112,27 @@ describe('search filtering (integration)', () => {
             const r = await searchProject.execute(cur, opts('asc(project_id)'),
                 [{ field: 'project_title', operator: 'LIKE', value: '%alpha%' }])
             expect(r.search_info.total).toEqual(2)
+        })
+
+        test('privacy_status is computed per project from its oldest sample: 3 private, 1 open, none public', async () => {
+            // Projects without samples stay private; Gamma's oldest sample is far older than its 3 months of delays
+            const gamma = (await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'project_title', operator: '=', value: 'Gamma' }])).projects[0]
+            const samples = new SQLiteSampleDataSource(db)
+            await samples.createOne({ ...sampleRequestCreationModel_1, project_id: gamma.project_id, sample_name: 'g_recent', sampling_utc_date_time: new Date().toISOString() })
+            await samples.createOne({ ...sampleRequestCreationModel_1, project_id: gamma.project_id, sample_name: 'g_old', sampling_utc_date_time: '1990-01-01T00:00:00Z' })
+
+            const privateOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: '=', value: 'private' }])
+            const openOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: 'IN', value: ['public', 'open'] }])
+            const publicOnes = await searchProject.execute(cur, opts('asc(project_id)'),
+                [{ field: 'privacy_status', operator: '=', value: 'public' }])
+
+            expect(privateOnes.search_info.total).toEqual(3)
+            expect(privateOnes.projects.map(p => p.privacy_status)).toEqual(['private', 'private', 'private'])
+            expect(openOnes.projects.map(p => p.project_title)).toEqual(['Gamma'])
+            expect(openOnes.projects[0].oldest_sample_utc_date_time).toEqual('1990-01-01T00:00:00Z')
+            expect(publicOnes.search_info.total).toEqual(0)
         })
     })
 
