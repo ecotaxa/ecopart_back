@@ -2,7 +2,7 @@ import sqlite3 from "sqlite3";
 import fs from "fs";
 
 import { SQLiteDatabaseWrapper } from "../../../src/data/interfaces/data-sources/database-wrapper";
-import { migration } from "../../../src/data/migrations/034_sample_ecotaxa_stats";
+import { migration } from "../../../src/data/migrations/035_sample_ecotaxa_stats";
 
 const TEST_DB = "TEST_DB_SAMPLE_ECOTAXA_STATS_MIGRATION";
 
@@ -47,7 +47,7 @@ const insertStats = (sample_id: number) => runSQL(wrapper(), `INSERT INTO sample
     (sample_id, ecotaxa_sample_id, nb_unclassified, nb_validated, nb_dubious, nb_predicted, used_taxa, fetched_utc_date_time)
     VALUES (?, 9000 + ?, 0, 10, 0, 0, '1,2', '2026-10-22T08:00:00.000Z');`, [sample_id, sample_id]);
 
-describe("034_sample_ecotaxa_stats", () => {
+describe("035_sample_ecotaxa_stats", () => {
     test("creates the table, keyed by sample, twice without error", async () => {
         await migration.up(wrapper());
         await insertStats(1);

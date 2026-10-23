@@ -131,8 +131,18 @@ describe("Explore selection", () => {
             }
         });
 
+        test("a project without sample date stays private, whatever its durations", async () => {
+            const empty = exploreProject(6, "open", { oldest_sample_utc_date_time: null });
+            jest.spyOn(projectRepository, "listProjects").mockResolvedValue([empty]);
+            jest.spyOn(privilegeRepository, "getPublicPrivilegesOfProjects").mockResolvedValue(new Map());
+
+            const projects = await loadExploreProjects(repositories, { user_id: CAROL.user_id, is_admin: false });
+
+            expect(projects.get(6)).toMatchObject({ privacy: "private", can_figures: false, can_export: false });
+        });
+
         test("a project without privileges has none, and the status follows the given date", async () => {
-            const recent = exploreProject(5, "open", { project_creation_utc_date_time: "2026-01-15 09:30:00", privacy_duration: 6, visible_duration: 6, public_duration: 6 });
+            const recent = exploreProject(5, "open", { oldest_sample_utc_date_time: "2026-01-15T09:30:00Z", privacy_duration: 6, visible_duration: 6, public_duration: 6 });
             jest.spyOn(projectRepository, "listProjects").mockResolvedValue([recent]);
             jest.spyOn(privilegeRepository, "getPublicPrivilegesOfProjects").mockResolvedValue(new Map());
 

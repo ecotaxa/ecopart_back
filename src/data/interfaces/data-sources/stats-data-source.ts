@@ -4,7 +4,7 @@ import { LabelCount, OrganisationCount, ProjectsStats, SamplesStats, UsersStats 
 // and except the derived task aggregates, which are computed in the repository).
 export interface StatsTotalsDbPart {
     users: UsersStats;
-    projects: ProjectsStats;
+    projects: Omit<ProjectsStats, "by_privacy">;
     samples: SamplesStats;
     tasks: {
         by_type: LabelCount[];
@@ -42,10 +42,20 @@ export interface ProjectSizingRow {
     interval_label: string | null;
 }
 
+// What a project's privacy level is computed from. The level depends on the current date, so the
+// domain computes it.
+export interface ProjectPrivacyInputsRow {
+    oldest_sample_utc_date_time: string | null;
+    privacy_duration: number;
+    visible_duration: number;
+    public_duration: number;
+}
+
 export interface StatsDataSource {
     getTotals(): Promise<StatsTotalsDbPart>;
     getEarliestActivityDate(): Promise<string | null>;
     getPeriodScalars(from: string, to: string): Promise<StatsPeriodScalarsDbPart>;
     getCreationSeries(from: string, to: string, sqliteFormat: string): Promise<StatsCreationSeriesRow[]>;
     getProjectsForSizing(from: string, to: string, sqliteFormat: string): Promise<ProjectSizingRow[]>;
+    getProjectsPrivacyInputs(): Promise<ProjectPrivacyInputsRow[]>;
 }

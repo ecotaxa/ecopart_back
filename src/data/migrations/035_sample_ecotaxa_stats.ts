@@ -4,7 +4,7 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 // EcoTaxa classification counts of each sample, as last read from EcoTaxa (sample_set/taxo_stats), so
 // that the Explore page serves them from here and asks EcoTaxa at most once a day per sample.
 export const migration: Migration = {
-    id: "034_sample_ecotaxa_stats",
+    id: "035_sample_ecotaxa_stats",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, `

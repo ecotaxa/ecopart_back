@@ -14,6 +14,12 @@ const DOMAIN_TO_PHYSICAL_COLUMN: Record<string, string> = {
 const toPhysicalColumn = (domainKey: string): string =>
     DOMAIN_TO_PHYSICAL_COLUMN[domainKey] ?? domainKey;
 
+// Acquisition date of the project's oldest sample, the start of its privacy delays. Only ISO dates are
+// compared: a sampling date the import could not parse is kept as found and would sort anywhere.
+export const OLDEST_SAMPLE_UTC_DATE_TIME_SQL = `(SELECT MIN(sample.sampling_utc_date_time) FROM sample
+    WHERE sample.project_id = project.project_id
+    AND sample.sampling_utc_date_time GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T*')`;
+
 // const DB_TABLE = "project"
 export class SQLiteProjectDataSource implements ProjectDataSource {
 
@@ -54,7 +60,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         placeholders = placeholders.slice(0, -4);
         // form final sql
         const sql = `
-        SELECT project.*, instrument_model.instrument_model_name
+        SELECT project.*, instrument_model.instrument_model_name, ${OLDEST_SAMPLE_UTC_DATE_TIME_SQL} AS oldest_sample_utc_date_time
         FROM project
         LEFT JOIN instrument_model
             ON project.instrument_model = instrument_model.instrument_model_id
@@ -93,6 +99,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             instrument_model: row.instrument_model_name,
                             serial_number: row.serial_number,
                             project_creation_utc_date_time: row.project_creation_utc_date_time,
+                            oldest_sample_utc_date_time: row.oldest_sample_utc_date_time ?? null,
                             ecotaxa_project_id: row.ecotaxa_project_id,
                             ecotaxa_project_name: row.ecotaxa_project_name,
                             ecotaxa_instance_id: row.ecotaxa_instance_id,
@@ -153,7 +160,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
     }
     async getAll(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT project.*, instrument_model.instrument_model_name, (SELECT COUNT(*) FROM project`
+        let sql = `SELECT project.*, instrument_model.instrument_model_name, ${OLDEST_SAMPLE_UTC_DATE_TIME_SQL} AS oldest_sample_utc_date_time, (SELECT COUNT(*) FROM project`
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -258,6 +265,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             instrument_model: row.instrument_model_name,
                             serial_number: row.serial_number,
                             project_creation_utc_date_time: row.project_creation_utc_date_time,
+                            oldest_sample_utc_date_time: row.oldest_sample_utc_date_time ?? null,
                             ecotaxa_project_id: row.ecotaxa_project_id,
                             ecotaxa_project_name: row.ecotaxa_project_name,
                             ecotaxa_instance_id: row.ecotaxa_instance_id,

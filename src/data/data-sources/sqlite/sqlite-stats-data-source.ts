@@ -1,5 +1,6 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import {
+    ProjectPrivacyInputsRow,
     ProjectSizingRow,
     StatsCreationSeriesRow,
     StatsDataSource,
@@ -7,6 +8,7 @@ import {
     StatsTotalsDbPart,
 } from "../../interfaces/data-sources/stats-data-source";
 import { LabelCount, OrganisationCount } from "../../../domain/entities/stats";
+import { OLDEST_SAMPLE_UTC_DATE_TIME_SQL } from "./sqlite-project-data-source";
 
 // Coerce a SQLite scalar (COUNT is a number, SUM(...) can be null over 0 rows) to a safe number.
 function n(value: any): number {
@@ -117,6 +119,12 @@ export class SQLiteStatsDataSource implements StatsDataSource {
             },
             top_organisations: topOrgs.map((r: any): OrganisationCount => ({ organisation: r.organisation, users: n(r.cnt) })),
         };
+    }
+
+    getProjectsPrivacyInputs(): Promise<ProjectPrivacyInputsRow[]> {
+        return this.queryAll<ProjectPrivacyInputsRow>(
+            `SELECT ${OLDEST_SAMPLE_UTC_DATE_TIME_SQL} AS oldest_sample_utc_date_time, privacy_duration, visible_duration, public_duration
+             FROM project;`, []);
     }
 
     async getEarliestActivityDate(): Promise<string | null> {

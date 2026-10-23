@@ -32,6 +32,8 @@ export interface ProjectResponseModel {
 
     project_id: number;
     project_creation_utc_date_time: string;
+    // Computed from the samples (MIN sampling_utc_date_time), not stored: the privacy delays run from it.
+    oldest_sample_utc_date_time: string | null;
 
     root_folder_path: string;
     project_title: string;
@@ -155,6 +157,7 @@ export type ProjectPrivacyLevel = "private" | "visible" | "public" | "open";
 export interface PublicProjectResponseModel extends Omit<PublicProjectRequestCreationModel_base, "root_folder_path"> {
     project_id: number;
     project_creation_utc_date_time: string;
+    oldest_sample_utc_date_time: string | null;
     privacy_status: ProjectPrivacyLevel;
     // Only served to admins and to the project's members and managers (see project-access.ts).
     root_folder_path?: string;
@@ -192,17 +195,3 @@ export interface MigrateEcotaxaProjectResponseModel {
     unmatched_samples: string[];
     ecotaxa_only_samples: string[];
 }
-
-// // FOR acess permissions LATER
-// export interface ProjectVisibility {
-//     visibility_id: number;
-//     visibility_name: ProjectVisibilityStatus;
-//     visibility_creation_date: string;
-// }
-// // TODO ENUM TO CREATE IN DB
-// export enum ProjectVisibilityStatus {
-//     Private = "Private",
-//     Visible = "Visible",
-//     Public = "Public",
-//     Public_plus = "Public+"
-// }

@@ -202,13 +202,39 @@
             "items": {
               "$ref": "#/components/schemas/LabelCount"
             }
+          },
+          "by_privacy": {
+            "type": "array",
+            "description": "Project counts by privacy level, computed at request time from each project's oldest sample date and privacy, visible and public durations (a project without any sample is private). Always the four labels private, visible, public, open, in that order, including those with a count of 0.",
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            },
+            "example": [
+              {
+                "label": "private",
+                "count": 5
+              },
+              {
+                "label": "visible",
+                "count": 3
+              },
+              {
+                "label": "public",
+                "count": 2
+              },
+              {
+                "label": "open",
+                "count": 2
+              }
+            ]
           }
         },
         "required": [
           "total",
           "backed_up",
           "linked_to_ecotaxa",
-          "by_instrument"
+          "by_instrument",
+          "by_privacy"
         ]
       },
       "AdminTasksStats": {
@@ -2094,6 +2120,12 @@
             "description": "Project creation date.",
             "example": "2024-01-15T10:30:00.000Z"
           },
+          "oldest_sample_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Acquisition date of the project's oldest sample (smallest `sampling_utc_date_time`), computed\nfrom the samples. The privacy delays run from it. Null while the project has no sample.\n",
+            "example": "2019-10-12T15:15:16Z"
+          },
           "privacy_status": {
             "type": "string",
             "enum": [
@@ -2102,7 +2134,7 @@
               "public",
               "open"
             ],
-            "description": "Current privacy status, computed from the creation date and the three durations below.\nFor a user without privilege on the project: `private` = metadata only, `visible` = samples\nand QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.\nMembers and managers are not bound by it.\n",
+            "description": "Current privacy status, computed from `oldest_sample_utc_date_time` and the three durations\nbelow (months). A project without any sample is `private`.\nFor a user without privilege on the project: `private` = metadata only, `visible` = samples\nand QC graphs too, `public` = binned export too, `open` = EcoTaxa classification data too.\nMembers and managers are not bound by it.\n",
             "example": "visible"
           },
           "root_folder_path": {
@@ -5147,7 +5179,7 @@
     "/projects/searches": {
       "post": {
         "summary": "Search projects",
-        "description": "Returns a paginated, sorted, and filtered list of projects.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `project_id` | number | |\n| `project_title` | string | |\n| `project_acronym` | string | |\n| `project_description` | string | |\n| `cruise` | string | |\n| `ship` | string | |\n| `data_owner_name` | string | |\n| `data_owner_email` | string | |\n| `operator_name` | string | |\n| `operator_email` | string | |\n| `chief_scientist_name` | string | |\n| `chief_scientist_email` | string | |\n| `override_depth_offset` | number | |\n| `enable_descent_filter` | boolean | |\n| `privacy_duration` | number | |\n| `visible_duration` | number | |\n| `public_duration` | number | |\n| `serial_number` | string | |\n| `root_folder_path` | string | |\n| `project_creation_utc_date_time` | string (ISO timestamp) | |\n| `instrument_model` | string | Computed — resolved to instrument model IDs |\n| `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |\n| `contact` | string or number | Computed — resolved to project IDs via privilege system |\n| `managers` | string or number | Computed — resolved to project IDs via privilege system |\n| `members` | string or number | Computed — resolved to project IDs via privilege system |\n| `granted_users` | string or number | Computed — resolved to project IDs via privilege system |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.\n",
+        "description": "Returns a paginated, sorted, and filtered list of projects.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `project_id` | number | |\n| `project_title` | string | |\n| `project_acronym` | string | |\n| `project_description` | string | |\n| `cruise` | string | |\n| `ship` | string | |\n| `data_owner_name` | string | |\n| `data_owner_email` | string | |\n| `operator_name` | string | |\n| `operator_email` | string | |\n| `chief_scientist_name` | string | |\n| `chief_scientist_email` | string | |\n| `override_depth_offset` | number | |\n| `enable_descent_filter` | boolean | |\n| `privacy_duration` | number | |\n| `visible_duration` | number | |\n| `public_duration` | number | |\n| `serial_number` | string | |\n| `root_folder_path` | string | |\n| `project_creation_utc_date_time` | string (ISO timestamp) | |\n| `instrument_model` | string | Computed — resolved to instrument model IDs |\n| `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |\n| `privacy_status` | string (`private`, `visible`, `public`, `open`) | Computed — level at the time of the request, operator `=` or `IN` |\n| `contact` | string or number | Computed — resolved to project IDs via privilege system |\n| `managers` | string or number | Computed — resolved to project IDs via privilege system |\n| `members` | string or number | Computed — resolved to project IDs via privilege system |\n| `granted_users` | string or number | Computed — resolved to project IDs via privilege system |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.\n",
         "tags": [
           "Projects"
         ],
@@ -5203,6 +5235,14 @@
                   "field": "for_managing",
                   "operator": "=",
                   "value": true
+                },
+                {
+                  "field": "privacy_status",
+                  "operator": "IN",
+                  "value": [
+                    "public",
+                    "open"
+                  ]
                 }
               ]
             }

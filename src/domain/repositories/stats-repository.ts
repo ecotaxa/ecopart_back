@@ -1,7 +1,7 @@
 import * as fsPromises from 'fs/promises';
 import path from 'path';
 
-import { StatsDataSource } from "../../data/interfaces/data-sources/stats-data-source";
+import { ProjectPrivacyInputsRow, StatsDataSource } from "../../data/interfaces/data-sources/stats-data-source";
 import { StatsRepository } from "../interfaces/repositories/stats-repository";
 import {
     AdminStatsResponseModel,
@@ -13,9 +13,13 @@ import {
     TasksStats,
 } from "../entities/stats";
 import { TasksStatus, TaskType } from "../entities/task";
+import { ProjectPrivacyLevel } from "../entities/project";
+import { computeProjectPrivacy } from "../utils/project-privacy";
 
 const EXPORT_TASK_LABELS: string[] = [TaskType.Export, TaskType.Export_Backup, TaskType.Export_Raw];
 const IMPORT_TASK_LABELS: string[] = [TaskType.Import, TaskType.Import_Backup, TaskType.Import_CTD, TaskType.Import_EcoTaxa];
+
+const PRIVACY_LEVELS: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
 
 const SQLITE_INTERVAL_FORMAT: Record<StatsGranularity, string> = {
     day: '%Y-%m-%d',
@@ -29,6 +33,15 @@ function totalOf(list: LabelCount[]): number {
 
 function sumWhereLabelIn(list: LabelCount[], labels: string[]): number {
     return list.reduce((acc, item) => (labels.includes(item.label) ? acc + item.count : acc), 0);
+}
+
+function countByPrivacy(projects: ProjectPrivacyInputsRow[], now: Date): LabelCount[] {
+    const counts = new Map<ProjectPrivacyLevel, number>(PRIVACY_LEVELS.map(level => [level, 0]));
+    for (const p of projects) {
+        const level = computeProjectPrivacy(p.oldest_sample_utc_date_time, p.privacy_duration, p.visible_duration, p.public_duration, now);
+        counts.set(level, (counts.get(level) ?? 0) + 1);
+    }
+    return PRIVACY_LEVELS.map(level => ({ label: level, count: counts.get(level) ?? 0 }));
 }
 
 export class StatsRepositoryImpl implements StatsRepository {
@@ -51,10 +64,11 @@ export class StatsRepositoryImpl implements StatsRepository {
 
         const includeStorage = options.include_storage === true;
 
-        const [totalsDb, periodScalars, series] = await Promise.all([
+        const [totalsDb, periodScalars, series, privacyInputs] = await Promise.all([
             this.statsDataSource.getTotals(),
             this.statsDataSource.getPeriodScalars(from, to),
             this.statsDataSource.getCreationSeries(from, to, fmt),
+            this.statsDataSource.getProjectsPrivacyInputs(),
         ]);
 
         // ── Filesystem sizes (attributed by project creation date) ──
@@ -119,7 +133,7 @@ export class StatsRepositoryImpl implements StatsRepository {
             generated_at,
             totals: {
                 users: totalsDb.users,
-                projects: totalsDb.projects,
+                projects: { ...totalsDb.projects, by_privacy: countByPrivacy(privacyInputs, new Date(generated_at)) },
                 tasks: totalsTasks,
                 samples: totalsDb.samples,
                 storage: { total_size_bytes: storageTotalBytes },

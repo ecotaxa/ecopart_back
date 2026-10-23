@@ -8,14 +8,17 @@ function monthsBetween(from: Date, to: Date): number {
     return total;
 }
 
+// The delays run from the acquisition date of the project's oldest sample, as in the former EcoPart
+// (oldestsampledate). A project without any sample date stays private.
 export function computeProjectPrivacy(
-    project_creation_utc_date_time: string,
+    oldest_sample_utc_date_time: string | null,
     privacy_duration: number,
     visible_duration: number,
     public_duration: number,
     now: Date,
 ): ProjectPrivacyLevel {
-    const elapsed = monthsBetween(new Date(project_creation_utc_date_time), now);
+    if (!oldest_sample_utc_date_time) return "private";
+    const elapsed = monthsBetween(new Date(oldest_sample_utc_date_time), now);
     // The binned export decides access with this level: an unreadable date must not open a project.
     if (!Number.isFinite(elapsed)) return "private";
     if (elapsed < privacy_duration) return "private";

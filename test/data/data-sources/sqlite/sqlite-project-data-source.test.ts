@@ -323,7 +323,8 @@ describe('SQLiteProjectDataSource', () => {
                 const projectKeys = Object.keys(project);
                 const projectByIdKeys = Object.keys(project_by_id);
                 const additionalKeys = projectKeys.filter(key => !projectByIdKeys.includes(key));
-                expect(additionalKeys).toHaveLength(2);
+                expect(additionalKeys).toEqual(["project_creation_utc_date_time", "oldest_sample_utc_date_time", "last_backup_utc_date_time"]);
+                expect(project.oldest_sample_utc_date_time).toBeNull();
             }
         });
     });

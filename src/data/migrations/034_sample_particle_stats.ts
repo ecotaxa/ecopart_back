@@ -5,7 +5,7 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 // Explore page can sum particles and give a size range without reading every particle file. NULL
 // until computed (samples imported before this migration: task COMPUTE_PARTICLE_STATS).
 export const migration: Migration = {
-    id: "033_sample_particle_stats",
+    id: "034_sample_particle_stats",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         const columns = await new Promise<{ name: string }[]>((resolve, reject) =>

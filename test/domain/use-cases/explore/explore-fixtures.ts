@@ -7,7 +7,7 @@ import { ExploreProjectContext } from "../../../../src/domain/use-cases/explore/
 /* Shared fixtures of the Explore tests: projects whose privacy status does not depend on the day
  * the tests run, light sample rows and project contexts. */
 
-// Durations in months that give a project created in 2024 the same status whatever "now" is.
+// Durations in months that give a project sampled in 2024 the same status whatever "now" is.
 export const PRIVACY_DURATIONS: Record<ProjectPrivacyLevel, Pick<ProjectResponseModel, "privacy_duration" | "visible_duration" | "public_duration">> = {
     private: { privacy_duration: 10000, visible_duration: 0, public_duration: 0 },
     visible: { privacy_duration: 0, visible_duration: 10000, public_duration: 0 },
@@ -22,6 +22,8 @@ export function exploreProject(project_id: number, privacy: ProjectPrivacyLevel,
         ecotaxa_instance_id: null,
         project_id,
         project_creation_utc_date_time: "2024-01-15 09:30:00",
+        // The privacy delays run from the oldest sample.
+        oldest_sample_utc_date_time: "2024-01-10T08:00:00Z",
         root_folder_path: `/remote/plankton/uvp6/project_${project_id}`,
         project_title: `Project ${project_id}`,
         project_acronym: `P${project_id}`,

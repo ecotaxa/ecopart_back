@@ -213,7 +213,7 @@ export class ExportMetadataWriter {
                 project_creation_utc_date_time: dateValue(project.project_creation_utc_date_time),
                 project_export_utc_date_time: export_started_at,
                 project_privacy: computeProjectPrivacy(
-                    project.project_creation_utc_date_time,
+                    project.oldest_sample_utc_date_time,
                     project.privacy_duration,
                     project.visible_duration,
                     project.public_duration,

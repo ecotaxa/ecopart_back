@@ -213,6 +213,7 @@ export default function ProjectRouter(
      *       | `project_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `instrument_model` | string | Computed — resolved to instrument model IDs |
      *       | `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |
+     *       | `privacy_status` | string (`private`, `visible`, `public`, `open`) | Computed — level at the time of the request, operator `=` or `IN` |
      *       | `contact` | string or number | Computed — resolved to project IDs via privilege system |
      *       | `managers` | string or number | Computed — resolved to project IDs via privilege system |
      *       | `members` | string or number | Computed — resolved to project IDs via privilege system |
@@ -249,6 +250,9 @@ export default function ProjectRouter(
      *             - field: "for_managing"
      *               operator: "="
      *               value: true
+     *             - field: "privacy_status"
+     *               operator: "IN"
+     *               value: ["public", "open"]
      *     responses:
      *       200:
      *         description: Paginated filtered list of projects.
@@ -303,6 +307,7 @@ export default function ProjectRouter(
             else if (err.message.includes("members should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("managers should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("granted_users should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.startsWith("privacy_status should be one of")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search projects"] })
         }
