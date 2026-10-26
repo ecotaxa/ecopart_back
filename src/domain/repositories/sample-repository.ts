@@ -61,6 +61,8 @@ function parseIntAt(text: string, start: number, end: number): number {
 const MAX_CACHED_VIGNETTE_COUNTS = 10_000;
 // Bounds the UVP6 operator email cache, same order of size.
 const MAX_CACHED_OPERATOR_EMAIL_CHECKS = 10_000;
+// Sample ids per lookup query in getSamplesByIds (twice this many SQL variables).
+const SAMPLE_IDS_PER_QUERY = 5_000;
 
 // A value step 4/4 can store in a required text column: a non-blank text. The UVP6 INI parser turns
 // an empty value into the number 0.
@@ -2199,16 +2201,23 @@ export class SampleRepositoryImpl implements SampleRepository {
         return await this.sampleDataSource.getEcoTaxaSampleSummaries(options);
     }
 
+    // getAll binds the IN list twice (count and select) and SQLite allows 32 766 variables per
+    // statement: a long list is read in slices.
     async getSamplesByIds(sample_ids: number[]): Promise<PublicSampleModel[]> {
         if (!sample_ids || sample_ids.length === 0) return [];
-        const options: PreparedSearchOptions = {
-            filter: [{ field: "sample_id", operator: "IN", value: sample_ids }],
-            sort_by: [],
-            page: 1,
-            limit: sample_ids.length
-        };
-        const result = await this.sampleDataSource.getAll(options);
-        return result.items;
+        const samples: PublicSampleModel[] = [];
+        for (let start = 0; start < sample_ids.length; start += SAMPLE_IDS_PER_QUERY) {
+            const slice = sample_ids.slice(start, start + SAMPLE_IDS_PER_QUERY);
+            const options: PreparedSearchOptions = {
+                filter: [{ field: "sample_id", operator: "IN", value: slice }],
+                sort_by: [],
+                page: 1,
+                limit: slice.length
+            };
+            const result = await this.sampleDataSource.getAll(options);
+            samples.push(...result.items);
+        }
+        return samples;
     }
 
     // Returns absolute paths of raw LPM artifacts stored per sample after import.
