@@ -8,6 +8,9 @@ const server = express();
 // gzip for the clients that accept it. JSON shrinks about 7 times (the QC graphs above all); archives
 // (zip, tar.zst) are left as they are, their types not being compressible.
 server.use(compression());
+// Export requests list their sample ids: a selection of tens of thousands of samples is over the
+// 100 KB default. Parsed here first, the body is skipped by the default parser below.
+server.use("/exports", express.json({ limit: "5mb" }));
 server.use(express.json());
 server.use(express.urlencoded({ extended: false }))
 server.use(cookieParser());
