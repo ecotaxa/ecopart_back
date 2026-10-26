@@ -7,7 +7,7 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { TaskRequestCreationModel, PrivateTaskRequestModel, TaskUpdateModel, TaskResponseModel, PublicTaskResponseModel, PublicTaskRequestCreationModel } from "../entities/task";
 import { PrivateTaskRequestCreationModel, PublicTaskRequestCreationModel, PublicTaskRequestModel, PublicTaskResponseModel, TasksStatus, TaskType, TaskVisibilityModel } from "../entities/task";
 import { PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../entities/task";
-import { TASK_CANCELLED_MESSAGE } from "../constants/task";
+import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE } from "../constants/task";
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { TaskRepository } from "../interfaces/repositories/task-repository";
@@ -594,6 +594,12 @@ export class TaskRepositoryImpl implements TaskRepository {
             limit: 1
         });
         return result.total > 0;
+    }
+
+    async countExportTasks(project_id: number): Promise<number> {
+        const export_labels: string[] = EXPORT_TASK_TYPES;
+        return (await this.taskDataSource.countTasksByType(project_id))
+            .reduce((total, { label, count }) => export_labels.includes(label) ? total + count : total, 0);
     }
 
     async getActiveTasks(): Promise<TaskResponseModel[]> {

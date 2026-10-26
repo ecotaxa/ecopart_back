@@ -3,6 +3,7 @@ import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-q
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
 import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
+import { ProjectStatsSampleRow } from "../../entities/project-stats";
 import { CtdRows } from "../../entities/ctd";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { TaskLogger } from "./task-repository";
@@ -82,6 +83,8 @@ export interface SampleRepository {
     // Explore
     // Every sample matching the query, as light rows (one query).
     getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]>;
+    // Every sample of a project as the light rows of its statistics (one query).
+    getProjectStatsSamples(project_id: number): Promise<ProjectStatsSampleRow[]>;
     // Size and modification time of the sample's pivot ("<size>-<mtime_ms>"), null when it has none:
     // a cache key that changes whenever the file is rewritten.
     getPivotFileStamp(project_id: number, sample_name: string, instrument_model: string): Promise<string | null>;

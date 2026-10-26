@@ -1,6 +1,7 @@
 import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
+import { ProjectStatsSampleRow } from "../../../domain/entities/project-stats";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //SampleTypeModel, SampleTypeRequestModel, SampleRequestModel, SampleUpdateModel, SampleResponseModel, QualityCheckStatusRequestModel, QualityCheckStatusModel 
 export interface SampleDataSource {
@@ -17,6 +18,8 @@ export interface SampleDataSource {
     deleteOneEcoTaxaSample(sample: SampleIdModel): Promise<number>;
     // The light rows of the Explore selection, every matching sample, ordered by id.
     getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]>;
+    // Every sample of the project, as the light rows of its statistics, ordered by id.
+    getProjectStatsSamples(project_id: number): Promise<ProjectStatsSampleRow[]>;
     // Samples per project (one GROUP BY); null covers every project. Projects without samples are absent.
     countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>>;
     // EcoTaxa classification counts kept per sample (table sample_ecotaxa_stats).

@@ -1,4 +1,5 @@
 import { TaskDataSource } from "../../interfaces/data-sources/task-data-source";
+import { LabelCount } from "../../../domain/entities/stats";
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { PrivateTaskRequestModel, PrivateTaskRequestCreationModel, TaskResponseModel, TaskTypeResponseModel, TaskStatusResponseModel, PrivateTaskUpdateModel, TaskVisibilityModel } from "../../../domain/entities/task";
@@ -94,6 +95,15 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 }
             });
         })
+    }
+
+    async countTasksByType(project_id: number): Promise<LabelCount[]> {
+        const sql = `SELECT task_type.task_type_label AS label, COUNT(*) AS cnt
+            FROM task JOIN task_type ON task.task_type_id = task_type.task_type_id
+            WHERE task.task_project_id = (?)
+            GROUP BY label ORDER BY cnt DESC, label ASC;`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [project_id], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({ label: row.label, count: Number(row.cnt) || 0 }));
     }
 
     async getAll(options: PreparedSearchOptions, visible_to?: TaskVisibilityModel): Promise<SearchResult<TaskResponseModel>> {

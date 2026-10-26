@@ -2,6 +2,7 @@ import { EcoTaxaSampleSummary, SampleRequestCreationModel, PublicHeaderSampleRes
 import { PerImageColumns, SampleSourceQcMetadata } from "../../src/domain/entities/sample-qc-graph";
 import { SearchResult } from "../../src/domain/entities/search";
 import { EcoTaxaImportedSample, ExploreSampleRow, StoredEcoTaxaStats } from "../../src/domain/entities/explore";
+import { ProjectStatsSampleRow } from "../../src/domain/entities/project-stats";
 import { CtdRows } from "../../src/domain/entities/ctd";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
 import { PivotImages, SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
@@ -123,6 +124,9 @@ export class MockSampleRepository implements SampleRepository {
     }
     getExploreSamples(): Promise<ExploreSampleRow[]> {
         throw new Error("Method not implemented for getExploreSamples");
+    }
+    getProjectStatsSamples(): Promise<ProjectStatsSampleRow[]> {
+        throw new Error("Method not implemented for getProjectStatsSamples");
     }
     getPivotFileStamp(): Promise<string | null> {
         throw new Error("Method not implemented for getPivotFileStamp");

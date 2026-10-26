@@ -1,6 +1,6 @@
 import { ECOTAXA_BIOTA_TAXO_ID } from "../../constants/ecotaxa-living-taxo";
 import { EcoTaxaTaxon } from "../../entities/ecotaxa_account";
-import { ClassificationShares, EcoTaxaImportedSample, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
+import { ClassificationShares, EcoTaxaImportedSample, EcoTaxaObjectCounts, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
@@ -87,6 +87,16 @@ export function classificationSharesOf(stats: EcoTaxaSampleStat[]): Classificati
         partially_validated: percent(shares.partially_validated),
         partially_predicted: percent(shares.partially_predicted),
     };
+}
+
+export function objectCountsOf(stats: EcoTaxaSampleStat[]): EcoTaxaObjectCounts {
+    const counts = { total: 0, validated: 0, predicted: 0 };
+    for (const stat of stats) {
+        counts.total += totalOf(stat);
+        counts.validated += stat.nb_validated;
+        counts.predicted += stat.nb_predicted;
+    }
+    return counts;
 }
 
 export function toSampleStat(stored: StoredEcoTaxaStats): EcoTaxaSampleStat {
@@ -324,6 +334,7 @@ export class ExploreEcoTaxaService {
         return {
             categories: Array.from(categories).sort((a, b) => a.localeCompare(b)),
             classification: classificationSharesOf(stats_list),
+            objects: objectCountsOf(stats_list),
             nb_samples_with_stats: stats_list.filter(stat => totalOf(stat) > 0).length,
             partial: pending > 0,
             nb_samples_pending: pending,

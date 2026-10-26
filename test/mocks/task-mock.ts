@@ -75,6 +75,9 @@ export class MockTaskRepository implements TaskRepository {
     logMessage(): Promise<void> {
         throw new Error("Method not implemented for logMessage");
     }
+    countExportTasks(): Promise<number> {
+        throw new Error("Method not implemented for countExportTasks");
+    }
     updateTaskResult(): Promise<void> {
         throw new Error("Method not implemented for updateTaskResult");
     }

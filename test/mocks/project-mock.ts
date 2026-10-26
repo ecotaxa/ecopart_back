@@ -15,6 +15,8 @@ import { ImportSamplesUseCase } from "../../src/domain/interfaces/use-cases/samp
 import { ListImportableSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/list-importable-samples";
 import { SearchSamplesUseCase } from "../../src/domain/interfaces/use-cases/sample/search-samples";
 import { GetSampleUseCase } from "../../src/domain/interfaces/use-cases/sample/get-sample";
+import { GetProjectStatsUseCase } from "../../src/domain/interfaces/use-cases/project/get-project-stats";
+import { ProjectStatsResponseModel } from "../../src/domain/entities/project-stats";
 import { ListShipsUseCase } from "../../src/domain/interfaces/use-cases/project/list-ships";
 import { SearchEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/search-ecotaxa-samples";
 import { DeleteEcoTaxaSamplesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples";
@@ -164,6 +166,12 @@ export class MockSearchSamplesUseCase implements SearchSamplesUseCase {
         throw new Error("Method not implemented for search samples")
     }
 }
+export class MockGetProjectStatsUseCase implements GetProjectStatsUseCase {
+    execute(): Promise<ProjectStatsResponseModel> {
+        throw new Error("Method not implemented for MockGetProjectStatsUseCase");
+    }
+}
+
 export class MockGetSampleUseCase implements GetSampleUseCase {
     execute(): Promise<PublicSampleModel> {
         throw new Error("Method not implemented for get sample")

@@ -102,6 +102,7 @@ import { ExportBinnedData } from './domain/use-cases/export/export-binned-data'
 import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_account-repository'
 import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
 import { GetStats } from './domain/use-cases/admin/get-stats'
+import { GetProjectStats } from './domain/use-cases/project/get-project-stats'
 import { ComputeParticleStats } from './domain/use-cases/sample/compute-particle-stats'
 import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
 import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
@@ -313,6 +314,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         console.log(new Date().toISOString(), 'Cannot encrypt the stored EcoTaxa tokens:', error)
     }
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
+    // The EcoTaxa statistics kept per sample, shared by the Explore page and the project STATS tab.
+    const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
     const userMiddleWare =
@@ -379,6 +382,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new SelectSampleCoordinates(user_repo, sample_repo, privilege_repo),
         new GetSample(user_repo, sample_repo, privilege_repo, project_repo),
         new RegeneratePivots(user_repo, privilege_repo, project_repo, sample_repo, task_repo),
+        new GetProjectStats(user_repo, project_repo, privilege_repo, sample_repo, task_repo, explore_ecotaxa),
     )
 
     const taskMiddleWare = TaskRouter(
@@ -437,7 +441,6 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     // Explore: the selection, its stats and its curves over every project; anonymous callers served
     // except on the graphs. The EcoTaxa service and the particle bins keep caches shared by every request.
     const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
-    const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)
     // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
     explore_ecotaxa.startSweeper()
     server.use("/explore", ExploreRouter(

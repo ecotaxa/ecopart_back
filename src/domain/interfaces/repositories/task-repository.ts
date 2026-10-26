@@ -35,4 +35,6 @@ export interface TaskRepository {
     failedTask(task_id: number, error: Error): Promise<void>;
     logMessage(task_log_file_path: string | undefined, message: string): Promise<void>;
     updateTaskResult(task: PublicTaskRequestModel, task_result: string): Promise<void>;
+    // Export tasks of the project (EXPORT, EXPORT_BACKUP, EXPORT_RAW), whatever their status.
+    countExportTasks(project_id: number): Promise<number>;
 }

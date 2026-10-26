@@ -21,6 +21,7 @@ import { PreviewSamplesQcGraphsUseCase } from '../../domain/interfaces/use-cases
 import { SelectSampleCoordinatesUseCase } from '../../domain/interfaces/use-cases/sample/select-sample-coordinates'
 import { GetSampleUseCase } from '../../domain/interfaces/use-cases/sample/get-sample'
 import { RegeneratePivotsUseCase } from '../../domain/interfaces/use-cases/sample/regenerate-pivots'
+import { GetProjectStatsUseCase } from '../../domain/interfaces/use-cases/project/get-project-stats'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -69,6 +70,7 @@ export default function ProjectRouter(
     selectSampleCoordinatesUseCase: SelectSampleCoordinatesUseCase,
     getSampleUseCase: GetSampleUseCase,
     regeneratePivotsUseCase: RegeneratePivotsUseCase,
+    getProjectStatsUseCase: GetProjectStatsUseCase,
 ) {
     const router = express.Router()
 
@@ -650,6 +652,78 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this project") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete project"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/stats:
+     *   get:
+     *     summary: Statistics of a project (STATS tab)
+     *     description: |
+     *       Everything the project STATS tab shows, in one call: headline counts (stations, samples,
+     *       particles, vignettes, exports), the privacy timeline (the dates the project becomes visible,
+     *       public and open, counted in months from its oldest sample), the raw backup state, the
+     *       positions of the samples and of their CTD casts, the sample types, pressure, size and time
+     *       ranges with the maximum-pressure histogram, and the EcoTaxa classification state, each
+     *       section with its warnings (missing CTD files, mismatching positions, instrument parameters
+     *       that differ between samples, suspicious dates or pressures, samples not imported in EcoTaxa).
+     *
+     *       Served to any logged-in user, like the project metadata; `raw_backup` is `null` for a user
+     *       without privilege on the project. The EcoTaxa part is read from the statistics EcoPart keeps
+     *       per sample: when some samples have none yet (`ecotaxa.partial`), they are being read from
+     *       EcoTaxa in the background, ask again later.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     responses:
+     *       200:
+     *         description: The statistics of the project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ProjectStats'
+     *       401:
+     *         description: Missing or invalid access token.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: Project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:project_id/stats', middlewareAuth.auth, async (req: Request, res: Response) => {
+        try {
+            const stats = await getProjectStatsUseCase.execute((req as CustomRequest).token, { project_id: Number(req.params.project_id) })
+            res.status(200).send(stats)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get project statistics"] })
         }
     })
 

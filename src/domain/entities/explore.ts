@@ -172,9 +172,17 @@ export interface ClassificationShares {
     partially_predicted: number;
 }
 
+// The objects of the samples with EcoTaxa stats, by classification state.
+export interface EcoTaxaObjectCounts {
+    total: number;
+    validated: number;
+    predicted: number;
+}
+
 export interface ExploreEcoTaxaSummary {
     categories: string[];
     classification: ClassificationShares;
+    objects: EcoTaxaObjectCounts;             // over the samples with stats
     nb_samples_with_stats: number;
     partial: boolean;                         // some samples have no stats yet: they are being read from EcoTaxa, ask again later
     nb_samples_pending: number;

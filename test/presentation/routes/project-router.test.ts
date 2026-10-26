@@ -16,7 +16,9 @@ import { IMiddlewareProjectValidation } from "../../../src/presentation/interfac
 
 import { Request, Response, NextFunction } from "express";
 import { projectRequestCreationModel, projectResponseModel, projectResponseModelArray, partial_projectUpdateModel } from "../../entities/project";
-import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase, MockListShipsUseCase, MockSearchEcoTaxaSamplesUseCase, MockDeleteEcoTaxaSamplesUseCase, MockImportEcoTaxaSamplesUseCase, MockListImportableEcoTaxaSamplesUseCase, MockListImportableCTDSamplesUseCase, MockImportCTDSamplesUseCase, MockListImportedCTDSamplesUseCase, MockDeleteImportedCTDSamplesUseCase, MockGetSampleUseCase } from "../../mocks/project-mock";
+import { MockCreateProjectUseCase, MockUpdateProjectUseCase, MockSearchProjectsUseCase, MockBackupProjectUseCase, MockExportBackupedProjectUseCase, MockListImportableSamplesUseCase, MockImportSamplesUseCase, MockDeleteSampleUseCase, MockSearchSamplesUseCase, MockListShipsUseCase, MockSearchEcoTaxaSamplesUseCase, MockDeleteEcoTaxaSamplesUseCase, MockImportEcoTaxaSamplesUseCase, MockListImportableEcoTaxaSamplesUseCase, MockListImportableCTDSamplesUseCase, MockImportCTDSamplesUseCase, MockListImportedCTDSamplesUseCase, MockDeleteImportedCTDSamplesUseCase, MockGetSampleUseCase, MockGetProjectStatsUseCase } from "../../mocks/project-mock";
+import { GetProjectStatsUseCase } from "../../../src/domain/interfaces/use-cases/project/get-project-stats";
+import { ProjectStatsResponseModel } from "../../../src/domain/entities/project-stats";
 import { BackupProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/backup-project";
 import { ExportBackupedProjectUseCase } from "../../../src/domain/interfaces/use-cases/project/export-backuped-project";
 import { DeleteSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/delete-sample";
@@ -118,6 +120,7 @@ describe("Project Router", () => {
     let mockImportCTDSamplesUseCase: ImportCTDSamplesUseCase;
     let mockListImportedCTDSamplesUseCase: ListImportedCTDSamplesUseCase;
     let mockDeleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase;
+    let mockGetProjectStatsUseCase: GetProjectStatsUseCase;
     let mockListShipsUseCase: ListShipsUseCase;
     let mockGetSampleUseCase: GetSampleUseCase;
     let mockGetSampleQcGraphsUseCase: { execute: jest.Mock }
@@ -148,10 +151,11 @@ describe("Project Router", () => {
         mockDeleteImportedCTDSamplesUseCase = new MockDeleteImportedCTDSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
         mockGetSampleUseCase = new MockGetSampleUseCase()
+        mockGetProjectStatsUseCase = new MockGetProjectStatsUseCase()
         mockGetSampleQcGraphsUseCase = { execute: jest.fn() }
         mockPreviewSamplesQcGraphsUseCase = { execute: jest.fn() }
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, mockGetSampleQcGraphsUseCase, {} as any, mockPreviewSamplesQcGraphsUseCase, {} as any, mockGetSampleUseCase, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, mockGetSampleQcGraphsUseCase, {} as any, mockPreviewSamplesQcGraphsUseCase, {} as any, mockGetSampleUseCase, {} as any, mockGetProjectStatsUseCase))
     })
 
     beforeEach(() => {
@@ -1175,6 +1179,33 @@ describe("Project Router", () => {
             const response = await request(server).get("/projects/1/samples/2")
             expect(response.status).toBe(500)
             expect(response.body).toStrictEqual({ errors: ["Cannot get sample"] })
+        });
+    });
+
+    describe("GET /projects/:project_id/stats", () => {
+        const stats = { project_id: 1, generated_at: "2026-10-23T12:00:00.000Z", counts: { stations: 6, samples: 56, particles: 1000, vignettes: 600, exports: 7 } } as unknown as ProjectStatsResponseModel
+
+        test("returns 200 with the statistics of the project", async () => {
+            jest.spyOn(mockGetProjectStatsUseCase, "execute").mockImplementation(() => Promise.resolve(stats))
+            const response = await request(server).get("/projects/1/stats")
+            expect(response.status).toBe(200)
+            expect(mockGetProjectStatsUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), { project_id: 1 })
+            expect(response.body).toStrictEqual(stats)
+        });
+        test.each([
+            ["User cannot be used", 403],
+            ["Cannot find project", 404],
+        ])("maps '%s' to %i", async (message, status) => {
+            jest.spyOn(mockGetProjectStatsUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).get("/projects/1/stats")
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+        test("returns 500 for an unexpected error", async () => {
+            jest.spyOn(mockGetProjectStatsUseCase, "execute").mockImplementation(() => Promise.reject(new Error("xyz")))
+            const response = await request(server).get("/projects/1/stats")
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual({ errors: ["Cannot get project statistics"] })
         });
     });
 

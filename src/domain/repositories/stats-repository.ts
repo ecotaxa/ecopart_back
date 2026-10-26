@@ -12,12 +12,13 @@ import {
     StatsSeriePoint,
     TasksStats,
 } from "../entities/stats";
-import { TasksStatus, TaskType } from "../entities/task";
+import { TasksStatus } from "../entities/task";
 import { ProjectPrivacyLevel } from "../entities/project";
 import { computeProjectPrivacy } from "../utils/project-privacy";
+import { EXPORT_TASK_TYPES, IMPORT_TASK_TYPES } from "../constants/task";
 
-const EXPORT_TASK_LABELS: string[] = [TaskType.Export, TaskType.Export_Backup, TaskType.Export_Raw];
-const IMPORT_TASK_LABELS: string[] = [TaskType.Import, TaskType.Import_Backup, TaskType.Import_CTD, TaskType.Import_EcoTaxa];
+const EXPORT_TASK_LABELS: string[] = EXPORT_TASK_TYPES;
+const IMPORT_TASK_LABELS: string[] = IMPORT_TASK_TYPES;
 
 const PRIVACY_LEVELS: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
 

@@ -260,6 +260,50 @@ describe('SQLiteSampleDataSource', () => {
         })
     })
 
+    describe('getProjectStatsSamples', () => {
+        const P_STATS_ROWS = 9006
+
+        beforeAll(async () => {
+            const depth_type_id = await new Promise<number>((resolve, reject) =>
+                db.get('SELECT sample_type_id AS id FROM sample_type WHERE sample_type_label = ?', ['Depth'], (e, row: any) => e ? reject(e) : resolve(row.id)))
+            const create = async (sample_name: string, overrides: Partial<SampleRequestCreationModel>, columns: Record<string, unknown> = {}) => {
+                const id = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_STATS_ROWS, sample_type_id: depth_type_id, ...overrides })
+                const names = Object.keys(columns)
+                if (names.length > 0) await run(db, `UPDATE sample SET ${names.map(name => `${name} = ?`).join(', ')} WHERE sample_id = ?`, [...Object.values(columns), id])
+                return id
+            }
+            await create('rows_b', { station_id: 'st_2', latitude: 10, longitude: 20, sampling_utc_date_time: '2024-02-01T00:00:00Z' },
+                { use_ctd_coordinates: 1, ctd_latitude: 11, ctd_longitude: 21, ctd_imported: 1, ctd_file_extension: 'ctd' })
+            await create('rows_a', { station_id: 'st_1', latitude: 43.4, longitude: 7.87, sampling_utc_date_time: '20240101120000', instrument_serial_number: 'sn_42' },
+                { instrument_settings_acq_exposure: null })
+        })
+
+        test('every sample of the project, by id, with the reference position and the two positions apart', async () => {
+            const rows = await dataSource.getProjectStatsSamples(P_STATS_ROWS)
+
+            expect(rows.map(row => row.sample_name)).toEqual(['rows_b', 'rows_a'])
+            expect(rows[0]).toMatchObject({
+                project_id: P_STATS_ROWS, station_id: 'st_2',
+                latitude: 11, longitude: 21, sample_latitude: 10, sample_longitude: 20, ctd_latitude: 11, ctd_longitude: 21, use_ctd_coordinates: true,
+                ctd_imported: true, sampling_utc_date_time: '2024-02-01T00:00:00Z',
+            })
+            expect(rows[1]).toMatchObject({
+                station_id: 'st_1', latitude: 43.4, longitude: 7.87, sample_latitude: 43.4, sample_longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false,
+                // Legacy UVP5 date format read as an ISO date-time, like the Explore rows.
+                sampling_utc_date_time: '2024-01-01T12:00:00Z',
+                instrument_serial_number: 'sn_42', instrument_settings_acq_exposure: null,
+                instrument_settings_pixel_size_mm: sampleRequestCreationModel_1.instrument_settings_pixel_size_mm,
+                instrument_settings_acq_gain: sampleRequestCreationModel_1.instrument_settings_acq_gain,
+                instrument_settings_acq_threshold: sampleRequestCreationModel_1.instrument_settings_acq_threshold,
+            })
+            expect(typeof rows[1].sample_creation_utc_date_time).toBe('string')
+        })
+
+        test('nothing for a project without sample', async () => {
+            expect(await dataSource.getProjectStatsSamples(999999)).toEqual([])
+        })
+    })
+
     describe('Explore queries on legacy sampling dates', () => {
         // Samples imported before the ISO conversion keep the UVP formats: "20120520080213" (UVP5),
         // "20230406-144332-820" (UVP6). The Explore query reads them as ISO date-times.

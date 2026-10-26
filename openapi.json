@@ -1622,6 +1622,21 @@
               }
             }
           },
+          "objects": {
+            "type": "object",
+            "description": "The objects of the samples with EcoTaxa stats, by classification state.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "validated": {
+                "type": "integer"
+              },
+              "predicted": {
+                "type": "integer"
+              }
+            }
+          },
           "nb_samples_with_stats": {
             "type": "integer"
           },
@@ -2251,6 +2266,398 @@
             "description": "EcoTaxa instance ID."
           }
         }
+      },
+      "ProjectStatsCounts": {
+        "type": "object",
+        "properties": {
+          "stations": {
+            "type": "integer",
+            "description": "Distinct station ids of the samples."
+          },
+          "samples": {
+            "type": "integer"
+          },
+          "particles": {
+            "type": "integer",
+            "description": "Sum of the samples' particle counts (unknown counts as 0)."
+          },
+          "vignettes": {
+            "type": "integer",
+            "description": "Sum of the samples' vignette counts."
+          },
+          "exports": {
+            "type": "integer",
+            "description": "Export tasks of the project (EXPORT",
+            "EXPORT_BACKUP": null,
+            "EXPORT_RAW)": null,
+            "whatever their status.": null
+          }
+        },
+        "required": [
+          "stations",
+          "samples",
+          "particles",
+          "vignettes",
+          "exports"
+        ]
+      },
+      "ProjectStatsPrivacy": {
+        "type": "object",
+        "description": "The privacy timeline, counted in months from the acquisition date of the oldest sample; the dates are null while the project has no sample.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "private",
+              "visible",
+              "public",
+              "open"
+            ]
+          },
+          "oldest_sample_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visible_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the project becomes visible."
+          },
+          "public_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the project becomes public."
+          },
+          "open_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the project becomes open."
+          }
+        },
+        "required": [
+          "status",
+          "oldest_sample_utc_date_time",
+          "visible_utc_date_time",
+          "public_utc_date_time",
+          "open_utc_date_time"
+        ]
+      },
+      "ProjectStatsRawBackup": {
+        "type": "object",
+        "properties": {
+          "last_backup_utc_date_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nb_samples_not_backed_up": {
+            "type": "integer",
+            "description": "Samples imported after the last backup (every sample when there was none)."
+          }
+        },
+        "required": [
+          "last_backup_utc_date_time",
+          "nb_samples_not_backed_up"
+        ]
+      },
+      "ProjectStatsMapSample": {
+        "type": "object",
+        "properties": {
+          "sample_id": {
+            "type": "integer"
+          },
+          "sample_name": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true,
+            "description": "Position of the sample metadata."
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "ctd_latitude": {
+            "type": "number",
+            "nullable": true,
+            "description": "Position read from the CTD file",
+            "when it has one.": null
+          },
+          "ctd_longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "use_ctd_coordinates": {
+            "type": "boolean",
+            "description": "Which of the two positions the project uses as the sample position."
+          },
+          "coordinates_mismatch": {
+            "type": "boolean",
+            "description": "Both positions are known and more than 5 km apart."
+          }
+        },
+        "required": [
+          "sample_id",
+          "sample_name",
+          "latitude",
+          "longitude",
+          "ctd_latitude",
+          "ctd_longitude",
+          "use_ctd_coordinates",
+          "coordinates_mismatch"
+        ]
+      },
+      "ProjectStatsMap": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectStatsMapSample"
+            }
+          },
+          "nb_samples_without_ctd": {
+            "type": "integer"
+          },
+          "nb_coordinates_mismatches": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "samples",
+          "nb_samples_without_ctd",
+          "nb_coordinates_mismatches"
+        ]
+      },
+      "ProjectStatsSamples": {
+        "type": "object",
+        "properties": {
+          "sample_types": {
+            "type": "object",
+            "properties": {
+              "depth": {
+                "type": "integer"
+              },
+              "time": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          },
+          "pressure_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "description": "dbar"
+          },
+          "size_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "description": "ESD in µm of the smallest and largest particles counted."
+          },
+          "time_range": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "max_pressure_histogram": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "max_pressure": {
+                  "type": "number",
+                  "description": "Upper edge of the 100 dbar bin."
+                },
+                "nb_profiles": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "nb_instrument_parameter_mismatches": {
+            "type": "integer",
+            "description": "Samples whose instrument parameters differ from the most common ones of the project."
+          },
+          "nb_suspicious_dates": {
+            "type": "integer",
+            "description": "Samples dated before 2000",
+            "in the future": null,
+            "or with an unreadable date.": null
+          },
+          "nb_suspicious_pressures": {
+            "type": "integer",
+            "description": "Depth samples without a positive maximum pressure",
+            "and samples deeper than 6500 dbar.": null
+          }
+        },
+        "required": [
+          "sample_types",
+          "pressure_range",
+          "size_range",
+          "time_range",
+          "max_pressure_histogram",
+          "nb_instrument_parameter_mismatches",
+          "nb_suspicious_dates",
+          "nb_suspicious_pressures"
+        ]
+      },
+      "ProjectStatsEcoTaxa": {
+        "type": "object",
+        "properties": {
+          "linked": {
+            "type": "boolean",
+            "description": "The project is linked to an EcoTaxa project; every other field is empty otherwise."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Display names of the taxa used",
+            "sorted.": null
+          },
+          "classification": {
+            "type": "object",
+            "description": "Percentages of the samples with EcoTaxa stats, exclusive states.",
+            "properties": {
+              "fully_validated": {
+                "type": "number"
+              },
+              "fully_predicted": {
+                "type": "number"
+              },
+              "partially_validated": {
+                "type": "number"
+              },
+              "partially_predicted": {
+                "type": "number"
+              }
+            }
+          },
+          "objects": {
+            "type": "object",
+            "description": "The objects of the samples with EcoTaxa stats, by classification state.",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "validated": {
+                "type": "integer"
+              },
+              "predicted": {
+                "type": "integer"
+              }
+            }
+          },
+          "nb_samples_with_stats": {
+            "type": "integer"
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Some samples have no stats yet: they are being read from EcoTaxa in the background, ask again later."
+          },
+          "nb_samples_pending": {
+            "type": "integer"
+          },
+          "nb_samples_not_imported": {
+            "type": "integer",
+            "description": "Samples of the project not imported in EcoTaxa."
+          },
+          "classification_completed": {
+            "type": "boolean",
+            "description": "Every sample imported in EcoTaxa has its stats and every object of theirs is validated."
+          }
+        },
+        "required": [
+          "linked",
+          "categories",
+          "classification",
+          "objects",
+          "nb_samples_with_stats",
+          "partial",
+          "nb_samples_pending",
+          "nb_samples_not_imported",
+          "classification_completed"
+        ]
+      },
+      "ProjectStats": {
+        "type": "object",
+        "description": "The statistics of a project, as its STATS tab shows them.",
+        "properties": {
+          "project_id": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ProjectStatsCounts"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/ProjectStatsPrivacy"
+          },
+          "raw_backup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectStatsRawBackup"
+              }
+            ],
+            "nullable": true,
+            "description": "Null for a user without privilege on the project."
+          },
+          "map": {
+            "$ref": "#/components/schemas/ProjectStatsMap"
+          },
+          "samples": {
+            "$ref": "#/components/schemas/ProjectStatsSamples"
+          },
+          "ecotaxa": {
+            "$ref": "#/components/schemas/ProjectStatsEcoTaxa"
+          }
+        },
+        "required": [
+          "project_id",
+          "generated_at",
+          "counts",
+          "privacy",
+          "raw_backup",
+          "map",
+          "samples",
+          "ecotaxa"
+        ]
       },
       "ProjectSearchResponse": {
         "type": "object",
@@ -5540,6 +5947,83 @@
           },
           "403": {
             "description": "User cannot be used. Logged user cannot delete this project. The logged user is not allowed to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/stats": {
+      "get": {
+        "summary": "Statistics of a project (STATS tab)",
+        "description": "Everything the project STATS tab shows, in one call: headline counts (stations, samples,\nparticles, vignettes, exports), the privacy timeline (the dates the project becomes visible,\npublic and open, counted in months from its oldest sample), the raw backup state, the\npositions of the samples and of their CTD casts, the sample types, pressure, size and time\nranges with the maximum-pressure histogram, and the EcoTaxa classification state, each\nsection with its warnings (missing CTD files, mismatching positions, instrument parameters\nthat differ between samples, suspicious dates or pressures, samples not imported in EcoTaxa).\n\nServed to any logged-in user, like the project metadata; `raw_backup` is `null` for a user\nwithout privilege on the project. The EcoTaxa part is read from the statistics EcoPart keeps\nper sample: when some samples have none yet (`ecotaxa.partial`), they are being read from\nEcoTaxa in the background, ask again later.\n",
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The statistics of the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
             "content": {
               "application/json": {
                 "schema": {

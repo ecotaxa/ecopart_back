@@ -18,6 +18,7 @@ import { readUvpTextLines } from "../utils/text-lines";
 import { parseCtdRows } from "../utils/ctd-rows";
 import { CtdRows } from "../entities/ctd";
 import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../entities/explore";
+import { ProjectStatsSampleRow } from "../entities/project-stats";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
 import { PivotImageRecord, PivotParticleBlock } from "../entities/binned-export";
@@ -2392,6 +2393,10 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]> {
         return await this.sampleDataSource.getExploreSamples(query);
+    }
+
+    async getProjectStatsSamples(project_id: number): Promise<ProjectStatsSampleRow[]> {
+        return await this.sampleDataSource.getProjectStatsSamples(project_id);
     }
 
     async getCtdRows(project_id: number, sample_name: string, ctd_file_extension: string): Promise<CtdRows> {

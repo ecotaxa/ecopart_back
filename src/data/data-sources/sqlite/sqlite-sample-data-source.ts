@@ -4,6 +4,7 @@ import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampl
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
+import { ProjectStatsSampleRow } from "../../../domain/entities/project-stats";
 import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 
@@ -130,6 +131,24 @@ function mapRowToExploreSample(row: any): ExploreSampleRow {
         instrument_settings_aa: row.instrument_settings_aa,
         instrument_settings_exp: row.instrument_settings_exp,
         instrument_settings_particule_minimum_area_pixels: row.instrument_settings_particule_minimum_area_pixels ?? null,
+    };
+}
+
+function mapRowToProjectStatsSample(row: any): ProjectStatsSampleRow {
+    return {
+        ...mapRowToExploreSample(row),
+        station_id: row.station_id ?? "",
+        sample_latitude: row.sample_latitude ?? null,
+        sample_longitude: row.sample_longitude ?? null,
+        ctd_latitude: row.ctd_latitude ?? null,
+        ctd_longitude: row.ctd_longitude ?? null,
+        use_ctd_coordinates: !!row.use_ctd_coordinates,
+        sample_creation_utc_date_time: row.sample_creation_utc_date_time ?? null,
+        instrument_serial_number: row.instrument_serial_number ?? "",
+        instrument_settings_pixel_size_mm: row.instrument_settings_pixel_size_mm ?? null,
+        instrument_settings_acq_gain: row.instrument_settings_acq_gain ?? null,
+        instrument_settings_acq_threshold: row.instrument_settings_acq_threshold ?? null,
+        instrument_settings_acq_exposure: row.instrument_settings_acq_exposure ?? null,
     };
 }
 
@@ -516,6 +535,29 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     }
 
     // Samples per project in one query; null: every project.
+    async getProjectStatsSamples(project_id: number): Promise<ProjectStatsSampleRow[]> {
+        const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id,
+                ${EXPLORE_LATITUDE} AS latitude, ${EXPLORE_LONGITUDE} AS longitude,
+                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
+                sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
+                sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
+                sample.nb_vignettes, sample.nb_particles, sample.particle_min_area_px, sample.particle_max_area_px,
+                sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_depth_offset_m,
+                sample.instrument_settings_image_volume_l, sample.instrument_settings_aa, sample.instrument_settings_exp,
+                sample.instrument_settings_particule_minimum_area_pixels,
+                sample.station_id, sample.latitude AS sample_latitude, sample.longitude AS sample_longitude,
+                sample.ctd_latitude, sample.ctd_longitude, sample.use_ctd_coordinates, sample.sample_creation_utc_date_time,
+                sample.instrument_serial_number, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_acq_gain,
+                sample.instrument_settings_acq_threshold, sample.instrument_settings_acq_exposure
+            FROM sample
+            JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
+            JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
+            WHERE sample.project_id = (?)
+            ORDER BY sample.sample_id;`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [project_id], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => mapRowToProjectStatsSample(row));
+    }
+
     async countSamplesPerProject(project_ids: number[] | null): Promise<Map<number, number>> {
         const counts = new Map<number, number>();
         let sql = "SELECT project_id, COUNT(*) AS nb FROM sample";
