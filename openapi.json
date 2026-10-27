@@ -1275,9 +1275,10 @@
             "type": "string",
             "enum": [
               "depth",
-              "time"
+              "time",
+              "all"
             ],
-            "description": "The sample type explored."
+            "description": "The sample type explored: depth profiles, time series, or both (`all`)."
           },
           "filters": {
             "allOf": [
@@ -1315,6 +1316,14 @@
           {
             "type": "object",
             "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "depth",
+                  "time"
+                ],
+                "description": "The axis of the curves: one sample type (`all` is refused)."
+              },
               "pressure_bin": {
                 "type": "number",
                 "minimum": 1,
@@ -4634,7 +4643,7 @@
     "/explore/map": {
       "post": {
         "summary": "Samples of the Explore selection, for the map",
-        "description": "One point per sample matching the criteria (every sample of the application when `filters`\nis null), with its project's privacy status. `mode` selects the sample type: depth profiles\nor time series. Anonymous callers are served.\n",
+        "description": "One point per sample matching the criteria (every sample of the application when `filters`\nis null), with its project's privacy status. `mode` selects the sample type: depth profiles,\ntime series, or both (`all`). Anonymous callers are served.\n",
         "tags": [
           "Explore"
         ],

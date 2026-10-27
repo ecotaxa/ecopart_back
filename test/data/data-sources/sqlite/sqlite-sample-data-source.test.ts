@@ -171,6 +171,11 @@ describe('SQLiteSampleDataSource', () => {
         test('filters by sample type', async () => {
             expect(await names()).toEqual(['ligurian_001', 'pacific_002', 'pacific_003', 'ctd_positioned_005', 'ctd_without_position_006'])
             expect(await names({ sample_type_label: 'Time' })).toEqual(['mooring_004'])
+            expect(await names({ sample_type_label: null })).toEqual(['ligurian_001', 'pacific_002', 'pacific_003', 'mooring_004', 'ctd_positioned_005', 'ctd_without_position_006'])
+        })
+
+        test('no criterion at all: every sample of both types', async () => {
+            expect(await names({ sample_type_label: null, project_ids: null })).toEqual(expect.arrayContaining(['ligurian_001', 'mooring_004', 'st_10']))
         })
 
         test('filters by project; an empty list matches nothing, null every project', async () => {

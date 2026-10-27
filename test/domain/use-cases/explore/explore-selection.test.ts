@@ -189,9 +189,10 @@ describe("Explore selection", () => {
 
     describe("toSampleQuery", () => {
         test("maps the mode to the sample type label", () => {
-            expect(SAMPLE_TYPE_OF_MODE).toEqual({ depth: "Depth", time: "Time" });
+            expect(SAMPLE_TYPE_OF_MODE).toEqual({ depth: "Depth", time: "Time", all: null });
             expect(toSampleQuery("depth", null, null).sample_type_label).toBe("Depth");
             expect(toSampleQuery("time", null, null).sample_type_label).toBe("Time");
+            expect(toSampleQuery("all", null, null).sample_type_label).toBeNull();
         });
 
         test("no filters means no constraint", () => {
@@ -253,6 +254,13 @@ describe("Explore selection", () => {
             await resolveExploreSelection(repositories, logged(CAROL.user_id), { mode: "time", filters: exploreFilters({ privacy_statuses: ["public", "open"] }) }, classificationStateFilter);
 
             expect(sampleRepository.getExploreSamples).toBeCalledWith(expect.objectContaining({ sample_type_label: "Time", project_ids: [1, 4] }));
+        });
+
+        test("the all mode asks both sample types", async () => {
+            const selection = await resolveExploreSelection(repositories, null, { mode: "all", filters: exploreFilters() }, classificationStateFilter);
+
+            expect(sampleRepository.getExploreSamples).toBeCalledWith(expect.objectContaining({ sample_type_label: null }));
+            expect(selection.mode).toBe("all");
         });
 
         test("null filters: every sample of the type, no classification filter", async () => {

@@ -47,7 +47,7 @@ export interface ExploreSelectionRepositories {
 // Samples whose classification state is asked are decided with EcoTaxa, by the caller.
 export type ClassificationStateFilter = (samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, filters: ExploreFilters) => Promise<ExploreSampleRow[]>;
 
-export const SAMPLE_TYPE_OF_MODE: Record<ExploreMode, "Depth" | "Time"> = { depth: "Depth", time: "Time" };
+export const SAMPLE_TYPE_OF_MODE: Record<ExploreMode, "Depth" | "Time" | null> = { depth: "Depth", time: "Time", all: null };
 
 export async function resolveExploreUser(userRepository: UserRepository, current_user: UserUpdateModel | null | undefined): Promise<ExploreUser> {
     if (!current_user) return { user_id: null, is_admin: false };

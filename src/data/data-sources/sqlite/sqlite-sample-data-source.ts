@@ -474,8 +474,12 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     // One query for the Explore selection: fixed, parameterised clauses, no column name from the caller.
     async getExploreSamples(query: ExploreSampleQuery): Promise<ExploreSampleRow[]> {
-        const clauses: string[] = ["sample_type.sample_type_label = (?)"];
-        const params: any[] = [query.sample_type_label];
+        const clauses: string[] = [];
+        const params: any[] = [];
+        if (query.sample_type_label !== null) {
+            clauses.push("sample_type.sample_type_label = (?)");
+            params.push(query.sample_type_label);
+        }
         if (query.project_ids !== null) {
             if (query.project_ids.length === 0) return [];
             clauses.push(`sample.project_id IN (${query.project_ids.map(() => "(?)").join(",")})`);
@@ -535,7 +539,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             LEFT JOIN project ON project.project_id = sample.project_id
             JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
             JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
-            WHERE ${clauses.join(" AND ")}
+            ${clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : ""}
             ORDER BY sample.sample_id;`;
         return await new Promise((resolve, reject) => {
             this.db.all(sql, params, (err, rows) => {
