@@ -170,7 +170,12 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
                 const physicalField = toPhysicalColumn(filter.field);
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                // An empty IN matches no project (e.g. a privacy_status no project is at). Explicit: otherwise
+                // [] would fall through to the `== false` branch below and only work as `project_id = 0`.
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
+                    filtering_sql += `0 = 1`;
+                }
+                else if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
