@@ -10,7 +10,7 @@ import { PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, Ta
 import { TASK_CANCELLED_MESSAGE } from "../constants/task";
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
-import { TaskRepository } from "../interfaces/repositories/task-repository";
+import { TaskEndListener, TaskRepository } from "../interfaces/repositories/task-repository";
 import path from "path";
 import fs from "fs/promises";
 
@@ -18,6 +18,7 @@ export class TaskRepositoryImpl implements TaskRepository {
     taskDataSource: TaskDataSource
     fs: FsWrapper
     DATA_STORAGE_FOLDER: string
+    taskEndListener?: TaskEndListener
 
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
@@ -25,10 +26,11 @@ export class TaskRepositoryImpl implements TaskRepository {
     base_folder = path.join(__dirname, '..', '..', '..');
 
 
-    constructor(taskDataSource: TaskDataSource, fs: FsWrapper, DATA_STORAGE_FOLDER: string) {
+    constructor(taskDataSource: TaskDataSource, fs: FsWrapper, DATA_STORAGE_FOLDER: string, taskEndListener?: TaskEndListener) {
         this.taskDataSource = taskDataSource
         this.fs = fs
         this.DATA_STORAGE_FOLDER = DATA_STORAGE_FOLDER
+        this.taskEndListener = taskEndListener
     }
 
     async createTask(task: PublicTaskRequestCreationModel): Promise<number> {
@@ -536,7 +538,19 @@ export class TaskRepositoryImpl implements TaskRepository {
 
         // Logging task status update in the log file
         await this.logMessage(task.task_log_file_path, `Task status updated from ${task.task_status} to ${status}`);
+
+        if (this.isFinished(status)) await this.notifyTaskEnded(task, status);
         return true;
+    }
+
+    // Best effort: the task has ended whatever happens to its notification.
+    private async notifyTaskEnded(task: TaskResponseModel, status: TasksStatus): Promise<void> {
+        if (!this.taskEndListener) return;
+        try {
+            await this.taskEndListener.onTaskEnded(task, status);
+        } catch (err) {
+            console.log(new Date().toISOString(), `Cannot notify the end of task ${task.task_id}`, err);
+        }
     }
 
     // A pending task is cancelled at once, its work has not started. A running task is marked

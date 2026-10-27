@@ -1,0 +1,54 @@
+components:
+  schemas:
+    Notification:
+      type: object
+      properties:
+        notification_id:
+          type: integer
+          example: 7
+        user_id:
+          type: integer
+          description: Id of the user the notification is addressed to.
+          example: 42
+        notification_type:
+          type: string
+          enum: [TASK_DONE, TASK_ERROR, TASK_CANCELLED]
+          example: TASK_DONE
+        notification_message:
+          type: string
+          example: Sample import #12 on project "Alpha" is finished.
+        task_id:
+          type: integer
+          nullable: true
+          description: Task the notification is about, null once that task is deleted.
+          example: 12
+        project_id:
+          type: integer
+          nullable: true
+          description: Project of that task, null for a cross-project task or once the project is deleted.
+          example: 3
+        is_read:
+          type: boolean
+          example: false
+        notification_creation_utc_date_time:
+          type: string
+          format: date-time
+    NotificationList:
+      type: object
+      properties:
+        search_info:
+          $ref: "#/components/schemas/SearchInfo"
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unread_count:
+          type: integer
+          description: Unread notifications of the user, whatever the page.
+          example: 2
+    NotificationUnreadCount:
+      type: object
+      properties:
+        unread_count:
+          type: integer
+          example: 2
