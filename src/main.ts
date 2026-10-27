@@ -11,6 +11,7 @@ import { MiddlewareTaskValidation } from './presentation/middleware/task-validat
 import { MiddlewareExportValidation } from './presentation/middleware/export-validation'
 import { MiddlewareAdminValidation } from './presentation/middleware/admin-validation'
 import { MiddlewareBroadcastMessageValidation } from './presentation/middleware/broadcast_message-validation'
+import { MiddlewareNotificationValidation } from './presentation/middleware/notification-validation'
 import { errorHandler, notFoundHandler } from './presentation/middleware/error-handlers'
 import { bodyEmail, limitAttempts } from './presentation/middleware/rate-limit'
 import { AesGcmTokenCipher } from './infra/cryptography/aes-gcm-token-cipher'
@@ -25,6 +26,7 @@ import FileSystemRouter from './presentation/routers/file_system-router'
 import ExportRouter from './presentation/routers/export-router'
 import AdminRouter from './presentation/routers/admin-router'
 import BroadcastMessageRouter from './presentation/routers/broadcast_message-router'
+import NotificationRouter from './presentation/routers/notification-router'
 import VersionRouter from './presentation/routers/version-router'
 import { setServedApiVersion } from './presentation/openapi/swagger-definition'
 
@@ -108,6 +110,12 @@ import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_
 import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
 import { SetBroadcastMessage } from './domain/use-cases/broadcast_message/set-broadcast-message'
 import { DeleteBroadcastMessage } from './domain/use-cases/broadcast_message/delete-broadcast-message'
+import { NotificationRepositoryImpl } from './domain/repositories/notification-repository'
+import { GetNotifications } from './domain/use-cases/notification/get-notifications'
+import { CountUnreadNotifications } from './domain/use-cases/notification/count-unread-notifications'
+import { MarkNotificationRead } from './domain/use-cases/notification/mark-notification-read'
+import { MarkAllNotificationsRead } from './domain/use-cases/notification/mark-all-notifications-read'
+import { DeleteNotification } from './domain/use-cases/notification/delete-notification'
 
 
 import { SQLiteUserDataSource } from './data/data-sources/sqlite/sqlite-user-data-source'
@@ -120,6 +128,7 @@ import { SQLiteSampleDataSource } from './data/data-sources/sqlite/sqlite-sample
 import { SQLiteEcotaxaAccountDataSource } from './data/data-sources/sqlite/sqlite-ecotaxa_account-data-source'
 import { SQLiteStatsDataSource } from './data/data-sources/sqlite/sqlite-stats-data-source'
 import { SQLiteBroadcastMessageDataSource } from './data/data-sources/sqlite/sqlite-broadcast_message-data-source'
+import { SQLiteNotificationDataSource } from './data/data-sources/sqlite/sqlite-notification-data-source'
 
 import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
@@ -270,6 +279,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     const ecotaxa_account_dataSource = new SQLiteEcotaxaAccountDataSource(db)
     const stats_dataSource = new SQLiteStatsDataSource(db)
     const broadcast_message_dataSource = new SQLiteBroadcastMessageDataSource(db)
+    const notification_dataSource = new SQLiteNotificationDataSource(db)
 
     const transporter = await mailerAdapter.createTransport({
         host: config.MAIL_HOST,
@@ -295,7 +305,9 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     const project_repo = new ProjectRepositoryImpl(project_dataSource, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.DATA_STORAGE_FOLDER, config.DATA_STORAGE_IMPORT)
     const privilege_repo = new PrivilegeRepositoryImpl(privilege_dataSource)
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
-    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER)
+    // Notifies the owner of a task when it ends
+    const notification_repo = new NotificationRepositoryImpl(notification_dataSource, project_dataSource)
+    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER, notification_repo)
 
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
@@ -435,6 +447,15 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetBroadcastMessage(user_repo, broadcast_message_repo),
         new SetBroadcastMessage(user_repo, broadcast_message_repo),
         new DeleteBroadcastMessage(user_repo, broadcast_message_repo)
+    ))
+    server.use("/notifications", NotificationRouter(
+        new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
+        new MiddlewareNotificationValidation(),
+        new GetNotifications(user_repo, notification_repo),
+        new CountUnreadNotifications(user_repo, notification_repo),
+        new MarkNotificationRead(user_repo, notification_repo),
+        new MarkAllNotificationsRead(user_repo, notification_repo),
+        new DeleteNotification(user_repo, notification_repo)
     ))
 
 

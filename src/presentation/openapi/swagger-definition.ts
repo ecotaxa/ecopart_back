@@ -31,6 +31,7 @@ const swaggerDefinition: swaggerJsdoc.SwaggerDefinition = {
         { name: 'File System', description: 'File system operations' },
         { name: 'Admin', description: 'Administration and application statistics' },
         { name: 'Broadcast Messages', description: 'Application-wide message shown to users, managed by admins' },
+        { name: 'Notifications', description: 'Notifications of the logged user, e.g. the end of their tasks' },
         { name: 'Version', description: 'Version of the running API' },
     ],
     components: {

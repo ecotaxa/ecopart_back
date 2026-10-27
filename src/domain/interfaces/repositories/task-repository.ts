@@ -4,11 +4,16 @@
 // import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
-import { PublicTaskRequestCreationModel, PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel, PublicTaskRequestModel, PublicTaskResponseModel, TaskType, TaskVisibilityModel } from "../../entities/task";
+import { PublicTaskRequestCreationModel, PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel, PublicTaskRequestModel, PublicTaskResponseModel, TaskType, TaskVisibilityModel, TasksStatus } from "../../entities/task";
 import { UserRequestModel } from "../../entities/user";
 
 // Appends one line to a task log file (see TaskRepository.logMessage).
 export type TaskLogger = (message: string) => Promise<void>;
+
+// Told when a task reaches a final status (DONE, ERROR or CANCELLED), e.g. to notify its owner.
+export interface TaskEndListener {
+    onTaskEnded(task: TaskResponseModel, status: TasksStatus): Promise<void>;
+}
 
 export interface TaskRepository {
     getOneTask(task: PrivateTaskRequestModel): Promise<TaskResponseModel | null>;
