@@ -138,6 +138,13 @@ describe("MiddlewareExploreValidation", () => {
             expect(response.body).toEqual({ mode: "time", filters: null });
         });
 
+        test("the all mode asks both sample types", async () => {
+            const response = await request(app).post("/request").send({ mode: "all", filters: null });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ mode: "all", filters: null });
+        });
+
         test("mode is required", async () => {
             const response = await request(app).post("/request").send({ filters: null });
 
@@ -145,11 +152,11 @@ describe("MiddlewareExploreValidation", () => {
             expect(messages(response.body)).toContain("mode is required.");
         });
 
-        test("mode is depth or time", async () => {
+        test("mode is depth, time or all", async () => {
             const response = await request(app).post("/request").send({ mode: "profile", filters: null });
 
             expect(response.status).toBe(422);
-            expect(messages(response.body)).toEqual(["mode must be one of: depth, time."]);
+            expect(messages(response.body)).toEqual(["mode must be one of: depth, time, all."]);
         });
 
         test.each([
@@ -189,6 +196,13 @@ describe("MiddlewareExploreValidation", () => {
 
             expect(response.status).toBe(422);
             expect(messages(response.body)).toEqual([message]);
+        });
+
+        test("a curve has one axis: the all mode is refused", async () => {
+            const response = await request(app).post("/graphs").send({ mode: "all", filters: null });
+
+            expect(response.status).toBe(422);
+            expect(messages(response.body)).toEqual(["mode must be one of: depth, time."]);
         });
 
         test("the request rules apply too", async () => {

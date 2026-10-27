@@ -84,8 +84,8 @@ export default function ExploreRouter(
      *     summary: Samples of the Explore selection, for the map
      *     description: |
      *       One point per sample matching the criteria (every sample of the application when `filters`
-     *       is null), with its project's privacy status. `mode` selects the sample type: depth profiles
-     *       or time series. Anonymous callers are served.
+     *       is null), with its project's privacy status. `mode` selects the sample type: depth profiles,
+     *       time series, or both (`all`). Anonymous callers are served.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []

@@ -31,7 +31,7 @@ components:
       type: object
       required: [mode]
       properties:
-        mode: { type: string, enum: [depth, time], description: The sample type explored. }
+        mode: { type: string, enum: [depth, time, all], description: "The sample type explored: depth profiles, time series, or both (`all`)." }
         filters:
           allOf: [{ $ref: '#/components/schemas/ExploreFilters' }]
           nullable: true
@@ -46,6 +46,7 @@ components:
         - $ref: '#/components/schemas/ExploreRequest'
         - type: object
           properties:
+            mode: { type: string, enum: [depth, time], description: "The axis of the curves: one sample type (`all` is refused)." }
             pressure_bin: { type: number, minimum: 1, maximum: 100, default: 5, description: Depth bin in metres (dbar). }
             time_bin: { type: number, minimum: 0.5, maximum: 24, default: 1, description: Time bin in hours. }
     ExploreProjectOption:

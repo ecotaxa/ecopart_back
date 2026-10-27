@@ -11,7 +11,9 @@ export interface IMiddlewareExploreValidation {
     rulesExploreImages: any[];
 }
 
-const MODES = ["depth", "time"];
+const MODES = ["depth", "time", "all"];
+// A curve has one axis: the graphs take one sample type.
+const GRAPH_MODES = ["depth", "time"];
 const PRIVACY_STATUSES: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
 const CLASSIFICATION_STATES: ExploreClassificationState[] = ["all", "fully_predicted", "fully_validated"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -108,18 +110,21 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
     next();
 };
 
-const requestRules = [
-    check("mode").exists().withMessage("mode is required.").isIn(MODES).withMessage(`mode must be one of: ${MODES.join(", ")}.`),
-    check("filters")
-        .custom(value => { parseExploreFilters(value); return true; })
-        .customSanitizer(value => { try { return parseExploreFilters(value); } catch { return value; } }),
-];
+const modeRule = (modes: string[]) =>
+    check("mode").exists().withMessage("mode is required.").isIn(modes).withMessage(`mode must be one of: ${modes.join(", ")}.`);
+
+const filtersRule = check("filters")
+    .custom(value => { parseExploreFilters(value); return true; })
+    .customSanitizer(value => { try { return parseExploreFilters(value); } catch { return value; } });
+
+const requestRules = [modeRule(MODES), filtersRule];
 
 export class MiddlewareExploreValidation implements IMiddlewareExploreValidation {
     rulesExploreRequest = [...requestRules, validate];
 
     rulesExploreGraphs = [
-        ...requestRules,
+        modeRule(GRAPH_MODES),
+        filtersRule,
         check("pressure_bin").optional({ nullable: true })
             .isFloat({ min: BINNED_DEPTH_STEP_M.min, max: BINNED_DEPTH_STEP_M.max }).withMessage(`pressure_bin must be a number between ${BINNED_DEPTH_STEP_M.min} and ${BINNED_DEPTH_STEP_M.max}.`).toFloat(),
         check("time_bin").optional({ nullable: true })

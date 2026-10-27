@@ -3,7 +3,10 @@ import { ProjectPrivacyLevel } from "./project";
 /* Explore page: a selection of samples drawn from every project of the application, its statistics,
  * its projects and the curves of its samples. The shapes mirror the front's explore.types.ts. */
 
-export type ExploreMode = "depth" | "time";
+export type ExploreSampleType = "depth" | "time";
+
+// The sample types of the selection: one of them, or both.
+export type ExploreMode = ExploreSampleType | "all";
 
 export type ExploreClassificationState = "all" | "fully_predicted" | "fully_validated";
 
@@ -39,6 +42,7 @@ export interface ExploreRequest {
 }
 
 export interface ExploreGraphsRequest extends ExploreRequest {
+    mode: ExploreSampleType;                  // the axis of the curves: one sample type
     pressure_bin?: number;                    // depth step in metres (dbar), see BINNED_DEPTH_STEP_M
     time_bin?: number;                        // time step in hours, see BINNED_TIME_STEP_H
 }
@@ -50,7 +54,7 @@ export interface ExploreImagesRequest extends ExploreRequest {
 /* ─── what the data source can filter ─── */
 
 export interface ExploreSampleQuery {
-    sample_type_label: "Depth" | "Time";
+    sample_type_label: "Depth" | "Time" | null;   // null: both types
     project_ids: number[] | null;             // null: every project
     bounds: ExploreBounds | null;
     date_from: string | null;
