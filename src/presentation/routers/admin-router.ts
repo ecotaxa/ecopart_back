@@ -111,13 +111,15 @@ export default function AdminRouter(
      *       Starts an asynchronous task (returns a Task immediately; poll the task for progress) that
      *       reads the pivot of each sample and stores its particle statistics: `nb_particles` and the
      *       smallest and largest particle areas in pixels (`particle_min_area_px`, `particle_max_area_px`).
-     *       They count the particles of the images the sample uses (operator window, descent filter on a
-     *       depth profile when the project enables it), lit and not over-exposed, whose area reaches the
-     *       sample's minimum particle area: the particles of the binned export.
+     *       They count the particles of the lit, not over-exposed images whose area reaches the sample's
+     *       minimum particle area, twice: over the images of the operator window, and over those the descent
+     *       filter keeps too (`*_descent_filter`, the same values for a time series). The Explore page and the
+     *       project statistics read the pair the project's `enable_descent_filter` selects, so they always
+     *       count the particles of the binned export, and changing the setting needs no new computation.
      *
      *       The import and the pivot regeneration compute them; this endpoint covers the samples imported
      *       before. Without `project_ids`, every project is considered; an unknown project id is skipped.
-     *       A sample that already has its statistics is kept, unless `force` is true. A sample of an
+     *       A sample that already has both pairs is kept, unless `force` is true. A sample of an
      *       instrument other than UVP5 or UVP6, and a UVP5 sample without pivot, are skipped. A failing
      *       sample does not stop the others: the task finishes with the number of samples computed,
      *       skipped and failed. Reserved to administrators; the task belongs to no project.

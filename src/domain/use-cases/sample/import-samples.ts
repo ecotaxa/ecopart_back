@@ -14,7 +14,7 @@ import path from "path";
 import { describeUvp5PivotReport } from "../../utils/uvp5-pivot-converter";
 import { cleanupLogPrefix } from "../../utils/task-cleanup";
 import { binnedSampleSettingsOf } from "../export/binned-settings";
-import { computeParticleStats, describeParticleStats } from "./particle-stats";
+import { computeParticleStats, describeParticleStats, NO_PARTICLE_STATS } from "./particle-stats";
 
 export class ImportSamples implements ImportSamplesUseCase {
     sampleRepository: SampleRepository
@@ -301,15 +301,11 @@ export class ImportSamples implements ImportSamplesUseCase {
                 const pivot = await this.sampleRepository.getPivotImages(project.project_id, sample.sample_name, project.instrument_model);
                 stats = await computeParticleStats(binnedSampleSettingsOf({ ...sample, sample_type_label }, project), pivot);
             } catch (error) {
-                sample.nb_particles = null;
-                sample.particle_min_area_px = null;
-                sample.particle_max_area_px = null;
+                Object.assign(sample, NO_PARTICLE_STATS);
                 await log(`Step 3/4 particle statistics : ${sample.sample_name} : WARNING particle statistics not computed, left empty (${(error as Error).message})`);
                 continue;
             }
-            sample.nb_particles = stats.nb_particles;
-            sample.particle_min_area_px = stats.particle_min_area_px;
-            sample.particle_max_area_px = stats.particle_max_area_px;
+            Object.assign(sample, stats);
             const progress = 70 + Math.round(((i + 1) / formated_samples.length) * 4);
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, "Step 3/4 particle statistics : " + describeParticleStats(sample.sample_name, stats));
         }

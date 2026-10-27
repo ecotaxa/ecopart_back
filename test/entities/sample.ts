@@ -80,6 +80,9 @@ export const sampleModel_1: PublicSampleModel = {
     nb_particles: null,
     particle_min_area_px: null,
     particle_max_area_px: null,
+    nb_particles_descent_filter: null,
+    particle_min_area_px_descent_filter: null,
+    particle_max_area_px_descent_filter: null,
 }
 export const sampleModel_2: PublicSampleModel =
 {
@@ -161,6 +164,9 @@ export const sampleModel_2: PublicSampleModel =
     nb_particles: null,
     particle_min_area_px: null,
     particle_max_area_px: null,
+    nb_particles_descent_filter: null,
+    particle_min_area_px_descent_filter: null,
+    particle_max_area_px_descent_filter: null,
 }
 export const SearchSampleResult: { samples: PublicSampleModel[], search_info: SearchInfo } = {
     search_info: {

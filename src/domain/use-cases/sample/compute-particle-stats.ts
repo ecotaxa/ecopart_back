@@ -108,7 +108,7 @@ export class ComputeParticleStats implements ComputeParticleStatsUseCase {
 
     private async computeSample(project: ProjectResponseModel, sample: PublicSampleModel, force: boolean): Promise<{ outcome: SampleOutcome, message: string }> {
         const name = sample.sample_name;
-        if (!force && typeof sample.nb_particles === "number") {
+        if (!force && typeof sample.nb_particles === "number" && typeof sample.nb_particles_descent_filter === "number") {
             return { outcome: "skipped", message: `${name}: particle statistics already computed, kept` };
         }
         const instrument_model = project.instrument_model;

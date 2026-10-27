@@ -1277,7 +1277,7 @@ describe("particle statistics at import", () => {
         jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue();
     });
 
-    test("reads each sample's pivot and creates the samples with their statistics, over the images they use", async () => {
+    test("reads each sample's pivot and creates the samples with their statistics, without and with the descent filter", async () => {
         jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => yoyo());
 
         await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
@@ -1287,12 +1287,18 @@ describe("particle statistics at import", () => {
         expect(mockSampleRepository.getPivotImages).toBeCalledWith(uvp6_project.project_id, "Mooring_0N_23W_201910_850m", "UVP6M");
         expect(mockSampleRepository.getSampleType).toBeCalledWith({ sample_type_id: 1 });
         expect(mockSampleRepository.getSampleType).toBeCalledWith({ sample_type_id: 2 });
-        // The descent filter of the project drops the image that goes back up, on the depth profile only.
+        // The descent filter drops the image that goes back up, on the depth profile only.
         expect(mockSampleRepository.createManySamples).toBeCalledWith([
-            expect.objectContaining({ sample_name: "perle3_001", nb_particles: 6, particle_min_area_px: 2, particle_max_area_px: 9 }),
-            expect.objectContaining({ sample_name: "Mooring_0N_23W_201910_850m", nb_particles: 13, particle_min_area_px: 2, particle_max_area_px: 40 }),
+            expect.objectContaining({
+                sample_name: "perle3_001", nb_particles: 13, particle_min_area_px: 2, particle_max_area_px: 40,
+                nb_particles_descent_filter: 6, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 9,
+            }),
+            expect.objectContaining({
+                sample_name: "Mooring_0N_23W_201910_850m", nb_particles: 13, particle_min_area_px: 2, particle_max_area_px: 40,
+                nb_particles_descent_filter: 13, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 40,
+            }),
         ]);
-        expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 72, "Step 3/4 particle statistics : perle3_001: 6 particle(s) counted, areas from 2 to 9 px");
+        expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 72, "Step 3/4 particle statistics : perle3_001: 13 particle(s) counted, areas from 2 to 40 px, 6 kept by the descent filter");
         expect(mockTaskRepository.updateTaskProgress).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, 74, "Step 3/4 particle statistics : Mooring_0N_23W_201910_850m: 13 particle(s) counted, areas from 2 to 40 px");
         expect(loggedMessages().filter((message: string) => message.includes("WARNING"))).toHaveLength(0);
         expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
@@ -1307,7 +1313,10 @@ describe("particle statistics at import", () => {
 
         expect(loggedMessages()).toContain("Step 3/4 particle statistics : perle3_001 : WARNING particle statistics not computed, left empty (Cannot read the particle file of sample perle3_001 (no such file))");
         expect(mockSampleRepository.createManySamples).toBeCalledWith([
-            expect.objectContaining({ sample_name: "perle3_001", nb_particles: null, particle_min_area_px: null, particle_max_area_px: null }),
+            expect.objectContaining({
+                sample_name: "perle3_001", nb_particles: null, particle_min_area_px: null, particle_max_area_px: null,
+                nb_particles_descent_filter: null, particle_min_area_px_descent_filter: null, particle_max_area_px_descent_filter: null,
+            }),
             expect.objectContaining({ sample_name: "Mooring_0N_23W_201910_850m", nb_particles: 13 }),
         ]);
         expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
