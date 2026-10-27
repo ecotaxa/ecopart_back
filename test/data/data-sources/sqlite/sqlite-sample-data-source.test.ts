@@ -304,6 +304,60 @@ describe('SQLiteSampleDataSource', () => {
         })
     })
 
+    describe('particle statistics: the pair the descent filter of the project selects', () => {
+        const P_FILTER_ON = 9007, P_FILTER_OFF = 9008
+        const STATS = {
+            nb_particles: 29, particle_min_area_px: 1, particle_max_area_px: 40,
+            nb_particles_descent_filter: 20, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 30,
+        }
+        const WINDOW = { nb_particles: 29, particle_min_area_px: 1, particle_max_area_px: 40 }
+        const DESCENT = { nb_particles: 20, particle_min_area_px: 2, particle_max_area_px: 30 }
+        const ids: Record<string, number> = {}
+        const query: ExploreSampleQuery = {
+            sample_type_label: 'Depth', project_ids: [P_FILTER_ON, P_FILTER_OFF], bounds: null, date_from: null, date_to: null, months: [], sample_names: [],
+            hour_range: null, pressure_range: null, ctd_only: false, ecotaxa_imported_only: false,
+        }
+        const insertProject = (project_id: number, enable_descent_filter: number) => run(db,
+            `INSERT INTO project (project_id, root_folder_path, project_title, project_acronym, cruise_wmo, ship_floatref, data_owner_name, data_owner_email,
+                operator_name, operator_email, chief_scientist_name, chief_scientist_email, enable_descent_filter, privacy_duration, visible_duration, public_duration, serial_number)
+             VALUES (?, 'folder', 'title', 'acronym', 'cruise', 'ship', 'owner', 'owner@test', 'operator', 'operator@test', 'chief', 'chief@test', ?, 2, 24, 36, 'sn')`,
+            [project_id, enable_descent_filter])
+        const exploreRow = async (sample_name: string) => (await dataSource.getExploreSamples(query)).find(row => row.sample_name === sample_name)
+
+        beforeAll(async () => {
+            const depth_type_id = await new Promise<number>((resolve, reject) =>
+                db.get('SELECT sample_type_id AS id FROM sample_type WHERE sample_type_label = ?', ['Depth'], (e, row: any) => e ? reject(e) : resolve(row.id)))
+            await insertProject(P_FILTER_ON, 1)
+            await insertProject(P_FILTER_OFF, 0)
+            ids.on = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name: 'filter_on', project_id: P_FILTER_ON, sample_type_id: depth_type_id, ...STATS })
+            ids.off = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name: 'filter_off', project_id: P_FILTER_OFF, sample_type_id: depth_type_id, ...STATS })
+        })
+
+        test('a sample stores both pairs', async () => {
+            expect(await dataSource.getOne({ sample_id: ids.on })).toMatchObject(STATS)
+        })
+
+        test('the Explore rows and the project statistics read the pair of the project setting', async () => {
+            expect(await exploreRow('filter_on')).toMatchObject(DESCENT)
+            expect(await exploreRow('filter_off')).toMatchObject(WINDOW)
+            expect((await dataSource.getProjectStatsSamples(P_FILTER_ON))[0]).toMatchObject(DESCENT)
+            expect((await dataSource.getProjectStatsSamples(P_FILTER_OFF))[0]).toMatchObject(WINDOW)
+        })
+
+        test('changing the setting changes the pair read at once, nothing is recomputed', async () => {
+            await run(db, 'UPDATE project SET enable_descent_filter = 0 WHERE project_id = ?', [P_FILTER_ON])
+            expect(await exploreRow('filter_on')).toMatchObject(WINDOW)
+            await run(db, 'UPDATE project SET enable_descent_filter = 1 WHERE project_id = ?', [P_FILTER_ON])
+            expect(await exploreRow('filter_on')).toMatchObject(DESCENT)
+        })
+
+        test('updateMany writes both pairs', async () => {
+            const recomputed = { ...STATS, nb_particles: 31, nb_particles_descent_filter: 22 }
+            expect(await dataSource.updateMany(recomputed, { sample_id: ids.off })).toBe(1)
+            expect(await dataSource.getOne({ sample_id: ids.off })).toMatchObject(recomputed)
+        })
+    })
+
     describe('Explore queries on legacy sampling dates', () => {
         // Samples imported before the ISO conversion keep the UVP formats: "20120520080213" (UVP5),
         // "20230406-144332-820" (UVP6). The Explore query reads them as ISO date-times.

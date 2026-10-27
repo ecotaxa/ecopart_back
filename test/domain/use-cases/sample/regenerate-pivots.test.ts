@@ -150,21 +150,27 @@ describe("RegeneratePivots", () => {
 
             expect(mockSampleRepository.getPivotImages).toBeCalledTimes(1);
             expect(mockSampleRepository.getPivotImages).toBeCalledWith(projectResponseModel.project_id, sampleModel_2.sample_name, projectResponseModel.instrument_model);
-            // sampleModel_2 is a time series: the descent filter of the project does not apply.
+            // sampleModel_2 is a time series: the descent filter never applies, both pairs are equal.
             expect(mockSampleRepository.updateParticleStats).toBeCalledTimes(1);
-            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, { nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50 });
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, {
+                nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50,
+                nb_particles_descent_filter: 8, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 50,
+            });
             expect((mockSampleRepository.updateParticleStats as jest.Mock).mock.invocationCallOrder[0]).toBeGreaterThan((mockSampleRepository.generateUvp5Pivot as jest.Mock).mock.invocationCallOrder[0]);
             expect(loggedMessages()).toEqual(["Particle statistics : Mooring_0N_23W_201910_850m: 8 particle(s) counted, areas from 2 to 50 px"]);
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1);
         });
 
-        test("the statistics of a depth profile follow the project's descent filter", async () => {
+        test("the statistics of a depth profile are stored without and with the descent filter", async () => {
             jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockResolvedValue(null);
             jest.spyOn(mockSampleRepository, "generateUvp5Pivot").mockResolvedValue(report("perle3_001"));
 
             await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1], false);
 
-            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_1.sample_id, { nb_particles: 4, particle_min_area_px: 2, particle_max_area_px: 30 });
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_1.sample_id, {
+                nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50,
+                nb_particles_descent_filter: 4, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 30,
+            });
         });
 
         test("statistics that cannot be computed are a warning: the previous ones are kept and the task goes on", async () => {

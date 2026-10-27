@@ -102,6 +102,9 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         nb_particles: row.nb_particles ?? null,
         particle_min_area_px: row.particle_min_area_px ?? null,
         particle_max_area_px: row.particle_max_area_px ?? null,
+        nb_particles_descent_filter: row.nb_particles_descent_filter ?? null,
+        particle_min_area_px_descent_filter: row.particle_min_area_px_descent_filter ?? null,
+        particle_max_area_px_descent_filter: row.particle_max_area_px_descent_filter ?? null,
     };
 }
 
@@ -162,6 +165,11 @@ const EXPLORE_SAMPLING_TIME = `CASE
     WHEN sample.sampling_utc_date_time GLOB '${DIGITS(14)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 9, 2) || ':' || substr(sample.sampling_utc_date_time, 11, 2) || ':' || substr(sample.sampling_utc_date_time, 13, 2) || 'Z'
     WHEN sample.sampling_utc_date_time GLOB '${DIGITS(8)}-${DIGITS(6)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 10, 2) || ':' || substr(sample.sampling_utc_date_time, 12, 2) || ':' || substr(sample.sampling_utc_date_time, 14, 2) || 'Z'
     ELSE sample.sampling_utc_date_time END`;
+// The particle statistics the project's descent filter selects (see SampleParticleStats). Expects the
+// query to join `project`.
+const PARTICLE_STATS_OF_PROJECT = ["nb_particles", "particle_min_area_px", "particle_max_area_px"]
+    .map(column => `CASE WHEN project.enable_descent_filter = 1 THEN sample.${column}_descent_filter ELSE sample.${column} END AS ${column}`)
+    .join(", ");
 const EXPLORE_MINUTE_OF_DAY = `(CAST(strftime('%H', ${EXPLORE_SAMPLING_TIME}) AS INTEGER) * 60 + CAST(strftime('%M', ${EXPLORE_SAMPLING_TIME}) AS INTEGER))`;
 
 const escapeLike = (fragment: string) => fragment.replace(/[\\%_]/g, (c) => "\\" + c);
@@ -195,6 +203,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             sample.visual_qc_validator_user_id, sample.sample_type_id, sample.project_id,
             sample.nb_vignettes, sample.nb_black,
             sample.nb_particles ?? null, sample.particle_min_area_px ?? null, sample.particle_max_area_px ?? null,
+            sample.nb_particles_descent_filter ?? null, sample.particle_min_area_px_descent_filter ?? null, sample.particle_max_area_px_descent_filter ?? null,
             // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time
             // (see sqlite-task-data-source about why we no longer rely on DEFAULT CURRENT_TIMESTAMP).
             new Date().toISOString(),
@@ -220,6 +229,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             visual_qc_validator_user_id, sample_type_id, project_id,
             nb_vignettes, nb_black,
             nb_particles, particle_min_area_px, particle_max_area_px,
+            nb_particles_descent_filter, particle_min_area_px_descent_filter, particle_max_area_px_descent_filter,
             sample_creation_utc_date_time
         ) VALUES  (` + placeholders + `);`;
 
@@ -517,11 +527,12 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
                 sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
                 sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
-                sample.nb_vignettes, sample.nb_particles, sample.particle_min_area_px, sample.particle_max_area_px,
+                sample.nb_vignettes, ${PARTICLE_STATS_OF_PROJECT},
                 sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_depth_offset_m,
                 sample.instrument_settings_image_volume_l, sample.instrument_settings_aa, sample.instrument_settings_exp,
                 sample.instrument_settings_particule_minimum_area_pixels
             FROM sample
+            LEFT JOIN project ON project.project_id = sample.project_id
             JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
             JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
             WHERE ${clauses.join(" AND ")}
@@ -541,7 +552,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
                 sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
                 sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
-                sample.nb_vignettes, sample.nb_particles, sample.particle_min_area_px, sample.particle_max_area_px,
+                sample.nb_vignettes, ${PARTICLE_STATS_OF_PROJECT},
                 sample.filter_first_image, sample.filter_last_image, sample.instrument_settings_depth_offset_m,
                 sample.instrument_settings_image_volume_l, sample.instrument_settings_aa, sample.instrument_settings_exp,
                 sample.instrument_settings_particule_minimum_area_pixels,
@@ -550,6 +561,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
                 sample.instrument_serial_number, sample.instrument_settings_pixel_size_mm, sample.instrument_settings_acq_gain,
                 sample.instrument_settings_acq_threshold, sample.instrument_settings_acq_exposure
             FROM sample
+            LEFT JOIN project ON project.project_id = sample.project_id
             JOIN sample_type ON sample.sample_type_id = sample_type.sample_type_id
             JOIN visual_quality_check_status ON sample.visual_qc_status_id = visual_quality_check_status.visual_qc_status_id
             WHERE sample.project_id = (?)

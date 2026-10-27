@@ -2421,10 +2421,7 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number> {
-        return await this.sampleDataSource.updateMany(
-            { nb_particles: stats.nb_particles, particle_min_area_px: stats.particle_min_area_px, particle_max_area_px: stats.particle_max_area_px },
-            { sample_id }
-        );
+        return await this.sampleDataSource.updateMany({ ...stats }, { sample_id });
     }
 
     async getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages> {

@@ -33,7 +33,9 @@ function pivot(): PivotImages {
     ];
     return { columns: toPerImageColumns(records), rows: async function* () { yield* records; } };
 }
-const STATS = { nb_particles: 4, particle_min_area_px: 2, particle_max_area_px: 40 };
+// It goes down: the descent filter keeps every image.
+const STATS = { nb_particles: 4, particle_min_area_px: 2, particle_max_area_px: 40, nb_particles_descent_filter: 4, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 40 };
+const COMPUTED = { nb_particles: 7, particle_min_area_px: 1, particle_max_area_px: 9, nb_particles_descent_filter: 5, particle_min_area_px_descent_filter: 1, particle_max_area_px_descent_filter: 9 };
 
 const uvp5_project: ProjectResponseModel = { ...projectResponseModel, project_id: 1, instrument_model: "UVP5HD" };
 const uvp6_project: ProjectResponseModel = { ...projectResponseModel, project_id: 2, instrument_model: "UVP6HF" };
@@ -136,8 +138,8 @@ describe("ComputeParticleStats", () => {
         test("computes the samples of every project that have no statistics yet, keeps the others", async () => {
             jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue([uvp5_project, uvp6_project]);
             jest.spyOn(mockSampleRepository, "standardGetSamples")
-                .mockResolvedValueOnce({ items: [sample(11, "uvp5_a"), sample(12, "uvp5_b", { nb_particles: 7, particle_min_area_px: 1, particle_max_area_px: 9 })], total: 2 })
-                .mockResolvedValueOnce({ items: [sample(21, "uvp6_a"), sample(22, "uvp6_b", { nb_particles: 0, particle_min_area_px: null, particle_max_area_px: null })], total: 2 });
+                .mockResolvedValueOnce({ items: [sample(11, "uvp5_a"), sample(12, "uvp5_b", COMPUTED)], total: 2 })
+                .mockResolvedValueOnce({ items: [sample(21, "uvp6_a"), sample(22, "uvp6_b", { nb_particles: 0, particle_min_area_px: null, particle_max_area_px: null, nb_particles_descent_filter: 0, particle_min_area_px_descent_filter: null, particle_max_area_px_descent_filter: null })], total: 2 });
 
             await run([], false);
 
@@ -163,13 +165,22 @@ describe("ComputeParticleStats", () => {
 
         test("forced, recomputes the samples that already have statistics", async () => {
             jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(uvp6_project);
-            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ items: [sample(21, "uvp6_a", { nb_particles: 7, particle_min_area_px: 1, particle_max_area_px: 9 })], total: 1 });
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ items: [sample(21, "uvp6_a", COMPUTED)], total: 1 });
 
             await run([2], true);
 
             expect(mockProjectRepository.getProject).toBeCalledWith({ project_id: 2 });
             expect(mockSampleRepository.updateParticleStats).toBeCalledWith(21, STATS);
             expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, "Particle statistics computed for 1 sample(s), 0 skipped, 0 failed");
+        });
+
+        test("computes a sample that has only the statistics over the operator window", async () => {
+            jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue([uvp6_project]);
+            jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ items: [sample(21, "uvp6_a", { ...COMPUTED, nb_particles_descent_filter: null })], total: 1 });
+
+            await run([], false);
+
+            expect(mockSampleRepository.updateParticleStats).toBeCalledWith(21, STATS);
         });
 
         test("skips an unknown project id with a log line, and lists no project", async () => {
