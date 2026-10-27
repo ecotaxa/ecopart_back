@@ -210,6 +210,17 @@ describe('SQLiteProjectDataSource', () => {
             expect(getAllOutput.total).toEqual(5);
             expect(getAllOutput.items.length).toEqual(5);
         });
+        test('an empty IN matches no project', async () => {
+            // e.g. a privacy_status filter no project is at, resolved to project_id IN []
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'project_id', operator: 'IN', value: [] }], sort_by: [] });
+            expect(getAllOutput.total).toEqual(0);
+            expect(getAllOutput.items.length).toEqual(0);
+        });
+        test('an empty IN matches no project, even on a column holding 0', async () => {
+            const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'enable_descent_filter', operator: 'IN', value: [] }], sort_by: [] });
+            expect(getAllOutput.total).toEqual(0);
+            expect(getAllOutput.items.length).toEqual(0);
+        });
         test('should return all projects with sorting and filtering and pagination true', async () => {
             // Call the getAll method
             const getAllOutput = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'enable_descent_filter', operator: '=', value: true }], sort_by: [] });
