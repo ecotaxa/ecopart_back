@@ -607,3 +607,42 @@ test("Refuses a root folder outside the import folder before any write", async (
     await expect(updateProjectUseCase.execute(current_user, project_to_update)).rejects.toThrow("Root folder path must stay inside the import folder");
     expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
 });
+
+describe("Accounts newly named by the project", () => {
+    const before: ProjectResponseModel = { ...projectResponseModel, data_owner_email: "owner@lov.fr", operator_email: "old_op@lov.fr", chief_scientist_email: "cs@lov.fr" }
+    const after: ProjectResponseModel = { ...before, operator_email: "new_op@lov.fr" }
+    const account = (user_id: number, email: string) =>
+        ({ user_id, email, valid_email: true, first_name: "F", last_name: "L", is_admin: false, organisation: "LOV", country: "FR", user_planned_usage: "", user_creation_utc_date_time: "2023-08-01 10:30:00" })
+
+    beforeEach(() => {
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+        jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
+        jest.spyOn(mockProjectRepository, "toPublicProject").mockReturnValue(projectResponseModel)
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(async ({ email }) => account(9, email as string))
+        jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false)
+        jest.spyOn(mockPrivilegeRepository, "addPrivilege").mockResolvedValue(1)
+    })
+
+    test("Only the account behind a changed email joins the project", async () => {
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValueOnce(before).mockResolvedValueOnce(after)
+
+        const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+        await updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, operator_email: "new_op@lov.fr" })
+
+        expect(mockUserRepository.getUser).toBeCalledTimes(1)
+        expect(mockUserRepository.getUser).toBeCalledWith({ email: "new_op@lov.fr" })
+        expect(mockPrivilegeRepository.addPrivilege).toBeCalledWith({ user_id: 9, project_id: 1, privilege_name: "member", contact: false })
+    })
+
+    test("Nobody joins when no named email changes", async () => {
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(before)
+
+        const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+        await updateProjectUseCase.execute({ user_id: 1 }, { project_id: 1, operator_email: "OLD_op@lov.fr" })
+
+        expect(mockUserRepository.getUser).toBeCalledTimes(0)
+        expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(0)
+    })
+})

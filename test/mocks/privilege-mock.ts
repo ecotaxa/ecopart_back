@@ -34,6 +34,9 @@ export class MockPrivilegeRepository implements PrivilegeRepository {
     createPrivileges(): Promise<number> {
         throw new Error("Method not implemented for privilege mock createPrivileges");
     }
+    addPrivilege(): Promise<number> {
+        throw new Error("Method not implemented for privilege mock addPrivilege");
+    }
     getPublicPrivileges(): Promise<PublicPrivilege | null> {
         throw new Error("Method not implemented for privilege mock getPublicPrivileges");
     }

@@ -5,9 +5,16 @@ import { MigrateUsers } from '../../../../src/domain/use-cases/user/migrate-user
 import { NodemailerAdapter } from '../../../../src/infra/mailer/nodemailer'
 import { MailerWrapper } from "../../../../src/infra/mailer/nodemailer-wrapper";
 import { MockUserRepository } from "../../../mocks/user-mock";
+import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
+import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
+import { MockProjectRepository } from "../../../mocks/project-mock";
+import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
+import { projectResponseModel } from "../../../entities/project";
 
 describe("Migrate Users Use Case", () => {
     let mockUserRepository: UserRepository;
+    let mockProjectRepository: ProjectRepository;
+    let mockPrivilegeRepository: PrivilegeRepository;
     let mockTransporter: Transporter;
     let mockMailerAdapter: MailerWrapper;
     let migrateUsersUseCase: MigrateUsers;
@@ -47,7 +54,10 @@ describe("Migrate Users Use Case", () => {
         mockTransporter = await mockMailerAdapter.createTransport({
             host: 'smtp.example.com', port: 465, secure: true, auth: { user: "u", pass: "p" },
         })
-        migrateUsersUseCase = new MigrateUsers(mockUserRepository, mockTransporter, mockMailerAdapter)
+        mockProjectRepository = new MockProjectRepository();
+        mockPrivilegeRepository = new MockPrivilegeRepository();
+        jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue([])
+        migrateUsersUseCase = new MigrateUsers(mockUserRepository, mockTransporter, mockMailerAdapter, mockProjectRepository, mockPrivilegeRepository)
     })
 
     test("Rejects when the current user is not an admin", async () => {
@@ -179,5 +189,59 @@ describe("Migrate Users Use Case", () => {
         expect(report.results[0].message).toBe("DB error")
         expect(report.results[1].status).toBe("created")
         expect(report.summary).toEqual({ total: 2, error: 1, created: 1 })
+    })
+
+    describe("Joining the projects naming the migrated email", () => {
+        const secondUser: UserMigrationRequestModel = { ...InputUser, email: "jane@gmail.com", legacy_ecopart_user_id: 9999 }
+        const project = (project_id: number, data_owner_email: string, operator_email: string) =>
+            ({ ...projectResponseModel, project_id, data_owner_email, operator_email, chief_scientist_email: "other@lov.fr" })
+
+        beforeEach(() => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+            jest.spyOn(mockUserRepository, "setResetPasswordCode").mockResolvedValue(1)
+            jest.spyOn(mockUserRepository, "generateResetPasswordToken").mockReturnValue("token")
+            jest.spyOn(mockMailerAdapter, "send_migration_email").mockResolvedValue()
+            jest.spyOn(mockUserRepository, "linkLegacyUser").mockResolvedValue(1)
+            jest.spyOn(mockUserRepository, "migrateUser").mockResolvedValue(10)
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false)
+            jest.spyOn(mockPrivilegeRepository, "addPrivilege").mockResolvedValue(1)
+            jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue([
+                project(1, "john@gmail.com", "other@lov.fr"),
+                project(2, "other@lov.fr", "jane@gmail.com"),
+            ])
+        })
+
+        test("Created and linked accounts join their projects, the projects being read once", async () => {
+            jest.spyOn(mockUserRepository, "getUser")
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(migratedUser)
+                .mockResolvedValueOnce({ ...migratedUser, user_id: 20, email: "jane@gmail.com", legacy_ecopart_user_id: null, legacy_password_set: null })
+
+            await migrateUsersUseCase.execute(admin, [InputUser, secondUser], false)
+
+            expect(mockProjectRepository.listProjects).toBeCalledTimes(1)
+            expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(2)
+            expect(mockPrivilegeRepository.addPrivilege).toBeCalledWith({ user_id: 10, project_id: 1, privilege_name: "manager", contact: false })
+            expect(mockPrivilegeRepository.addPrivilege).toBeCalledWith({ user_id: 20, project_id: 2, privilege_name: "member", contact: false })
+        })
+
+        test("A linked account whose email is not validated does not join", async () => {
+            jest.spyOn(mockUserRepository, "getUser").mockResolvedValue({ ...migratedUser, valid_email: false, legacy_ecopart_user_id: null, legacy_password_set: null })
+
+            await migrateUsersUseCase.execute(admin, [InputUser], false)
+
+            expect(mockProjectRepository.listProjects).toBeCalledTimes(0)
+            expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(0)
+        })
+
+        test("dry_run joins no project", async () => {
+            jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(null)
+
+            await migrateUsersUseCase.execute(admin, [InputUser], true)
+
+            expect(mockProjectRepository.listProjects).toBeCalledTimes(0)
+            expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(0)
+        })
     })
 })

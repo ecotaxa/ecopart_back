@@ -11,6 +11,7 @@ import { PublicPrivilege } from "../../entities/privilege";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { ProjectAccessPolicy } from "./project-access";
+import { NAMED_ROLE_FIELDS, normalizeNamedEmail, ProjectNamedRoles } from "./project-named-roles";
 
 export class UpdateProject implements UpdateProjectUseCase {
     userRepository: UserRepository
@@ -21,6 +22,7 @@ export class UpdateProject implements UpdateProjectUseCase {
     sampleRepository: SampleRepository;
     DATA_STORAGE_IMPORT: string
     private readonly access: ProjectAccessPolicy
+    private readonly namedRoles: ProjectNamedRoles
 
     constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, sampleRepository: SampleRepository, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
@@ -31,6 +33,7 @@ export class UpdateProject implements UpdateProjectUseCase {
         this.sampleRepository = sampleRepository
         this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
         this.access = new ProjectAccessPolicy(userRepository, privilegeRepository)
+        this.namedRoles = new ProjectNamedRoles(userRepository, projectRepository, privilegeRepository)
     }
 
     async execute(current_user: UserUpdateModel, public_project_to_update: PublicProjectUpdateModel): Promise<PublicProjectResponseModel> {
@@ -46,6 +49,9 @@ export class UpdateProject implements UpdateProjectUseCase {
         await this.updateProject(current_user, project_to_update, public_project_to_update, current_project);
         // Retrieve updated project
         const updated_project = await this.getUpdatedProject(project_to_update.project_id);
+        // Validated accounts newly named as data owner, operator or chief scientist join the project
+        const changed_fields = NAMED_ROLE_FIELDS.filter(field => normalizeNamedEmail(updated_project[field]) !== normalizeNamedEmail(current_project[field]));
+        if (changed_fields.length > 0) await this.namedRoles.grantNamedUsers(updated_project, changed_fields);
         // Retrieve updated privileges
         const updated_privileges = await this.getUpdatedPrivileges(project_to_update.project_id);
         // Return the updated project with privileges

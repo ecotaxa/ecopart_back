@@ -1,10 +1,15 @@
+import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { ValidUserUseCase } from "../../interfaces/use-cases/user/valid-user";
+import { ProjectNamedRoles } from "../project/project-named-roles";
 
 export class ValidUser implements ValidUserUseCase {
     userRepository: UserRepository
-    constructor(userRepository: UserRepository) {
+    private readonly namedRoles: ProjectNamedRoles
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, privilegeRepository: PrivilegeRepository) {
         this.userRepository = userRepository
+        this.namedRoles = new ProjectNamedRoles(userRepository, projectRepository, privilegeRepository)
     }
 
     async execute(user_id: number, confirmation_token: string): Promise<void> {
@@ -34,5 +39,8 @@ export class ValidUser implements ValidUserUseCase {
         const updated_user = await this.userRepository.getUser({ user_id: user_to_update.user_id })
         if (!updated_user) throw new Error("Cannot find updated user");
         if (!updated_user.valid_email || updated_user.confirmation_code !== null) throw new Error("Cannot validate user");
+
+        // The email is now proven: join the projects naming it as data owner, operator or chief scientist
+        await this.namedRoles.joinProjectsNaming([updated_user])
     }
 }
