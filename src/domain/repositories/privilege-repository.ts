@@ -26,6 +26,10 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         return result;
     }
 
+    async addPrivilege(privilege: PrivilegeRequestCreationModel): Promise<number> {
+        return await this.privilegeDataSource.create(privilege)
+    }
+
     async publicToPrivate(publicPrivilege: PublicPrivilege): Promise<PrivilegeRequestCreationModel[]> {
         const privileges: PrivilegeRequestCreationModel[] = publicPrivilege.managers.map(manager => {
             return {

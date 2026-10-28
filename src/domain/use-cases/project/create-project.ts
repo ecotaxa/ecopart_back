@@ -8,6 +8,7 @@ import { ProjectRepository } from "../../interfaces/repositories/project-reposit
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { CreateProjectUseCase } from "../../interfaces/use-cases/project/create-project";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
+import { ProjectNamedRoles } from "./project-named-roles";
 
 export class CreateProject implements CreateProjectUseCase {
     userRepository: UserRepository
@@ -17,6 +18,7 @@ export class CreateProject implements CreateProjectUseCase {
     ecotaxa_accountRepository: EcotaxaAccountRepository
     DATA_STORAGE_FS_STORAGE: string
     DATA_STORAGE_IMPORT: string
+    private readonly namedRoles: ProjectNamedRoles
 
     constructor(userRepository: UserRepository, projectRepository: ProjectRepository, instrument_modelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, ecotaxa_accountRepository: EcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE: string, DATA_STORAGE_IMPORT: string) {
         this.userRepository = userRepository
@@ -26,6 +28,7 @@ export class CreateProject implements CreateProjectUseCase {
         this.ecotaxa_accountRepository = ecotaxa_accountRepository
         this.DATA_STORAGE_FS_STORAGE = DATA_STORAGE_FS_STORAGE
         this.DATA_STORAGE_IMPORT = DATA_STORAGE_IMPORT
+        this.namedRoles = new ProjectNamedRoles(userRepository, projectRepository, privilegeRepository)
     }
 
     async execute(current_user: UserUpdateModel, public_project: PublicProjectRequestCreationModel): Promise<PublicProjectResponseModel> {
@@ -64,7 +67,12 @@ export class CreateProject implements CreateProjectUseCase {
         const createdProject = await this.getCreatedProject(createdProjectId);
 
         // Create and retrieve privileges for the project
-        const createdPrivileges = await this.createAndRetrievePrivileges(createdProjectId, public_project);
+        let createdPrivileges = await this.createAndRetrievePrivileges(createdProjectId, public_project);
+
+        // Validated accounts named as data owner, operator or chief scientist join the project
+        if (await this.namedRoles.grantNamedUsers(createdProject) > 0) {
+            createdPrivileges = await this.privilegeRepository.getPublicPrivileges({ project_id: createdProjectId }) ?? createdPrivileges;
+        }
 
         // Return the newly created project with the privileges
         return this.projectRepository.toPublicProject(createdProject, createdPrivileges);

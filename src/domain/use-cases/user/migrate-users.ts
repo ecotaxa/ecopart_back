@@ -10,16 +10,21 @@ import {
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { MigrateUsersUseCase } from "../../interfaces/use-cases/user/migrate-users";
 import { MailerWrapper } from "../../../infra/mailer/nodemailer-wrapper";
+import { ProjectRepository } from "../../interfaces/repositories/project-repository";
+import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
+import { ProjectNamedRoles } from "../project/project-named-roles";
 
 export class MigrateUsers implements MigrateUsersUseCase {
     userRepository: UserRepository
     transporter: Transporter
     mailer: MailerWrapper
+    private readonly namedRoles: ProjectNamedRoles
 
-    constructor(userRepository: UserRepository, transporter: Transporter, mailer: MailerWrapper) {
+    constructor(userRepository: UserRepository, transporter: Transporter, mailer: MailerWrapper, projectRepository: ProjectRepository, privilegeRepository: PrivilegeRepository) {
         this.userRepository = userRepository
         this.transporter = transporter
         this.mailer = mailer
+        this.namedRoles = new ProjectNamedRoles(userRepository, projectRepository, privilegeRepository)
     }
 
     async execute(current_user: UserUpdateModel, users: UserMigrationRequestModel[], dry_run: boolean): Promise<MigrateUsersResponseModel> {
@@ -28,13 +33,17 @@ export class MigrateUsers implements MigrateUsersUseCase {
         if (!await this.userRepository.isAdmin(current_user.user_id)) throw new Error("Logged user cannot migrate users");
 
         const results: UserMigrationResultModel[] = []
+        const users_to_join: Pick<UserResponseModel, "user_id" | "email">[] = []
         for (const user of users) {
             try {
-                results.push(await this.migrateOne(user, dry_run))
+                results.push(await this.migrateOne(user, dry_run, users_to_join))
             } catch (err) {
                 results.push({ email: user.email, legacy_ecopart_user_id: user.legacy_ecopart_user_id, status: "error", message: err.message })
             }
         }
+
+        // Migrated and linked accounts join the projects naming their email
+        await this.namedRoles.joinProjectsNaming(users_to_join)
 
         // Build the per-status summary
         const summary = { total: results.length } as MigrateUsersResponseModel["summary"]
@@ -45,7 +54,7 @@ export class MigrateUsers implements MigrateUsersUseCase {
         return { dry_run, summary, results }
     }
 
-    private async migrateOne(user: UserMigrationRequestModel, dry_run: boolean): Promise<UserMigrationResultModel> {
+    private async migrateOne(user: UserMigrationRequestModel, dry_run: boolean, users_to_join: Pick<UserResponseModel, "user_id" | "email">[]): Promise<UserMigrationResultModel> {
         const result = (status: UserMigrationStatus, message?: string): UserMigrationResultModel =>
             ({ email: user.email, legacy_ecopart_user_id: user.legacy_ecopart_user_id, status, message })
 
@@ -66,12 +75,14 @@ export class MigrateUsers implements MigrateUsersUseCase {
             // data can be mapped, but never touch their password or send an email.
             if (dry_run) return result("would_link")
             await this.userRepository.linkLegacyUser(preexistentUser.user_id, user.legacy_ecopart_user_id)
+            if (preexistentUser.valid_email && !preexistentUser.deleted) users_to_join.push(preexistentUser)
             return result("linked_existing_user")
         }
 
-        // Brand new migrated user.
+        // Brand new migrated user, created already validated.
         if (dry_run) return result("would_create")
         const createdId = await this.userRepository.migrateUser(user);
+        users_to_join.push({ user_id: createdId, email: user.email })
         await this.setResetCodeAndSendEmail(createdId)
         return result("created")
     }

@@ -27,7 +27,8 @@ beforeEach(async () => {
     mockEcotaxaAccountRepository = new MockEcotaxaAccountRepository()
     DATA_STORAGE_FS_STORAGE = "data_storage/files_system_storage/"
     DATA_STORAGE_IMPORT = "data_storage/ecopart_data_to_import/"
-
+    // By default no account uses the emails the project names
+    jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(null)
 })
 
 test("Try to add a project return created project", async () => {
@@ -213,3 +214,54 @@ test("Refuses a root folder outside the import folder before creating anything",
     expect(mockInstrumentModelRepository.getInstrumentByName).toBeCalledTimes(0);
     expect(mockProjectRepository.createProject).toBeCalledTimes(0);
 });
+
+describe("Accounts named by the project", () => {
+    const named_project: ProjectResponseModel = { ...projectResponseModel, data_owner_email: "owner@lov.fr", operator_email: "op@lov.fr", chief_scientist_email: "owner@lov.fr" }
+    const account = (user_id: number, email: string, valid_email: boolean) =>
+        ({ user_id, email, valid_email, first_name: "F", last_name: "L", is_admin: false, organisation: "LOV", country: "FR", user_planned_usage: "", user_creation_utc_date_time: "2023-08-01 10:30:00" })
+
+    beforeEach(() => {
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockProjectRepository, "createProject").mockResolvedValue(1)
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue(named_project)
+        jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockResolvedValue(instrument_model_response)
+        jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => undefined)
+        jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockReturnValue(projectRequestCreationModelForRepository)
+        jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockResolvedValue(2)
+        jest.spyOn(mockProjectRepository, "toPublicProject").mockReturnValue(projectResponseModel)
+        jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockResolvedValue()
+        jest.spyOn(mockPrivilegeRepository, "addPrivilege").mockResolvedValue(1)
+    })
+
+    test("Validated accounts named by the project join it and are returned with its privileges", async () => {
+        const refreshed = { ...publicPrivileges_WithMemberAndManager, members: [...publicPrivileges_WithMemberAndManager.members, { user_id: 8, user_name: "op", email: "op@lov.fr" }] }
+        jest.spyOn(mockUserRepository, "getUser").mockImplementation(async ({ email }) =>
+            email === "owner@lov.fr" ? account(7, "owner@lov.fr", true) : account(8, "op@lov.fr", true))
+        jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges")
+            .mockResolvedValueOnce(publicPrivileges_WithMemberAndManager)
+            .mockResolvedValueOnce(refreshed)
+
+        const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_IMPORT)
+        await createProjectUseCase.execute({ user_id: 1 }, projectRequestCreationModel)
+
+        expect(mockUserRepository.getUser).toBeCalledTimes(2)
+        expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(1)
+        expect(mockPrivilegeRepository.addPrivilege).toBeCalledWith({ user_id: 8, project_id: 1, privilege_name: "member", contact: false })
+        expect(mockProjectRepository.toPublicProject).toBeCalledWith(named_project, refreshed)
+    })
+
+    test("An account whose email is not validated does not join", async () => {
+        jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(account(8, "op@lov.fr", false))
+        jest.spyOn(mockPrivilegeRepository, "isGranted")
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges_WithMemberAndManager)
+
+        const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_IMPORT)
+        await createProjectUseCase.execute({ user_id: 1 }, projectRequestCreationModel)
+
+        expect(mockPrivilegeRepository.isGranted).toBeCalledTimes(0)
+        expect(mockPrivilegeRepository.addPrivilege).toBeCalledTimes(0)
+        expect(mockPrivilegeRepository.getPublicPrivileges).toBeCalledTimes(1)
+    })
+})

@@ -1,7 +1,7 @@
 // import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, PublicProjectResponseModel } from "../../entities/project";
 // import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 
-import { PrivilegeRequestModel, PrivilegeResponseModel, PublicPrivilege } from "../../entities/privilege";
+import { PrivilegeRequestCreationModel, PrivilegeRequestModel, PrivilegeResponseModel, PublicPrivilege } from "../../entities/privilege";
 import { ProjectRequestModel } from "../../entities/project";
 
 export interface PrivilegeRepository {
@@ -15,6 +15,7 @@ export interface PrivilegeRepository {
     isGranted(privilege: PrivilegeRequestModel): Promise<boolean>;
     getContact(project: ProjectRequestModel): Promise<PrivilegeResponseModel>;
     createPrivileges(publicPrivilege: PublicPrivilege): Promise<number>;
+    addPrivilege(privilege: PrivilegeRequestCreationModel): Promise<number>;
     getPublicPrivileges(project: ProjectRequestModel): Promise<PublicPrivilege | null>;
     // The same for many projects in one query; projects without privileges are absent from the map.
     getPublicPrivilegesOfProjects(project_ids: number[]): Promise<Map<number, PublicPrivilege>>;
