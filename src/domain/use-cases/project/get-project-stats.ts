@@ -7,6 +7,7 @@ import { SampleRepository } from "../../interfaces/repositories/sample-repositor
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { GetProjectStatsUseCase } from "../../interfaces/use-cases/project/get-project-stats";
+import { LandMask } from "../../interfaces/geography/land-mask";
 import { ExploreEcoTaxaService } from "../explore/explore-ecotaxa";
 import { ExploreProjectContext } from "../explore/explore-selection";
 import { buildExploreSummary } from "../explore/explore-stats";
@@ -34,6 +35,7 @@ export class GetProjectStats implements GetProjectStatsUseCase {
         private readonly sampleRepository: SampleRepository,
         private readonly taskRepository: TaskRepository,
         private readonly ecotaxa: ExploreEcoTaxaService,
+        private readonly land: LandMask,
         private readonly now: () => Date = () => new Date(),
     ) {
         this.access = new ProjectAccessPolicy(userRepository, privilegeRepository);
@@ -80,7 +82,7 @@ export class GetProjectStats implements GetProjectStatsUseCase {
             },
             privacy: buildProjectStatsPrivacy(project, now),
             raw_backup: role === "user" ? null : buildProjectStatsRawBackup(project, samples),
-            map: buildProjectStatsMap(samples),
+            map: buildProjectStatsMap(samples, this.land),
             samples: buildProjectStatsSamples(summary, samples, now),
             ecotaxa: buildProjectStatsEcoTaxa(ecotaxa, samples, linked),
         };

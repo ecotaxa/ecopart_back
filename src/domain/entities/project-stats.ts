@@ -54,12 +54,14 @@ export interface ProjectStatsMapSample {
     ctd_longitude: number | null;
     use_ctd_coordinates: boolean;             // which of the two the project uses as the sample position
     coordinates_mismatch: boolean;            // both known and more than COORDINATES_MISMATCH_KM apart
+    on_land: boolean;                         // the position used is on land, more than LAND_MARGIN_KM from the sea or a lake
 }
 
 export interface ProjectStatsMap {
     samples: ProjectStatsMapSample[];
     nb_samples_without_ctd: number;
     nb_coordinates_mismatches: number;
+    nb_samples_on_land: number;
 }
 
 export interface ProjectStatsSamples {
@@ -102,6 +104,7 @@ export type ProjectQcWarningCode =
     | "samples_not_backed_up"
     | "samples_without_ctd"
     | "coordinates_mismatches"
+    | "samples_on_land"
     | "instrument_parameter_mismatches"
     | "suspicious_dates"
     | "suspicious_pressures"

@@ -3,6 +3,10 @@ import * as shell from "shelljs";
 // Copy all the html mailer templates
 shell.cp("-R", "src/infra/mailer/templates", "dist/infra/mailer/");
 
+// Copy the lakes the land mask reads
+shell.mkdir("-p", "dist/infra/geography");
+shell.cp("-R", "src/infra/geography/data", "dist/infra/geography/");
+
 // Copy OpenAPI YAML schema files (not compiled by tsc, must be copied manually)
 shell.mkdir("-p", "dist/presentation/openapi/schemas");
 shell.cp("-R", "src/presentation/openapi/schemas", "dist/presentation/openapi/");

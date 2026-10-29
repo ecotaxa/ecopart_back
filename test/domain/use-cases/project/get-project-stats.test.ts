@@ -1,6 +1,7 @@
 import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { UserUpdateModel } from "../../../../src/domain/entities/user";
 import { ExploreEcoTaxaService } from "../../../../src/domain/use-cases/explore/explore-ecotaxa";
+import { LandMask } from "../../../../src/domain/interfaces/geography/land-mask";
 import { GetProjectStats } from "../../../../src/domain/use-cases/project/get-project-stats";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
@@ -11,6 +12,8 @@ import { exploreProject, projectStatsSample } from "../explore/explore-fixtures"
 
 const NOW = new Date("2026-10-23T12:00:00Z");
 const current_user: UserUpdateModel = { user_id: 7 };
+// Every position at sea except the second sample's, inland.
+const LAND: LandMask = { isOnLand: (latitude, longitude) => Math.abs(latitude - 45.76) < 1 && Math.abs(longitude - 4.83) < 1 };
 
 const PROJECT: ProjectResponseModel = exploreProject(5, "open", {
     oldest_sample_utc_date_time: "2021-05-05T10:00:00Z",
@@ -21,7 +24,7 @@ const PROJECT: ProjectResponseModel = exploreProject(5, "open", {
 
 const SAMPLES = [
     projectStatsSample({ sample_id: 1, sample_name: "s1", project_id: 5, station_id: "st_1", nb_particles: 1000, nb_vignettes: 50, ecotaxa_sample_imported: true, ecotaxa_sample_id: 9001, ctd_imported: true, ctd_latitude: 43.41, ctd_longitude: 7.88, sample_creation_utc_date_time: "2024-07-01T09:00:00.000Z" }),
-    projectStatsSample({ sample_id: 2, sample_name: "s2", project_id: 5, station_id: "st_2", nb_particles: null, nb_vignettes: 30, max_pressure: 1500, sample_creation_utc_date_time: "2024-07-11T09:00:00.000Z" }),
+    projectStatsSample({ sample_id: 2, sample_name: "s2", project_id: 5, station_id: "st_2", nb_particles: null, nb_vignettes: 30, max_pressure: 1500, sample_creation_utc_date_time: "2024-07-11T09:00:00.000Z", latitude: 45.76, longitude: 4.83, sample_latitude: 45.76, sample_longitude: 4.83 }),
 ];
 
 const ECOTAXA = {
@@ -50,7 +53,7 @@ describe("GetProjectStats use case", () => {
         sampleRepository = new MockSampleRepository();
         taskRepository = new MockTaskRepository();
         ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository, projectRepository);
-        useCase = new GetProjectStats(userRepository, projectRepository, privilegeRepository, sampleRepository, taskRepository, ecotaxa, () => NOW);
+        useCase = new GetProjectStats(userRepository, projectRepository, privilegeRepository, sampleRepository, taskRepository, ecotaxa, LAND, () => NOW);
 
         jest.spyOn(userRepository, "ensureUserCanBeUsed").mockResolvedValue();
         jest.spyOn(userRepository, "isAdmin").mockResolvedValue(false);
@@ -102,11 +105,12 @@ describe("GetProjectStats use case", () => {
             raw_backup: { last_backup_utc_date_time: "2024-07-10T00:00:00.000Z", nb_samples_not_backed_up: 1 },
             map: {
                 samples: [
-                    { sample_id: 1, sample_name: "s1", latitude: 43.4, longitude: 7.87, ctd_latitude: 43.41, ctd_longitude: 7.88, use_ctd_coordinates: false, coordinates_mismatch: false },
-                    { sample_id: 2, sample_name: "s2", latitude: 43.4, longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false, coordinates_mismatch: false },
+                    { sample_id: 1, sample_name: "s1", latitude: 43.4, longitude: 7.87, ctd_latitude: 43.41, ctd_longitude: 7.88, use_ctd_coordinates: false, coordinates_mismatch: false, on_land: false },
+                    { sample_id: 2, sample_name: "s2", latitude: 45.76, longitude: 4.83, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false, coordinates_mismatch: false, on_land: true },
                 ],
                 nb_samples_without_ctd: 1,
                 nb_coordinates_mismatches: 0,
+                nb_samples_on_land: 1,
             },
             samples: {
                 sample_types: { depth: 2, time: 0, total: 2 },
@@ -174,7 +178,7 @@ describe("GetProjectStats use case", () => {
         expect(stats.counts).toEqual({ stations: 0, samples: 0, particles: 0, vignettes: 0, exports: 0 });
         expect(stats.privacy).toEqual({ status: "private", oldest_sample_utc_date_time: null, visible_utc_date_time: null, public_utc_date_time: null, open_utc_date_time: null });
         expect(stats.raw_backup).toEqual({ last_backup_utc_date_time: null, nb_samples_not_backed_up: 0 });
-        expect(stats.map).toEqual({ samples: [], nb_samples_without_ctd: 0, nb_coordinates_mismatches: 0 });
+        expect(stats.map).toEqual({ samples: [], nb_samples_without_ctd: 0, nb_coordinates_mismatches: 0, nb_samples_on_land: 0 });
         expect(stats.samples.sample_types).toEqual({ depth: 0, time: 0, total: 0 });
         expect(stats.samples.pressure_range).toBeNull();
         expect(stats.samples.max_pressure_histogram).toEqual([]);
