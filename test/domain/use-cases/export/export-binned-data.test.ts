@@ -470,6 +470,30 @@ describe("ExportBinnedData", () => {
             expect(log_messages).toContain(`${sampleModel_1.sample_name}: 6 particle(s) smaller than the minimum area of 2 px are left out of the counts`);
         });
 
+        test("the task log states the request, each sample binned, the particle table and the archive", async () => {
+            jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(pivotOf(
+                sample_name === "no_pressure"
+                    ? [{ ...pivotLine(1, 2, 10, 20, 0), raw_pressure: null }]
+                    : [pivotLine(1, 2, 10, 20, 0), pivotLine(12, 2, 4, 20, 1)]))) as any);
+            given([sample(), sample({ sample_id: 8, sample_name: "no_pressure" })], [project({ project_title: "Perle 3", instrument_model: "UVP5HD" })]);
+
+            await useCase.execute(current_user, { sample_ids: [7, 8] });
+            expect((await task_finished).outcome).toBe("finished");
+
+            expect(log_messages).toContain("Request: 2 sample(s) from 1 project(s), bin_mode auto, depth bins of 5 m, time bins of 1 h, format tsv");
+            expect(log_messages).toContain("Request: project 1 'Perle 3' (UVP5HD): 2 sample(s)");
+            expect(log_messages).toContain("Particles: 26 size class(es) exported, from 80p6um_102um to 26000um_inf");
+            // Pressures 1 and 12 on 5 m bins: 0-5 m and 10-15 m hold an image, 5-10 m is crossed without one
+            expect(log_messages).toContain(`Particles: ${sampleModel_1.sample_name} (depth axis, Depth sample): 2 of 2 image(s) of the particle file used, 3 row(s) from 0 m to 15 m, 1 of them without imaged volume, 2.24 L imaged`);
+            expect(log_messages).toContain("Particles: no_pressure (depth axis, Depth sample): 0 of 1 image(s) of the particle file used");
+            expect(log_messages.some(m => /^Particles: particles\.tsv written, 3 row\(s\) for 2 sample\(s\), [\d.]+ (B|kB)$/.test(m))).toBe(true);
+            expect(log_messages.some(m => new RegExp(`^Archive: ecopart_export_binned_${TASK_ID}\\.zip written, [\\d.]+ (B|kB)$`).test(m))).toBe(true);
+            expect(log_messages).toContain(`Exported at: ${path.relative(PROJECT_ROOT, zip_path())}`);
+            expect(log_messages.some(m => m.includes(PROJECT_ROOT))).toBe(false);
+            // The size classes are announced with the particle step, after the metadata
+            expect(log_messages.findIndex(m => m.startsWith("Particles: 26 size class"))).toBeGreaterThan(log_messages.findIndex(m => m.startsWith("Metadata: samples.tsv")));
+        });
+
         test("the samples dropped by skip_not_validated are named in the task log", async () => {
             given([sample(), sample({ sample_id: 8, sample_name: "pending_one", visual_qc_status_label: "PENDING" })], [project()]);
 

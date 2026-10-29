@@ -1007,8 +1007,9 @@ export default function ProjectRouter(
      *       - Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via
      *         `GET /tasks/{task_id}/file`.
      *       - **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export
-     *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the
-     *         download link; when `false`, only the download link is returned.
+     *         folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the archive path inside
+     *         the FTP export folder (`<task_id>/<archive name>`) and the download link; when `false`, only the
+     *         download link is returned.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []

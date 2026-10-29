@@ -132,6 +132,24 @@ describe('task repository (integration)', () => {
             expect(task?.task_error).toBe('boom')
         })
 
+        test('the log, the error and the result quote paths relative to the application root', async () => {
+            const server_path = path.join(PROJECT_ROOT, 'data_storage', 'tasks', '1', 'export.zip')
+            const failing = await newTask()
+            await taskRepo.logMessage((await taskRepo.getOneTask({ task_id: failing }))?.task_log_file_path, `Exported at: ${server_path}`)
+            await taskRepo.failedTask(failing, new Error(`ENOENT: no such file or directory, open '${server_path}'`))
+
+            expect((await taskRepo.getOneTask({ task_id: failing }))?.task_error).toBe("ENOENT: no such file or directory, open 'data_storage/tasks/1/export.zip'")
+            const log = await logOf(failing)
+            expect(log).toContain('Exported at: data_storage/tasks/1/export.zip')
+            expect(log).toContain("open 'data_storage/tasks/1/export.zip'")
+            expect(log).not.toContain(PROJECT_ROOT)
+
+            const done = await newTask()
+            await taskRepo.startTask({ task_id: done })
+            await taskRepo.finishTask({ task_id: done }, `${server_path} https://ecopart.example.org/api/tasks/1/file`)
+            expect((await taskRepo.getOneTask({ task_id: done }))?.task_result).toBe('data_storage/tasks/1/export.zip https://ecopart.example.org/api/tasks/1/file')
+        })
+
         test('a final status cannot change any more', async () => {
             const task_id = await newTask()
             await taskRepo.startTask({ task_id })

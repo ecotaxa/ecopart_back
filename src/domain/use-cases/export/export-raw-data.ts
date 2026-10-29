@@ -12,7 +12,7 @@ import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
-import { TaskRepository } from "../../interfaces/repositories/task-repository";
+import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportRawDataRequestModel, ExportRawDataUseCase, RawExportType } from "../../interfaces/use-cases/export/export-raw-data";
@@ -20,6 +20,7 @@ import { renderReadme } from "./readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { zipFolder } from "./zip-folder";
 import { removeExportWorkFolder } from "./work-folder";
+import { fileSize, fileSizeLabel, formatBytes, logExportedProjects, relativePath } from "./export-log";
 import { ProjectAccessPolicy } from "../project/project-access";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
@@ -149,6 +150,7 @@ export class ExportRawData implements ExportRawDataUseCase {
         skipped_not_validated: string[],
     ): Promise<void> {
         const task_id = task.task_id;
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, message);
 
         // Computed before the try so the failure path can remove exactly what this task produced.
         const base_folder = path.join(__dirname, "..", "..", "..", "..");
@@ -161,6 +163,11 @@ export class ExportRawData implements ExportRawDataUseCase {
 
         try {
             await this.taskRepository.startTask({ task_id });
+
+            const project_count = new Set(samples.map(s => s.project_id)).size;
+            const ecotaxa_option = export_types.includes("ecotaxa") ? `, EcoTaxa non-living objects ${ecotaxa_exclude_not_living ? "excluded" : "included"}` : "";
+            await log(`Request: ${samples.length} sample(s) from ${project_count} project(s), export types ${export_types.join(", ")}, format ${format}${ecotaxa_option}`);
+            await logExportedProjects(log, samples, projects_by_id);
 
             // Traceability of a partial export: the archive itself only holds validated samples, so
             // the task log is the only place stating what the caller asked for and did not get.
@@ -184,11 +191,11 @@ export class ExportRawData implements ExportRawDataUseCase {
                 if (export_type === "metadata") {
                     await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, export_types.includes("ecotaxa"), format);
                 } else if (export_type === "lpm" || export_type === "images" || export_type === "instrument_config") {
-                    await this.writeArtifacts(task, work_folder, samples, projects_by_id, ARTIFACT_STEPS[export_type]);
+                    await this.writeArtifacts(log, work_folder, samples, projects_by_id, ARTIFACT_STEPS[export_type]);
                 } else if (export_type === "ctd") {
-                    await this.writeCtd(task, work_folder, samples, projects_by_id);
+                    await this.writeCtd(log, work_folder, samples, projects_by_id);
                 } else if (export_type === "ecotaxa") {
-                    await this.writeEcotaxa(task, work_folder, samples, projects_by_id, ecotaxa_exclude_not_living);
+                    await this.writeEcotaxa(log, work_folder, samples, projects_by_id, ecotaxa_exclude_not_living);
                 }
 
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index), `Step ${step_index}/${step_count} ${export_type}: done`);
@@ -201,10 +208,11 @@ export class ExportRawData implements ExportRawDataUseCase {
             await this.taskRepository.throwIfCancelled(task_id);
             await zipFolder(work_folder, zip_path);
             await fsPromises.rm(work_folder, { recursive: true, force: true });
+            await log(`Archive: ${path.basename(zip_path)} written, ${await fileSizeLabel(zip_path)}`);
 
             const download_link = `${this.base_url_path}/api/tasks/${task_id}/file`;
-            await this.taskRepository.logMessage(task.task_log_file_path, `Exported at: ${zip_path}`);
-            await this.taskRepository.logMessage(task.task_log_file_path, `Download link: ${download_link}`);
+            await log(`Exported at: ${relativePath(zip_path)}`);
+            await log(`Download link: ${download_link}`);
             await this.taskRepository.finishTask({ task_id }, download_link);
         } catch (error) {
             if (work_folder_created) await removeExportWorkFolder(this.taskRepository, task, work_folder, error);
@@ -230,41 +238,55 @@ export class ExportRawData implements ExportRawDataUseCase {
     // value. Applying it means producing derived files, hence the dependency on the TODO above.
     // See docs/export-raw-todo.md section E.
     private async writeArtifacts(
-        task: TaskResponseModel,
+        log: TaskLogger,
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
         step: { category: RawFileCategory; folder: string; label: string; warn_when_empty: boolean },
     ): Promise<void> {
+        let copied_files = 0;
+        let copied_bytes = 0;
+        let samples_with_files = 0;
         for (const sample of samples) {
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;
             const files = await this.sampleRepository.listRawFilesForSample(project.instrument_model, project.project_id, sample.sample_name, step.category);
             if (files.length === 0) {
                 if (step.warn_when_empty) {
-                    await this.taskRepository.logMessage(task.task_log_file_path, `${step.label}: no raw files found for sample '${sample.sample_name}' (project ${project.project_id}, instrument ${project.instrument_model})`);
+                    await log(`${step.label}: no raw files found for sample '${sample.sample_name}' (project ${project.project_id}, instrument ${project.instrument_model})`);
                 } else {
-                    await this.taskRepository.logMessage(task.task_log_file_path, `${step.label}: nothing to export for sample '${sample.sample_name}' (instrument ${project.instrument_model})`);
+                    await log(`${step.label}: nothing to export for sample '${sample.sample_name}' (instrument ${project.instrument_model})`);
                 }
                 continue;
             }
             const dest_dir = path.join(work_folder, step.folder, `${project.project_id}`, sample.sample_name);
             await fsPromises.mkdir(dest_dir, { recursive: true });
+            const copied: string[] = [];
             for (const src of files) {
-                await fsPromises.copyFile(src, path.join(dest_dir, path.basename(src)));
+                const dest = path.join(dest_dir, path.basename(src));
+                await fsPromises.copyFile(src, dest);
+                const size = await fileSize(dest);
+                copied_bytes += size ?? 0;
+                copied.push(`${path.basename(src)} (${size === null ? "size unknown" : formatBytes(size)})`);
             }
+            copied_files += files.length;
+            samples_with_files += 1;
+            await log(`${step.label}: ${sample.sample_name}: copied ${copied.join(", ")}`);
         }
+        await log(`${step.label}: ${copied_files} file(s) copied for ${samples_with_files} of ${samples.length} sample(s), ${formatBytes(copied_bytes)}`);
     }
 
     private async writeCtd(
-        task: TaskResponseModel,
+        log: TaskLogger,
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
     ): Promise<void> {
+        let copied_samples = 0;
+        let copied_bytes = 0;
         for (const sample of samples) {
             if (!sample.ctd_imported) {
-                await this.taskRepository.logMessage(task.task_log_file_path, `CTD: skipping sample '${sample.sample_name}' (no CTD imported)`);
+                await log(`CTD: skipping sample '${sample.sample_name}' (no CTD imported)`);
                 continue;
             }
             const project = projects_by_id.get(sample.project_id);
@@ -274,17 +296,24 @@ export class ExportRawData implements ExportRawDataUseCase {
             try {
                 await fsPromises.access(src);
             } catch {
-                await this.taskRepository.logMessage(task.task_log_file_path, `CTD: file not found on disk for sample '${sample.sample_name}': ${src}`);
+                await log(`CTD: file not found on disk for sample '${sample.sample_name}': ${relativePath(src)}`);
                 continue;
             }
             const dest_dir = path.join(work_folder, "ctd", `${project.project_id}`);
             await fsPromises.mkdir(dest_dir, { recursive: true });
-            await fsPromises.copyFile(src, path.join(dest_dir, `${sample.sample_name}.${extension}`));
+            const dest_name = `${sample.sample_name}.${extension}`;
+            await fsPromises.copyFile(src, path.join(dest_dir, dest_name));
+            const size = await fileSize(path.join(dest_dir, dest_name));
+            copied_bytes += size ?? 0;
+            copied_samples += 1;
+            const original = sample.ctd_original_file_name ? `, imported from ${sample.ctd_original_file_name}` : "";
+            await log(`CTD: ${sample.sample_name}: copied as ${dest_name} (${size === null ? "size unknown" : formatBytes(size)}${original})`);
         }
+        await log(`CTD: ${copied_samples} of ${samples.length} sample(s) copied, ${formatBytes(copied_bytes)}`);
     }
 
     private async writeEcotaxa(
-        task: TaskResponseModel,
+        log: TaskLogger,
         work_folder: string,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
@@ -298,11 +327,11 @@ export class ExportRawData implements ExportRawDataUseCase {
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;
             if (!project.ecotaxa_project_id) {
-                await this.taskRepository.logMessage(task.task_log_file_path, `EcoTaxa: skipping sample '${sample.sample_name}' (project ${project.project_id} has no linked EcoTaxa project)`);
+                await log(`EcoTaxa: skipping sample '${sample.sample_name}' (project ${project.project_id} has no linked EcoTaxa project)`);
                 continue;
             }
             if (!sample.ecotaxa_sample_imported) {
-                await this.taskRepository.logMessage(task.task_log_file_path, `EcoTaxa: skipping sample '${sample.sample_name}' (not imported into EcoTaxa)`);
+                await log(`EcoTaxa: skipping sample '${sample.sample_name}' (not imported into EcoTaxa)`);
                 continue;
             }
             const entry = by_project.get(project.project_id) ?? { project, sample_names: [] };
@@ -314,12 +343,15 @@ export class ExportRawData implements ExportRawDataUseCase {
             const dest_dir = path.join(work_folder, "ecotaxa", `${project.project_id}`);
             await fsPromises.mkdir(dest_dir, { recursive: true });
             const dest_file = path.join(dest_dir, `ecotaxa_export_${project.project_id}.zip`);
+            const project_log: TaskLogger = (message) => log(`EcoTaxa: project ${project.project_id}: ${message}`);
+            await project_log(`export of ${sample_names.length} sample(s) from EcoTaxa project ${project.ecotaxa_project_id}${exclude_not_living ? ", non-living objects excluded" : ""}`);
             try {
-                await this.ecotaxaAccountRepository.exportObjectSetGeneral(project, sample_names, exclude_not_living, dest_file);
+                await this.ecotaxaAccountRepository.exportObjectSetGeneral(project, sample_names, exclude_not_living, dest_file, project_log);
             } catch (err) {
-                await this.taskRepository.logMessage(task.task_log_file_path, `EcoTaxa: export failed for project ${project.project_id}: ${(err as Error).message}`);
+                await log(`EcoTaxa: export failed for project ${project.project_id}: ${(err as Error).message}`);
                 throw err;
             }
+            await project_log(`${path.basename(dest_file)} received, ${await fileSizeLabel(dest_file)}`);
         }
     }
 }

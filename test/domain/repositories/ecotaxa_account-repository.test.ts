@@ -1,4 +1,7 @@
 //test/domain/repositories/ecotaxa_account-repository.test.ts
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { EcotaxaAccountDataSource } from "../../../src/data/interfaces/data-sources/ecotaxa_account-data-source";
 import { EcotaxaAccountRequestCreationModel, PublicEcotaxaAccountRequestCreationModel } from "../../../src/domain/entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectUpdateModel } from "../../../src/domain/entities/project";
@@ -323,6 +326,36 @@ describe("EcotaxaAccount Repository", () => {
                 42,
                 { managers: [contact], contact }
             )
+        });
+    });
+
+    describe("exportObjectSetGeneral", () => {
+        let tmp_dir: string;
+        beforeEach(() => { tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-ecotaxa-export-")); });
+        afterEach(() => { fs.rmSync(tmp_dir, { recursive: true, force: true }); });
+
+        test("logs the samples found in EcoTaxa, those left out, and the export job", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            jest.spyOn(repositoryImpl, "getOneEcoTaxaInstance").mockResolvedValue(ecotaxa_instance_test_ecotaxa);
+            jest.spyOn(repositoryImpl, "getEcotaxaGenericAccountForInstance").mockResolvedValue(ecotaxaAccountResponseModel_1);
+            jest.spyOn(repositoryImpl, "pollJobUntilDone").mockResolvedValue({} as any);
+            jest.spyOn(repositoryImpl as any, "http").mockImplementation((async (url: string) => {
+                if (url.includes("id_pattern=found")) return [{ sampleid: 11, orig_id: "found" }];
+                if (url.includes("id_pattern=missing")) return [{ sampleid: 12, orig_id: "missing_too_long" }];
+                return { job_id: 99 };
+            }) as any);
+            jest.spyOn(repositoryImpl as any, "fetchWithAgent").mockResolvedValue({ ok: true, arrayBuffer: async () => Buffer.from("zip") });
+            const messages: string[] = [];
+            const dest = path.join(tmp_dir, "ecotaxa_export_1.zip");
+
+            await repositoryImpl.exportObjectSetGeneral({ ecotaxa_instance_id: 1, ecotaxa_project_id: 55 } as ProjectResponseModel, ["found", "missing"], false, dest, async (message) => { messages.push(message); });
+
+            expect(messages).toEqual([
+                "1 of 2 sample(s) found in EcoTaxa project 55, not found and left out: missing",
+                "EcoTaxa export job 99 started",
+                "EcoTaxa export job 99 done, downloading its file",
+            ]);
+            expect(fs.readFileSync(dest, "utf8")).toBe("zip");
         });
     });
 

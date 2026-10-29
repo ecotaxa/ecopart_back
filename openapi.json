@@ -2857,7 +2857,7 @@
         "properties": {
           "ftp_export": {
             "type": "boolean",
-            "description": "FTP export toggle. The export archive is always written to the task folder and downloadable via `GET /tasks/{task_id}/file`. When `true`, the same archive is additionally written to the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and both paths are returned.",
+            "description": "FTP export toggle. The export archive is always written to the task folder and downloadable via `GET /tasks/{task_id}/file`. When `true`, the same archive is additionally written to the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) and the task result also gives the archive path inside that folder (`<task_id>/<archive name>`).",
             "example": false
           }
         }
@@ -6881,7 +6881,7 @@
     "/projects/{project_id}/backup/export": {
       "post": {
         "summary": "Export project backup",
-        "description": "Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).\nRequires a prior successful backup — fails if `l0b_backup/` does not exist for the project.\n\nThe whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and\n`config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)\nis compressed into a single archive named\n`ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).\n\nThis export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains\nthe `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the\n`<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.\n\n**Destination(s):**\n\n- Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via\n  `GET /tasks/{task_id}/file`.\n- **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export\n  folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the FTP path and the\n  download link; when `false`, only the download link is returned.\n",
+        "description": "Start an asynchronous **backup export** task (returns a Task immediately; poll the task for progress).\nRequires a prior successful backup — fails if `l0b_backup/` does not exist for the project.\n\nThe whole `<DATA_STORAGE_FS_STORAGE>/<project_id>/l0b_backup/` folder (its `raw/`, `meta/` and\n`config/` contents, exactly as produced by the backup task — see `POST /projects/{project_id}/backup`)\nis compressed into a single archive named\n`ecopart_export_backup_<project_id>_<YYYY_MM_DD_HH_MM_SS>.zip` (ZIP, DEFLATE level 9).\n\nThis export is instrument-agnostic: it re-zips whatever the backup produced, so a UVP5 export contains\nthe `HDR<timestamp>.zip` raw archives + UVP5 `meta`/`config`, and a UVP6 export contains the\n`<YYYYMMDD-HHMMSS>.zip` raw archives + UVP6 `meta`/`config`.\n\n**Destination(s):**\n\n- Always written to `<DATA_STORAGE_FOLDER>/tasks/<task_id>/` and made available for download via\n  `GET /tasks/{task_id}/file`.\n- **Option `ftp_export`:** when `true`, the same archive is additionally written to the FTP export\n  folder `<DATA_STORAGE_EXPORT>/<task_id>/`, and the task result returns both the archive path inside\n  the FTP export folder (`<task_id>/<archive name>`) and the download link; when `false`, only the\n  download link is returned.\n",
         "tags": [
           "Projects"
         ],

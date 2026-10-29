@@ -236,6 +236,20 @@ describe("ExportRawData — produced archive", () => {
             expect(entries.filter(e => e.startsWith("lpm/") || e.startsWith("ctd/") || e.startsWith("ecotaxa/"))).toEqual([]);
         });
 
+        test("the task log states the request, each table written and the archive", async () => {
+            await runExport(samples, ["metadata"], [project({ project_id: 1, project_title: "Perle 3", instrument_model: "UVP5HD" })]);
+
+            expect(log_messages).toContain("Request: 2 sample(s) from 1 project(s), export types metadata, format tsv");
+            expect(log_messages).toContain("Request: project 1 'Perle 3' (UVP5HD): 2 sample(s)");
+            expect(log_messages.some(m => /^Metadata: projects\.tsv written, 1 row\(s\), [\d.]+ (B|kB)$/.test(m))).toBe(true);
+            expect(log_messages.some(m => /^Metadata: samples\.tsv written, 2 row\(s\), [\d.]+ (B|kB)$/.test(m))).toBe(true);
+            expect(log_messages.some(m => /^Descent filter: image filtering computed for \d of 2 sample\(s\)/.test(m))).toBe(true);
+            expect(log_messages.some(m => new RegExp(`^Archive: ecopart_export_raw_${TASK_ID}\\.zip written, [\\d.]+ (B|kB)$`).test(m))).toBe(true);
+            // Relative to the application root: the task log never shows the server layout
+            expect(log_messages).toContain(`Exported at: ${path.relative(PROJECT_ROOT, zip_path())}`);
+            expect(log_messages.some(m => m.includes(PROJECT_ROOT))).toBe(false);
+        });
+
         test("format=parquet writes both tables as typed Parquet files, documented as such in the README", async () => {
             const outcome = await runExport(samples, ["metadata"], [project({ project_id: 1 })], { format: "parquet" });
 
@@ -409,6 +423,9 @@ describe("ExportRawData — produced archive", () => {
             // The vignettes and the instrument configuration are other export types now.
             expect(entries.some(e => e.includes("_Images.zip"))).toBe(false);
             expect(entries.some(e => e.includes("_meta_conf.zip"))).toBe(false);
+            // Each copy is logged with its size, then the step total
+            expect(log_messages).toContain("LPM: perle3_001: copied perle3_001_work.zip (12 B)");
+            expect(log_messages).toContain("LPM: 1 file(s) copied for 1 of 1 sample(s), 12 B");
         });
 
         test("images and instrument_config each produce their own folder", async () => {
@@ -434,6 +451,7 @@ describe("ExportRawData — produced archive", () => {
             expect(log_messages.some(m => m.includes("LPM: no raw files found for sample 'perle3_001'"))).toBe(true);
             expect(log_messages.some(m => m.includes("Images: nothing to export for sample 'perle3_001'"))).toBe(true);
             expect(log_messages.some(m => m.includes("Instrument config: nothing to export for sample 'perle3_001'"))).toBe(true);
+            expect(log_messages).toContain("LPM: 0 file(s) copied for 0 of 1 sample(s), 0 B");
         });
 
         test("the repository is queried once per sample and per requested category", async () => {
@@ -460,10 +478,12 @@ describe("ExportRawData — produced archive", () => {
             fs.writeFileSync(ctd_file, "ctd-payload");
             jest.spyOn(mockSampleRepository, "getCTDFileAbsolutePath").mockImplementation(() => ctd_file);
 
-            await runExport([validated(sampleModel_1, { sample_id: 1, project_id: 1, sample_name: "perle3_001", ctd_imported: true, ctd_file_extension: "ctd" })],
+            await runExport([validated(sampleModel_1, { sample_id: 1, project_id: 1, sample_name: "perle3_001", ctd_imported: true, ctd_file_extension: "ctd", ctd_original_file_name: "station_12.cnv" })],
                 ["ctd"], [project({ project_id: 1 })]);
 
             expect(await zipEntryContent(zip_path(), "ctd/1/perle3_001.ctd")).toBe("ctd-payload");
+            expect(log_messages).toContain("CTD: perle3_001: copied as perle3_001.ctd (11 B, imported from station_12.cnv)");
+            expect(log_messages).toContain("CTD: 1 of 1 sample(s) copied, 11 B");
         });
 
         test("samples without a CTD import, and files missing on disk, are logged and skipped", async () => {
@@ -476,7 +496,8 @@ describe("ExportRawData — produced archive", () => {
 
             expect(outcome.outcome).toBe("finished");
             expect(log_messages.some(m => m.includes("CTD: skipping sample 'no_ctd' (no CTD imported)"))).toBe(true);
-            expect(log_messages.some(m => m.includes("CTD: file not found on disk for sample 'ctd_gone'"))).toBe(true);
+            expect(log_messages).toContain(`CTD: file not found on disk for sample 'ctd_gone': ${path.relative(PROJECT_ROOT, path.join(tmp_dir, "does_not_exist.ctd"))}`);
+            expect(log_messages).toContain("CTD: 0 of 2 sample(s) copied, 0 B");
         });
     });
 
@@ -484,10 +505,10 @@ describe("ExportRawData — produced archive", () => {
         test("one export call per linked project, with only the imported sample names", async () => {
             const calls: Array<{ project_id: number, sample_names: string[], exclude: boolean, dest: string }> = [];
             jest.spyOn(mockEcotaxaAccountRepository, "exportObjectSetGeneral").mockImplementation(
-                ((p: any, sample_names: string[], exclude: boolean, dest: string) => {
+                (async (p: any, sample_names: string[], exclude: boolean, dest: string, log: (message: string) => Promise<void>) => {
                     calls.push({ project_id: p.project_id, sample_names, exclude, dest });
+                    await log("1 of 1 sample(s) found in EcoTaxa project 55");
                     fs.writeFileSync(dest, "ecotaxa-zip-payload");
-                    return Promise.resolve();
                 }) as any);
 
             await runExport([
@@ -506,6 +527,12 @@ describe("ExportRawData — produced archive", () => {
             expect(await zipEntries(zip_path())).toContain("ecotaxa/1/ecotaxa_export_1.zip");
             expect(log_messages.some(m => m.includes("EcoTaxa: skipping sample 'not_in_ecotaxa' (not imported into EcoTaxa)"))).toBe(true);
             expect(log_messages.some(m => m.includes("has no linked EcoTaxa project"))).toBe(true);
+            // The repository's own lines carry the project, like the lines around them
+            expect(log_messages).toEqual(expect.arrayContaining([
+                "EcoTaxa: project 1: export of 1 sample(s) from EcoTaxa project 55",
+                "EcoTaxa: project 1: 1 of 1 sample(s) found in EcoTaxa project 55",
+                "EcoTaxa: project 1: ecotaxa_export_1.zip received, 19 B",
+            ]));
         });
 
         test("an EcoTaxa API failure fails the whole task — unlike the per-sample skips", async () => {
