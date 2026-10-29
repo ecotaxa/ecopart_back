@@ -387,8 +387,12 @@ test("user should be able to backup project, runs all fier and forgot steps suce
     jest.spyOn(mockTaskRepository, "startTask").mockImplementation(() => Promise.resolve())
     jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue()
     jest.spyOn(mockProjectRepository, "ensureFolderStructureForBackup").mockResolvedValue()
-    jest.spyOn(mockProjectRepository, "copyL0bToProjectFolder").mockResolvedValue()
+    // The repository reports each copy through the logger it is given
+    jest.spyOn(mockProjectRepository, "copyL0bToProjectFolder").mockImplementation((async (_source: string, _dest: string, _skip: boolean, log: (message: string) => Promise<void>) => {
+        await log("raw/r1/ zipped as raw/r1.zip (12 B)")
+    }) as any)
     jest.spyOn(mockProjectRepository, "standardUpdateProject").mockResolvedValue(1)
+    jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue()
     jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue()
     jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue()
 
@@ -404,6 +408,10 @@ test("user should be able to backup project, runs all fier and forgot steps suce
     expect(mockTaskRepository.throwIfCancelled).toBeCalledTimes(1)
     expect(mockProjectRepository.ensureFolderStructureForBackup).toBeCalledTimes(1)
     expect(mockProjectRepository.copyL0bToProjectFolder).toBeCalledTimes(1)
+    expect((mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message)).toEqual([
+        `Step 2/2 L0-b backup folders copy : from ${private_projectResponseModel.root_folder_path} to ${DATA_STORAGE_FS_STORAGE}1/l0b_backup, every raw folder is written again`,
+        "Step 2/2 L0-b backup folders copy : raw/r1/ zipped as raw/r1.zip (12 B)",
+    ])
     expect(mockTaskRepository.finishTask).toBeCalledTimes(1)
 
     expect(mockTaskRepository.failedTask).toBeCalledTimes(0)

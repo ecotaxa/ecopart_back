@@ -1,4 +1,4 @@
-import { formatBytes } from "../../../../src/domain/use-cases/export/export-log";
+import { formatBytes } from "../../../src/domain/utils/format-bytes";
 
 describe("formatBytes", () => {
     test.each([

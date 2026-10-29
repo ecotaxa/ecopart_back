@@ -16,6 +16,7 @@ import { ECOTAXA_BIOTA_TAXO_ID } from "../constants/ecotaxa-living-taxo";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
+import { formatBytes } from "../utils/format-bytes";
 import { Agent } from "http";
 import { TokenCipherWrapper } from "../../infra/cryptography/token-cipher-wrapper";
 import { AesGcmTokenCipher } from "../../infra/cryptography/aes-gcm-token-cipher";
@@ -743,10 +744,10 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
      * API expects field: "file" (binary) and "path" (full path including filename)
      * Returns the server_path for each uploaded file
      */
-    async uploadFilesToUserFolder(baseUrl: string, token: string, destFolderAbsPath: string, localPaths: string[]): Promise<string[]> {
+    async uploadFilesToUserFolder(baseUrl: string, token: string, destFolderAbsPath: string, localPaths: string[], log: TaskLogger = async () => undefined): Promise<string[]> {
         const serverPaths: string[] = [];
 
-        for (const localPath of localPaths) {
+        for (const [i, localPath] of localPaths.entries()) {
             // Extract filename from local path
             const fileName = localPath.split(path.sep).pop() as string;
             // Build full destination path including filename (API requires path to end with filename)
@@ -778,6 +779,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
             const serverPath = await response.json() as string;
             serverPaths.push(serverPath);
+            await log(`${fileName} uploaded to ${destFolderAbsPath} (${formatBytes(file.size)}, ${i + 1}/${localPaths.length})`);
         }
 
         return serverPaths;
@@ -827,7 +829,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         baseUrl: string,
         token: string,
         jobId: number | string,
-        opts: { intervalMs?: number; stallMinutes?: number } = {}
+        opts: { intervalMs?: number; stallMinutes?: number; onProgress?: (progress_pct: number | null, progress_msg: string | null) => Promise<void> } = {}
     ): Promise<any> {
         const intervalMs = opts.intervalMs ?? 2000;
         // No total duration cap: the job of a large sample can run for hours. It only fails when
@@ -835,6 +837,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const stallMs = (opts.stallMinutes ?? 30) * 60_000;
         let last_progress: string | undefined;
         let last_progress_at = Date.now();
+        let last_reported: string | undefined;
 
         for (; ;) {
             // Common pattern: GET /api/jobs/{jobId}/
@@ -853,6 +856,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             } catch (e) {
                 throw new Error(`Failed to poll job status for job ${jobId}: ${e.message}`);
             }
+            const reported = JSON.stringify([status1?.progress_pct, status1?.progress_msg]);
+            if (opts.onProgress && reported !== last_reported) {
+                last_reported = reported;
+                await opts.onProgress(status1?.progress_pct ?? null, status1?.progress_msg ?? null);
+            }
             const progress = JSON.stringify([status1?.state, status1?.progress_pct, status1?.progress_msg, status1?.updated_on]);
             if (progress !== last_progress) {
                 last_progress = progress;
@@ -867,7 +875,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     // ---- Main API ---------------------------------------------------------------
     async importEcoTaxaSamplesInEcoTaxa(
         samples_to_import: PublicImportableEcoTaxaSampleResponseModel[],
-        project: ProjectResponseModel
+        project: ProjectResponseModel,
+        log: TaskLogger = async () => undefined,
+        on_job_progress: (progress_pct: number | null, progress_msg: string | null) => Promise<void> = async () => undefined
     ): Promise<string[]> {
         const ecotaxa_instance_id = project.ecotaxa_instance_id as number;
         const ecotaxa_project_id = project.ecotaxa_project_id as number;
@@ -895,6 +905,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         if (ecotaxa_project.highest_right !== "Manage") {
             throw new Error("Given EcoTaxa account is not manager in the EcoTaxa project and cannot import samples");
         }
+        await log(`EcoTaxa project ${ecotaxa_project_id} on ${ecotaxa_instance.ecotaxa_instance_url}, the EcoPart account manages it`);
 
         // 3) Ensure user-files folder exists: from_EcoPart/<project_id>
         const destFolderAbsPath = await this.ensureUserFilesFolder(
@@ -905,7 +916,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         );
         // 4) Upload files for all samples
         const localPaths = samples_to_import.map((s) => s.local_folder_tsv_path);
-        await this.uploadFilesToUserFolder(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, destFolderAbsPath, localPaths);
+        await this.uploadFilesToUserFolder(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, destFolderAbsPath, localPaths, log);
         // 5) Start import from that folder
         const { job_id } = await this.startImportFromFolder(
             ecotaxa_instance.ecotaxa_instance_url,
@@ -914,8 +925,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             destFolderAbsPath
         );
 
+        await log(`EcoTaxa import job ${job_id} started on the folder ${destFolderAbsPath}`);
+
         // 6) Poll until done
-        await this.pollJobUntilDone(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, job_id, { intervalMs: 2500, stallMinutes: 30 });
+        await this.pollJobUntilDone(ecotaxa_instance.ecotaxa_instance_url, ecotaxa_account.ecotaxa_account_token, job_id, { intervalMs: 2500, stallMinutes: 30, onProgress: on_job_progress });
+        await log(`EcoTaxa import job ${job_id} done`);
 
         // Return uploaded filenames as a convenience
         const imported_sample_names = samples_to_import.map((s) => s.local_folder_tsv_path.split(path.sep).pop() as string);

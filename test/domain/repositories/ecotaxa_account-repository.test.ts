@@ -359,6 +359,38 @@ describe("EcotaxaAccount Repository", () => {
         });
     });
 
+    describe("importEcoTaxaSamplesInEcoTaxa", () => {
+        let tmp_dir: string;
+        beforeEach(() => { tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-ecotaxa-import-")); });
+        afterEach(() => { fs.rmSync(tmp_dir, { recursive: true, force: true }); });
+
+        test("logs the EcoTaxa project, each file uploaded, and the import job", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            const zip = path.join(tmp_dir, "s1.zip");
+            fs.writeFileSync(zip, "zip-payload");
+            jest.spyOn(repositoryImpl, "getOneEcoTaxaInstance").mockResolvedValue(ecotaxa_instance_test_ecotaxa);
+            jest.spyOn(repositoryImpl, "getEcotaxaGenericAccountForInstance").mockResolvedValue(ecotaxaAccountResponseModel_1);
+            jest.spyOn(repositoryImpl, "api_get_ecotaxa_project").mockResolvedValue({ highest_right: "Manage" });
+            jest.spyOn(repositoryImpl, "ensureUserFilesFolder").mockResolvedValue("from_EcoPart/1/");
+            jest.spyOn(repositoryImpl as any, "fetchWithAgent").mockResolvedValue({ ok: true, json: async () => "from_EcoPart/1/s1.zip" });
+            jest.spyOn(repositoryImpl, "startImportFromFolder").mockResolvedValue({ job_id: 99 });
+            jest.spyOn(repositoryImpl, "pollJobUntilDone").mockResolvedValue({});
+            const messages: string[] = [];
+
+            await repositoryImpl.importEcoTaxaSamplesInEcoTaxa(
+                [{ sample_id: 1, sample_name: "s1", tsv_file_name: "s1.tsv", local_folder_tsv_path: zip, images: 3 }],
+                { project_id: 1, ecotaxa_instance_id: 1, ecotaxa_project_id: 55 } as ProjectResponseModel,
+                async (message) => { messages.push(message); });
+
+            expect(messages).toEqual([
+                `EcoTaxa project 55 on ${ecotaxa_instance_test_ecotaxa.ecotaxa_instance_url}, the EcoPart account manages it`,
+                "s1.zip uploaded to from_EcoPart/1/ (11 B, 1/1)",
+                "EcoTaxa import job 99 started on the folder from_EcoPart/1/",
+                "EcoTaxa import job 99 done",
+            ]);
+        });
+    });
+
     describe("pollJobUntilDone", () => {
         const status = (state: string, progress_pct: number) => ({ state, progress_pct, progress_msg: `step ${progress_pct}`, updated_on: `2026-10-13T15:00:${progress_pct}` });
         const poll = (opts: { intervalMs: number, stallMinutes: number }) =>
@@ -372,6 +404,17 @@ describe("EcotaxaAccount Repository", () => {
             // 10 polls of 10 ms each outlast the 30 ms stall delay, a total cap would have failed.
             await expect(poll({ intervalMs: 10, stallMinutes: 0.0005 })).resolves.toEqual(status("F", 100));
             expect(http).toBeCalledTimes(11);
+        });
+
+        test("reports the job progress each time it changes, not at every poll", async () => {
+            const http = jest.spyOn(ecotaxa_accountRepository as any, "http");
+            http.mockResolvedValueOnce(status("R", 10)).mockResolvedValueOnce({ ...status("R", 10), updated_on: "later" }).mockResolvedValueOnce(status("R", 50)).mockResolvedValueOnce(status("F", 100));
+            const reported: Array<[number | null, string | null]> = [];
+
+            await (ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl).pollJobUntilDone("https://ecotaxa.test/", "token", 7,
+                { intervalMs: 1, stallMinutes: 30, onProgress: async (pct, msg) => { reported.push([pct, msg]); } });
+
+            expect(reported).toEqual([[10, "step 10"], [50, "step 50"]]);
         });
 
         test("fails when the job reports no progress for the stall delay", async () => {

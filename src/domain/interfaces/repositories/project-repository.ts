@@ -3,6 +3,7 @@ import { PublicPrivilege } from "../../entities/privilege";
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../../entities/project";
 import { ProjectPrivacyInputs } from "../../use-cases/project/project-access";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
+import { TaskLogger } from "./task-repository";
 
 export interface ProjectRepository {
     createProjectRootFolder(root_folder_path: string): Promise<void>;
@@ -15,7 +16,7 @@ export interface ProjectRepository {
     deleteProject(project: ProjectRequestModel): Promise<number>;
     standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>>;
     ensureFolderStructureForBackup(root_folder_path: string): Promise<void>;
-    copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean): Promise<void>;
+    copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean, log?: TaskLogger): Promise<void>;
     removeInterruptedWriteLeftovers(project_id: number): Promise<string[]>;
     ensureBackupExist(project_id: number): Promise<void>;
     // Returns the archive path inside the FTP export folder, as an FTP user reaches it.

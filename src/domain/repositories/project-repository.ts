@@ -5,8 +5,10 @@ import { PublicPrivilege } from "../entities/privilege";
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../entities/project";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
+import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { ProjectPrivacyInputs } from "../use-cases/project/project-access";
 import { computeProjectPrivacy } from "../utils/project-privacy";
+import { formatBytes } from "../utils/format-bytes";
 
 import * as fsPromises from 'fs/promises'; // For promise-based file operations//import fs from 'fs'; // Correct import for `createReadStream`
 import * as fs from 'fs'; // For createWriteStream
@@ -240,40 +242,42 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         }
     }
 
-    async copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean): Promise<void> {
+    async copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean, log: TaskLogger = async () => undefined): Promise<void> {
         // Create destination folder if does not exist
         await fsPromises.mkdir(path.join(this.base_folder, dest_folder), { recursive: true });
 
         // Copy meta/*, and config/*.
-        await this.copy_metadata(this.base_folder, source_folder, dest_folder);
+        await this.copy_metadata(this.base_folder, source_folder, dest_folder, log);
 
         // Copy L0b files
         if (skip_already_imported === true) {
-            await this.copyNewL0bFolders(this.base_folder, source_folder, dest_folder);
+            await this.copyNewL0bFolders(this.base_folder, source_folder, dest_folder, log);
         } else {
-            await this.copyAllL0bFolders(this.base_folder, source_folder, dest_folder);
+            await this.copyAllL0bFolders(this.base_folder, source_folder, dest_folder, log);
         }
     }
 
-    async copy_metadata(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
+    async copy_metadata(base_folder: string, source_folder: string, dest_folder: string, log: TaskLogger = async () => undefined): Promise<void> {
         // Replaced versions go next to the backup folder (<dest_folder>_history/<date>/), not inside it,
         // so the backup export keeps its raw/meta/config shape.
         const history_root = path.join(base_folder, path.dirname(dest_folder), `${path.basename(dest_folder)}_history`);
         const history_run = await this.firstFreePath(path.join(history_root, this.getFormattedDate(new Date())));
 
         for (const folder of ['meta', 'config']) {
-            await this.replaceFolderKeepingHistory(
-                path.join(base_folder, source_folder, folder),
-                path.join(base_folder, dest_folder, folder),
-                path.join(history_run, folder)
-            );
+            const dest_path = path.join(base_folder, dest_folder, folder);
+            const history_path = path.join(history_run, folder);
+            const outcome = await this.replaceFolderKeepingHistory(path.join(base_folder, source_folder, folder), dest_path, history_path);
+            const files = (await this.listFilesRecursive(dest_path)).length;
+            if (outcome === "unchanged") await log(`${folder}/ : unchanged, ${files} file(s) kept`);
+            else if (outcome === "replaced") await log(`${folder}/ : ${files} file(s) copied, the previous version is kept in ${path.relative(base_folder, history_path)}/`);
+            else await log(`${folder}/ : ${files} file(s) copied`);
         }
     }
 
     // Replaces dest_path by a copy of source_path. The copy is made in a staging folder and swapped in
     // with renames, so a failed or interrupted copy never leaves dest_path partial. The replaced version
     // is moved to history_path, unless it is empty or identical to the new one.
-    async replaceFolderKeepingHistory(source_path: string, dest_path: string, history_path: string): Promise<void> {
+    async replaceFolderKeepingHistory(source_path: string, dest_path: string, history_path: string): Promise<"created" | "unchanged" | "replaced"> {
         const staging_path = `${dest_path}.staging`;
         const legacy_old_path = path.join(path.dirname(dest_path), `old_${path.basename(dest_path)}`);
 
@@ -297,7 +301,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             await fsPromises.rm(dest_path, { recursive: true, force: true });
         } else if (await this.foldersHaveSameContent(dest_path, staging_path)) {
             await fsPromises.rm(staging_path, { recursive: true, force: true });
-            return;
+            return "unchanged";
         } else {
             await fsPromises.mkdir(path.dirname(history_path), { recursive: true });
             await fsPromises.rename(dest_path, history_path);
@@ -309,6 +313,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             if (has_current_version) await fsPromises.rename(history_path, dest_path).catch(() => undefined);
             throw error;
         }
+        return has_current_version ? "replaced" : "created";
     }
 
     async foldersHaveSameContent(folder_a: string, folder_b: string): Promise<boolean> {
@@ -356,30 +361,49 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         return free_path;
     }
 
-    async copyAllL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
+    async copyAllL0bFolders(base_folder: string, source_folder: string, dest_folder: string, log: TaskLogger = async () => undefined): Promise<void> {
+        await this.copyL0bRawEntries(base_folder, source_folder, dest_folder, false, log);
+    }
+
+    async copyNewL0bFolders(base_folder: string, source_folder: string, dest_folder: string, log: TaskLogger = async () => undefined): Promise<void> {
+        await this.copyL0bRawEntries(base_folder, source_folder, dest_folder, true, log);
+    }
+
+    // Each raw/ subfolder is zipped into the backup and a raw/ .zip is copied as is; with skip_existing,
+    // an entry whose archive is already in the backup is left alone.
+    private async copyL0bRawEntries(base_folder: string, source_folder: string, dest_folder: string, skip_existing: boolean, log: TaskLogger): Promise<void> {
         const sourcePath = path.join(base_folder, source_folder, 'raw');
         const destPath = path.join(base_folder, dest_folder, 'raw');
-
-        // Ensure the destination folder exists
         await fsPromises.mkdir(destPath, { recursive: true });
 
-        // Read all subfolders in the source folder
-        const subfolders = await fsPromises.readdir(sourcePath, { withFileTypes: true });
-
-        for (const entry of subfolders) {
-            if (entry.isDirectory()) {
-                const sourceSubfolder = path.join(sourcePath, entry.name);
-                const destZipFile = path.join(destPath, `${entry.name}.zip`);
-
-                // Zip the folder and write to the destination
-                await this.zipFolder(sourceSubfolder, destZipFile);
-            } else if (entry.isFile() && entry.name.endsWith('.zip')) {
-                // Raw subfolder is already zipped — copy it directly
-                const sourceZipFile = path.join(sourcePath, entry.name);
-                const destZipFile = path.join(destPath, entry.name);
-                await this.copyFileAtomic(sourceZipFile, destZipFile);
+        let zipped = 0, copied = 0, skipped = 0, ignored = 0, bytes = 0;
+        for (const entry of await fsPromises.readdir(sourcePath, { withFileTypes: true })) {
+            const is_folder = entry.isDirectory();
+            if (!is_folder && !(entry.isFile() && entry.name.endsWith('.zip'))) {
+                ignored++;
+                await log(`raw/${entry.name} : neither a folder nor a .zip, not backed up`);
+                continue;
             }
+            const archive_name = is_folder ? `${entry.name}.zip` : entry.name;
+            const destFile = path.join(destPath, archive_name);
+            if (skip_existing && await this.checkFileExists(destFile)) {
+                skipped++;
+                await log(`raw/${entry.name}${is_folder ? "/" : ""} : already in the backup as raw/${archive_name}, skipped`);
+                continue;
+            }
+            if (is_folder) await this.zipFolder(path.join(sourcePath, entry.name), destFile);
+            else await this.copyFileAtomic(path.join(sourcePath, entry.name), destFile);
+            const size = (await fsPromises.stat(destFile)).size;
+            bytes += size;
+            if (is_folder) zipped++;
+            else copied++;
+            await log(is_folder ? `raw/${entry.name}/ zipped as raw/${archive_name} (${formatBytes(size)})` : `raw/${entry.name} copied (${formatBytes(size)})`);
         }
+        const not_written = [
+            ...(skip_existing ? [`${skipped} already in the backup`] : []),
+            ...(ignored > 0 ? [`${ignored} not backed up`] : []),
+        ];
+        await log(`raw/ : ${zipped + copied} archive(s) written (${zipped} zipped, ${copied} copied), ${formatBytes(bytes)}${not_written.length > 0 ? `, ${not_written.join(", ")}` : ""}`);
     }
 
     // Temporary files of writes cut short by a server stop, in the project's storage: the `.partial`
@@ -463,43 +487,6 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         await fsPromises.rename(tmpZipFile, destZipFile);
     }
-    async copyNewL0bFolders(base_folder: string, source_folder: string, dest_folder: string): Promise<void> {
-        const sourcePath = path.join(base_folder, source_folder, 'raw');
-        const destPath = path.join(base_folder, dest_folder, 'raw');
-
-        // Ensure the destination folder exists
-        await fsPromises.mkdir(destPath, { recursive: true });
-
-        // Read all subfolders in the source folder
-        const subfolders = await fsPromises.readdir(sourcePath, { withFileTypes: true });
-
-        for (const entry of subfolders) {
-            if (entry.isDirectory()) {
-                const sourceSubfolder = path.join(sourcePath, entry.name);
-                const destSubfolder = path.join(destPath, `${entry.name}.zip`);
-
-                // Check if the subfolder is already copied (check if the zip file exists)
-                const zipExists = await this.checkFileExists(destSubfolder);
-                if (!zipExists) {
-                    // If not, copy and zip the folder
-                    // TODO LOG IN TASK LOG FILE `Copying new folder: ${entry.name}`
-                    await this.zipFolder(sourceSubfolder, destSubfolder);
-                }
-                // else {
-                //     TODO LOG IN TASK LOG FILE `Skipping already existing folder: ${entry.name}`)
-                // }
-            } else if (entry.isFile() && entry.name.endsWith('.zip')) {
-                // Raw subfolder is already zipped — copy it directly if not already backed up
-                const sourceZipFile = path.join(sourcePath, entry.name);
-                const destZipFile = path.join(destPath, entry.name);
-                const alreadyBacked = await this.checkFileExists(destZipFile);
-                if (!alreadyBacked) {
-                    await this.copyFileAtomic(sourceZipFile, destZipFile);
-                }
-            }
-        }
-    }
-
     async checkFileExists(filePath: string): Promise<boolean> {
         try {
             await fsPromises.access(filePath);

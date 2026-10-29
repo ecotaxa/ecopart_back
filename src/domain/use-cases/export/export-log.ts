@@ -4,25 +4,14 @@ import * as fsPromises from "fs/promises";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicSampleModel } from "../../entities/sample";
 import { TaskLogger } from "../../interfaces/repositories/task-repository";
+import { formatBytes } from "../../utils/format-bytes";
 
-const BYTE_UNITS = ["B", "kB", "MB", "GB", "TB"];
 // The application root, which the data storage folders are configured relative to.
 const BASE_FOLDER = path.join(__dirname, "..", "..", "..", "..");
 
 // Task logs are readable by the task owner: they show paths relative to the application root, never the server layout.
 export function relativePath(absolute_path: string): string {
     return path.relative(BASE_FOLDER, absolute_path);
-}
-
-// A byte count as the task log shows it ("12.3 MB"), in powers of 1000.
-export function formatBytes(bytes: number): string {
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1000 && unit < BYTE_UNITS.length - 1) {
-        value /= 1000;
-        unit += 1;
-    }
-    return unit === 0 ? `${value} ${BYTE_UNITS[0]}` : `${value.toFixed(1)} ${BYTE_UNITS[unit]}`;
 }
 
 // Size of a written file, null when it cannot be read: a log line never fails an export.
