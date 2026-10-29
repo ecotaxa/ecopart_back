@@ -79,6 +79,13 @@ describe('SQLiteSampleDataSource', () => {
             await expect(dataSource.createMany([named('after_rollback')])).resolves.toHaveLength(1)
         })
 
+        test('the error names the sample that could not be inserted', async () => {
+            await expect(dataSource.createMany([named('listed_once'), named('listed_twice'), named('listed_twice')]))
+                .rejects.toThrow('Failed to insert sample listed_twice: Error: SQLITE_CONSTRAINT: UNIQUE constraint failed: sample.project_id, sample.sample_name')
+
+            expect(await countByName(['listed_once', 'listed_twice'])).toBe(0)
+        })
+
         test('a failing COMMIT is rolled back so the next call can begin a transaction', async () => {
             let fail_next_commit = true
             const flakyDb = {

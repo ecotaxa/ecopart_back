@@ -1053,7 +1053,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         // List importable samples from root_folder_path
         const folderPath = path.join(this.base_folder, root_folder_path);
         // Read from folderPath/meta/*header*.txt and return the list of samples
-        const meta_header_samples = await this.getSamplesFromHeaders(folderPath);
+        const { samples: meta_header_samples, ambiguous } = this.mergeRepeatedHeaderLines(await this.getSamplesFromHeaders(folderPath));
 
         let source_samples: string[];
         let source_folder: string;
@@ -1086,7 +1086,30 @@ export class SampleRepositoryImpl implements SampleRepository {
             not_imported_samples.map(sample => sample.profileId),
             to_inspect.map(sample => sample.profileId).filter(name => source_samples.includes(name)),
         );
+        for (const [sample_name, problem] of ambiguous) {
+            const other_problem = source_problems.get(sample_name);
+            source_problems.set(sample_name, other_problem ? `${problem}, ${other_problem}` : problem);
+        }
         return this.setupSamples(not_imported_samples, source_samples, source_folder, sample_images_counts, source_problems);
+    }
+
+    // A profileid on several lines of the meta header is listed once. When those lines differ, which
+    // one describes the sample is unknown (UVP5 takes its metadata from it): the sample is not
+    // importable, with the reason.
+    private mergeRepeatedHeaderLines(header_samples: HeaderSampleModel[]): { samples: HeaderSampleModel[], ambiguous: Map<string, string> } {
+        const lines_by_name = new Map<string, HeaderSampleModel[]>();
+        for (const sample of header_samples) {
+            const lines = lines_by_name.get(sample.profileId);
+            if (lines) lines.push(sample);
+            else lines_by_name.set(sample.profileId, [sample]);
+        }
+        const ambiguous = new Map<string, string>();
+        for (const [sample_name, lines] of lines_by_name) {
+            if (new Set(lines.map(line => JSON.stringify(line))).size > 1) {
+                ambiguous.set(sample_name, `listed on ${lines.length} lines of the meta header, with different values`);
+            }
+        }
+        return { samples: [...lines_by_name.values()].map(lines => lines[0]), ambiguous };
     }
 
     // Samples the import would refuse after the copy, with the reason. UVP5: the config files shared by

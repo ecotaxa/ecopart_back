@@ -1102,6 +1102,7 @@ export default function ProjectRouter(
             "No samples to import": { status: 404, message: err.message },
             "Samples not importable:": { status: 401, message: err.message },
             "Invalid validated_samples:": { status: 422, message: err.message },
+            "Samples listed more than once:": { status: 422, message: err.message },
             "Unknown instrument model": { status: 404, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
@@ -1135,7 +1136,9 @@ export default function ProjectRouter(
      *          missing, unknown, or failing QC aborts the whole task (nothing is imported). A depth sample must
      *          also have at least one readable pressure in its particle file (UVP6 `particules.csv`, UVP5
      *          datfile); a time sample may have none, its `max_pressure` is then null. `validated_samples`
-     *          must be a subset of `samples`.
+     *          must be a subset of `samples`, and `samples` must not list a sample twice: both are refused
+     *          with a `422` before any task is created. A profileid on several lines of the meta header is
+     *          listed once by `can_be_imported`, and fails QC level 1 when those lines differ.
      *       2. **Copy source files** into the internal project folder `<DATA_STORAGE_FS_STORAGE>/<project_id>/<sample>/`:
      *          - **UVP5 (UVP5SD / UVP5HD):** the per-cast `work/<sample>` source (plain folder, `.zip`, or
      *            `.tar.zst` — normalized so files sit at the archive root) is re-zipped to `<sample>_work.zip`;
@@ -1195,6 +1198,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project or samples not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: A sample listed twice in `samples`, or `validated_samples` not a subset of `samples`.
      *         content:
      *           application/json:
      *             schema:
