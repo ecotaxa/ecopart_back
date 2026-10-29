@@ -42,6 +42,9 @@ export class ImportSamples implements ImportSamplesUseCase {
 
         if (samples_names_to_import.length === 0) { throw new Error("No samples to import"); }
 
+        // A sample listed twice would only be refused at step 4/4, by the database, after the copy.
+        this.ensureNoSampleIsRepeated(samples_names_to_import);
+
         // Samples pre-validated via the QC preview must be part of the imported set.
         this.ensureValidatedSamplesAreImported(samples_names_to_import, validated_samples);
 
@@ -63,6 +66,13 @@ export class ImportSamples implements ImportSamplesUseCase {
             .catch((error) => console.log(new Date().toISOString(), `Import task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
+    }
+
+    private ensureNoSampleIsRepeated(samples_names_to_import: string[]): void {
+        const repeated = new Set(samples_names_to_import.filter((name, i) => samples_names_to_import.indexOf(name) !== i));
+        if (repeated.size > 0) {
+            throw new Error("Samples listed more than once: " + [...repeated].join(", "));
+        }
     }
 
     private ensureValidatedSamplesAreImported(samples_names_to_import: string[], validated_samples: string[]): void {
@@ -252,7 +262,9 @@ export class ImportSamples implements ImportSamplesUseCase {
     }
 
     // Removes the copies made at step 2/4. Never throws: a failing removal is logged with what may be
-    // left behind, and the task still reaches its final status.
+    // left behind, and the task still reaches its final status. The folder of a sample that exists in
+    // the database is kept: those are its files, whether another import running at the same time
+    // created it or this one did before failing.
     async deleteSourcesFromProjectFolder(task: TaskResponseModel, samples_names_to_import: string[], project: ProjectResponseModel, error: unknown) {
         const prefix = cleanupLogPrefix(error);
         const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, `${prefix} : ${message}`).catch(() => undefined);
@@ -260,7 +272,14 @@ export class ImportSamples implements ImportSamplesUseCase {
 
         await log(`removing the copies of ${samples_names_to_import.length} sample(s) from ${dest_folder} : ${samples_names_to_import.join(", ")}`);
         try {
-            const removed = await this.sampleRepository.deleteSamplesFromImportFolder(dest_folder, samples_names_to_import);
+            const created: string[] = [];
+            for (const sample_name of samples_names_to_import) {
+                if (await this.sampleRepository.getSample({ sample_name, project_id: project.project_id })) created.push(sample_name);
+            }
+            if (created.length > 0) await log(`kept the copies of ${created.length} sample(s) that exist in the database : ${created.join(", ")}`);
+            const uncreated = samples_names_to_import.filter(name => !created.includes(name));
+            if (uncreated.length === 0) return;
+            const removed = await this.sampleRepository.deleteSamplesFromImportFolder(dest_folder, uncreated);
             await log(removed.length > 0 ? `removed ${removed.join(", ")}` : "nothing removed, no copy found");
         } catch (cleanup_error) {
             await log(`removal failed, copies may remain in ${dest_folder} : ${(cleanup_error as Error).message}`);

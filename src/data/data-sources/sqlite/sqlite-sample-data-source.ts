@@ -263,7 +263,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             // Sequential inserts: no statement of the batch can still be pending when ROLLBACK runs.
             const insertedIds: number[] = [];
             for (const sample of samples) {
-                insertedIds.push(await this.createOne(sample).catch((err) => { throw new Error("Failed to insert sample: " + err) }));
+                insertedIds.push(await this.createOne(sample).catch((err) => { throw new Error(`Failed to insert sample ${sample.sample_name}: ${err}`) }));
             }
             await this.runStatement('COMMIT', "Failed to commit transaction: ");
             return insertedIds;

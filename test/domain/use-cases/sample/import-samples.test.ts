@@ -83,6 +83,9 @@ beforeEach(async () => {
     // Step 3/4 reads the particle statistics of every sample from its pivot (an empty one by default).
     jest.spyOn(mockSampleRepository, "getSampleType").mockResolvedValue({ sample_type_id: 1, sample_type_label: "Depth", sample_type_description: "Depth profile" });
     jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(async () => pivotOf([]));
+
+    // The cleanup after a failure keeps the copies of the samples that exist in the database (none by default).
+    jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(null);
 })
 
 
@@ -998,6 +1001,46 @@ describe("Delete Sample Use Case", () => {
                 ]);
             });
 
+            test("keeps the copies of the samples that exist in the database, created by another import at the same time", async () => {
+                jest.spyOn(mockSampleRepository, "createManySamples").mockRejectedValue(new Error("Transaction rolled back due to error: Error: Failed to insert sample perle3_001: Error: SQLITE_CONSTRAINT: UNIQUE constraint failed: sample.project_id, sample.sample_name"));
+                jest.spyOn(mockSampleRepository, "getSample").mockImplementation(async ({ sample_name }) => sample_name === "perle3_001" ? { sample_id: 7 } as any : null);
+                jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder").mockResolvedValue([`${dest_folder}/Mooring_0N_23W_201910_850m/ (2 files, 2.0 KB)`]);
+
+                await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+                expect(mockSampleRepository.getSample).toBeCalledWith({ sample_name: "perle3_001", project_id: projectResponseModel.project_id });
+                expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledWith(dest_folder, ["Mooring_0N_23W_201910_850m"]);
+                expect(loggedMessages().slice(-3)).toEqual([
+                    `Cleanup after failure : removing the copies of 2 sample(s) from ${dest_folder} : perle3_001, Mooring_0N_23W_201910_850m`,
+                    "Cleanup after failure : kept the copies of 1 sample(s) that exist in the database : perle3_001",
+                    `Cleanup after failure : removed ${dest_folder}/Mooring_0N_23W_201910_850m/ (2 files, 2.0 KB)`,
+                ]);
+            });
+
+            test("removes nothing when every sample exists in the database", async () => {
+                jest.spyOn(mockSampleRepository, "createManySamples").mockRejectedValue(new Error("SQLITE_BUSY"));
+                jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue({ sample_id: 7 } as any);
+                jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder");
+
+                await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+                expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
+                expect(loggedMessages().slice(-1)).toEqual(["Cleanup after failure : kept the copies of 2 sample(s) that exist in the database : perle3_001, Mooring_0N_23W_201910_850m"]);
+                expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error("SQLITE_BUSY"));
+            });
+
+            test("a database that cannot be read removes nothing: the copies may belong to created samples", async () => {
+                jest.spyOn(mockSampleRepository, "createManySamples").mockRejectedValue(new Error("SQLITE_BUSY"));
+                jest.spyOn(mockSampleRepository, "getSample").mockRejectedValue(new Error("SQLITE_BUSY"));
+                jest.spyOn(mockSampleRepository, "deleteSamplesFromImportFolder");
+
+                await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+                expect(mockSampleRepository.deleteSamplesFromImportFolder).toBeCalledTimes(0);
+                expect(loggedMessages()).toContain(`Cleanup after failure : removal failed, copies may remain in ${dest_folder} : SQLITE_BUSY`);
+                expect(mockTaskRepository.failedTask).toBeCalledTimes(1);
+            });
+
             test("a failing removal is logged and the task still fails with its own error", async () => {
                 const importError = new Error("SQLITE_BUSY");
                 jest.spyOn(mockSampleRepository, "createManySamples").mockRejectedValue(importError);
@@ -1174,6 +1217,23 @@ describe("Delete Sample Use Case", () => {
             const getProject = jest.spyOn(mockProjectRepository, "getProject");
 
             await expect(importSamplesUseCase.execute(current_user, 1, [])).rejects.toThrow("No samples to import");
+
+            expect(getProject).toBeCalledTimes(0);
+            expect(createTask).toBeCalledTimes(0);
+        });
+
+        test("rejects a sample listed twice before any task is created", async () => {
+            const current_user: UserUpdateModel = { user_id: 1 };
+
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
+            jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true);
+            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+            const createTask = jest.spyOn(mockTaskRepository, "createTask");
+            const getProject = jest.spyOn(mockProjectRepository, "getProject");
+
+            await expect(
+                importSamplesUseCase.execute(current_user, 1, ["sample1", "sample2", "sample1", "sample3", "sample2", "sample1"])
+            ).rejects.toThrow("Samples listed more than once: sample1, sample2");
 
             expect(getProject).toBeCalledTimes(0);
             expect(createTask).toBeCalledTimes(0);

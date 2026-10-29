@@ -220,5 +220,45 @@ describe("Import pre-checks in the source folder", () => {
                 expect(read).toBeCalledTimes(2);
             });
         });
+
+        describe("a profileid on several lines of the meta header", () => {
+            const writeUvp6Project = async (header: string, samples: Record<string, string>) => {
+                fs.mkdirSync(path.join(tmp, "uvp6_m1", "meta"), { recursive: true });
+                fs.writeFileSync(path.join(tmp, "uvp6_m1", "meta", "uvp6_header_m1.txt"), header);
+                for (const [name, hw_conf] of Object.entries(samples)) {
+                    fs.mkdirSync(path.join(tmp, "uvp6_m1", "ecodata", name), { recursive: true });
+                    await writeZip(path.join(tmp, "uvp6_m1", "ecodata", name, `${name}_Particule.zip`), { "metadata.ini": `[sample_metadata]\nprofileid=${name}\n[HW_CONF]\n${hw_conf}\n[ACQ_CONF]\n` });
+                }
+            };
+            const EMAIL = "Operator_email=marc.picheral@imev-mer.fr";
+
+            test("is listed once, importable when its lines are identical and not importable when they differ", async () => {
+                await writeUvp6Project(
+                    "cruise;ship;filename;profileid\nm1;ship;file_a;s1\nm1;ship;file_b;s2\nm1;ship;file_a;s1\nm1;ship;file_c;s2\nm1;ship;file_b;s2\nm1;ship;file_d;s3\n",
+                    { s1: EMAIL, s2: EMAIL, s3: EMAIL },
+                );
+
+                expect(qc(await list("uvp6_m1", "UVP6LP"))).toEqual([
+                    ["s1", true, ""],
+                    ["s2", false, "listed on 3 lines of the meta header, with different values"],
+                    ["s3", true, ""],
+                ]);
+            });
+
+            test("the reason comes before the other problems of the sample", async () => {
+                await writeUvp6Project("cruise;ship;filename;profileid\nm1;ship;file_a;s1\nm1;ship;file_b;s1\n", { s1: "Gain=6" });
+
+                expect(qc(await list("uvp6_m1", "UVP6LP"))).toEqual([
+                    ["s1", false, "listed on 2 lines of the meta header, with different values, no Operator_email in the HW_CONF section of metadata.ini (ecodata/s1/s1_Particule.zip)"],
+                ]);
+            });
+
+            test("a sample already imported is left out, whatever its lines", async () => {
+                await writeUvp6Project("cruise;ship;filename;profileid\nm1;ship;file_a;s1\nm1;ship;file_b;s1\nm1;ship;file_c;s2\n", { s1: EMAIL, s2: EMAIL });
+                getAll.mockResolvedValue({ items: [{ sample_name: "s1" }], total: 1 });
+
+                expect(qc(await list("uvp6_m1", "UVP6LP"))).toEqual([["s2", true, ""]]);
+            });
+        });
     });
 });
