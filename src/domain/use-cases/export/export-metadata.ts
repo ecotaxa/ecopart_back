@@ -15,7 +15,8 @@ import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { buildImageFilteringMetadata } from "../sample/qc-graphs-builder";
 import { computeProjectPrivacy } from "../../utils/project-privacy";
-import { dateValue, TableColumn, TableValue, writeTable } from "./table";
+import { dateValue, TableColumn, tableFileName, TableValue, writeTable } from "./table";
+import { fileSizeLabel } from "./export-log";
 
 // `metadata/projects` and `metadata/samples`, identical in every export product: the raw export
 // and the binned export both write them with this writer, as TSV or Parquet. The integer columns
@@ -228,6 +229,7 @@ export class ExportMetadataWriter {
         }
 
         await writeTable(format, path.join(dir, "projects"), PROJECT_COLUMNS, project_rows.map(row => PROJECT_COLUMNS.map(column => row[column.name] ?? null)));
+        await this.logTableWritten(task, dir, "projects", format, project_rows.length);
 
         // Stable, reproducible row order: by (ecopart_project_id, ecopart_sample_id).
         const ordered_samples = [...samples].sort((a, b) =>
@@ -305,6 +307,12 @@ export class ExportMetadataWriter {
         }));
 
         await writeTable(format, path.join(dir, "samples"), SAMPLE_COLUMNS, sample_rows.map(row => SAMPLE_COLUMNS.map(column => row[column.name] ?? null)));
+        await this.logTableWritten(task, dir, "samples", format, sample_rows.length);
+    }
+
+    private async logTableWritten(task: TaskResponseModel, dir: string, base_name: string, format: ExportTableFormat, row_count: number): Promise<void> {
+        const file_path = tableFileName(path.join(dir, base_name), format);
+        await this.taskRepository.logMessage(task.task_log_file_path, `Metadata: ${path.basename(file_path)} written, ${row_count} row(s), ${await fileSizeLabel(file_path)}`);
     }
 
     /* Descent-filter outcome per sample, replayed at export time from the stored per-image records
@@ -345,6 +353,9 @@ export class ExportMetadataWriter {
                     `Descent filter: cannot compute image filtering for sample '${sample.sample_name}' (${(error as Error).message}) — the filter_* columns stay empty for it`);
             }
         }
+        const with_removed_images = Array.from(by_sample_id.values()).filter(filtering => filtering.removed_images.count > 0).length;
+        await this.taskRepository.logMessage(task.task_log_file_path,
+            `Descent filter: image filtering computed for ${by_sample_id.size} of ${samples.length} sample(s), ${with_removed_images} of them with images removed by the descent filter`);
         return by_sample_id;
     }
 

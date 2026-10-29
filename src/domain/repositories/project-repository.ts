@@ -522,7 +522,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         try {
             await fsPromises.access(backuped_project_path);
         } catch (error) {
-            throw new Error(`Backup folder does not exist at path: ${backuped_project_path}`);
+            throw new Error(`Backup folder does not exist at path: ${path.relative(this.base_folder, backuped_project_path)}`);
         }
     }
 
@@ -538,12 +538,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
         // Create the export zip file path
         await fsPromises.mkdir(exportFolder, { recursive: true });
-        const exportZip = path.join(
-            exportFolder,
-            `ecopart_export_backup_${project.project_id.toString()}_${formattedDate}.zip`
-        );
-        await this.copyZippedL0bFoldersToExportFolder(project, exportZip);
-        return exportZip;
+        const exportZipName = `ecopart_export_backup_${project.project_id.toString()}_${formattedDate}.zip`;
+        await this.copyZippedL0bFoldersToExportFolder(project, path.join(exportFolder, exportZipName));
+        return path.join(task_id.toString(), exportZipName);
     }
 
     async exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string> {

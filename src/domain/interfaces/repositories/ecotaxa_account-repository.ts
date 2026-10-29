@@ -3,6 +3,7 @@ import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectU
 import { PublicImportableEcoTaxaSampleResponseModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { UserUpdateModel } from "../../entities/user";
+import { TaskLogger } from "./task-repository";
 
 export interface EcotaxaAccountRepository {
     api_ecotaxa_get_samples_in_project(baseUrl: string, token: string, ecotaxa_project_id: number): Promise<Array<{ sampleid: number; orig_id: string }>>;
@@ -31,7 +32,7 @@ export interface EcotaxaAccountRepository {
     ensureUserCanUseEcotaxaAccount(current_user: UserUpdateModel, ecotaxa_account_id: number): Promise<void>;
     ensureEcotaxaInstanceConsistency(public_project: PublicProjectRequestCreationModel | PublicProjectUpdateModel): Promise<void>;
     getEcotaxaGenericAccountForInstance(ecotaxa_instance_id: number): Promise<EcotaxaAccountResponseModel>;
-    exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string): Promise<void>;
+    exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string, log?: TaskLogger): Promise<void>;
     // GET api/taxon_set/query: names and lineage of the given taxa.
     api_ecotaxa_get_taxa(baseUrl: string, token: string, taxon_ids: number[]): Promise<EcoTaxaTaxon[]>;
     // POST api/object_set/{project_id}/query: a window of the objects matching the filters, with the asked fields.

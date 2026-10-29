@@ -15,6 +15,7 @@ import { ECOTAXA_BIOTA_TAXO_ID } from "../constants/ecotaxa-living-taxo";
 // import { InstrumentModelRequestModel, InstrumentModelResponseModel } from "../entities/instrument_model";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { EcotaxaAccountRepository } from "../interfaces/repositories/ecotaxa_account-repository";
+import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { Agent } from "http";
 import { TokenCipherWrapper } from "../../infra/cryptography/token-cipher-wrapper";
 import { AesGcmTokenCipher } from "../../infra/cryptography/aes-gcm-token-cipher";
@@ -1085,7 +1086,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     // When exclude_not_living=true, scope the export to descendants of biota
     // (taxo=ECOTAXA_BIOTA_TAXO_ID + taxochild=Y) so only living organisms are returned.
     // Downloads the produced file (TSV/zip) to dest_file_path.
-    async exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string): Promise<void> {
+    async exportObjectSetGeneral(project: ProjectResponseModel, sample_names: string[], exclude_not_living: boolean, dest_file_path: string, log: TaskLogger = async () => undefined): Promise<void> {
         const ecotaxa_instance_id = project.ecotaxa_instance_id as number;
         const ecotaxa_project_id = project.ecotaxa_project_id as number;
         if (!ecotaxa_project_id) throw new Error("No linked EcoTaxa project");
@@ -1101,18 +1102,20 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
 
         // Resolve sample names → EcoTaxa numeric sample ids
         const sampleIds: number[] = [];
+        const not_found: string[] = [];
         for (const name of sample_names) {
             const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
                 `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
                 { method: "GET", headers: this.JSON_HEADERS(token) }
             );
-            for (const s of samples) {
-                if (s.orig_id === name) sampleIds.push(s.sampleid);
-            }
+            const matching = samples.filter(s => s.orig_id === name);
+            for (const s of matching) sampleIds.push(s.sampleid);
+            if (matching.length === 0) not_found.push(name);
         }
         if (sampleIds.length === 0) {
             throw new Error(`No EcoTaxa samples found in project ${ecotaxa_project_id} matching: ${sample_names.join(", ")}`);
         }
+        await log(`${sample_names.length - not_found.length} of ${sample_names.length} sample(s) found in EcoTaxa project ${ecotaxa_project_id}${not_found.length > 0 ? `, not found and left out: ${not_found.join(", ")}` : ""}`);
 
         // Build the filters & request body for /object_set/export/general
         const filters: { [key: string]: string } = { samples: sampleIds.join(",") };
@@ -1143,8 +1146,11 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const job_id = startResp.job_id;
         if (!job_id) throw new Error("EcoTaxa export did not return a job id");
 
+        await log(`EcoTaxa export job ${job_id} started`);
+
         // Poll until the export job is done
         await this.pollJobUntilDone(baseUrl, token, job_id, { intervalMs: 2500, stallMinutes: 30 });
+        await log(`EcoTaxa export job ${job_id} done, downloading its file`);
 
         // Download the produced file
         const fileResp = await this.fetchWithAgent(`${baseUrl}api/jobs/${job_id}/file`, {

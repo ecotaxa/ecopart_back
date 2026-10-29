@@ -14,11 +14,11 @@ import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
-import { TaskRepository } from "../../interfaces/repositories/task-repository";
+import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { ExportBinnedDataRequestModel, ExportBinnedDataUseCase } from "../../interfaces/use-cases/export/export-binned-data";
-import { BinAxis, BinnedSampleBuilder, BinnedSampleSettings, exportedSizeClasses, formatNumber, particleCells, particleTableColumns, sampleVisibleSizeClasses } from "./binned-computation";
+import { BinAxis, BinnedSample, BinnedSampleBuilder, BinnedSampleSettings, exportedSizeClasses, formatNumber, particleCells, particleTableColumns, sampleVisibleSizeClasses } from "./binned-computation";
 import { binnedSampleSettingsOf } from "./binned-settings";
 import { renderBinnedReadme } from "./binned-readme";
 import { ExportMetadataWriter } from "./export-metadata";
@@ -26,6 +26,8 @@ import { ProjectAccessPolicy } from "../project/project-access";
 import { zipFolder } from "./zip-folder";
 import { removeExportWorkFolder } from "./work-folder";
 import { openTableWriter, TableWriter } from "./table";
+import { fileSizeLabel, logExportedProjects, relativePath } from "./export-log";
+import { sizeClassSuffix } from "../../constants/size-classes";
 
 const BIN_MODES: BinnedExportBinMode[] = ["auto", "depth", "time"];
 // The particle table is appended this many rows at a time, so a long sample never sits whole in memory.
@@ -186,6 +188,25 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         return sample.sample_type_label === "Depth" ? "depth" : "time";
     }
 
+    // One line per sample: why its axis, what its particle file held, and the range its rows cover.
+    private describeBinnedSample(sample: PublicSampleModel, bin_mode: BinnedExportBinMode, file_images: number, binned: BinnedSample): string {
+        const axis_origin = bin_mode === "auto" ? `${sample.sample_type_label} sample` : `bin_mode ${bin_mode}`;
+        const parts = [`${binned.used_images} of ${file_images} image(s) of the particle file used`];
+        if (binned.bins.length > 0) {
+            const first = binned.bins[0];
+            const last = binned.bins[binned.bins.length - 1];
+            const range = binned.axis === "depth"
+                ? `${formatNumber(first.depth_start_m as number)} m to ${formatNumber(last.depth_stop_m as number)} m`
+                : `${new Date(first.time_start_ms as number).toISOString()} to ${new Date(last.time_stop_ms as number).toISOString()}`;
+            const without_volume = binned.bins.filter(bin => bin.nb_images === 0).length;
+            const volume_l = binned.bins.reduce((total, bin) => total + bin.water_volume_l, 0);
+            parts.push(`${binned.bins.length} row(s) from ${range}`);
+            if (without_volume > 0) parts.push(`${without_volume} of them without imaged volume`);
+            parts.push(`${formatNumber(volume_l)} L imaged`);
+        }
+        return `Particles: ${sample.sample_name} (${binned.axis} axis, ${axis_origin}): ${parts.join(", ")}`;
+    }
+
     private async runExport(
         task: TaskResponseModel,
         samples: PublicSampleModel[],
@@ -195,6 +216,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         skipped_not_validated: string[],
     ): Promise<void> {
         const task_id = task.task_id;
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, message);
 
         // Computed before the try so the failure path can remove exactly what this task produced.
         const base_folder = path.join(__dirname, "..", "..", "..", "..");
@@ -207,9 +229,10 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
 
         try {
             await this.taskRepository.startTask({ task_id });
+            await log(`Request: ${samples.length} sample(s) from ${projects_by_id.size} project(s), bin_mode ${plan.bin_mode}, depth bins of ${plan.depth_step_m} m, time bins of ${plan.time_step_h} h, format ${plan.format}`);
+            await logExportedProjects(log, samples, projects_by_id);
             if (skipped_not_validated.length > 0) {
-                await this.taskRepository.logMessage(task.task_log_file_path,
-                    `QC: ${skipped_not_validated.length} sample(s) excluded from this export because they are not VALIDATED: ${skipped_not_validated.join(", ")}`);
+                await log(`QC: ${skipped_not_validated.length} sample(s) excluded from this export because they are not VALIDATED: ${skipped_not_validated.join(", ")}`);
             }
 
             await fsPromises.mkdir(work_folder, { recursive: true });
@@ -225,9 +248,13 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, false, plan.format);
             await this.taskRepository.updateTaskProgress({ task_id }, 15, "Step 1/2 metadata: done");
 
+            if (class_indexes.length > 0) {
+                await log(`Particles: ${class_indexes.length} size class(es) exported, from ${sizeClassSuffix(class_indexes[0])} to ${sizeClassSuffix(class_indexes[class_indexes.length - 1])}`);
+            }
             const particles_writer = await openTableWriter(plan.format, path.join(work_folder, "particles"), particleTableColumns(class_indexes), { formatNumber });
             particles = particles_writer;
             const particles_file = path.basename(particles_writer.file_path);
+            let particle_rows = 0;
             for (const [i, sample] of samples.entries()) {
                 await this.taskRepository.throwIfCancelled(task_id);
                 const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
@@ -241,9 +268,11 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
                     await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
                 }
+                particle_rows += binned.bins.length;
 
                 const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
                 await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round(((i + 1) / samples.length) * 75), `Step 2/2 particles: ${summary}`);
+                await log(this.describeBinnedSample(sample, plan.bin_mode, pivot.columns.length, binned));
                 if (binned.bins.length === 0) {
                     const position = axis === "depth" ? "pressure" : "readable time";
                     const positions = axis === "depth" ? pivot.columns.raw_pressure : pivot.columns.image_time_ms;
@@ -252,16 +281,16 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                         : !placeable ? `none of its images has a ${position}`
                             : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
                                 : `none of its ${binned.used_images} image(s) used has a ${position}`;
-                    await this.taskRepository.logMessage(task.task_log_file_path, `${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
+                    await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
                 }
                 if (binned.particles_below_minimum_area > 0) {
-                    await this.taskRepository.logMessage(task.task_log_file_path,
-                        `${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
+                    await log(`${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
                 }
             }
 
             await particles_writer.close();
             particles = null;
+            await log(`Particles: ${particles_file} written, ${particle_rows} row(s) for ${samples.length} sample(s), ${await fileSizeLabel(particles_writer.file_path)}`);
 
             await fsPromises.writeFile(path.join(work_folder, "README.md"), renderBinnedReadme({
                 format: plan.format,
@@ -274,10 +303,11 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             await this.taskRepository.throwIfCancelled(task_id);
             await zipFolder(work_folder, zip_path);
             await fsPromises.rm(work_folder, { recursive: true, force: true });
+            await log(`Archive: ${path.basename(zip_path)} written, ${await fileSizeLabel(zip_path)}`);
 
             const download_link = `${this.base_url_path}/api/tasks/${task_id}/file`;
-            await this.taskRepository.logMessage(task.task_log_file_path, `Exported at: ${zip_path}`);
-            await this.taskRepository.logMessage(task.task_log_file_path, `Download link: ${download_link}`);
+            await log(`Exported at: ${relativePath(zip_path)}`);
+            await log(`Download link: ${download_link}`);
             await this.taskRepository.finishTask({ task_id }, download_link);
         } catch (error) {
             // The particle file goes with the working folder: its handle must not outlive it.

@@ -66,3 +66,27 @@ describe("ProjectRepositoryImpl.zipFolder", () => {
         expect(fs.existsSync(path.join(dest_zip(), "kept.txt"))).toBe(true);
     });
 });
+
+describe("ProjectRepositoryImpl.exportBackupedProjectToFtp", () => {
+    const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
+    let tmp_dir: string;
+
+    beforeEach(() => {
+        tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-ftp-export-"));
+        fs.mkdirSync(path.join(tmp_dir, "fs", "1", "l0b_backup", "raw"), { recursive: true });
+        fs.writeFileSync(path.join(tmp_dir, "fs", "1", "l0b_backup", "raw", "HDR1.zip"), "payload");
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmp_dir, { recursive: true, force: true });
+    });
+
+    test("returns the archive path inside the FTP export folder, where the archive is written", async () => {
+        const repo = new ProjectRepositoryImpl({} as any, path.relative(PROJECT_ROOT, path.join(tmp_dir, "fs")), path.relative(PROJECT_ROOT, path.join(tmp_dir, "ftp")), "", "");
+
+        const ftp_path = await repo.exportBackupedProjectToFtp({ project_id: 1 } as any, 42);
+
+        expect(ftp_path).toMatch(/^42\/ecopart_export_backup_1_[\d_]+\.zip$/);
+        expect(fs.existsSync(path.join(tmp_dir, "ftp", ftp_path))).toBe(true);
+    });
+});

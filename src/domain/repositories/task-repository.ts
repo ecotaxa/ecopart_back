@@ -126,7 +126,7 @@ export class TaskRepositoryImpl implements TaskRepository {
 
         // Update the task result if provided
         if (task_result) {
-            await this.taskDataSource.updateOne({ task_id: task_to_finish.task_id, task_result: task_result })
+            await this.taskDataSource.updateOne({ task_id: task_to_finish.task_id, task_result: this.withoutServerRoot(task_result) })
         }
 
         // appendFile to log file that task is done
@@ -459,7 +459,7 @@ export class TaskRepositoryImpl implements TaskRepository {
 
     async internalFailedTask(task_id: number, error: Error): Promise<void> {
         // Update the task error message
-        await this.taskDataSource.updateOne({ task_id: task_id, task_error: error.message })
+        await this.taskDataSource.updateOne({ task_id: task_id, task_error: this.withoutServerRoot(error.message) })
 
         // Update the task status to error
         await this.statusManager({
@@ -470,7 +470,13 @@ export class TaskRepositoryImpl implements TaskRepository {
     async logMessage(task_log_file_path: string | undefined, message: string): Promise<void> {
         if (!task_log_file_path) throw new Error("No log file path found for this task")
         const log_file_path = task_log_file_path;
-        if (log_file_path) await this.fs.appendFile(log_file_path, new Date().toISOString() + " " + message + "\n");
+        if (log_file_path) await this.fs.appendFile(log_file_path, new Date().toISOString() + " " + this.withoutServerRoot(message) + "\n");
+    }
+
+    // The log, the error and the result of a task are read by its owner: every path they quote, system
+    // errors included, is shown relative to the application root, never as a server path.
+    private withoutServerRoot(message: string): string {
+        return message.split(this.base_folder + path.sep).join("");
     }
     // Define allowed transitions between statuses
     private allowedTransitions: { [key in TasksStatus]: TasksStatus[] } = {
@@ -666,7 +672,7 @@ export class TaskRepositoryImpl implements TaskRepository {
             throw new Error("Task not found");
         }
         await this.taskDataSource.updateOne({
-            task_id: task_to_update.task_id, task_result: task_result
+            task_id: task_to_update.task_id, task_result: this.withoutServerRoot(task_result)
         })
     }
 }

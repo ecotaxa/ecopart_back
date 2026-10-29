@@ -1,3 +1,5 @@
+import path from "path";
+
 import { UserRepository } from "../../../../src/domain/interfaces/repositories/user-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 
@@ -15,6 +17,8 @@ import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
 // import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 // import { private_projectResponseModel } from "../../../entities/project";
 // import { task_status_1_search_result, task_type_1_search_result, TaskResponseModel_1 } from "../../../entities/task";
+
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
 let mockUserRepository: UserRepository;
 let mockTaskRepository: TaskRepository;
@@ -404,7 +408,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockProjectRepository, "ensureBackupExist").mockResolvedValue()
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
-            jest.spyOn(mockProjectRepository, "exportBackupedProjectToFs").mockResolvedValue("path/to/backup")
+            jest.spyOn(mockProjectRepository, "exportBackupedProjectToFs").mockResolvedValue(path.join(PROJECT_ROOT, "data_storage", "tasks", "1", "ecopart_export_backup_1.zip"))
             jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue()
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
@@ -423,7 +427,11 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(4)
             expect(mockProjectRepository.ensureBackupExist).toBeCalledTimes(1)
             expect(mockProjectRepository.exportBackupedProjectToFs).toBeCalledTimes(1)
-            expect(mockTaskRepository.logMessage).toBeCalledTimes(1)
+            expect(mockTaskRepository.logMessage).toBeCalledTimes(2)
+            // Relative to the application root: the task log never shows the server layout
+            expect(mockTaskRepository.logMessage).toBeCalledWith(TaskResponseModel_1.task_log_file_path, "Exported at : data_storage/tasks/1/ecopart_export_backup_1.zip")
+            // The mocked archive does not exist on disk: its size is reported unknown, the export still succeeds
+            expect(mockTaskRepository.logMessage).toBeCalledWith(TaskResponseModel_1.task_log_file_path, "Archive : ecopart_export_backup_1.zip written, size unknown")
             expect(mockProjectRepository.exportBackupedProjectToFtp).toBeCalledTimes(0)
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1)
             // The download link points to the route that serves the task's archive
@@ -442,7 +450,7 @@ describe("ExportBackupedProjectUseCase", () => {
             jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue()
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
-            jest.spyOn(mockProjectRepository, "exportBackupedProjectToFtp").mockResolvedValue("path/to/backup")
+            jest.spyOn(mockProjectRepository, "exportBackupedProjectToFtp").mockResolvedValue("1/ecopart_export_backup_1.zip")
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
             // jest.spyOn(mockTaskRepository,"updateTaskProgress")
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue()
@@ -457,10 +465,12 @@ describe("ExportBackupedProjectUseCase", () => {
             expect(mockTaskRepository.updateTaskProgress).toBeCalledTimes(6)
             expect(mockProjectRepository.ensureBackupExist).toBeCalledTimes(1)
             expect(mockProjectRepository.exportBackupedProjectToFs).toBeCalledTimes(1)
-            expect(mockTaskRepository.logMessage).toBeCalledTimes(1)
+            expect(mockTaskRepository.logMessage).toBeCalledTimes(3)
+            // The path inside the FTP export folder, the one an FTP user reaches
+            expect(mockTaskRepository.logMessage).toBeCalledWith(TaskResponseModel_1.task_log_file_path, "Exported to the FTP export folder at : 1/ecopart_export_backup_1.zip")
             expect(mockProjectRepository.exportBackupedProjectToFtp).toBeCalledTimes(1)
             expect(mockTaskRepository.finishTask).toBeCalledTimes(1)
-            expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, "path/to/backup http://localhost:3000/api/tasks/1/file")
+            expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id }, "1/ecopart_export_backup_1.zip http://localhost:3000/api/tasks/1/file")
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0)
         });
         test("a cancellation requested during the validation stops the export before the archive is built", async () => {

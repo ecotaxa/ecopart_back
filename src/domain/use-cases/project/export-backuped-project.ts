@@ -1,3 +1,4 @@
+import path from "path";
 
 import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
@@ -8,6 +9,7 @@ import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { ExportBackupedProjectUseCase } from "../../interfaces/use-cases/project/export-backuped-project";
 import { ProjectResponseModel } from "../../entities/project";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
+import { fileSizeLabel, relativePath } from "../export/export-log";
 
 export class ExportBackupedProject implements ExportBackupedProjectUseCase {
     userRepository: UserRepository
@@ -120,13 +122,15 @@ export class ExportBackupedProject implements ExportBackupedProjectUseCase {
         await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 25, "Step 2/3 Export backuped project, export to fs : start");
         const dl_link = await this.exportToFs(project, task.task_id);
         // log dl link in task
-        await this.taskRepository.logMessage(task.task_log_file_path, "Exported at : " + dl_link);
+        await this.taskRepository.logMessage(task.task_log_file_path, "Exported at : " + relativePath(dl_link));
+        await this.taskRepository.logMessage(task.task_log_file_path, `Archive : ${path.basename(dl_link)} written, ${await fileSizeLabel(dl_link)}`);
         // update task with download link ex :
         const download_link = this.base_url_path + "/api/tasks/" + task.task_id + "/file";
         if (out_to_ftp) {
             await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 60, "Step 2/3 Export backuped project, export to fs : done");
             await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 60, "Step 2/3 Export backuped project, export to ftp : start");
             const ftp_link = await this.exportToFtp(project, task.task_id);
+            await this.taskRepository.logMessage(task.task_log_file_path, "Exported to the FTP export folder at : " + ftp_link);
             await this.taskRepository.updateTaskProgress({ task_id: task.task_id }, 99, "Step 2/3 Export backuped project, export to ftp : done");
             return ftp_link + " " + download_link;
         } else {

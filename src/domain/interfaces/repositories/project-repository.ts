@@ -18,6 +18,7 @@ export interface ProjectRepository {
     copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean): Promise<void>;
     removeInterruptedWriteLeftovers(project_id: number): Promise<string[]>;
     ensureBackupExist(project_id: number): Promise<void>;
+    // Returns the archive path inside the FTP export folder, as an FTP user reaches it.
     exportBackupedProjectToFtp(project: ProjectResponseModel, task_id: number): Promise<string>;
     exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string>;
     ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void>;
