@@ -66,6 +66,7 @@ import { SelectSampleCoordinates } from '../../src/domain/use-cases/sample/selec
 import { GetSample } from '../../src/domain/use-cases/sample/get-sample'
 import { RegeneratePivots } from '../../src/domain/use-cases/sample/regenerate-pivots'
 import { GetProjectStats } from '../../src/domain/use-cases/project/get-project-stats'
+import { GetProjectsQcStates } from '../../src/domain/use-cases/project/get-projects-qc-states'
 import { ExploreEcoTaxaService } from '../../src/domain/use-cases/explore/explore-ecotaxa'
 import { BackupProject } from '../../src/domain/use-cases/project/backup-project'
 import { ExportBackupedProject } from '../../src/domain/use-cases/project/export-backuped-project'
@@ -320,6 +321,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new GetSample(userRepo, sampleRepo, privilegeRepo, projectRepo),
             new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
             new GetProjectStats(userRepo, projectRepo, privilegeRepo, sampleRepo, taskRepo, new ExploreEcoTaxaService(ecotaxaAccountRepo, sampleRepo, projectRepo)),
+            new GetProjectsQcStates(userRepo, projectRepo, privilegeRepo, sampleRepo),
         )
 
         const taskMiddleware = TaskRouter(

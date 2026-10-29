@@ -95,3 +95,30 @@ export interface ProjectStatsResponseModel {
     samples: ProjectStatsSamples;
     ecotaxa: ProjectStatsEcoTaxa;
 }
+
+// The warnings of the STATS tab, one per kind; `nb_samples` is how many samples it concerns, null
+// for the classification, which concerns the objects.
+export type ProjectQcWarningCode =
+    | "samples_not_backed_up"
+    | "samples_without_ctd"
+    | "coordinates_mismatches"
+    | "instrument_parameter_mismatches"
+    | "suspicious_dates"
+    | "suspicious_pressures"
+    | "samples_not_imported_in_ecotaxa"
+    | "classification_uncompleted";
+
+export interface ProjectQcWarning {
+    code: ProjectQcWarningCode;
+    nb_samples: number | null;
+}
+
+// The QC state of a project in the project lists: "empty" without any sample, "ok" without any
+// warning of its STATS tab, "warning" otherwise.
+export type ProjectQcStateLabel = "empty" | "ok" | "warning";
+
+export interface ProjectQcStateModel {
+    project_id: number;
+    qc_state: ProjectQcStateLabel;
+    warnings: ProjectQcWarning[];
+}

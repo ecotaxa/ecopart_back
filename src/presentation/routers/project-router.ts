@@ -22,6 +22,7 @@ import { SelectSampleCoordinatesUseCase } from '../../domain/interfaces/use-case
 import { GetSampleUseCase } from '../../domain/interfaces/use-cases/sample/get-sample'
 import { RegeneratePivotsUseCase } from '../../domain/interfaces/use-cases/sample/regenerate-pivots'
 import { GetProjectStatsUseCase } from '../../domain/interfaces/use-cases/project/get-project-stats'
+import { GetProjectsQcStatesUseCase } from '../../domain/interfaces/use-cases/project/get-projects-qc-states'
 
 import { ImportEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples'
 import { DeleteEcoTaxaSamplesUseCase } from '../../domain/interfaces/use-cases/ecotaxa_sample/delete-ecotaxa-samples'
@@ -71,6 +72,7 @@ export default function ProjectRouter(
     getSampleUseCase: GetSampleUseCase,
     regeneratePivotsUseCase: RegeneratePivotsUseCase,
     getProjectStatsUseCase: GetProjectStatsUseCase,
+    getProjectsQcStatesUseCase: GetProjectsQcStatesUseCase,
 ) {
     const router = express.Router()
 
@@ -312,6 +314,76 @@ export default function ProjectRouter(
             else if (err.message.startsWith("privacy_status should be one of")) res.status(401).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search projects"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /projects/qc-states:
+     *   post:
+     *     summary: QC state of a page of projects (project lists)
+     *     description: |
+     *       The QC state the project lists show for each project: the warnings of its STATS tab
+     *       (`GET /projects/{project_id}/stats`), under the same rules, read from the database only.
+     *       The EcoTaxa classification is the one EcoPart last stored per sample, EcoTaxa is not asked:
+     *       a sample imported in EcoTaxa whose statistics were never read makes the classification
+     *       `classification_uncompleted`, as the STATS tab does while they are being read.
+     *
+     *       Served to any logged-in user, like the statistics; `samples_not_backed_up` only to the
+     *       admins and to the users with a privilege on the project. Unknown ids are left out; the
+     *       answer follows the order of `project_ids`, duplicates removed.
+     *     tags: [Projects]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/ProjectQcStatesRequest'
+     *     responses:
+     *       200:
+     *         description: The QC state of each known project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 $ref: '#/components/schemas/ProjectQcState'
+     *       401:
+     *         description: Missing or invalid access token.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       403:
+     *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error (missing `project_ids`, more than 100, or not positive integers).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/qc-states', middlewareAuth.auth, middlewareProjectValidation.rulesProjectsQcStates, async (req: Request, res: Response) => {
+        try {
+            const states = await getProjectsQcStatesUseCase.execute((req as CustomRequest).token, req.body.project_ids)
+            res.status(200).send(states)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message.startsWith("Too many projects")) res.status(422).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot get the QC state of the projects"] })
         }
     })
 

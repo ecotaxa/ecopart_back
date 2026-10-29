@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult, query } from 'express-validator';
 import { IMiddlewareProjectValidation } from '../interfaces/middleware/project-validation';
+import { PROJECTS_QC_STATES_MAX } from '../../domain/use-cases/project/get-projects-qc-states';
 
 
 // The path is joined to the import folder: a ".." segment would let it point anywhere on the server.
@@ -351,6 +352,24 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .isArray().withMessage('validated_samples must be an array.'),
         check("validated_samples.*")
             .isString().withMessage('Each validated sample name must be a string.'),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Centralized error handling for validation errors
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ]
+
+    rulesProjectsQcStates = [
+        check("project_ids")
+            .exists().withMessage('project_ids is required.').bail()
+            .isArray({ max: PROJECTS_QC_STATES_MAX }).withMessage(`project_ids must be an array of at most ${PROJECTS_QC_STATES_MAX} project ids.`),
+        check("project_ids.*")
+            .isInt({ gt: 0 }).withMessage('project_ids must contain positive integers.').bail()
+            .toInt(),
         // Error Handling Middleware
         (req: Request, res: Response, next: NextFunction) => {
             const errors = validationResult(req);

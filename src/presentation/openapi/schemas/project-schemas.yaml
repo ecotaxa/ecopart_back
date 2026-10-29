@@ -478,6 +478,47 @@ components:
         ecotaxa: { $ref: "#/components/schemas/ProjectStatsEcoTaxa" }
       required: [project_id, generated_at, counts, privacy, raw_backup, map, samples, ecotaxa]
 
+    ProjectQcStatesRequest:
+      type: object
+      properties:
+        project_ids:
+          type: array
+          description: The projects to read, at most 100 (a page of the project lists).
+          maxItems: 100
+          items: { type: integer, minimum: 1 }
+          example: [12, 15, 902]
+      required: [project_ids]
+
+    ProjectQcWarning:
+      type: object
+      properties:
+        code:
+          type: string
+          enum: [samples_not_backed_up, samples_without_ctd, coordinates_mismatches, instrument_parameter_mismatches, suspicious_dates, suspicious_pressures, samples_not_imported_in_ecotaxa, classification_uncompleted]
+          description: >-
+            The warning of the STATS tab: samples imported since the last raw backup, samples without CTD
+            file, samples whose CTD position is more than 5 km from their own, samples with other instrument
+            parameters than the rest of the project, suspicious sampling dates, suspicious pressures, samples
+            not imported in EcoTaxa, objects of the samples imported in EcoTaxa not all validated.
+        nb_samples:
+          type: integer
+          nullable: true
+          description: How many samples the warning concerns; null for `classification_uncompleted`.
+      required: [code, nb_samples]
+
+    ProjectQcState:
+      type: object
+      properties:
+        project_id: { type: integer }
+        qc_state:
+          type: string
+          enum: [empty, ok, warning]
+          description: "`empty` without any sample, `ok` without any warning, `warning` otherwise."
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/ProjectQcWarning" }
+      required: [project_id, qc_state, warnings]
+
     ProjectSearchResponse:
       type: object
       description: Paginated project search results.

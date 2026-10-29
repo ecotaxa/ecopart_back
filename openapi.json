@@ -2747,6 +2747,84 @@
           "ecotaxa"
         ]
       },
+      "ProjectQcStatesRequest": {
+        "type": "object",
+        "properties": {
+          "project_ids": {
+            "type": "array",
+            "description": "The projects to read, at most 100 (a page of the project lists).",
+            "maxItems": 100,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": [
+              12,
+              15,
+              902
+            ]
+          }
+        },
+        "required": [
+          "project_ids"
+        ]
+      },
+      "ProjectQcWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "samples_not_backed_up",
+              "samples_without_ctd",
+              "coordinates_mismatches",
+              "instrument_parameter_mismatches",
+              "suspicious_dates",
+              "suspicious_pressures",
+              "samples_not_imported_in_ecotaxa",
+              "classification_uncompleted"
+            ],
+            "description": "The warning of the STATS tab: samples imported since the last raw backup, samples without CTD file, samples whose CTD position is more than 5 km from their own, samples with other instrument parameters than the rest of the project, suspicious sampling dates, suspicious pressures, samples not imported in EcoTaxa, objects of the samples imported in EcoTaxa not all validated."
+          },
+          "nb_samples": {
+            "type": "integer",
+            "nullable": true,
+            "description": "How many samples the warning concerns; null for `classification_uncompleted`."
+          }
+        },
+        "required": [
+          "code",
+          "nb_samples"
+        ]
+      },
+      "ProjectQcState": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "integer"
+          },
+          "qc_state": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "ok",
+              "warning"
+            ],
+            "description": "`empty` without any sample, `ok` without any warning, `warning` otherwise."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectQcWarning"
+            }
+          }
+        },
+        "required": [
+          "project_id",
+          "qc_state",
+          "warnings"
+        ]
+      },
       "ProjectSearchResponse": {
         "type": "object",
         "description": "Paginated project search results.",
@@ -6177,6 +6255,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/qc-states": {
+      "post": {
+        "summary": "QC state of a page of projects (project lists)",
+        "description": "The QC state the project lists show for each project: the warnings of its STATS tab\n(`GET /projects/{project_id}/stats`), under the same rules, read from the database only.\nThe EcoTaxa classification is the one EcoPart last stored per sample, EcoTaxa is not asked:\na sample imported in EcoTaxa whose statistics were never read makes the classification\n`classification_uncompleted`, as the STATS tab does while they are being read.\n\nServed to any logged-in user, like the statistics; `samples_not_backed_up` only to the\nadmins and to the users with a privilege on the project. Unknown ids are left out; the\nanswer follows the order of `project_ids`, duplicates removed.\n",
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectQcStatesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The QC state of each known project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectQcState"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (missing `project_ids`, more than 100, or not positive integers).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
                 }
               }
             }
