@@ -13,12 +13,18 @@ import { MockInstrumentModelRepository } from "../../../mocks/instrumentModel-mo
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { publicPrivileges } from "../../../entities/privilege";
 import { instrument_model_response } from "../../../entities/instrumentModel";
+import { MockSampleRepository } from "../../../mocks/sample-mock";
+import { LandMask } from "../../../../src/domain/interfaces/geography/land-mask";
+import { exploreProject, projectStatsSample } from "../explore/explore-fixtures";
+
+const LAND: LandMask = { isOnLand: () => false };
 
 let mockUserRepository: UserRepository;
 let mockSearchRepository: SearchRepository;
 let mockProjectRepository: ProjectRepository;
 let mockInstrumentModelRepository: MockInstrumentModelRepository;
 let mockPrivilegeRepository: MockPrivilegeRepository;
+let mockSampleRepository: MockSampleRepository;
 let searchProjectUseCase: SearchProject;
 
 
@@ -29,7 +35,8 @@ beforeEach(() => {
     mockProjectRepository = new MockProjectRepository()
     mockInstrumentModelRepository = new MockInstrumentModelRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
-    searchProjectUseCase = new SearchProject(mockUserRepository, mockProjectRepository, mockSearchRepository, mockInstrumentModelRepository, mockPrivilegeRepository)
+    mockSampleRepository = new MockSampleRepository()
+    searchProjectUseCase = new SearchProject(mockUserRepository, mockProjectRepository, mockSearchRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockSampleRepository, LAND)
     // The user has a privilege on both fixture projects, so the full projects come back
     jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
     jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1, 2])
@@ -687,6 +694,72 @@ describe("what the list shows depends on the user's role on each project", () =>
 
         expect(result.projects).toStrictEqual([full_1, full_2])
         expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter }))
+    })
+})
+
+describe("qc_state is resolved to the projects in that state, as the QC state column shows it", () => {
+    const options: SearchOptions = { limit: 10, page: 1, sort_by: [] }
+    // 1: linked, its sample imported in EcoTaxa and fully validated; 2: not linked; 3: no sample.
+    const projects = [
+        exploreProject(1, "open", { ecotaxa_project_id: 1234, ecotaxa_instance_id: 1, last_backup_utc_date_time: "2024-07-10T00:00:00.000Z" }),
+        exploreProject(2, "open"),
+        exploreProject(3, "open"),
+    ]
+    const samples = new Map([
+        [1, [projectStatsSample({ sample_id: 1, project_id: 1, ctd_imported: true, ecotaxa_sample_imported: true, sample_creation_utc_date_time: "2024-07-01T09:00:00.000Z" })]],
+        [2, [projectStatsSample({ sample_id: 2, project_id: 2, ctd_imported: true })]],
+        [3, []],
+    ])
+    const stored = { sample_id: 1, ecotaxa_sample_id: 9001, nb_unclassified: 0, nb_validated: 30, nb_dubious: 0, nb_predicted: 0, used_taxa: [45072], fetched_utc_date_time: "2026-10-23T00:00:00.000Z" }
+
+    beforeEach(() => {
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockSearchRepository, "formatSortBy").mockReturnValue([])
+        jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockResolvedValue(publicPrivileges)
+        jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue(projects)
+        jest.spyOn(mockSampleRepository, "getProjectStatsSamples").mockImplementation(async (...args: unknown[]) => samples.get(args[0] as number) ?? [])
+        jest.spyOn(mockSampleRepository, "getEcoTaxaStats").mockImplementation(async (...args: unknown[]) => (args[0] as number[]).includes(1) ? [stored] : [])
+        jest.spyOn(mockProjectRepository, "standardGetProjects").mockResolvedValue({ items: [], total: 0 })
+        jest.spyOn(mockSearchRepository, "formatSearchInfo").mockReturnValue({ total: 0, limit: 10, total_on_page: 0, page: 1, pages: 0 })
+    })
+
+    test.each([
+        ["=", "ok", [1]],
+        ["=", "warning", [2]],
+        ["=", "empty", [3]],
+        ["IN", ["ok", "empty"], [1, 3]],
+    ])("operator %s with %j", async (operator, value, expected_ids) => {
+        const filters = [{ field: "qc_state", operator, value }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] })
+        expect(mockSampleRepository.getProjectStatsSamples).toBeCalledTimes(3)
+    })
+
+    test("the raw backup warning counts for a user with a privilege on the project, as on its STATS tab", async () => {
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1])
+        jest.spyOn(mockProjectRepository, "listProjects").mockResolvedValue([{ ...projects[0], last_backup_utc_date_time: null }])
+        const filters = [{ field: "qc_state", operator: "=", value: "warning" }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [1] }] }))
+    })
+
+    test.each([
+        ["=", "validated"],
+        ["IN", []],
+        ["IN", ["ok", "nope"]],
+        ["LIKE", "ok%"],
+    ])("refuses operator %s with %j", async (operator, value) => {
+        const filters = [{ field: "qc_state", operator, value }]
+        jest.spyOn(mockSearchRepository, "formatFilters").mockReturnValue(filters)
+
+        await expect(searchProjectUseCase.execute({ user_id: 1 }, options, filters)).rejects.toThrow("Unauthorized or unexisting parameters : qc_state")
+        expect(mockProjectRepository.standardGetProjects).toBeCalledTimes(0)
     })
 })
 

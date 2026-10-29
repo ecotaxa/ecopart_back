@@ -16,6 +16,8 @@ export interface ProjectRequestCreationModel {
     chief_scientist_email: string;
     override_depth_offset?: number;
     enable_descent_filter: boolean;
+    filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
+    time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
     privacy_duration: number;
     visible_duration: number;
     public_duration: number;
@@ -49,6 +51,8 @@ export interface ProjectResponseModel {
     chief_scientist_email: string;
     override_depth_offset?: number;
     enable_descent_filter: boolean;
+    filtered_project: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
+    time_duration_check: boolean;     // warn when the samples span more than a year; disabled on a long project
     privacy_duration: number;
     visible_duration: number;
     public_duration: number;
@@ -77,6 +81,8 @@ export interface ProjectUpdateModel {
     chief_scientist_email?: string;
     override_depth_offset?: number;
     enable_descent_filter?: boolean;
+    filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
+    time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
     privacy_duration?: number;
     visible_duration?: number;
     public_duration?: number;
@@ -104,6 +110,8 @@ export interface PublicProjectUpdateModel {
     chief_scientist_email?: string;
     override_depth_offset?: number;
     enable_descent_filter?: boolean;
+    filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
+    time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
     privacy_duration?: number;
     visible_duration?: number;
     public_duration?: number;
@@ -133,6 +141,8 @@ export interface PublicProjectRequestCreationModel_base {
     chief_scientist_email: string;
     override_depth_offset?: number;
     enable_descent_filter: boolean;
+    filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
+    time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
     privacy_duration: number;
     visible_duration: number;
     public_duration: number;

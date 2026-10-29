@@ -153,6 +153,7 @@ describe("RegeneratePivots", () => {
             // sampleModel_2 is a time series: the descent filter never applies, both pairs are equal.
             expect(mockSampleRepository.updateParticleStats).toBeCalledTimes(1);
             expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_2.sample_id, {
+                min_pressure: 1,
                 nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50,
                 nb_particles_descent_filter: 8, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 50,
             });
@@ -168,6 +169,7 @@ describe("RegeneratePivots", () => {
             await (regeneratePivots as any).startRegeneratePivotsTask(TaskResponseModel_1, projectResponseModel, [sampleModel_1], false);
 
             expect(mockSampleRepository.updateParticleStats).toBeCalledWith(sampleModel_1.sample_id, {
+                min_pressure: 1,
                 nb_particles: 8, particle_min_area_px: 2, particle_max_area_px: 50,
                 nb_particles_descent_filter: 4, particle_min_area_px_descent_filter: 2, particle_max_area_px_descent_filter: 30,
             });

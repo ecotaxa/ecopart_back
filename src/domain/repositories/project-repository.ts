@@ -86,17 +86,17 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async standardUpdateProject(project: ProjectUpdateModel): Promise<number> {
-        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_id", "ecotaxa_project_name", "ecotaxa_instance_id", "last_backup_utc_date_time"]
+        const params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_id", "ecotaxa_project_name", "ecotaxa_instance_id", "last_backup_utc_date_time"]
         const updated_project_nb = await this.updateProject(project, params_restricted)
         return updated_project_nb
     }
 
     async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
 
         // Can be sort_by
-        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
 
         return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
@@ -158,6 +158,8 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             chief_scientist_email: public_project.chief_scientist_email,
             override_depth_offset: public_project.override_depth_offset,
             enable_descent_filter: public_project.enable_descent_filter,
+            filtered_project: public_project.filtered_project,
+            time_duration_check: public_project.time_duration_check,
             privacy_duration: public_project.privacy_duration,
             visible_duration: public_project.visible_duration,
             public_duration: public_project.public_duration,
@@ -193,6 +195,8 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             chief_scientist_email: project.chief_scientist_email,
             override_depth_offset: project.override_depth_offset,
             enable_descent_filter: project.enable_descent_filter,
+            filtered_project: project.filtered_project,
+            time_duration_check: project.time_duration_check,
             privacy_duration: project.privacy_duration,
             visible_duration: project.visible_duration,
             public_duration: project.public_duration,

@@ -49,10 +49,12 @@ const UVP5: BinnedSampleSettings = { ...UVP6, sample_name: "uvp5_sample", instru
 
 // The statistics over the images of the window, then over those the descent filter keeps too (the same by default).
 type Tally = [number, number | null, number | null];
-function stats(window: Tally, descent: Tally = window): SampleParticleStats {
+// The minimum pressure is read over every image: 1 in most fixtures below.
+function stats(window: Tally, descent: Tally = window, min_pressure: number | null = 1): SampleParticleStats {
     return {
         nb_particles: window[0], particle_min_area_px: window[1], particle_max_area_px: window[2],
         nb_particles_descent_filter: descent[0], particle_min_area_px_descent_filter: descent[1], particle_max_area_px_descent_filter: descent[2],
+        min_pressure,
     };
 }
 
@@ -65,7 +67,7 @@ describe("computeParticleStats", () => {
 
     test("a sample without particle has no area", async () => {
         await expect(computeParticleStats(UVP6, pivotOf(sequence([img(1), img(2)])))).resolves.toEqual(stats([0, null, null]));
-        await expect(computeParticleStats(UVP6, pivotOf([]))).resolves.toEqual(stats([0, null, null]));
+        await expect(computeParticleStats(UVP6, pivotOf([]))).resolves.toEqual(stats([0, null, null], undefined, null));
     });
 
     test("leaves out the images with the light off and the over-exposed ones, keeps an empty image", async () => {
@@ -78,6 +80,12 @@ describe("computeParticleStats", () => {
         ]);
 
         await expect(computeParticleStats(UVP6, pivotOf(records))).resolves.toEqual(stats([4, 2, 4]));
+    });
+
+    test("reads the minimum pressure over every image, lit or not, in the window or not", async () => {
+        const records = sequence([img(5, [[1, 1]]), img(-3, [[1, 1]], { light_on: false }), img(2, [[1, 1]]), img(null, [[1, 1]])]);
+
+        await expect(computeParticleStats({ ...UVP6, filter_first_image: "102", filter_last_image: "102" }, pivotOf(records))).resolves.toEqual(stats([1, 1, 1], undefined, -3));
     });
 
     test("leaves out the blocks under the minimum area, rounded up, and the blocks without particle", async () => {
@@ -115,8 +123,8 @@ describe("computeParticleStats", () => {
 
         test("a depth profile leaves out the images without pressure, a time series keeps them", async () => {
             const records = sequence([img(null, [[50, 2]]), img(2, [[3, 1]])]);
-            await expect(computeParticleStats(UVP6, pivotOf(records))).resolves.toEqual(stats([1, 3, 3]));
-            await expect(computeParticleStats({ ...UVP6, is_depth_profile: false }, pivotOf(records))).resolves.toEqual(stats([3, 3, 50]));
+            await expect(computeParticleStats(UVP6, pivotOf(records))).resolves.toEqual(stats([1, 3, 3], undefined, 2));
+            await expect(computeParticleStats({ ...UVP6, is_depth_profile: false }, pivotOf(records))).resolves.toEqual(stats([3, 3, 50], undefined, 2));
         });
 
         test("each pair is the number of particles the binned export counts over all its bins, without and with the descent filter", async () => {

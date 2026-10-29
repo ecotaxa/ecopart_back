@@ -84,6 +84,12 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .exists().withMessage('Enable descent filter is required.')
             .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
 
+        check('filtered_project').optional()
+            .isBoolean().withMessage('Filtered project must be a boolean value.'),
+
+        check('time_duration_check').optional()
+            .isBoolean().withMessage('Time duration check must be a boolean value.'),
+
         // Privacy duration Validation
         check('privacy_duration').default(2)
             .isInt({ min: 0 }).withMessage('Privacy duration must be a number and must be greater than 0.'),
@@ -251,6 +257,12 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
         // Enable descent filter Validation
         check('enable_descent_filter').optional()
             .isBoolean().withMessage('Enable descent filter must be a boolean value.'),
+
+        check('filtered_project').optional()
+            .isBoolean().withMessage('Filtered project must be a boolean value.'),
+
+        check('time_duration_check').optional()
+            .isBoolean().withMessage('Time duration check must be a boolean value.'),
 
         // Privacy duration Validation
         check('privacy_duration').optional()

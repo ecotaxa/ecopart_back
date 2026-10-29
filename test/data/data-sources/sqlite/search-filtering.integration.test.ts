@@ -57,7 +57,7 @@ describe('search filtering (integration)', () => {
         const projectRepo = new ProjectRepositoryImpl(projectDs, 'fs', 'exp', 'folder', 'imp')
         const taskRepo = new TaskRepositoryImpl(taskDs, {} as any, 'folder')
         const searchRepo = new SearchRepositoryImpl()
-        searchProject = new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo)
+        searchProject = new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo, {} as any, { isOnLand: () => false })
         searchTask = new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo)
 
         // Owner of every seeded task.

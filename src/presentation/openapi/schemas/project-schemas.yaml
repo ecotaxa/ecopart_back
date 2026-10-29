@@ -67,6 +67,14 @@ components:
           type: boolean
           description: Whether to enable the descent filter.
           example: true
+        filtered_project:
+          type: boolean
+          default: false
+          description: The data were filtered before their import (expected of a UVP5HD project).
+        time_duration_check:
+          type: boolean
+          default: true
+          description: Warn when the samples span more than a year; disable it on a long project.
         privacy_duration:
           type: number
           description: Duration in months for which the project data is private.
@@ -193,6 +201,12 @@ components:
         enable_descent_filter:
           type: boolean
           description: Whether to enable the descent filter.
+        filtered_project:
+          type: boolean
+          description: The data were filtered before their import (expected of a UVP5HD project).
+        time_duration_check:
+          type: boolean
+          description: Warn when the samples span more than a year; disable it on a long project.
         privacy_duration:
           type: number
           description: Duration in months for private data access.
@@ -321,6 +335,12 @@ components:
         enable_descent_filter:
           type: boolean
           description: Whether the descent filter is enabled.
+        filtered_project:
+          type: boolean
+          description: The data were filtered before their import (expected of a UVP5HD project).
+        time_duration_check:
+          type: boolean
+          description: Whether the project warns when its samples span more than a year.
         privacy_duration:
           type: number
           description: Duration in months for private access.
@@ -434,8 +454,11 @@ components:
             type: object
             properties: { max_pressure: { type: number, description: Upper edge of the 100 dbar bin. }, nb_profiles: { type: integer } }
         nb_instrument_parameter_mismatches: { type: integer, description: Samples whose instrument parameters differ from the most common ones of the project. }
-        nb_suspicious_dates: { type: integer, description: Samples dated before 2000, in the future, or with an unreadable date. }
-        nb_suspicious_pressures: { type: integer, description: Depth samples without a positive maximum pressure, and samples deeper than 6500 dbar. }
+        nb_object_size_mismatches: { type: integer, description: Samples with objects outside the size classes of the instrument model. }
+        nb_suspicious_dates: { type: integer, description: Samples dated before 2008, in the future, or with an unreadable date. }
+        time_span_over_a_year: { type: boolean, description: The samples span more than a year, while the project keeps the time duration check. }
+        nb_suspicious_pressures: { type: integer, description: Samples with a minimum pressure below -5 dbar or a maximum above 6500 dbar, and depth samples without a positive maximum pressure. }
+        unfiltered_uvp5hd: { type: boolean, description: A UVP5HD project whose data were not declared filtered before import. }
       required: [sample_types, pressure_range, size_range, time_range, max_pressure_histogram, nb_instrument_parameter_mismatches, nb_suspicious_dates, nb_suspicious_pressures]
     ProjectStatsEcoTaxa:
       type: object
@@ -496,13 +519,16 @@ components:
       properties:
         code:
           type: string
-          enum: [samples_not_backed_up, samples_without_ctd, coordinates_mismatches, samples_on_land, instrument_parameter_mismatches, suspicious_dates, suspicious_pressures, samples_not_imported_in_ecotaxa, classification_uncompleted]
+          enum: [samples_not_backed_up, samples_without_ctd, coordinates_mismatches, samples_on_land, instrument_parameter_mismatches, object_size_mismatches, suspicious_dates, time_span_over_a_year, suspicious_pressures, unfiltered_uvp5hd, ecotaxa_not_linked, samples_not_imported_in_ecotaxa, classification_uncompleted]
           description: >-
             The warning of the STATS tab: samples imported since the last raw backup, samples without CTD
             file, samples whose CTD position is more than 5 km from their own, samples whose position is on land
             (more than 2 km from the sea or a lake), samples with other instrument
-            parameters than the rest of the project, suspicious sampling dates, suspicious pressures, samples
-            not imported in EcoTaxa, objects of the samples imported in EcoTaxa not all validated.
+            parameters than the rest of the project, samples with objects outside the size classes of the
+            instrument, suspicious sampling dates (before 2008, in the future, unreadable), samples spanning
+            more than a year, suspicious pressures (below -5 dbar, above 6500 dbar, depth samples without
+            one), a UVP5HD project not declared filtered, a project not linked to EcoTaxa, samples not imported
+            in EcoTaxa, objects of the samples imported in EcoTaxa not all validated or predicted.
         nb_samples:
           type: integer
           nullable: true

@@ -83,7 +83,7 @@ export class GetProjectStats implements GetProjectStatsUseCase {
             privacy: buildProjectStatsPrivacy(project, now),
             raw_backup: role === "user" ? null : buildProjectStatsRawBackup(project, samples),
             map: buildProjectStatsMap(samples, this.land),
-            samples: buildProjectStatsSamples(summary, samples, now),
+            samples: buildProjectStatsSamples(summary, samples, project, now),
             ecotaxa: buildProjectStatsEcoTaxa(ecotaxa, samples, linked),
         };
     }

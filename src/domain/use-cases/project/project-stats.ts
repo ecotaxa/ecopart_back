@@ -3,6 +3,7 @@ import { ProjectResponseModel } from "../../entities/project";
 import { ProjectQcStateModel, ProjectQcWarning, ProjectStatsEcoTaxa, ProjectStatsMap, ProjectStatsMapSample, ProjectStatsPrivacy, ProjectStatsRawBackup, ProjectStatsSampleRow, ProjectStatsSamples } from "../../entities/project-stats";
 import { computeProjectPrivacy, privacyMilestones } from "../../utils/project-privacy";
 import { classificationSharesOf, objectCountsOf, toSampleStat, totalOf } from "../explore/explore-ecotaxa";
+import { aaInMm2, esdMm } from "../export/binned-computation";
 import { LandMask } from "../../interfaces/geography/land-mask";
 
 /* The pure part of a project's statistics: what each section of the STATS tab shows, and its
@@ -11,10 +12,28 @@ import { LandMask } from "../../interfaces/geography/land-mask";
 // A CTD position further than this from the sample's own is reported as a mismatch: a wrong sign,
 // swapped coordinates or another station, not a drift during the cast.
 export const COORDINATES_MISMATCH_KM = 5;
-// Samples dated before this year, or in the future, carry an unreadable or wrong date.
-export const EARLIEST_PLAUSIBLE_SAMPLING_YEAR = 2000;
+// Samples dated before this year (the first UVP5), or in the future, carry an unreadable or wrong date.
+export const EARLIEST_PLAUSIBLE_SAMPLING_YEAR = 2008;
+// A cruise lasts less than this: samples further apart point at a wrong date, unless the project
+// disables the check (a time series, a float).
+export const MAX_PLAUSIBLE_TIME_SPAN_MS = 365 * 24 * 60 * 60 * 1000;
 // Deeper than any UVP rating (6000 m): the pressure was misread.
 export const MAX_PLAUSIBLE_PRESSURE_DBAR = 6500;
+// A pressure this far below the surface while the instrument was in the water: the whole profile is
+// offset (the sensor accuracy is about 0.1 % of its full scale).
+export const MIN_PLAUSIBLE_PRESSURE_DBAR = -5;
+// The size classes of each instrument model (EcoPart size classes sheet), in µm of ESD: objects
+// outside them were measured with the wrong calibration or pixel size. Models without classes
+// (UVP6M) are not checked.
+export const INSTRUMENT_SIZE_RANGE_UM: Record<string, { min: number; max: number }> = {
+    UVP5SD: { min: 102, max: 26000 },
+    UVP5HD: { min: 50.8, max: 26000 },
+    UVP5Z: { min: 64, max: 26000 },
+    UVP6LP: { min: 50.8, max: 26000 },
+    UVP6HF: { min: 50.8, max: 26000 },
+};
+// The instrument model whose data must be filtered before their import.
+export const FILTERED_INSTRUMENT_MODEL = "UVP5HD";
 // A sample whose instrument parameters differ from the most common ones in the project was acquired
 // or processed differently (another instrument, another calibration or acquisition configuration).
 export const INSTRUMENT_PARAMETERS: (keyof ProjectStatsSampleRow)[] = [
@@ -118,11 +137,38 @@ export function countSuspiciousDates(samples: ProjectStatsSampleRow[], now: Date
 export function countSuspiciousPressures(samples: ProjectStatsSampleRow[]): number {
     return samples.filter(sample => {
         if (isFinite(sample.max_pressure) && sample.max_pressure > MAX_PLAUSIBLE_PRESSURE_DBAR) return true;
+        if (isFinite(sample.min_pressure) && sample.min_pressure < MIN_PLAUSIBLE_PRESSURE_DBAR) return true;
         return sample.sample_type_label === "Depth" && !(isFinite(sample.max_pressure) && sample.max_pressure > 0);
     }).length;
 }
 
-export function buildProjectStatsSamples(summary: ExploreSummary | null, samples: ProjectStatsSampleRow[], now: Date): ProjectStatsSamples {
+// The samples whose smallest or largest object falls outside the size classes of the instrument.
+export function countObjectSizeMismatches(samples: ProjectStatsSampleRow[], instrument_model: string): number {
+    const range = INSTRUMENT_SIZE_RANGE_UM[instrument_model];
+    if (!range) return 0;
+    return samples.filter(sample => {
+        if (!isFinite(sample.particle_min_area_px) || !isFinite(sample.particle_max_area_px) || !(sample.instrument_settings_aa > 0) || !(sample.instrument_settings_exp > 0)) return false;
+        const aa_mm2 = aaInMm2(instrument_model, sample.instrument_settings_aa);
+        const smallest_um = esdMm(sample.particle_min_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
+        const largest_um = esdMm(sample.particle_max_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
+        return smallest_um < range.min || largest_um > range.max;
+    }).length;
+}
+
+// The readable sampling dates span more than a year.
+export function isTimeSpanOverAYear(samples: ProjectStatsSampleRow[]): boolean {
+    let first: number | null = null;
+    let last: number | null = null;
+    for (const sample of samples) {
+        const time = Date.parse(sample.sampling_utc_date_time);
+        if (!Number.isFinite(time)) continue;
+        if (first === null || time < first) first = time;
+        if (last === null || time > last) last = time;
+    }
+    return first !== null && last !== null && last - first > MAX_PLAUSIBLE_TIME_SPAN_MS;
+}
+
+export function buildProjectStatsSamples(summary: ExploreSummary | null, samples: ProjectStatsSampleRow[], project: ProjectResponseModel, now: Date): ProjectStatsSamples {
     return {
         sample_types: summary?.sample_types ?? { depth: 0, time: 0, total: 0 },
         pressure_range: summary?.pressure_range ?? null,
@@ -130,8 +176,11 @@ export function buildProjectStatsSamples(summary: ExploreSummary | null, samples
         time_range: summary?.time_range ?? null,
         max_pressure_histogram: summary?.max_pressure_histogram ?? [],
         nb_instrument_parameter_mismatches: countInstrumentParameterMismatches(samples),
+        nb_object_size_mismatches: countObjectSizeMismatches(samples, project.instrument_model),
         nb_suspicious_dates: countSuspiciousDates(samples, now),
+        time_span_over_a_year: project.time_duration_check !== false && isTimeSpanOverAYear(samples),
         nb_suspicious_pressures: countSuspiciousPressures(samples),
+        unfiltered_uvp5hd: project.instrument_model === FILTERED_INSTRUMENT_MODEL && !project.filtered_project,
     };
 }
 
@@ -170,10 +219,11 @@ export const EMPTY_ECOTAXA_SUMMARY: ExploreEcoTaxaSummary = {
 
 export function buildProjectStatsEcoTaxa(summary: ExploreEcoTaxaSummary, samples: ProjectStatsSampleRow[], linked: boolean): ProjectStatsEcoTaxa {
     const nb_imported = samples.filter(sample => sample.ecotaxa_sample_imported).length;
-    // Complete once every imported sample has its stats and every object of theirs is validated.
+    // Complete once every imported sample has its stats and every object of theirs is annotated,
+    // validated or predicted: a dubious or unclassified object leaves it incomplete.
     const classification_completed = linked && nb_imported > 0 && !summary.partial
         && summary.nb_samples_with_stats === nb_imported
-        && summary.objects.total > 0 && summary.objects.validated === summary.objects.total;
+        && summary.objects.total > 0 && summary.objects.validated + summary.objects.predicted === summary.objects.total;
     return {
         linked,
         categories: summary.categories,
@@ -191,12 +241,13 @@ export function buildProjectStatsEcoTaxa(summary: ExploreEcoTaxaSummary, samples
 export interface ProjectQcInputs {
     raw_backup: Pick<ProjectStatsRawBackup, "nb_samples_not_backed_up"> | null;
     map: Pick<ProjectStatsMap, "nb_samples_without_ctd" | "nb_coordinates_mismatches" | "nb_samples_on_land">;
-    samples: Pick<ProjectStatsSamples, "nb_instrument_parameter_mismatches" | "nb_suspicious_dates" | "nb_suspicious_pressures">;
+    samples: Pick<ProjectStatsSamples, "nb_instrument_parameter_mismatches" | "nb_object_size_mismatches" | "nb_suspicious_dates" | "time_span_over_a_year" | "nb_suspicious_pressures" | "unfiltered_uvp5hd">;
     ecotaxa: Pick<ProjectStatsEcoTaxa, "linked" | "nb_samples_not_imported" | "classification_completed">;
 }
 
 // The warnings the STATS tab shows, section by section, under the same conditions: the raw backup
-// one only when the backup state is shown, the EcoTaxa ones only for a linked project.
+// one only when the backup state is shown, the EcoTaxa ones only for a linked project (an unlinked
+// project gets the single warning its tab shows as a call to link one).
 export function buildProjectQcWarnings(stats: ProjectQcInputs): ProjectQcWarning[] {
     const warnings: ProjectQcWarning[] = [];
     if (stats.raw_backup && stats.raw_backup.nb_samples_not_backed_up > 0) warnings.push({ code: "samples_not_backed_up", nb_samples: stats.raw_backup.nb_samples_not_backed_up });
@@ -204,8 +255,12 @@ export function buildProjectQcWarnings(stats: ProjectQcInputs): ProjectQcWarning
     if (stats.map.nb_coordinates_mismatches > 0) warnings.push({ code: "coordinates_mismatches", nb_samples: stats.map.nb_coordinates_mismatches });
     if (stats.map.nb_samples_on_land > 0) warnings.push({ code: "samples_on_land", nb_samples: stats.map.nb_samples_on_land });
     if (stats.samples.nb_instrument_parameter_mismatches > 0) warnings.push({ code: "instrument_parameter_mismatches", nb_samples: stats.samples.nb_instrument_parameter_mismatches });
+    if (stats.samples.nb_object_size_mismatches > 0) warnings.push({ code: "object_size_mismatches", nb_samples: stats.samples.nb_object_size_mismatches });
     if (stats.samples.nb_suspicious_dates > 0) warnings.push({ code: "suspicious_dates", nb_samples: stats.samples.nb_suspicious_dates });
+    if (stats.samples.time_span_over_a_year) warnings.push({ code: "time_span_over_a_year", nb_samples: null });
     if (stats.samples.nb_suspicious_pressures > 0) warnings.push({ code: "suspicious_pressures", nb_samples: stats.samples.nb_suspicious_pressures });
+    if (stats.samples.unfiltered_uvp5hd) warnings.push({ code: "unfiltered_uvp5hd", nb_samples: null });
+    if (!stats.ecotaxa.linked) warnings.push({ code: "ecotaxa_not_linked", nb_samples: null });
     if (stats.ecotaxa.linked) {
         if (stats.ecotaxa.nb_samples_not_imported > 0) warnings.push({ code: "samples_not_imported_in_ecotaxa", nb_samples: stats.ecotaxa.nb_samples_not_imported });
         if (!stats.ecotaxa.classification_completed) warnings.push({ code: "classification_uncompleted", nb_samples: null });
@@ -243,11 +298,7 @@ export function buildProjectQcState(project: ProjectResponseModel, samples: Proj
     const warnings = buildProjectQcWarnings({
         raw_backup: with_raw_backup ? buildProjectStatsRawBackup(project, samples) : null,
         map: buildProjectStatsMap(samples, land),
-        samples: {
-            nb_instrument_parameter_mismatches: countInstrumentParameterMismatches(samples),
-            nb_suspicious_dates: countSuspiciousDates(samples, now),
-            nb_suspicious_pressures: countSuspiciousPressures(samples),
-        },
+        samples: buildProjectStatsSamples(null, samples, project, now),
         ecotaxa: buildProjectStatsEcoTaxa(storedEcoTaxaSummary(samples, stored), samples, linked),
     });
     return { project_id: project.project_id, qc_state: warnings.length > 0 ? "warning" : "ok", warnings };

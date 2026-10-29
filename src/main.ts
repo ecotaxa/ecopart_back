@@ -373,7 +373,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new CreateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_IMPORT),
         new DeleteProject(user_repo, project_repo, privilege_repo, sample_repo, ecotaxa_account_repo),
         new UpdateProject(user_repo, project_repo, instrument_model_repo, privilege_repo, ecotaxa_account_repo, sample_repo, config.DATA_STORAGE_IMPORT),
-        new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo),
+        new SearchProject(user_repo, project_repo, search_repo, instrument_model_repo, privilege_repo, sample_repo, land_mask),
         new GetProject(user_repo, project_repo, privilege_repo),
         new BackupProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE),
         new ExportBackupedProject(user_repo, privilege_repo, project_repo, task_repo, config.DATA_STORAGE_FS_STORAGE, config.DATA_STORAGE_EXPORT, config.API_URL),
