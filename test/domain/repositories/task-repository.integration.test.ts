@@ -400,4 +400,36 @@ describe('task repository (integration)', () => {
             expect(result.tasks[0]).not.toHaveProperty('task_log_file_path')
         })
     })
+    describe('detachTaskFromProject', () => {
+        test('a detached task outlives its project, an attached one goes with it', async () => {
+            const attached = await newTask(TaskType.Import, project_1)
+            const detached = await newTask(TaskType.Delete_Project, project_1)
+
+            await taskRepo.detachTaskFromProject(detached)
+
+            expect((await taskRepo.getOneTask({ task_id: detached }))?.task_project_id).toBeNull()
+            expect(await logOf(detached)).toContain(`Task detached from project ${project_1}`)
+
+            await run(db, 'DELETE FROM project WHERE project_id = ?', [project_1])
+
+            expect(await taskRepo.getOneTask({ task_id: attached })).toBeNull()
+            expect((await taskRepo.getOneTask({ task_id: detached }))?.task_type).toBe(TaskType.Delete_Project)
+            // The detached task still runs its lifecycle
+            await taskRepo.startTask({ task_id: detached })
+            await taskRepo.finishTask({ task_id: detached }, 'done')
+            expect(await statusOf(detached)).toBe(TasksStatus.Done)
+        })
+
+        test('a task without project is left as is', async () => {
+            const task_id = await newTask(TaskType.Export, null)
+            await taskRepo.detachTaskFromProject(task_id)
+            expect((await taskRepo.getOneTask({ task_id }))?.task_project_id).toBeNull()
+            expect(await logOf(task_id)).not.toContain('Task detached')
+        })
+
+        test('an unknown task is refused', async () => {
+            await expect(taskRepo.detachTaskFromProject(999)).rejects.toThrow('Task not found')
+        })
+    })
+
 })

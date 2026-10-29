@@ -295,7 +295,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new MiddlewareProjectValidation(),
             new MiddlewareSampleValidation(),
             new CreateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, fsStorage, 'data_storage/ecopart_data_to_import/'),
-            new DeleteProject(userRepo, projectRepo, privilegeRepo, sampleRepo, ecotaxaAccountRepo),
+            new DeleteProject(userRepo, projectRepo, privilegeRepo, sampleRepo, ecotaxaAccountRepo, taskRepo),
             new UpdateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, sampleRepo, 'data_storage/ecopart_data_to_import/'),
             new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo),
             new GetProject(userRepo, projectRepo, privilegeRepo),
@@ -303,7 +303,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new ExportBackupedProject(userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage, exportDir, "http://localhost:0"),
             new ListImportableSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage),
-            new DeleteSample(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo),
+            new DeleteSample(userRepo, sampleRepo, privilegeRepo, ecotaxaAccountRepo, projectRepo, taskRepo),
             new SearchSamples(userRepo, sampleRepo, searchRepo, instrumentModelRepo, privilegeRepo, projectRepo),
             new ListImportableEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, fsStorage),
             new ImportEcoTaxaSamples(sampleRepo, userRepo, privilegeRepo, projectRepo, taskRepo, ecotaxaAccountRepo, fsStorage),
@@ -362,9 +362,11 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
         // ecotaxa objects and ecotaxa project). Runs whether tests passed or not.
         try {
             if (capturedProjectId && loginCookies) {
-                await request(server)
+                const deleteRes = await request(server)
                     .delete(`/projects/${capturedProjectId}/`)
                     .set("Cookie", cookieHeader())
+                // The deletion runs as a task: wait for it before closing the database and removing the storage
+                if (deleteRes.body?.task_id) await pollTaskUntilDone(deleteRes.body.task_id, 2000, 180000)
             }
         } catch (e) {
             console.warn("Cleanup: failed to delete project", (e as Error).message)

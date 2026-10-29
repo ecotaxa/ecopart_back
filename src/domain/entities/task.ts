@@ -21,6 +21,8 @@ export enum TaskType {
     Regenerate_Pivot = "REGENERATE_PIVOT",
     // Particle counts and extreme areas of the samples imported before they were stored (POST /admin/samples/particle-stats).
     Compute_Particle_Stats = "COMPUTE_PARTICLE_STATS",
+    Delete_Sample = "DELETE_SAMPLE",
+    Delete_Project = "DELETE_PROJECT",
 }
 
 /* CREATION */
@@ -121,7 +123,8 @@ export interface PrivateTaskUpdateModel {
     task_status?: string;
     task_owner_id?: number;
     task_owner?: string;
-    task_project_id?: number;
+    // null detaches the task from its project (see TaskRepository.detachTaskFromProject)
+    task_project_id?: number | null;
     task_params?: object;
     task_creation_utc_date_time?: string;
     task_start_utc_date_time?: string;

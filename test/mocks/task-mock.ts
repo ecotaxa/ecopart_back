@@ -81,6 +81,9 @@ export class MockTaskRepository implements TaskRepository {
     updateTaskResult(): Promise<void> {
         throw new Error("Method not implemented for updateTaskResult");
     }
+    detachTaskFromProject(): Promise<void> {
+        throw new Error("Method not implemented for detachTaskFromProject");
+    }
 }
 
 export class MockMiddlewareAuth implements MiddlewareAuth {

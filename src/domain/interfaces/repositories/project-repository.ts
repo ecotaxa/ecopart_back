@@ -18,6 +18,8 @@ export interface ProjectRepository {
     ensureFolderStructureForBackup(root_folder_path: string): Promise<void>;
     copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean, log?: TaskLogger): Promise<void>;
     removeInterruptedWriteLeftovers(project_id: number): Promise<string[]>;
+    // Removes the storage folder of a project (sample folders, backup, leftovers). False when there was none.
+    deleteProjectStorage(project_id: number): Promise<boolean>;
     ensureBackupExist(project_id: number): Promise<void>;
     // Returns the archive path inside the FTP export folder, as an FTP user reaches it.
     exportBackupedProjectToFtp(project: ProjectResponseModel, task_id: number): Promise<string>;

@@ -670,7 +670,17 @@ export default function ProjectRouter(
      * /projects/{project_id}:
      *   delete:
      *     summary: Delete project
-     *     description: Permanently delete a project and its associated data.
+     *     description: |
+     *       Starts an asynchronous DELETE_PROJECT task (returns a Task immediately; poll the task for
+     *       progress) that permanently deletes a project and everything it holds: its samples one by one
+     *       (their EcoTaxa objects, database rows and storage folders), the linked EcoTaxa project, the
+     *       past tasks of the project with their files, then the project row and its storage folder.
+     *       The source folder of the project is never touched. The task log details every step.
+     *
+     *       Refused while any task is still running on the project. If a sample cannot be deleted the
+     *       project is kept and the task fails, listing the failures; an EcoTaxa project that cannot be
+     *       deleted does not keep the project, it is reported in the task result. Cancelling the task
+     *       stops it between two samples: the project and its remaining samples are kept.
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []
@@ -683,11 +693,11 @@ export default function ProjectRouter(
      *         description: The project ID to delete.
      *     responses:
      *       200:
-     *         description: Project successfully deleted.
+     *         description: Deletion task created.
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/MessageResponse'
+     *               $ref: '#/components/schemas/TaskResponse'
      *       401:
      *         description: Missing or invalid access token.
      *         content:
@@ -706,6 +716,12 @@ export default function ProjectRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: A task is still running on this project.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       500:
      *         description: Internal server error.
      *         content:
@@ -716,13 +732,16 @@ export default function ProjectRouter(
     router.delete('/:project_id/', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             // Only the id: the data source builds its WHERE clause from the keys it receives
-            await deleteProjectUseCase.execute((req as CustomRequest).token, { project_id: req.params.project_id as any })
-            res.status(200).send({ message: "Project successfully deleted" })
+            const task = await deleteProjectUseCase.execute((req as CustomRequest).token, { project_id: req.params.project_id as any })
+            res.status(200).send(task)
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "A task is still running on this project") res.status(409).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete project"] })
         }
     })
@@ -2389,7 +2408,14 @@ export default function ProjectRouter(
      * /projects/{project_id}/samples/{sample_id}:
      *   delete:
      *     summary: Delete sample
-     *     description: Permanently delete a sample from a project.
+     *     description: |
+     *       Starts an asynchronous DELETE_SAMPLE task (returns a Task immediately; poll the task for
+     *       progress) that permanently deletes one sample of a project: its EcoTaxa objects when it was
+     *       imported there, then its database row, then its storage folder. The task log details every
+     *       step. To delete several samples in one task, use `DELETE /projects/{project_id}/samples`.
+     *
+     *       Refused while the project is being deleted. A sample whose EcoTaxa objects cannot be deleted
+     *       is kept, so that the deletion can be retried.
      *     tags: [Samples]
      *     security:
      *       - cookieAccessToken: []
@@ -2408,25 +2434,31 @@ export default function ProjectRouter(
      *         description: The sample ID to delete.
      *     responses:
      *       200:
-     *         description: Sample successfully deleted.
+     *         description: Deletion task created.
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/MessageResponse'
+     *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: User cannot delete sample or project mismatch.
+     *         description: Missing or invalid access token, or the sample does not belong to the project.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used. The logged user is not allowed to perform this action.
+     *         description: User cannot be used. Logged user cannot delete samples in this project.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Sample not found.
+     *         description: Project or sample not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The project is being deleted.
      *         content:
      *           application/json:
      *             schema:
@@ -2438,20 +2470,96 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      */
-    // Delete a sample
     router.delete('/:project_id/samples/:sample_id', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
-            await deleteSampleUseCase.execute((req as CustomRequest).token, req.params.sample_id as any, req.params.project_id as any);
-            res.status(200).send({ message: "Sample successfully deleted" })
+            const task = await deleteSampleUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), [Number(req.params.sample_id)]);
+            res.status(200).send(task)
         } catch (err) {
-            console.log(new Date().toISOString(), err)
-            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot delete this sample") res.status(403).send({ errors: [err.message] })
-            else res.status(500).send({ errors: ["Cannot delete sample"] })
+            sendDeleteSamplesError(res, err)
         }
     })
+
+    /**
+     * @openapi
+     * /projects/{project_id}/samples:
+     *   delete:
+     *     summary: Delete samples
+     *     description: |
+     *       Starts one asynchronous DELETE_SAMPLE task (returns a Task immediately; poll the task for
+     *       progress) that permanently deletes the given samples of a project, one after the other: for
+     *       each, its EcoTaxa objects when it was imported there, then its database row, then its storage
+     *       folder. The task log details every step.
+     *
+     *       Every sample must exist and belong to the project, otherwise nothing is deleted. Refused
+     *       while the project is being deleted. A failing sample does not stop the others; the task then
+     *       fails with every error listed. A sample whose EcoTaxa objects cannot be deleted is kept, so
+     *       that the deletion can be retried. Cancelling the task stops it between two samples.
+     *     tags: [Samples]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: project_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The project ID.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [sample_ids]
+     *             properties:
+     *               sample_ids:
+     *                 type: array
+     *                 minItems: 1
+     *                 items:
+     *                   type: integer
+     *                 description: Ids of the samples to delete.
+     *     responses:
+     *       200:
+     *         description: Deletion task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: Missing or invalid access token, or a sample does not belong to the project.
+     *       403:
+     *         description: User cannot be used. Logged user cannot delete samples in this project.
+     *       404:
+     *         description: Project or sample not found.
+     *       409:
+     *         description: The project is being deleted.
+     *       422:
+     *         description: Validation error.
+     *       500:
+     *         description: Internal server error.
+     */
+    router.delete('/:project_id/samples', middlewareAuth.auth, middlewareSampleValidation.rulesDeleteSamples, async (req: Request, res: Response) => {
+        try {
+            const task = await deleteSampleUseCase.execute((req as CustomRequest).token, Number(req.params.project_id), req.body.sample_ids);
+            res.status(200).send(task)
+        } catch (err) {
+            sendDeleteSamplesError(res, err)
+        }
+    })
+
+    function sendDeleteSamplesError(res: Response, err: Error): void {
+        console.log(new Date().toISOString(), err)
+        if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+        else if (err.message === "Logged user cannot delete samples in this project") res.status(403).send({ errors: [err.message] })
+        else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+        else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
+        else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
+        else if (err.message === "No samples to delete") res.status(422).send({ errors: [err.message] })
+        else if (err.message === "The project is being deleted") res.status(409).send({ errors: [err.message] })
+        else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+        else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
+        else res.status(500).send({ errors: ["Cannot delete samples"] })
+    }
 
     /***********************************************ECOTAXA SAMPLES***********************************************/
 

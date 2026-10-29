@@ -112,4 +112,31 @@ describe("leftovers of interrupted tasks", () => {
             expect(exists("backup/raw/r1.zip.partial")).toBe(false);
         });
     });
+    describe("ProjectRepositoryImpl.deleteProjectStorage", () => {
+        test("removes the whole storage folder of the project and nothing else", async () => {
+            const repo = new ProjectRepositoryImpl({} as any, "storage", "", "", "");
+            repo.base_folder = base_folder;
+            write("storage/5/s1/s1_Particule.zip");
+            write("storage/5/l0b_backup/raw/r1.zip");
+            write("storage/55/s1/s1_Particule.zip");
+
+            await expect(repo.deleteProjectStorage(5)).resolves.toBe(true);
+
+            expect(exists("storage/5")).toBe(false);
+            expect(exists("storage/55/s1/s1_Particule.zip")).toBe(true);
+        });
+
+        test("a project without storage : nothing to remove", async () => {
+            const repo = new ProjectRepositoryImpl({} as any, "storage", "", "", "");
+            repo.base_folder = base_folder;
+            await expect(repo.deleteProjectStorage(6)).resolves.toBe(false);
+        });
+
+        test("refuses anything but an integer id", async () => {
+            const repo = new ProjectRepositoryImpl({} as any, "storage", "", "", "");
+            repo.base_folder = base_folder;
+            await expect(repo.deleteProjectStorage("../x" as any)).rejects.toThrow("Invalid project id");
+        });
+    });
+
 });
