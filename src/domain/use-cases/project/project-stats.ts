@@ -1,7 +1,8 @@
-import { ExploreEcoTaxaSummary, ExploreSummary } from "../../entities/explore";
+import { ExploreEcoTaxaSummary, ExploreSummary, StoredEcoTaxaStats } from "../../entities/explore";
 import { ProjectResponseModel } from "../../entities/project";
-import { ProjectStatsEcoTaxa, ProjectStatsMap, ProjectStatsMapSample, ProjectStatsPrivacy, ProjectStatsRawBackup, ProjectStatsSampleRow, ProjectStatsSamples } from "../../entities/project-stats";
+import { ProjectQcStateModel, ProjectQcWarning, ProjectStatsEcoTaxa, ProjectStatsMap, ProjectStatsMapSample, ProjectStatsPrivacy, ProjectStatsRawBackup, ProjectStatsSampleRow, ProjectStatsSamples } from "../../entities/project-stats";
 import { computeProjectPrivacy, privacyMilestones } from "../../utils/project-privacy";
+import { classificationSharesOf, objectCountsOf, toSampleStat, totalOf } from "../explore/explore-ecotaxa";
 
 /* The pure part of a project's statistics: what each section of the STATS tab shows, and its
  * warnings, computed from the light sample rows without any further IO. */
@@ -161,4 +162,69 @@ export function buildProjectStatsEcoTaxa(summary: ExploreEcoTaxaSummary, samples
         nb_samples_not_imported: samples.length - nb_imported,
         classification_completed,
     };
+}
+
+// What the warnings of the STATS tab are read from: a full statistics response, or only its counts.
+export interface ProjectQcInputs {
+    raw_backup: Pick<ProjectStatsRawBackup, "nb_samples_not_backed_up"> | null;
+    map: Pick<ProjectStatsMap, "nb_samples_without_ctd" | "nb_coordinates_mismatches">;
+    samples: Pick<ProjectStatsSamples, "nb_instrument_parameter_mismatches" | "nb_suspicious_dates" | "nb_suspicious_pressures">;
+    ecotaxa: Pick<ProjectStatsEcoTaxa, "linked" | "nb_samples_not_imported" | "classification_completed">;
+}
+
+// The warnings the STATS tab shows, section by section, under the same conditions: the raw backup
+// one only when the backup state is shown, the EcoTaxa ones only for a linked project.
+export function buildProjectQcWarnings(stats: ProjectQcInputs): ProjectQcWarning[] {
+    const warnings: ProjectQcWarning[] = [];
+    if (stats.raw_backup && stats.raw_backup.nb_samples_not_backed_up > 0) warnings.push({ code: "samples_not_backed_up", nb_samples: stats.raw_backup.nb_samples_not_backed_up });
+    if (stats.map.nb_samples_without_ctd > 0) warnings.push({ code: "samples_without_ctd", nb_samples: stats.map.nb_samples_without_ctd });
+    if (stats.map.nb_coordinates_mismatches > 0) warnings.push({ code: "coordinates_mismatches", nb_samples: stats.map.nb_coordinates_mismatches });
+    if (stats.samples.nb_instrument_parameter_mismatches > 0) warnings.push({ code: "instrument_parameter_mismatches", nb_samples: stats.samples.nb_instrument_parameter_mismatches });
+    if (stats.samples.nb_suspicious_dates > 0) warnings.push({ code: "suspicious_dates", nb_samples: stats.samples.nb_suspicious_dates });
+    if (stats.samples.nb_suspicious_pressures > 0) warnings.push({ code: "suspicious_pressures", nb_samples: stats.samples.nb_suspicious_pressures });
+    if (stats.ecotaxa.linked) {
+        if (stats.ecotaxa.nb_samples_not_imported > 0) warnings.push({ code: "samples_not_imported_in_ecotaxa", nb_samples: stats.ecotaxa.nb_samples_not_imported });
+        if (!stats.ecotaxa.classification_completed) warnings.push({ code: "classification_uncompleted", nb_samples: null });
+    }
+    return warnings;
+}
+
+// The EcoTaxa summary as EcoPart last stored it, without asking EcoTaxa: a sample imported there
+// whose stats were never read counts as pending, so the classification is not reported complete.
+export function storedEcoTaxaSummary(samples: ProjectStatsSampleRow[], stored: StoredEcoTaxaStats[]): ExploreEcoTaxaSummary {
+    const by_sample = new Map(stored.map(row => [row.sample_id, row]));
+    const stats = [];
+    let pending = 0;
+    for (const sample of samples) {
+        if (!sample.ecotaxa_sample_imported) continue;
+        const row = by_sample.get(sample.sample_id);
+        if (row) stats.push(toSampleStat(row));
+        else pending++;
+    }
+    return {
+        categories: [],
+        classification: classificationSharesOf(stats),
+        objects: objectCountsOf(stats),
+        nb_samples_with_stats: stats.filter(stat => totalOf(stat) > 0).length,
+        partial: pending > 0,
+        nb_samples_pending: pending,
+    };
+}
+
+// The QC state of a project in the project lists: the warnings of its STATS tab, from the same
+// rows, with the EcoTaxa classification as last stored.
+export function buildProjectQcState(project: ProjectResponseModel, samples: ProjectStatsSampleRow[], stored: StoredEcoTaxaStats[], with_raw_backup: boolean, now: Date): ProjectQcStateModel {
+    if (samples.length === 0) return { project_id: project.project_id, qc_state: "empty", warnings: [] };
+    const linked = project.ecotaxa_project_id !== null && project.ecotaxa_instance_id !== null;
+    const warnings = buildProjectQcWarnings({
+        raw_backup: with_raw_backup ? buildProjectStatsRawBackup(project, samples) : null,
+        map: buildProjectStatsMap(samples),
+        samples: {
+            nb_instrument_parameter_mismatches: countInstrumentParameterMismatches(samples),
+            nb_suspicious_dates: countSuspiciousDates(samples, now),
+            nb_suspicious_pressures: countSuspiciousPressures(samples),
+        },
+        ecotaxa: buildProjectStatsEcoTaxa(storedEcoTaxaSummary(samples, stored), samples, linked),
+    });
+    return { project_id: project.project_id, qc_state: warnings.length > 0 ? "warning" : "ok", warnings };
 }

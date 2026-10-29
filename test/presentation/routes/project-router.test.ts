@@ -76,6 +76,7 @@ class MockMiddlewareProjectValidation implements IMiddlewareProjectValidation {
     rulesProjectUpdateModel = []
     rulesProjectBackup = []
     rulesProjectBackupFromImport = []
+    rulesProjectsQcStates = []
 }
 
 class MockIMiddlewareSampleValidation implements IMiddlewareSampleValidation {
@@ -121,6 +122,7 @@ describe("Project Router", () => {
     let mockListImportedCTDSamplesUseCase: ListImportedCTDSamplesUseCase;
     let mockDeleteImportedCTDSamplesUseCase: DeleteImportedCTDSamplesUseCase;
     let mockGetProjectStatsUseCase: GetProjectStatsUseCase;
+    let mockGetProjectsQcStatesUseCase: { execute: jest.Mock }
     let mockListShipsUseCase: ListShipsUseCase;
     let mockGetSampleUseCase: GetSampleUseCase;
     let mockGetSampleQcGraphsUseCase: { execute: jest.Mock }
@@ -152,10 +154,11 @@ describe("Project Router", () => {
         mockListShipsUseCase = new MockListShipsUseCase()
         mockGetSampleUseCase = new MockGetSampleUseCase()
         mockGetProjectStatsUseCase = new MockGetProjectStatsUseCase()
+        mockGetProjectsQcStatesUseCase = { execute: jest.fn() }
         mockGetSampleQcGraphsUseCase = { execute: jest.fn() }
         mockPreviewSamplesQcGraphsUseCase = { execute: jest.fn() }
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, mockGetSampleQcGraphsUseCase, {} as any, mockPreviewSamplesQcGraphsUseCase, {} as any, mockGetSampleUseCase, {} as any, mockGetProjectStatsUseCase))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, mockListImportableCTDSamplesUseCase, mockImportCTDSamplesUseCase, mockListImportedCTDSamplesUseCase, mockDeleteImportedCTDSamplesUseCase, mockListShipsUseCase, {} as any, mockGetSampleQcGraphsUseCase, {} as any, mockPreviewSamplesQcGraphsUseCase, {} as any, mockGetSampleUseCase, {} as any, mockGetProjectStatsUseCase, mockGetProjectsQcStatesUseCase))
     })
 
     beforeEach(() => {
@@ -1206,6 +1209,33 @@ describe("Project Router", () => {
             const response = await request(server).get("/projects/1/stats")
             expect(response.status).toBe(500)
             expect(response.body).toStrictEqual({ errors: ["Cannot get project statistics"] })
+        });
+    });
+
+    describe("POST /projects/qc-states", () => {
+        const states = [{ project_id: 1, qc_state: "warning", warnings: [{ code: "samples_without_ctd", nb_samples: 2 }] }]
+
+        test("returns 200 with the QC state of the projects", async () => {
+            mockGetProjectsQcStatesUseCase.execute.mockResolvedValue(states)
+            const response = await request(server).post("/projects/qc-states").send({ project_ids: [1, 2] })
+            expect(response.status).toBe(200)
+            expect(mockGetProjectsQcStatesUseCase.execute).toBeCalledWith(expect.objectContaining({ user_id: 1 }), [1, 2])
+            expect(response.body).toStrictEqual(states)
+        });
+        test.each([
+            ["User cannot be used", 403],
+            ["Too many projects, at most 100", 422],
+        ])("maps '%s' to %i", async (message, status) => {
+            mockGetProjectsQcStatesUseCase.execute.mockRejectedValue(new Error(message))
+            const response = await request(server).post("/projects/qc-states").send({ project_ids: [1] })
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+        test("returns 500 for an unexpected error", async () => {
+            mockGetProjectsQcStatesUseCase.execute.mockRejectedValue(new Error("xyz"))
+            const response = await request(server).post("/projects/qc-states").send({ project_ids: [1] })
+            expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual({ errors: ["Cannot get the QC state of the projects"] })
         });
     });
 

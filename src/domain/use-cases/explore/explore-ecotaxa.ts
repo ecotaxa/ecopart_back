@@ -56,7 +56,7 @@ export const EXPLORE_IMAGES_DEFAULT = 4;
 export const EXPLORE_IMAGES_MAX = 12;
 const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
 
-const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
+export const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
 
 export function matchesClassificationState(stat: EcoTaxaSampleStat, state: ExploreClassificationState): boolean {
     const total = totalOf(stat);

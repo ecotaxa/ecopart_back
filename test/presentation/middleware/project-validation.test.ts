@@ -65,6 +65,7 @@ describe("Project Router", () => {
     let mockDeleteEcoTaxaSamplesUseCase: DeleteEcoTaxaSamplesUseCase;
     let mockSearchEcoTaxaSamplesUseCase: SearchEcoTaxaSamplesUseCase;
     let mockListShipsUseCase: ListShipsUseCase;
+    const mockGetProjectsQcStatesUseCase = { execute: jest.fn() };
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -86,7 +87,7 @@ describe("Project Router", () => {
         mockSearchEcoTaxaSamplesUseCase = new MockSearchEcoTaxaSamplesUseCase()
         mockListShipsUseCase = new MockListShipsUseCase()
 
-        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any))
+        server.use("/projects", ProjectRouter(mockMiddlewareAuth, middlewareProjectValidation, middlewareSampleValidation, mockCreateProjectUseCase, mockDeleteProjectUseCase, mockUpdateProjectUseCase, mockSearchProjectsUseCase, {} as any, mockBackupProjectUseCase, mockExportBackupProjectUseCase, mockListImportableSamplesUseCase, mockImportSamplesUseCase, mockDeleteSampleUseCase, mockSearchSamplesUseCase, mockListImportableEcoTaxaSamplesUseCase, mockImportEcoTaxaSamplesUseCase, mockDeleteEcoTaxaSamplesUseCase, mockSearchEcoTaxaSamplesUseCase, {} as any, {} as any, {} as any, {} as any, mockListShipsUseCase, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, mockGetProjectsQcStatesUseCase))
     })
 
     beforeEach(() => {
@@ -490,6 +491,31 @@ describe("Project Router", () => {
             expect(mockBackupProjectUseCase.execute).not.toBeCalled()
             expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(OutputData)
+        });
+    });
+
+    describe("Test project rulesProjectsQcStates", () => {
+        test("passes the project ids on as integers", async () => {
+            mockGetProjectsQcStatesUseCase.execute.mockResolvedValue([])
+
+            const response = await request(server).post("/projects/qc-states").send({ project_ids: [3, "5"] })
+
+            expect(response.status).toBe(200)
+            expect(mockGetProjectsQcStatesUseCase.execute.mock.calls[0][1]).toEqual([3, 5])
+        });
+
+        test.each([
+            [{}, "project_ids is required."],
+            [{ project_ids: 5 }, "project_ids must be an array of at most 100 project ids."],
+            [{ project_ids: Array.from({ length: 101 }, (_, i) => i + 1) }, "project_ids must be an array of at most 100 project ids."],
+            [{ project_ids: [1, 0] }, "project_ids must contain positive integers."],
+            [{ project_ids: [1, "a"] }, "project_ids must contain positive integers."],
+        ])("refuses %j", async (body, message) => {
+            const response = await request(server).post("/projects/qc-states").send(body)
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors).toEqual([expect.objectContaining({ msg: message })])
+            expect(mockGetProjectsQcStatesUseCase.execute).toBeCalledTimes(0)
         });
     });
 })

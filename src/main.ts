@@ -105,6 +105,7 @@ import { EcotaxaAccountRepositoryImpl } from './domain/repositories/ecotaxa_acco
 import { StatsRepositoryImpl } from './domain/repositories/stats-repository'
 import { GetStats } from './domain/use-cases/admin/get-stats'
 import { GetProjectStats } from './domain/use-cases/project/get-project-stats'
+import { GetProjectsQcStates } from './domain/use-cases/project/get-projects-qc-states'
 import { ComputeParticleStats } from './domain/use-cases/sample/compute-particle-stats'
 import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
 import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
@@ -395,6 +396,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetSample(user_repo, sample_repo, privilege_repo, project_repo),
         new RegeneratePivots(user_repo, privilege_repo, project_repo, sample_repo, task_repo),
         new GetProjectStats(user_repo, project_repo, privilege_repo, sample_repo, task_repo, explore_ecotaxa),
+        new GetProjectsQcStates(user_repo, project_repo, privilege_repo, sample_repo),
     )
 
     const taskMiddleWare = TaskRouter(
