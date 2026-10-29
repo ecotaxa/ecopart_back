@@ -38,20 +38,50 @@ beforeEach(() => {
     jest.spyOn(mockSampleRepository, "createManyEcoTaxaSamples").mockResolvedValue(2);
 });
 
-describe("Import EcoTaxa samples : rollback of the database flags", () => {
-    test("a failure after the flags are written resets them and logs which samples were reset", async () => {
-        const ecotaxaError = new Error("EcoTaxa is down");
-        jest.spyOn(mockEcotaxaAccountRepository, "importEcoTaxaSamplesInEcoTaxa").mockRejectedValue(ecotaxaError);
-        const flagged = { sample_id: 1, sample_name: "s1", project_id: 1 } as PublicSampleModel;
-        jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ items: [flagged], total: 1 });
-        jest.spyOn(mockSampleRepository, "deleteEcoTaxaSamplesFromDb").mockResolvedValue(1);
+describe("Import EcoTaxa samples : what the task reports", () => {
+    test("the EcoTaxa step logs what the repository does and follows the progress of the EcoTaxa job", async () => {
+        jest.spyOn(mockEcotaxaAccountRepository, "importEcoTaxaSamplesInEcoTaxa").mockImplementation((async (_samples: unknown, _project: unknown, log: (message: string) => Promise<void>, on_job_progress: (pct: number | null, msg: string | null) => Promise<void>) => {
+            await log("EcoTaxa import job 99 started on the folder from_EcoPart/1/");
+            await on_job_progress(40, "Processing s1");
+            await on_job_progress(null, null);
+            return [];
+        }) as any);
 
         await run();
 
-        expect(mockSampleRepository.deleteEcoTaxaSamplesFromDb).toBeCalledWith([flagged]);
+        expect(loggedMessages()).toContain("Step 3/3 EcoTaxa import : EcoTaxa import job 99 started on the folder from_EcoPart/1/");
+        expect((mockTaskRepository.updateTaskProgress as jest.Mock).mock.calls.map(([, pct, msg]) => [pct, msg])).toEqual([
+            [10, "Step 1/3 EcoTaxa sample validation : start"],
+            [20, "Step 1/3 EcoTaxa sample validation : done"],
+            [25, "Step 2/3 EcoTaxa samples db creation : start"],
+            [35, "Step 2/3 EcoTaxa samples db creation : done"],
+            [40, "Step 3/3 EcoTaxa import : sending 2 sample(s) to EcoTaxa"],
+            [70, "Step 3/3 EcoTaxa import : EcoTaxa job at 40%, Processing s1"],
+            [50, "Step 3/3 EcoTaxa import : EcoTaxa job at ?%"],
+        ]);
+        expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: TaskResponseModel_1.task_id });
+    });
+});
+
+describe("Import EcoTaxa samples : rollback of the database flags", () => {
+    test("a failure after the flags are written resets every flagged sample, found by id, and logs them", async () => {
+        const ecotaxaError = new Error("EcoTaxa is down");
+        jest.spyOn(mockEcotaxaAccountRepository, "importEcoTaxaSamplesInEcoTaxa").mockRejectedValue(ecotaxaError);
+        const flagged = importable.map(sample => ({ ...sample, project_id: 1, visual_qc_status_label: "VALIDATED", ecotaxa_sample_imported: true }) as unknown as PublicSampleModel);
+        jest.spyOn(mockSampleRepository, "getSamplesByIds").mockResolvedValue(flagged);
+        jest.spyOn(mockSampleRepository, "deleteEcoTaxaSamplesFromDb").mockResolvedValue(2);
+
+        await run();
+
+        // By id: a sample name is unique only within its project
+        expect(mockSampleRepository.getSamplesByIds).toHaveBeenLastCalledWith([1, 2]);
+        expect(mockSampleRepository.deleteEcoTaxaSamplesFromDb).toBeCalledWith(flagged);
         expect(loggedMessages()).toEqual([
+            "Step 1/3 EcoTaxa sample validation : 2 sample(s) to send to EcoTaxa out of 2 importable",
+            "Step 2/3 EcoTaxa samples db creation : s1 (sample_id 1) marked as imported into EcoTaxa, 10 image(s), s1.tsv",
+            "Step 2/3 EcoTaxa samples db creation : s2 (sample_id 2) marked as imported into EcoTaxa, 10 image(s), s2.tsv",
             "Cleanup after failure : resetting the EcoTaxa import fields in the database for : s1, s2",
-            "Cleanup after failure : EcoTaxa import fields reset for s1 (sample_id 1, project 1)",
+            "Cleanup after failure : EcoTaxa import fields reset for s1 (sample_id 1, project 1), s2 (sample_id 2, project 1)",
         ]);
         expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, ecotaxaError);
     });
@@ -59,7 +89,6 @@ describe("Import EcoTaxa samples : rollback of the database flags", () => {
     test("a failure before any flag is written : nothing to reset, and the task still fails", async () => {
         const dbError = new Error("SQLITE_BUSY");
         jest.spyOn(mockSampleRepository, "createManyEcoTaxaSamples").mockRejectedValue(dbError);
-        jest.spyOn(mockSampleRepository, "standardGetSamples").mockResolvedValue({ items: [], total: 0 });
         jest.spyOn(mockSampleRepository, "deleteEcoTaxaSamplesFromDb");
 
         await run();
@@ -72,7 +101,10 @@ describe("Import EcoTaxa samples : rollback of the database flags", () => {
     test("a failing reset is logged, and the task still fails with its own error", async () => {
         const ecotaxaError = new Error("EcoTaxa is down");
         jest.spyOn(mockEcotaxaAccountRepository, "importEcoTaxaSamplesInEcoTaxa").mockRejectedValue(ecotaxaError);
-        jest.spyOn(mockSampleRepository, "standardGetSamples").mockRejectedValue(new Error("SQLITE_BUSY"));
+        // the visual QC gate reads the samples, then the reset fails to
+        jest.spyOn(mockSampleRepository, "getSamplesByIds")
+            .mockResolvedValueOnce(importable.map(sample => ({ ...sample, visual_qc_status_label: "VALIDATED" })) as any)
+            .mockRejectedValueOnce(new Error("SQLITE_BUSY"));
 
         await run();
 

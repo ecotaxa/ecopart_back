@@ -235,6 +235,7 @@ describe("Import CTD Samples Use Case", () => {
             jest.spyOn(mockTaskRepository, "throwIfCancelled").mockRejectedValue(cancelled);
             jest.spyOn(mockSampleRepository, "importCTDSamples");
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "finishTask");
             jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue(undefined);
 
@@ -260,8 +261,11 @@ describe("Import CTD Samples Use Case", () => {
             jest.spyOn(mockSampleRepository, "listImportableCTDSamples").mockResolvedValue([
                 { sample_name: "sample_a", file_extension: "ctd" },
             ]);
-            jest.spyOn(mockSampleRepository, "importCTDSamples").mockResolvedValue(undefined);
+            jest.spyOn(mockSampleRepository, "importCTDSamples").mockImplementation((async (...args: any[]) => {
+                await args[6]("sample_a : sample_a.ctd copied (24 B), no coordinates found in the file");
+            }) as any);
             jest.spyOn(mockTaskRepository, "updateTaskProgress").mockResolvedValue(undefined);
+            jest.spyOn(mockTaskRepository, "logMessage").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "finishTask").mockResolvedValue(undefined);
             jest.spyOn(mockTaskRepository, "failedTask").mockResolvedValue(undefined);
 
@@ -274,8 +278,13 @@ describe("Import CTD Samples Use Case", () => {
                 projectResponseModel.project_id,
                 ["sample_a"],
                 current_user.user_id,
-                42
+                42,
+                expect.any(Function)
             );
+            expect((mockTaskRepository.logMessage as jest.Mock).mock.calls.map(([, message]) => message)).toEqual([
+                "Step 1/3 CTD sample validation : 1 CTD file(s) to import out of 1 importable",
+                "Step 2/3 CTD sample copy : sample_a : sample_a.ctd copied (24 B), no coordinates found in the file",
+            ]);
             expect(mockTaskRepository.finishTask).toBeCalledWith({ task_id: 42 });
             expect(mockTaskRepository.failedTask).toBeCalledTimes(0);
         });

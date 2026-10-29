@@ -3,7 +3,7 @@ import { UserUpdateModel } from "../../entities/user";
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { TaskRepository } from "../../interfaces/repositories/task-repository";
+import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-repository";
 
 import { BackupProjectUseCase } from "../../interfaces/use-cases/project/backup-project";
 import { ProjectResponseModel } from "../../entities/project";
@@ -106,7 +106,7 @@ export class BackupProject implements BackupProjectUseCase {
             await this.taskRepository.throwIfCancelled(task_id);
 
             // 2/2 Copy source files to hiden project folder 25->100%
-            await this.copySourcesToBackupProjectFolder(task_id, project, skip_already_imported);
+            await this.copySourcesToBackupProjectFolder(task, project, skip_already_imported);
 
             // Record the backup date on the project
             await this.projectRepository.standardUpdateProject({ project_id: project.project_id, last_backup_utc_date_time: new Date().toISOString() });
@@ -124,14 +124,17 @@ export class BackupProject implements BackupProjectUseCase {
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 1/2 Validation, ensure folder structure is correct: done");
     }
 
-    async copySourcesToBackupProjectFolder(task_id: number, project: ProjectResponseModel, skip_already_imported: boolean) {
+    async copySourcesToBackupProjectFolder(task: TaskResponseModel, project: ProjectResponseModel, skip_already_imported: boolean) {
+        const task_id = task.task_id;
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/2 L0-b backup folders copy : start");
 
         const dest_folder = path.join(this.DATA_STORAGE_FS_STORAGE, `${project.project_id}`, "l0b_backup");
         const root_folder_path = project.root_folder_path;
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, "Step 2/2 L0-b backup folders copy : " + message);
+        await log(`from ${root_folder_path} to ${dest_folder}, ${skip_already_imported ? "raw folders already in the backup are skipped" : "every raw folder is written again"}`);
 
         // Copy sources files to project folder
-        await this.projectRepository.copyL0bToProjectFolder(root_folder_path, dest_folder, skip_already_imported);
+        await this.projectRepository.copyL0bToProjectFolder(root_folder_path, dest_folder, skip_already_imported, log);
         await this.taskRepository.updateTaskProgress({ task_id: task_id }, 99, "Step 2/2 L0-b backup folders copy : done");
     }
 

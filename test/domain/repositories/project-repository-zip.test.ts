@@ -90,3 +90,57 @@ describe("ProjectRepositoryImpl.exportBackupedProjectToFtp", () => {
         expect(fs.existsSync(path.join(tmp_dir, "ftp", ftp_path))).toBe(true);
     });
 });
+
+describe("ProjectRepositoryImpl raw/ backup copy", () => {
+    let base_folder: string;
+    let messages: string[];
+    const log = async (message: string) => { messages.push(message); };
+    const write = (relative_path: string, content: string) => {
+        fs.mkdirSync(path.dirname(path.join(base_folder, relative_path)), { recursive: true });
+        fs.writeFileSync(path.join(base_folder, relative_path), content);
+    };
+
+    beforeEach(() => {
+        base_folder = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-l0b-raw-"));
+        messages = [];
+        write("root/raw/r1/HDR1.dat", "raw data");
+        write("root/raw/r2.zip", "zipped raw");
+        write("root/raw/notes.txt", "not raw");
+        fs.mkdirSync(path.join(base_folder, "backup"), { recursive: true });
+    });
+
+    afterEach(() => {
+        fs.rmSync(base_folder, { recursive: true, force: true });
+    });
+
+    test("logs each archive written with its size, the entries left out, and a total", async () => {
+        const repo = new ProjectRepositoryImpl({} as any, "", "", "", "");
+
+        await repo.copyAllL0bFolders(base_folder, "root", "backup", log);
+
+        const zip_size = fs.statSync(path.join(base_folder, "backup", "raw", "r1.zip")).size;
+        expect(messages).toEqual(expect.arrayContaining([
+            "raw/notes.txt : neither a folder nor a .zip, not backed up",
+            `raw/r1/ zipped as raw/r1.zip (${zip_size} B)`,
+            "raw/r2.zip copied (10 B)",
+            `raw/ : 2 archive(s) written (1 zipped, 1 copied), ${zip_size + 10} B, 1 not backed up`,
+        ]));
+        expect(messages).toHaveLength(4);
+    });
+
+    test("with skip_already_imported, logs the archives already in the backup as skipped", async () => {
+        const repo = new ProjectRepositoryImpl({} as any, "", "", "", "");
+        await repo.copyAllL0bFolders(base_folder, "root", "backup");
+        write("root/raw/r3/HDR3.dat", "new raw data");
+
+        await repo.copyNewL0bFolders(base_folder, "root", "backup", log);
+
+        const zip_size = fs.statSync(path.join(base_folder, "backup", "raw", "r3.zip")).size;
+        expect(messages).toEqual(expect.arrayContaining([
+            "raw/r1/ : already in the backup as raw/r1.zip, skipped",
+            "raw/r2.zip : already in the backup as raw/r2.zip, skipped",
+            `raw/r3/ zipped as raw/r3.zip (${zip_size} B)`,
+            `raw/ : 1 archive(s) written (1 zipped, 0 copied), ${zip_size} B, 2 already in the backup, 1 not backed up`,
+        ]));
+    });
+});

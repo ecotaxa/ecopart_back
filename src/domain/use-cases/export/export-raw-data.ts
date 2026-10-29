@@ -20,7 +20,8 @@ import { renderReadme } from "./readme";
 import { ExportMetadataWriter } from "./export-metadata";
 import { zipFolder } from "./zip-folder";
 import { removeExportWorkFolder } from "./work-folder";
-import { fileSize, fileSizeLabel, formatBytes, logExportedProjects, relativePath } from "./export-log";
+import { fileSize, fileSizeLabel, logExportedProjects, relativePath } from "./export-log";
+import { formatBytes } from "../../utils/format-bytes";
 import { ProjectAccessPolicy } from "../project/project-access";
 
 const EXPORT_TYPES: RawExportType[] = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];

@@ -12,6 +12,7 @@ import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { PivotImages, SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
+import { formatBytes } from "../utils/format-bytes";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
@@ -1415,7 +1416,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         return importable_samples;
     }
 
-    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number, import_task_id: number): Promise<void> {
+    async importCTDSamples(root_folder_path: string, instrument_model: string, project_id: number, samples_names_to_import: string[], importator_user_id: number, import_task_id: number, log: TaskLogger = async () => undefined): Promise<void> {
         const ctd_relative_folder = this.getCTDFolderRelativePath(instrument_model);
         const ctd_folder_path = path.join(this.base_folder, root_folder_path, ctd_relative_folder);
         const project_storage_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
@@ -1436,6 +1437,7 @@ export class SampleRepositoryImpl implements SampleRepository {
             all_samples.items.map((sample) => [sample.sample_name, { sample_id: sample.sample_id, station_id: sample.station_id }])
         );
 
+        let imported = 0, with_coordinates = 0, bytes = 0;
         for (const sample_name of samples_names_to_import) {
             const ctd_original_file_name = `${sample_name}.ctd`;
             const ctd_imported_file_name = `${sample_name}.ctd`;
@@ -1467,8 +1469,12 @@ export class SampleRepositoryImpl implements SampleRepository {
                 throw new Error(`Failed to copy CTD file for sample '${sample_name}' to '${dest_file_path}': ${err.message}`);
             }
 
+            const size = (await fsPromises.stat(dest_file_path)).size;
+            bytes += size;
             const sample_info = sample_id_by_name.get(sample_name);
-            if (sample_info !== undefined) {
+            if (sample_info === undefined) {
+                await log(`${sample_name} : ${ctd_original_file_name} copied (${formatBytes(size)}), WARNING the sample is no longer in the project, nothing recorded`);
+            } else {
                 const file_content = (await fsPromises.readFile(dest_file_path)).toString("latin1");
                 const ctd_description = this.buildCTDDescription(file_content);
                 const ctd_coordinates = this.readCTDCoordinates(file_content);
@@ -1486,8 +1492,13 @@ export class SampleRepositoryImpl implements SampleRepository {
                     ctd_latitude: ctd_coordinates?.latitude ?? null,
                     ctd_longitude: ctd_coordinates?.longitude ?? null,
                 } as any);
+                imported++;
+                if (ctd_coordinates) with_coordinates++;
+                const coordinates = ctd_coordinates ? `coordinates ${ctd_coordinates.latitude}, ${ctd_coordinates.longitude}` : "no coordinates found in the file";
+                await log(`${sample_name} : ${ctd_original_file_name} copied (${formatBytes(size)}), ${coordinates}`);
             }
         }
+        await log(`${imported} of ${samples_names_to_import.length} CTD file(s) imported, ${with_coordinates} with coordinates, ${formatBytes(bytes)}`);
     }
 
     async getSamplesFromFsStorage(folderPath: string): Promise<string[]> {

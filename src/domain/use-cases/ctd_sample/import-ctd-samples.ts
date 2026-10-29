@@ -2,7 +2,7 @@ import { PrivilegeRepository } from "../../interfaces/repositories/privilege-rep
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { TaskRepository } from "../../interfaces/repositories/task-repository";
+import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-repository";
 
 import { ImportCTDSamplesUseCase } from "../../interfaces/use-cases/ctd_sample/import-ctd-samples";
 
@@ -79,17 +79,20 @@ export class ImportCTDSamples implements ImportCTDSamplesUseCase {
 
     private async startImportCTDSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], project: ProjectResponseModel, current_user: UserUpdateModel) {
         const task_id = task.task_id;
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, message);
         try {
             await this.taskRepository.startTask({ task_id: task_id });
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/3 CTD sample validation: start");
 
             const importable_samples = await this.sampleRepository.listImportableCTDSamples(project.root_folder_path, project.instrument_model, project.project_id);
             this.ensureCTDSamplesAreImportables(importable_samples.map(s => s.sample_name), samples_names_to_import);
+            await log(`Step 1/3 CTD sample validation : ${samples_names_to_import.length} CTD file(s) to import out of ${importable_samples.length} importable`);
 
             await this.taskRepository.throwIfCancelled(task_id);
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 50, "Step 2/3 CTD sample copy: start");
-            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id, task_id);
+            await this.sampleRepository.importCTDSamples(project.root_folder_path, project.instrument_model, project.project_id, samples_names_to_import, current_user.user_id, task_id,
+                (message) => log("Step 2/3 CTD sample copy : " + message));
 
             await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 3/3 CTD sample import: done");
             await this.taskRepository.finishTask({ task_id: task_id });

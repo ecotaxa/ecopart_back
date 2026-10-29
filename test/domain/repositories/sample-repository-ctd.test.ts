@@ -93,7 +93,13 @@ describe("CTD import / delete sample updates", () => {
     });
 
     test("import records the import task and the custom-column description", async () => {
-        await repo.importCTDSamples("project_src", "UVP6HF", 3, ["sample_a"], 5, 42);
+        const messages: string[] = [];
+        await repo.importCTDSamples("project_src", "UVP6HF", 3, ["sample_a"], 5, 42, async (message) => { messages.push(message); });
+
+        expect(messages).toEqual([
+            "sample_a : sample_a.ctd copied (24 B), no coordinates found in the file",
+            "1 of 1 CTD file(s) imported, 0 with coordinates, 24 B",
+        ]);
 
         expect(fs.existsSync(path.join(base_folder, "storage", "3", "sample_a", "sample_a.ctd"))).toBe(true);
         expect(dataSource.updateOne).toBeCalledWith(expect.objectContaining({
@@ -108,7 +114,10 @@ describe("CTD import / delete sample updates", () => {
     });
 
     test("import stores the CTD file start position", async () => {
-        await repo.importCTDSamples("project_src", "UVP6HF", 3, ["sample_b"], 5, 42);
+        const messages: string[] = [];
+        await repo.importCTDSamples("project_src", "UVP6HF", 3, ["sample_b"], 5, 42, async (message) => { messages.push(message); });
+
+        expect(messages[0]).toBe("sample_b : sample_b.ctd copied (53 B), coordinates 63.3476, -20.2736");
 
         expect(dataSource.updateOne).toBeCalledWith(expect.objectContaining({
             sample_id: 8,

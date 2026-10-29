@@ -329,6 +329,26 @@ describe("Project Repository", () => {
             });
         });
 
+        test("Should log for meta and config whether they were copied, kept unchanged or replaced", async () => {
+            const messages: string[] = [];
+            const log = async (message: string) => { messages.push(message); };
+
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder, log);
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder, log);
+            writeTree(sourcePath(), { "meta/uvp5_header_sn203.txt": "header v3" });
+            await repository.copy_metadata(tmp_dir, source_folder, dest_folder, log);
+
+            const run = historyRuns()[0];
+            expect(messages).toEqual([
+                "meta/ : 1 file(s) copied",
+                "config/ : 2 file(s) copied",
+                "meta/ : unchanged, 1 file(s) kept",
+                "config/ : unchanged, 2 file(s) kept",
+                `meta/ : 1 file(s) copied, the previous version is kept in ${path.join("fs_storage", "1", "l0b_backup_history", run, "meta")}/`,
+                "config/ : unchanged, 2 file(s) kept",
+            ]);
+        });
+
         test("Should not create a history entry when meta and config are unchanged", async () => {
             await repository.copy_metadata(tmp_dir, source_folder, dest_folder);
             await repository.copy_metadata(tmp_dir, source_folder, dest_folder);

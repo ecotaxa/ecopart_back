@@ -3,7 +3,7 @@ import { PrivilegeRepository } from "../../interfaces/repositories/privilege-rep
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
-import { TaskRepository } from "../../interfaces/repositories/task-repository";
+import { TaskLogger, TaskRepository } from "../../interfaces/repositories/task-repository";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 
 import { ImportEcoTaxaSamplesUseCase } from "../../interfaces/use-cases/ecotaxa_sample/import-ecotaxa-samples";
@@ -14,7 +14,6 @@ import { ProjectResponseModel } from "../../entities/project";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 
 import path from "path";
-import { PreparedSearchOptions } from "../../entities/search";
 import { cleanupLogPrefix } from "../../utils/task-cleanup";
 
 export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
@@ -96,36 +95,35 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
 
     private async startImportEcoTaxaSamplesTask(task: TaskResponseModel, samples_names_to_import: string[], instrument_model: string, project: ProjectResponseModel) {
         const task_id = task.task_id;
+        const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, message);
         let importable_samples: PublicImportableEcoTaxaSampleResponseModel[] = [];
         try {
             await this.taskRepository.startTask({ task_id: task_id });
 
-            // 1/5 Do validation before importing
+            // 1/3 Do validation before importing
             importable_samples = await this.listImportableEcoTaxaSamples(project);
             // Check that asked samples are in the importable list of samples
-            await this.ensureEcoTaxaSamplesAreImportables(importable_samples, samples_names_to_import, task_id);
+            await this.ensureEcoTaxaSamplesAreImportables(importable_samples, samples_names_to_import, task_id, log);
             // QC gate: only visual-QC-validated samples may be sent to EcoTaxa
             await this.ensureSamplesAreVisualQcValidated(importable_samples, samples_names_to_import);
 
-            // Only checkpoint: the rollback of step 4/5 does not reliably undo the rows it flags
+            // Only checkpoint: the rollback of step 2/3 does not reliably undo the rows it flags
             await this.taskRepository.throwIfCancelled(task_id);
         } catch (error) {
             await this.taskRepository.failedTask(task_id, error);
             return;
         }
+        //filter importable_samples to keep only the ones to import
+        const samples_to_import: PublicImportableEcoTaxaSampleResponseModel[] = importable_samples.filter(sample => samples_names_to_import.includes(sample.sample_name));
         try {
-            // 3/5 generate qc report by samples
-            //TODO LATER but we can already et the qc flag to un validated
+            //TODO LATER generate a qc report by sample, but we can already set the qc flag to un validated
 
-            // 4/5 Create EcoTaxa Samples samples in db
-            //filter importable_samples to keep only the ones to import
-            const samples_to_import: PublicImportableEcoTaxaSampleResponseModel[] = importable_samples.filter(sample => samples_names_to_import.includes(sample.sample_name));
+            // 2/3 Create EcoTaxa Samples samples in db
+            await this.importEcoTaxaSamplesInDb(task_id, samples_to_import, log);
 
-            await this.importEcoTaxaSamplesInDb(task_id, samples_to_import);
-
-            // 5/5  import samples in ecotaxa
+            // 3/3  import samples in ecotaxa
             //const ecotaxa_tasks_id = 
-            await this.importEcoTaxaSamplesToEcotaxa(samples_to_import, project);
+            await this.importEcoTaxaSamplesToEcotaxa(task_id, log, samples_to_import, project);
             //this.sampleRepository.updateEcoTaxaSamplesInDbWithEcotaxaInfo(samples_names_to_import, ecotaxa_tasks_id, task_id);
             // finish task
             await this.taskRepository.finishTask({ task_id: task_id });
@@ -133,14 +131,19 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         } catch (error) {
             console.error("Error during EcoTaxa samples import:", error);
             // rollback : delete created ecotaxa samples in db
-            await this.deleteEcoTaxaSamplesFromDb(task, samples_names_to_import, error);
+            await this.deleteEcoTaxaSamplesFromDb(task, samples_to_import, error);
             await this.taskRepository.failedTask(task_id, error);
             //todo abbort import in ecotaxa?
         }
 
     }
-    async importEcoTaxaSamplesToEcotaxa(samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], project: ProjectResponseModel) {
-        await this.ecotaxa_accountRepository.importEcoTaxaSamplesInEcoTaxa(samples_to_import, project);
+    // The EcoTaxa job reports its own progress, which fills the 50-99% of the task.
+    async importEcoTaxaSamplesToEcotaxa(task_id: number, log: TaskLogger, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], project: ProjectResponseModel) {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 40, `Step 3/3 EcoTaxa import : sending ${samples_to_import.length} sample(s) to EcoTaxa`);
+        await this.ecotaxa_accountRepository.importEcoTaxaSamplesInEcoTaxa(samples_to_import, project,
+            (message) => log("Step 3/3 EcoTaxa import : " + message),
+            (progress_pct, progress_msg) => this.taskRepository.updateTaskProgress({ task_id: task_id }, 50 + Math.round(Math.min(Math.max(progress_pct ?? 0, 0), 100) * 0.49),
+                `Step 3/3 EcoTaxa import : EcoTaxa job at ${progress_pct ?? "?"}%${progress_msg ? `, ${progress_msg}` : ""}`));
     }
     private async listImportableEcoTaxaSamples(project: ProjectResponseModel): Promise<PublicImportableEcoTaxaSampleResponseModel[]> {
         await this.sampleRepository.ensureFolderExists(project.root_folder_path);
@@ -150,11 +153,12 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
 
         return samples;
     }
-    async ensureEcoTaxaSamplesAreImportables(samples: PublicImportableEcoTaxaSampleResponseModel[], samples_names_to_import: string[], task_id: number) {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/5 EcoTaxa sample validation : start");
+    async ensureEcoTaxaSamplesAreImportables(samples: PublicImportableEcoTaxaSampleResponseModel[], samples_names_to_import: string[], task_id: number, log: TaskLogger = async () => undefined) {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 10, "Step 1/3 EcoTaxa sample validation : start");
         this.ensureEcoTaxaSamplesAreInImportableList(samples, samples_names_to_import);
         //TODO LATER add more validation
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 20, "Step 1/5 EcoTaxa sample validation : done");
+        await log(`Step 1/3 EcoTaxa sample validation : ${samples_names_to_import.length} sample(s) to send to EcoTaxa out of ${samples.length} importable`);
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 20, "Step 1/3 EcoTaxa sample validation : done");
 
     }
 
@@ -184,39 +188,31 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
         }
     }
 
-    // Rollback of step 4/5. Never throws: a failing rollback is logged, and the task still reaches its
-    // final status.
-    async deleteEcoTaxaSamplesFromDb(task: TaskResponseModel, samples_names_to_import: string[], error: unknown) {
+    // Rollback of step 2/3. Never throws: a failing rollback is logged, and the task still reaches its
+    // final status. Only samples not yet imported into EcoTaxa are importable, so the ones flagged now
+    // are this task's: they are found by id, a sample name being unique only within its project.
+    async deleteEcoTaxaSamplesFromDb(task: TaskResponseModel, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], error: unknown) {
         const prefix = cleanupLogPrefix(error);
         const log = (message: string) => this.taskRepository.logMessage(task.task_log_file_path, `${prefix} : ${message}`).catch(() => undefined);
 
-        await log(`resetting the EcoTaxa import fields in the database for : ${samples_names_to_import.join(", ")}`);
+        await log(`resetting the EcoTaxa import fields in the database for : ${samples_to_import.map(sample => sample.sample_name).join(", ")}`);
         try {
-            // update samples from db to empty ecotaxa related fields
-            const options: PreparedSearchOptions = {
-                filter: [
-                    { field: "sample_name", operator: "IN", value: samples_names_to_import },
-                    { field: "ecotaxa_sample_imported", operator: "=", value: true }
-                ],
-                sort_by: [],
-                page: 1,
-                limit: 1
-            }
-            const ecotaxa_samples = await this.sampleRepository.standardGetSamples(options);
-            if (ecotaxa_samples.total === 0) {
+            const flagged = (await this.sampleRepository.getSamplesByIds(samples_to_import.map(sample => sample.sample_id)))
+                .filter(sample => sample.ecotaxa_sample_imported);
+            if (flagged.length === 0) {
                 await log("nothing reset, no sample is marked as imported in EcoTaxa");
                 return;
             }
-            // delete samples from db
-            await this.sampleRepository.deleteEcoTaxaSamplesFromDb(ecotaxa_samples.items);
-            await log(`EcoTaxa import fields reset for ${ecotaxa_samples.items.map(sample => `${sample.sample_name} (sample_id ${sample.sample_id}, project ${sample.project_id})`).join(", ")}`);
+            // update samples from db to empty ecotaxa related fields
+            await this.sampleRepository.deleteEcoTaxaSamplesFromDb(flagged);
+            await log(`EcoTaxa import fields reset for ${flagged.map(sample => `${sample.sample_name} (sample_id ${sample.sample_id}, project ${sample.project_id})`).join(", ")}`);
         } catch (cleanup_error) {
             await log(`reset failed, samples may remain marked as imported in EcoTaxa : ${(cleanup_error as Error).message}`);
         }
     }
 
-    async importEcoTaxaSamplesInDb(task_id: number, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[]): Promise<number> {
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 75, "Step 4/5 EcoTaxa samples db creation : start");
+    async importEcoTaxaSamplesInDb(task_id: number, samples_to_import: PublicImportableEcoTaxaSampleResponseModel[], log: TaskLogger = async () => undefined): Promise<number> {
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 25, "Step 2/3 EcoTaxa samples db creation : start");
 
         // Common EcoTaxa sample data
         // will be SET when calling ecotaxa api
@@ -241,8 +237,11 @@ export class ImportEcoTaxaSamples implements ImportEcoTaxaSamplesUseCase {
 
         // Create ecotaxa samples in db
         const nb_of_updated_samples = await this.sampleRepository.createManyEcoTaxaSamples(formated_samples);
+        for (const sample of samples_to_import) {
+            await log(`Step 2/3 EcoTaxa samples db creation : ${sample.sample_name} (sample_id ${sample.sample_id}) marked as imported into EcoTaxa, ${sample.images} image(s), ${sample.tsv_file_name}`);
+        }
 
-        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 100, "Step 4/5 ecotaxa samples db creation done");
+        await this.taskRepository.updateTaskProgress({ task_id: task_id }, 35, "Step 2/3 EcoTaxa samples db creation : done");
         return nb_of_updated_samples;
     }
 }
