@@ -12,11 +12,18 @@ import {
     countSuspiciousPressures,
     distanceKm,
     EMPTY_ECOTAXA_SUMMARY,
+    isInland,
+    LAND_MARGIN_KM,
     MAX_PLAUSIBLE_PRESSURE_DBAR,
 } from "../../../../src/domain/use-cases/project/project-stats";
+import { LandMask } from "../../../../src/domain/interfaces/geography/land-mask";
 import { exploreProject, projectStatsSample } from "../explore/explore-fixtures";
 
 const NOW = new Date("2026-10-23T12:00:00Z");
+const SEA: LandMask = { isOnLand: () => false };
+// A round island 20 km across, centred on 45°N 5°E.
+const ISLAND: LandMask = { isOnLand: (latitude, longitude) => distanceKm(latitude, longitude, 45, 5) < 10 };
+const KM_PER_DEGREE_LATITUDE = 111.19;
 
 describe("Project statistics builders", () => {
     describe("distanceKm", () => {
@@ -47,15 +54,15 @@ describe("Project statistics builders", () => {
                 projectStatsSample({ sample_id: 2, sample_name: "b", ctd_imported: true, ctd_latitude: 44.3, ctd_longitude: 7.87 }),
                 projectStatsSample({ sample_id: 3, sample_name: "c", ctd_imported: false }),
                 projectStatsSample({ sample_id: 4, sample_name: "d", sample_latitude: null, sample_longitude: null, ctd_imported: true, ctd_latitude: 10, ctd_longitude: 10 }),
-            ]);
+            ], SEA);
 
             expect(map.nb_samples_without_ctd).toBe(1);
             expect(map.nb_coordinates_mismatches).toBe(1);
             expect(map.samples).toEqual([
-                { sample_id: 1, sample_name: "a", latitude: 43.4, longitude: 7.87, ctd_latitude: 43.41, ctd_longitude: 7.88, use_ctd_coordinates: true, coordinates_mismatch: false },
-                { sample_id: 2, sample_name: "b", latitude: 43.4, longitude: 7.87, ctd_latitude: 44.3, ctd_longitude: 7.87, use_ctd_coordinates: false, coordinates_mismatch: true },
-                { sample_id: 3, sample_name: "c", latitude: 43.4, longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false, coordinates_mismatch: false },
-                { sample_id: 4, sample_name: "d", latitude: null, longitude: null, ctd_latitude: 10, ctd_longitude: 10, use_ctd_coordinates: false, coordinates_mismatch: false },
+                { sample_id: 1, sample_name: "a", latitude: 43.4, longitude: 7.87, ctd_latitude: 43.41, ctd_longitude: 7.88, use_ctd_coordinates: true, coordinates_mismatch: false, on_land: false },
+                { sample_id: 2, sample_name: "b", latitude: 43.4, longitude: 7.87, ctd_latitude: 44.3, ctd_longitude: 7.87, use_ctd_coordinates: false, coordinates_mismatch: true, on_land: false },
+                { sample_id: 3, sample_name: "c", latitude: 43.4, longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false, coordinates_mismatch: false, on_land: false },
+                { sample_id: 4, sample_name: "d", latitude: null, longitude: null, ctd_latitude: 10, ctd_longitude: 10, use_ctd_coordinates: false, coordinates_mismatch: false, on_land: false },
             ]);
         });
 
@@ -63,8 +70,45 @@ describe("Project statistics builders", () => {
             const km_per_degree_lat = 111.19;
             const near = projectStatsSample({ ctd_latitude: 43.4 + (COORDINATES_MISMATCH_KM - 0.5) / km_per_degree_lat, ctd_longitude: 7.87 });
             const far = projectStatsSample({ ctd_latitude: 43.4 + (COORDINATES_MISMATCH_KM + 0.5) / km_per_degree_lat, ctd_longitude: 7.87 });
-            expect(buildProjectStatsMap([near]).nb_coordinates_mismatches).toBe(0);
-            expect(buildProjectStatsMap([far]).nb_coordinates_mismatches).toBe(1);
+            expect(buildProjectStatsMap([near], SEA).nb_coordinates_mismatches).toBe(0);
+            expect(buildProjectStatsMap([far], SEA).nb_coordinates_mismatches).toBe(1);
+        });
+
+        test("counts the samples whose position used is inland, an unknown position never is", () => {
+            const map = buildProjectStatsMap([
+                projectStatsSample({ sample_id: 1, latitude: 45, longitude: 5 }),
+                projectStatsSample({ sample_id: 2, latitude: 43.4, longitude: 7.87 }),
+                // The CTD position is used: the sample metadata one, at sea, is not read.
+                projectStatsSample({ sample_id: 3, latitude: 45, longitude: 5, use_ctd_coordinates: true, ctd_latitude: 45, ctd_longitude: 5 }),
+                projectStatsSample({ sample_id: 4, latitude: null, longitude: null }),
+            ], ISLAND);
+
+            expect(map.nb_samples_on_land).toBe(2);
+            expect(map.samples.map(sample => sample.on_land)).toEqual([true, false, true, false]);
+        });
+    });
+
+    describe("isInland", () => {
+        test("on land and further than the margin from the sea in every direction", () => {
+            expect(isInland(ISLAND, 45, 5)).toBe(true);
+            expect(isInland(ISLAND, 45 + (10 - LAND_MARGIN_KM - 0.5) / KM_PER_DEGREE_LATITUDE, 5)).toBe(true);
+        });
+
+        test("a coastal position within the margin, or one at sea, is not", () => {
+            expect(isInland(ISLAND, 45 + (10 - LAND_MARGIN_KM + 0.5) / KM_PER_DEGREE_LATITUDE, 5)).toBe(false);
+            expect(isInland(ISLAND, 45, 5 + 12 / (KM_PER_DEGREE_LATITUDE * Math.cos(45 * Math.PI / 180)))).toBe(false);
+        });
+
+        test("stops at the first position at sea", () => {
+            const land = { isOnLand: jest.fn(() => false) };
+            expect(isInland(land, 45, 5)).toBe(false);
+            expect(land.isOnLand).toBeCalledTimes(1);
+        });
+
+        test("the probes stay within the poles", () => {
+            const land = { isOnLand: jest.fn(() => true) };
+            expect(isInland(land, -89.99, 0)).toBe(true);
+            for (const [latitude] of land.isOnLand.mock.calls as unknown as [number, number][]) expect(Math.abs(latitude)).toBeLessThanOrEqual(90);
         });
     });
 

@@ -5,6 +5,7 @@ import { ProjectRepository } from "../../interfaces/repositories/project-reposit
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { GetProjectsQcStatesUseCase } from "../../interfaces/use-cases/project/get-projects-qc-states";
+import { LandMask } from "../../interfaces/geography/land-mask";
 import { buildProjectQcState } from "./project-stats";
 
 // At most this many projects per call: a page of the project lists.
@@ -20,6 +21,7 @@ export class GetProjectsQcStates implements GetProjectsQcStatesUseCase {
         private readonly projectRepository: ProjectRepository,
         private readonly privilegeRepository: PrivilegeRepository,
         private readonly sampleRepository: SampleRepository,
+        private readonly land: LandMask,
         private readonly now: () => Date = () => new Date(),
     ) { }
 
@@ -47,7 +49,7 @@ export class GetProjectsQcStates implements GetProjectsQcStatesUseCase {
             if (!project) continue;
             const samples = await this.sampleRepository.getProjectStatsSamples(project_id);
             const stored = await this.sampleRepository.getEcoTaxaStats(samples.filter(sample => sample.ecotaxa_sample_imported).map(sample => sample.sample_id));
-            states.push(buildProjectQcState(project, samples, stored, is_admin || granted.has(project_id), now));
+            states.push(buildProjectQcState(project, samples, stored, is_admin || granted.has(project_id), this.land, now));
         }
         return states;
     }

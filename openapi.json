@@ -2487,6 +2487,10 @@
           "coordinates_mismatch": {
             "type": "boolean",
             "description": "Both positions are known and more than 5 km apart."
+          },
+          "on_land": {
+            "type": "boolean",
+            "description": "The position used is on land (Natural Earth 1:10m land minus its lakes), more than 2 km from the sea or a lake."
           }
         },
         "required": [
@@ -2497,7 +2501,8 @@
           "ctd_latitude",
           "ctd_longitude",
           "use_ctd_coordinates",
-          "coordinates_mismatch"
+          "coordinates_mismatch",
+          "on_land"
         ]
       },
       "ProjectStatsMap": {
@@ -2514,12 +2519,17 @@
           },
           "nb_coordinates_mismatches": {
             "type": "integer"
+          },
+          "nb_samples_on_land": {
+            "type": "integer",
+            "description": "Samples whose position used is on land."
           }
         },
         "required": [
           "samples",
           "nb_samples_without_ctd",
-          "nb_coordinates_mismatches"
+          "nb_coordinates_mismatches",
+          "nb_samples_on_land"
         ]
       },
       "ProjectStatsSamples": {
@@ -2778,13 +2788,14 @@
               "samples_not_backed_up",
               "samples_without_ctd",
               "coordinates_mismatches",
+              "samples_on_land",
               "instrument_parameter_mismatches",
               "suspicious_dates",
               "suspicious_pressures",
               "samples_not_imported_in_ecotaxa",
               "classification_uncompleted"
             ],
-            "description": "The warning of the STATS tab: samples imported since the last raw backup, samples without CTD file, samples whose CTD position is more than 5 km from their own, samples with other instrument parameters than the rest of the project, suspicious sampling dates, suspicious pressures, samples not imported in EcoTaxa, objects of the samples imported in EcoTaxa not all validated."
+            "description": "The warning of the STATS tab: samples imported since the last raw backup, samples without CTD file, samples whose CTD position is more than 5 km from their own, samples whose position is on land (more than 2 km from the sea or a lake), samples with other instrument parameters than the rest of the project, suspicious sampling dates, suspicious pressures, samples not imported in EcoTaxa, objects of the samples imported in EcoTaxa not all validated."
           },
           "nb_samples": {
             "type": "integer",

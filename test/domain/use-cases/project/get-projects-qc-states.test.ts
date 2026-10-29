@@ -1,6 +1,7 @@
 import { StoredEcoTaxaStats } from "../../../../src/domain/entities/explore";
 import { ProjectResponseModel } from "../../../../src/domain/entities/project";
 import { UserUpdateModel } from "../../../../src/domain/entities/user";
+import { LandMask } from "../../../../src/domain/interfaces/geography/land-mask";
 import { ExploreEcoTaxaService } from "../../../../src/domain/use-cases/explore/explore-ecotaxa";
 import { GetProjectStats } from "../../../../src/domain/use-cases/project/get-project-stats";
 import { GetProjectsQcStates, PROJECTS_QC_STATES_MAX } from "../../../../src/domain/use-cases/project/get-projects-qc-states";
@@ -14,6 +15,8 @@ import { exploreProject, projectStatsSample } from "../explore/explore-fixtures"
 
 const NOW = new Date("2026-10-23T12:00:00Z");
 const current_user: UserUpdateModel = { user_id: 7 };
+// Land around Lyon only, where the second sample is.
+const LAND: LandMask = { isOnLand: (latitude, longitude) => Math.abs(latitude - 45.76) < 1 && Math.abs(longitude - 4.83) < 1 };
 
 const LINKED: ProjectResponseModel = exploreProject(5, "open", {
     last_backup_utc_date_time: "2024-07-10T00:00:00.000Z",
@@ -23,7 +26,7 @@ const EMPTY: ProjectResponseModel = exploreProject(6, "private");
 
 const SAMPLES = [
     projectStatsSample({ sample_id: 1, project_id: 5, ecotaxa_sample_imported: true, ecotaxa_sample_id: 9001, ctd_imported: true, sample_creation_utc_date_time: "2024-07-01T09:00:00.000Z" }),
-    projectStatsSample({ sample_id: 2, project_id: 5, sample_creation_utc_date_time: "2024-07-11T09:00:00.000Z" }),
+    projectStatsSample({ sample_id: 2, project_id: 5, sample_creation_utc_date_time: "2024-07-11T09:00:00.000Z", latitude: 45.76, longitude: 4.83, sample_latitude: 45.76, sample_longitude: 4.83 }),
 ];
 const STORED: StoredEcoTaxaStats[] = [
     { sample_id: 1, ecotaxa_sample_id: 9001, nb_unclassified: 0, nb_validated: 30, nb_dubious: 0, nb_predicted: 0, used_taxa: [45072], fetched_utc_date_time: "2026-10-23T00:00:00.000Z" },
@@ -31,6 +34,7 @@ const STORED: StoredEcoTaxaStats[] = [
 const LINKED_WARNINGS = [
     { code: "samples_not_backed_up", nb_samples: 1 },
     { code: "samples_without_ctd", nb_samples: 1 },
+    { code: "samples_on_land", nb_samples: 1 },
     { code: "samples_not_imported_in_ecotaxa", nb_samples: 1 },
 ];
 
@@ -47,7 +51,7 @@ describe("GetProjectsQcStates use case", () => {
         projectRepository = new MockProjectRepository();
         privilegeRepository = new MockPrivilegeRepository();
         sampleRepository = new MockSampleRepository();
-        useCase = new GetProjectsQcStates(userRepository, projectRepository, privilegeRepository, sampleRepository, () => NOW);
+        useCase = new GetProjectsQcStates(userRepository, projectRepository, privilegeRepository, sampleRepository, LAND, () => NOW);
 
         jest.spyOn(userRepository, "ensureUserCanBeUsed").mockResolvedValue();
         jest.spyOn(userRepository, "isAdmin").mockResolvedValue(false);
@@ -95,7 +99,7 @@ describe("GetProjectsQcStates use case", () => {
 
         const [state] = await useCase.execute(current_user, [5]);
 
-        expect(state.warnings.map(warning => warning.code)).toEqual(["samples_without_ctd", "samples_not_imported_in_ecotaxa"]);
+        expect(state.warnings.map(warning => warning.code)).toEqual(["samples_without_ctd", "samples_on_land", "samples_not_imported_in_ecotaxa"]);
     });
 
     test("shows the raw backup warning to an admin, without looking up their privileges", async () => {
@@ -123,7 +127,7 @@ describe("GetProjectsQcStates use case", () => {
         jest.spyOn(projectRepository, "getProject").mockResolvedValue(LINKED);
         const taskRepository = new MockTaskRepository();
         jest.spyOn(taskRepository, "countExportTasks").mockResolvedValue(0);
-        const stats = await new GetProjectStats(userRepository, projectRepository, privilegeRepository, sampleRepository, taskRepository, ecotaxa, () => NOW).execute(current_user, { project_id: 5 });
+        const stats = await new GetProjectStats(userRepository, projectRepository, privilegeRepository, sampleRepository, taskRepository, ecotaxa, LAND, () => NOW).execute(current_user, { project_id: 5 });
 
         const [state] = await useCase.execute(current_user, [5]);
 

@@ -135,6 +135,7 @@ import { BcryptAdapter } from './infra/cryptography/bcript'
 import { JwtAdapter } from './infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from './infra/mailer/nodemailer'
 import { CountriesAdapter } from './infra/countries/country'
+import { NaturalEarthLandMask } from './infra/geography/natural-earth-land-mask'
 import { FsAdapter } from './infra/files/fs'
 
 import sqlite3 from 'sqlite3'
@@ -329,6 +330,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     // The EcoTaxa statistics kept per sample, shared by the Explore page and the project STATS tab.
     const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)
+    const land_mask = new NaturalEarthLandMask()
     const broadcast_message_repo = new BroadcastMessageRepositoryImpl(broadcast_message_dataSource)
 
     const userMiddleWare =
@@ -395,8 +397,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new SelectSampleCoordinates(user_repo, sample_repo, privilege_repo),
         new GetSample(user_repo, sample_repo, privilege_repo, project_repo),
         new RegeneratePivots(user_repo, privilege_repo, project_repo, sample_repo, task_repo),
-        new GetProjectStats(user_repo, project_repo, privilege_repo, sample_repo, task_repo, explore_ecotaxa),
-        new GetProjectsQcStates(user_repo, project_repo, privilege_repo, sample_repo),
+        new GetProjectStats(user_repo, project_repo, privilege_repo, sample_repo, task_repo, explore_ecotaxa, land_mask),
+        new GetProjectsQcStates(user_repo, project_repo, privilege_repo, sample_repo, land_mask),
     )
 
     const taskMiddleWare = TaskRouter(

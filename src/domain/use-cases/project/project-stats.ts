@@ -3,6 +3,7 @@ import { ProjectResponseModel } from "../../entities/project";
 import { ProjectQcStateModel, ProjectQcWarning, ProjectStatsEcoTaxa, ProjectStatsMap, ProjectStatsMapSample, ProjectStatsPrivacy, ProjectStatsRawBackup, ProjectStatsSampleRow, ProjectStatsSamples } from "../../entities/project-stats";
 import { computeProjectPrivacy, privacyMilestones } from "../../utils/project-privacy";
 import { classificationSharesOf, objectCountsOf, toSampleStat, totalOf } from "../explore/explore-ecotaxa";
+import { LandMask } from "../../interfaces/geography/land-mask";
 
 /* The pure part of a project's statistics: what each section of the STATS tab shows, and its
  * warnings, computed from the light sample rows without any further IO. */
@@ -27,7 +28,12 @@ export const INSTRUMENT_PARAMETERS: (keyof ProjectStatsSampleRow)[] = [
     "instrument_settings_acq_exposure",
 ];
 
+// A position on land counts only this far from the water: the 1:10m coastline closes the narrow bays,
+// straits and harbours a coastal station can sit in, never by more than a kilometre.
+export const LAND_MARGIN_KM = 2;
+
 const EARTH_RADIUS_KM = 6371;
+const KM_PER_DEGREE = EARTH_RADIUS_KM * Math.PI / 180;
 
 const isFinite = (value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value);
 
@@ -49,15 +55,31 @@ export function countStations(samples: ProjectStatsSampleRow[]): number {
     return stations.size;
 }
 
-export function buildProjectStatsMap(samples: ProjectStatsSampleRow[]): ProjectStatsMap {
+// On land, and still on land LAND_MARGIN_KM away in each of eight directions.
+export function isInland(land: LandMask, latitude: number, longitude: number): boolean {
+    if (!land.isOnLand(latitude, longitude)) return false;
+    const margin_latitude = LAND_MARGIN_KM / KM_PER_DEGREE;
+    const margin_longitude = margin_latitude / Math.max(Math.cos(latitude * Math.PI / 180), 0.01);
+    for (let direction = 0; direction < 8; direction++) {
+        const angle = direction * Math.PI / 4;
+        const probe_latitude = Math.max(-90, Math.min(90, latitude + margin_latitude * Math.cos(angle)));
+        if (!land.isOnLand(probe_latitude, longitude + margin_longitude * Math.sin(angle))) return false;
+    }
+    return true;
+}
+
+export function buildProjectStatsMap(samples: ProjectStatsSampleRow[], land: LandMask): ProjectStatsMap {
     let nb_samples_without_ctd = 0;
     let nb_coordinates_mismatches = 0;
+    let nb_samples_on_land = 0;
     const points: ProjectStatsMapSample[] = samples.map(sample => {
         if (!sample.ctd_imported) nb_samples_without_ctd++;
         const both_known = isFinite(sample.sample_latitude) && isFinite(sample.sample_longitude) && isFinite(sample.ctd_latitude) && isFinite(sample.ctd_longitude);
         const coordinates_mismatch = both_known
             && distanceKm(sample.sample_latitude as number, sample.sample_longitude as number, sample.ctd_latitude as number, sample.ctd_longitude as number) > COORDINATES_MISMATCH_KM;
         if (coordinates_mismatch) nb_coordinates_mismatches++;
+        const on_land = isFinite(sample.latitude) && isFinite(sample.longitude) && isInland(land, sample.latitude, sample.longitude);
+        if (on_land) nb_samples_on_land++;
         return {
             sample_id: sample.sample_id,
             sample_name: sample.sample_name,
@@ -67,9 +89,10 @@ export function buildProjectStatsMap(samples: ProjectStatsSampleRow[]): ProjectS
             ctd_longitude: sample.ctd_longitude,
             use_ctd_coordinates: sample.use_ctd_coordinates,
             coordinates_mismatch,
+            on_land,
         };
     });
-    return { samples: points, nb_samples_without_ctd, nb_coordinates_mismatches };
+    return { samples: points, nb_samples_without_ctd, nb_coordinates_mismatches, nb_samples_on_land };
 }
 
 // The samples whose instrument parameters differ from the most common combination of the project.
@@ -167,7 +190,7 @@ export function buildProjectStatsEcoTaxa(summary: ExploreEcoTaxaSummary, samples
 // What the warnings of the STATS tab are read from: a full statistics response, or only its counts.
 export interface ProjectQcInputs {
     raw_backup: Pick<ProjectStatsRawBackup, "nb_samples_not_backed_up"> | null;
-    map: Pick<ProjectStatsMap, "nb_samples_without_ctd" | "nb_coordinates_mismatches">;
+    map: Pick<ProjectStatsMap, "nb_samples_without_ctd" | "nb_coordinates_mismatches" | "nb_samples_on_land">;
     samples: Pick<ProjectStatsSamples, "nb_instrument_parameter_mismatches" | "nb_suspicious_dates" | "nb_suspicious_pressures">;
     ecotaxa: Pick<ProjectStatsEcoTaxa, "linked" | "nb_samples_not_imported" | "classification_completed">;
 }
@@ -179,6 +202,7 @@ export function buildProjectQcWarnings(stats: ProjectQcInputs): ProjectQcWarning
     if (stats.raw_backup && stats.raw_backup.nb_samples_not_backed_up > 0) warnings.push({ code: "samples_not_backed_up", nb_samples: stats.raw_backup.nb_samples_not_backed_up });
     if (stats.map.nb_samples_without_ctd > 0) warnings.push({ code: "samples_without_ctd", nb_samples: stats.map.nb_samples_without_ctd });
     if (stats.map.nb_coordinates_mismatches > 0) warnings.push({ code: "coordinates_mismatches", nb_samples: stats.map.nb_coordinates_mismatches });
+    if (stats.map.nb_samples_on_land > 0) warnings.push({ code: "samples_on_land", nb_samples: stats.map.nb_samples_on_land });
     if (stats.samples.nb_instrument_parameter_mismatches > 0) warnings.push({ code: "instrument_parameter_mismatches", nb_samples: stats.samples.nb_instrument_parameter_mismatches });
     if (stats.samples.nb_suspicious_dates > 0) warnings.push({ code: "suspicious_dates", nb_samples: stats.samples.nb_suspicious_dates });
     if (stats.samples.nb_suspicious_pressures > 0) warnings.push({ code: "suspicious_pressures", nb_samples: stats.samples.nb_suspicious_pressures });
@@ -213,12 +237,12 @@ export function storedEcoTaxaSummary(samples: ProjectStatsSampleRow[], stored: S
 
 // The QC state of a project in the project lists: the warnings of its STATS tab, from the same
 // rows, with the EcoTaxa classification as last stored.
-export function buildProjectQcState(project: ProjectResponseModel, samples: ProjectStatsSampleRow[], stored: StoredEcoTaxaStats[], with_raw_backup: boolean, now: Date): ProjectQcStateModel {
+export function buildProjectQcState(project: ProjectResponseModel, samples: ProjectStatsSampleRow[], stored: StoredEcoTaxaStats[], with_raw_backup: boolean, land: LandMask, now: Date): ProjectQcStateModel {
     if (samples.length === 0) return { project_id: project.project_id, qc_state: "empty", warnings: [] };
     const linked = project.ecotaxa_project_id !== null && project.ecotaxa_instance_id !== null;
     const warnings = buildProjectQcWarnings({
         raw_backup: with_raw_backup ? buildProjectStatsRawBackup(project, samples) : null,
-        map: buildProjectStatsMap(samples),
+        map: buildProjectStatsMap(samples, land),
         samples: {
             nb_instrument_parameter_mismatches: countInstrumentParameterMismatches(samples),
             nb_suspicious_dates: countSuspiciousDates(samples, now),

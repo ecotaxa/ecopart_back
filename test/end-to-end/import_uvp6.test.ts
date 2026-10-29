@@ -117,6 +117,7 @@ import { BcryptAdapter } from '../../src/infra/cryptography/bcript'
 import { JwtAdapter } from '../../src/infra/auth/jsonwebtoken'
 import { NodemailerAdapter } from '../../src/infra/mailer/nodemailer'
 import { CountriesAdapter } from '../../src/infra/countries/country'
+import { NaturalEarthLandMask } from '../../src/infra/geography/natural-earth-land-mask'
 import { FsAdapter } from '../../src/infra/files/fs'
 import { MigrationManager } from '../../src/data/migrations/migration-manager'
 
@@ -320,8 +321,8 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
             new GetSample(userRepo, sampleRepo, privilegeRepo, projectRepo),
             new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
-            new GetProjectStats(userRepo, projectRepo, privilegeRepo, sampleRepo, taskRepo, new ExploreEcoTaxaService(ecotaxaAccountRepo, sampleRepo, projectRepo)),
-            new GetProjectsQcStates(userRepo, projectRepo, privilegeRepo, sampleRepo),
+            new GetProjectStats(userRepo, projectRepo, privilegeRepo, sampleRepo, taskRepo, new ExploreEcoTaxaService(ecotaxaAccountRepo, sampleRepo, projectRepo), new NaturalEarthLandMask()),
+            new GetProjectsQcStates(userRepo, projectRepo, privilegeRepo, sampleRepo, new NaturalEarthLandMask()),
         )
 
         const taskMiddleware = TaskRouter(
