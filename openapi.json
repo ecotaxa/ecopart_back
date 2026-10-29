@@ -6605,7 +6605,7 @@
       },
       "delete": {
         "summary": "Delete project",
-        "description": "Permanently delete a project and its associated data.",
+        "description": "Starts an asynchronous DELETE_PROJECT task (returns a Task immediately; poll the task for\nprogress) that permanently deletes a project and everything it holds: its samples one by one\n(their EcoTaxa objects, database rows and storage folders), the linked EcoTaxa project, the\npast tasks of the project with their files, then the project row and its storage folder.\nThe source folder of the project is never touched. The task log details every step.\n\nRefused while any task is still running on the project. If a sample cannot be deleted the\nproject is kept and the task fails, listing the failures; an EcoTaxa project that cannot be\ndeleted does not keep the project, it is reported in the task result. Cancelling the task\nstops it between two samples: the project and its remaining samples are kept.\n",
         "tags": [
           "Projects"
         ],
@@ -6627,11 +6627,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Project successfully deleted.",
+            "description": "Deletion task created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "$ref": "#/components/schemas/TaskResponse"
                 }
               }
             }
@@ -6658,6 +6658,16 @@
           },
           "404": {
             "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A task is still running on this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7685,6 +7695,82 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Delete samples",
+        "description": "Starts one asynchronous DELETE_SAMPLE task (returns a Task immediately; poll the task for\nprogress) that permanently deletes the given samples of a project, one after the other: for\neach, its EcoTaxa objects when it was imported there, then its database row, then its storage\nfolder. The task log details every step.\n\nEvery sample must exist and belong to the project, otherwise nothing is deleted. Refused\nwhile the project is being deleted. A failing sample does not stop the others; the task then\nfails with every error listed. A sample whose EcoTaxa objects cannot be deleted is kept, so\nthat the deletion can be retried. Cancelling the task stops it between two samples.\n",
+        "tags": [
+          "Samples"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The project ID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sample_ids"
+                ],
+                "properties": {
+                  "sample_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Ids of the samples to delete."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deletion task created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token, or a sample does not belong to the project."
+          },
+          "403": {
+            "description": "User cannot be used. Logged user cannot delete samples in this project."
+          },
+          "404": {
+            "description": "Project or sample not found."
+          },
+          "409": {
+            "description": "The project is being deleted."
+          },
+          "422": {
+            "description": "Validation error."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
       }
     },
     "/projects/{project_id}/samples/{sample_id}": {
@@ -7764,7 +7850,7 @@
       },
       "delete": {
         "summary": "Delete sample",
-        "description": "Permanently delete a sample from a project.",
+        "description": "Starts an asynchronous DELETE_SAMPLE task (returns a Task immediately; poll the task for\nprogress) that permanently deletes one sample of a project: its EcoTaxa objects when it was\nimported there, then its database row, then its storage folder. The task log details every\nstep. To delete several samples in one task, use `DELETE /projects/{project_id}/samples`.\n\nRefused while the project is being deleted. A sample whose EcoTaxa objects cannot be deleted\nis kept, so that the deletion can be retried.\n",
         "tags": [
           "Samples"
         ],
@@ -7795,17 +7881,17 @@
         ],
         "responses": {
           "200": {
-            "description": "Sample successfully deleted.",
+            "description": "Deletion task created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "$ref": "#/components/schemas/TaskResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "User cannot delete sample or project mismatch.",
+            "description": "Missing or invalid access token, or the sample does not belong to the project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7815,7 +7901,7 @@
             }
           },
           "403": {
-            "description": "User cannot be used. The logged user is not allowed to perform this action.",
+            "description": "User cannot be used. Logged user cannot delete samples in this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7825,7 +7911,17 @@
             }
           },
           "404": {
-            "description": "Sample not found.",
+            "description": "Project or sample not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is being deleted.",
             "content": {
               "application/json": {
                 "schema": {

@@ -1,7 +1,7 @@
 import { ProjectRequestCreationModel, ProjectResponseModel, PublicProjectResponseModel } from "../../src/domain/entities/project";
 import { EcoTaxaSampleListItem, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel } from "../../src/domain/entities/sample";
 import { SearchInfo, SearchResult } from "../../src/domain/entities/search";
-import { TaskResponseModel } from "../../src/domain/entities/task";
+import { PublicTaskResponseModel, TaskResponseModel } from "../../src/domain/entities/task";
 import { ProjectRepository } from "../../src/domain/interfaces/repositories/project-repository"
 import { ProjectPrivacyInputs } from "../../src/domain/use-cases/project/project-access";
 import { BackupProjectUseCase } from "../../src/domain/interfaces/use-cases/project/backup-project";
@@ -39,6 +39,9 @@ export class MockProjectRepository implements ProjectRepository {
     }
     removeInterruptedWriteLeftovers(): Promise<string[]> {
         throw new Error("Method not implemented for removeInterruptedWriteLeftovers");
+    }
+    deleteProjectStorage(): Promise<boolean> {
+        throw new Error("Method not implemented for deleteProjectStorage");
     }
     ensureBackupExist(): Promise<void> {
         throw new Error("Method not implemented for ensureBackupExist");
@@ -123,7 +126,7 @@ export class MockUpdateProjectUseCase implements UpdateProjectUseCase {
 }
 
 export class MockDeleteProjectUseCase implements DeleteProjectUseCase {
-    execute(): Promise<void> {
+    execute(): Promise<PublicTaskResponseModel> {
         throw new Error("Method not implemented for delete project")
     }
 }
@@ -157,7 +160,7 @@ export class MockImportSamplesUseCase implements ImportSamplesUseCase {
     }
 }
 export class MockDeleteSampleUseCase implements DeleteSampleUseCase {
-    execute(): Promise<void> {
+    execute(): Promise<PublicTaskResponseModel> {
         throw new Error("Method not implemented for delete sample")
     }
 }

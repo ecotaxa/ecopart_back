@@ -410,6 +410,20 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         await log(`raw/ : ${zipped + copied} archive(s) written (${zipped} zipped, ${copied} copied), ${formatBytes(bytes)}${not_written.length > 0 ? `, ${not_written.join(", ")}` : ""}`);
     }
 
+    // Everything EcoPart stored for the project: its sample folders, its backup, anything an import left.
+    // The source folder of the project (root_folder_path) is not EcoPart's and is never touched.
+    async deleteProjectStorage(project_id: number): Promise<boolean> {
+        if (!Number.isInteger(project_id)) throw new Error("Invalid project id");
+        const project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+        try {
+            await fsPromises.access(project_folder);
+        } catch {
+            return false;
+        }
+        await fsPromises.rm(project_folder, { recursive: true, force: true });
+        return true;
+    }
+
     // Temporary files of writes cut short by a server stop, in the project's storage: the `.partial`
     // copies and archives, the `.staging` folders of the backup metadata swap, and the `.tmp` pivots.
     // Only called at startup, when no task can be writing them. Returns their relative paths.

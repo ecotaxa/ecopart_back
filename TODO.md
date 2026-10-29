@@ -8,7 +8,7 @@ Review of 23 Oct 2026, after the Explore branch. The Explore reads are protected
 
 1. **Generic account: single point of failure, not monitored.** Every import, read, export and deletion uses the generic EcoTaxa account of the instance. Its expiry check is commented out (`getEcotaxaGenericAccountForInstance`, `src/domain/repositories/ecotaxa_account-repository.ts`), nothing renews its token and nothing warns when it dies: imports then fail with an EcoTaxa error, the Explore EcoTaxa figures stay empty and the deletions skip EcoTaxa silently. To do: a periodic check (`api/users/me` per instance) with its status in the admin pages and an alert, and a written renewal procedure.
 2. **No reconciliation between the two applications.**
-   - Deleting an EcoPart project or sample ignores an EcoTaxa failure (`delete-project.ts`, `delete-sample.ts`): the objects stay orphaned in EcoTaxa. The failure should be reported on the task or to the user.
+   - Deleting an EcoPart project ignores an EcoTaxa failure (`delete-project.ts`): the objects stay orphaned in EcoTaxa. Since 29 Oct 2026 the deletion runs as a task and the failure is written in its log and result (WARNING); a sample deletion keeps the sample instead. Nothing retries the EcoTaxa side afterwards.
    - Objects deleted in EcoTaxa leave the sample marked as imported in EcoPart.
    - An EcoTaxa import interrupted by an EcoPart restart lets the EcoTaxa job finish without the sample being marked imported; relaunching uploads the same files again.
    - To do: have the daily Explore sweep also detect samples that no longer exist in EcoTaxa, and record the EcoTaxa job id of an import so that a recovered task can check its outcome.
@@ -26,3 +26,7 @@ Structural, to keep in mind (not fixable in EcoPart alone):
 - "Export selection" button of the exportable tab: not wired to the export routes yet.
 - Renaming / grouping of EcoTaxa categories (modal of the mockups).
 - Samples imported before the ISO conversion keep their UVP date formats (`20120520080213`, `20230406-144332-820`). Explore reads them (`EXPLORE_SAMPLING_TIME` in `sqlite-sample-data-source.ts`), but the oldest-sample date of the privacy delays ignores them (`OLDEST_SAMPLE_UTC_DATE_TIME_SQL`), so a project with only such samples stays private. A migration converting them to ISO would align both.
+
+## Front
+
+- Project deletion overlay (front `ProjectDetailsPage`, since front v0.0.47): the deletion now runs as a DELETE_PROJECT task that the page follows until it ends (29 Oct 2026). Check whether the overlay still earns its place, or whether a redirect to the task page (global `/tasks/:id`) with a snackbar would do, since a long deletion keeps the user on a veiled page.

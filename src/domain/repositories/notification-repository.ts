@@ -15,6 +15,8 @@ const TASK_LABELS: { [key in TaskType]: string } = {
     [TaskType.Export_Raw]: "Raw export",
     [TaskType.Regenerate_Pivot]: "Pivot regeneration",
     [TaskType.Compute_Particle_Stats]: "Particle statistics computation",
+    [TaskType.Delete_Sample]: "Sample deletion",
+    [TaskType.Delete_Project]: "Project deletion",
 };
 
 const END_OUTCOMES: { [status: string]: { type: NotificationType, text: string } } = {

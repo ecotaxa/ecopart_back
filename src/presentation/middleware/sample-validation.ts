@@ -84,4 +84,20 @@ export class MiddlewareSampleValidation implements IMiddlewareSampleValidation {
         },
     ];
 
+    rulesDeleteSamples = [
+        body('sample_ids')
+            .exists().withMessage('sample_ids are required.').bail()
+            .isArray({ min: 1 }).withMessage('sample_ids must be a non-empty array.'),
+        body('sample_ids.*')
+            .isInt({ min: 1 }).withMessage('Each sample id must be a positive integer.').bail()
+            .toInt(),
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
+
 }

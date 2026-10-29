@@ -42,4 +42,6 @@ export interface TaskRepository {
     updateTaskResult(task: PublicTaskRequestModel, task_result: string): Promise<void>;
     // Export tasks of the project (EXPORT, EXPORT_BACKUP, EXPORT_RAW), whatever their status.
     countExportTasks(project_id: number): Promise<number>;
+    // Unlinks the task from its project so that deleting the project does not delete the task with it.
+    detachTaskFromProject(task_id: number): Promise<void>;
 }

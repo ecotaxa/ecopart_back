@@ -27,6 +27,7 @@ import { ListImportableSamplesUseCase } from "../../../src/domain/interfaces/use
 import { SearchSamplesUseCase } from "../../../src/domain/interfaces/use-cases/sample/search-samples";
 import { GetSampleUseCase } from "../../../src/domain/interfaces/use-cases/sample/get-sample";
 import { IMiddlewareSampleValidation } from "../../../src/presentation/interfaces/middleware/sample-validation";
+import { PublicTaskResponseModel } from "../../../src/domain/entities/task";
 import { TaskResponseModel_1, TaskResponseModel_2 } from "../../entities/task";
 import { PublicHeaderSampleResponseModel } from "../../../src/domain/entities/sample";
 import { SearchSampleResult, sampleModel_1 } from "../../entities/sample";
@@ -85,6 +86,7 @@ class MockIMiddlewareSampleValidation implements IMiddlewareSampleValidation {
     rulesSelectSampleCoordinates = []
     rulesPreviewQcGraphs = []
     rulesRegeneratePivots = []
+    rulesDeleteSamples = []
     rulesSampleRequestCreationModel = []
     rulesSampleUpdateModel = []
     rulesSampleBackup = []
@@ -94,7 +96,7 @@ class MockIMiddlewareSampleValidation implements IMiddlewareSampleValidation {
 
 
 class MockDeleteProjectUseCase implements DeleteProjectUseCase {
-    execute(): Promise<void> {
+    execute(): Promise<PublicTaskResponseModel> {
         throw new Error("Method not implemented for DeleteProjectUseCase");
     }
 }
@@ -467,7 +469,7 @@ describe("Project Router", () => {
 
     describe("DELETE /projects/:project_id", () => {
         test("DELETE /projects forwards the project id only, never the keys of the request body", async () => {
-            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve())
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
 
             const response = await request(server).delete("/projects/1").send({ "project_id = 2 OR 1": 1, root_folder_path: "/other" })
 
@@ -475,14 +477,12 @@ describe("Project Router", () => {
             expect(mockDeleteProjectUseCase.execute).toBeCalledWith(expect.anything(), { project_id: "1" })
         });
 
-        test("DELETE /projects", async () => {
-            const expectedResponse = { message: "Project successfully deleted" }
-
-            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve())
+        test("DELETE /projects returns the deletion task", async () => {
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
 
             const response = await request(server).delete("/projects/1")
             expect(response.status).toBe(200)
-            expect(response.body).toStrictEqual(expectedResponse)
+            expect(response.body).toStrictEqual(TaskResponseModel_1)
         });
 
         test("DELETE /projects fail for User is deleted should return 403", async () => {
@@ -507,6 +507,14 @@ describe("Project Router", () => {
             jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Logged user cannot delete this project")))
             const response = await request(server).delete("/projects/1")
             expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+
+        test("DELETE /projects fail while a task is still running on the project should return 409", async () => {
+            const expectedResponse = { errors: ["A task is still running on this project"] }
+            jest.spyOn(mockDeleteProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("A task is still running on this project")))
+            const response = await request(server).delete("/projects/1")
+            expect(response.status).toBe(409)
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
@@ -1255,10 +1263,12 @@ describe("Project Router", () => {
     });
 
     describe("DELETE /projects/:project_id/samples/:sample_id", () => {
-        test("DELETE /projects/:project_id/samples/:sample_id should return 200", async () => {
-            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.resolve())
-            const response = await request(server).delete("/projects/1/samples/1")
+        test("DELETE /projects/:project_id/samples/:sample_id returns the deletion task of that one sample", async () => {
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+            const response = await request(server).delete("/projects/1/samples/7")
             expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(TaskResponseModel_1)
+            expect(mockDeleteSampleUseCase.execute).toBeCalledWith(expect.anything(), 1, [7])
         });
         // User cannot be used
         test("DELETE /projects/:project_id/samples/:sample_id fail for User cannot be used should return 403", async () => {
@@ -1266,6 +1276,14 @@ describe("Project Router", () => {
             jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("User cannot be used")))
             const response = await request(server).delete("/projects/1/samples/1")
             expect(response.status).toBe(403)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        // Cannot find project
+        test("DELETE /projects/:project_id/samples/:sample_id fail for Cannot find project should return 404", async () => {
+            const expectedResponse = { errors: ["Cannot find project"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Cannot find project")))
+            const response = await request(server).delete("/projects/1/samples/1")
+            expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot find sample to delete
@@ -1277,27 +1295,59 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // The given project_id does not match the sample's project_id
-        test("DELETE /projects/:project_id/samples/:sample_id fail for The given project_id does not match the sample's project_id should return 403", async () => {
+        test("DELETE /projects/:project_id/samples/:sample_id fail for The given project_id does not match the sample's project_id should return 401", async () => {
             const expectedResponse = { errors: ["The given project_id does not match the sample's project_id"] }
             jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("The given project_id does not match the sample's project_id")))
             const response = await request(server).delete("/projects/1/samples/1")
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        // Logged user cannot delete this sample
-        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete this sample should return 403", async () => {
-            const expectedResponse = { errors: ["Logged user cannot delete this sample"] }
-            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete this sample")))
+        // Logged user cannot delete samples in this project
+        test("DELETE /projects/:project_id/samples/:sample_id fail for Logged user cannot delete samples in this project should return 403", async () => {
+            const expectedResponse = { errors: ["Logged user cannot delete samples in this project"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Logged user cannot delete samples in this project")))
             const response = await request(server).delete("/projects/1/samples/1")
             expect(response.status).toBe(403)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        // Cannot delete sample
-        test("DELETE /projects/:project_id/samples/:sample_id fail for Cannot delete sample should return 500", async () => {
-            const expectedResponse = { errors: ["Cannot delete sample"] }
+        // The project is being deleted
+        test("DELETE /projects/:project_id/samples/:sample_id fail while the project is being deleted should return 409", async () => {
+            const expectedResponse = { errors: ["The project is being deleted"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("The project is being deleted")))
+            const response = await request(server).delete("/projects/1/samples/1")
+            expect(response.status).toBe(409)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        // Cannot delete samples
+        test("DELETE /projects/:project_id/samples/:sample_id fail for an unexpected error should return 500", async () => {
+            const expectedResponse = { errors: ["Cannot delete samples"] }
             jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("xyz")))
             const response = await request(server).delete("/projects/1/samples/1")
             expect(response.status).toBe(500)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+    });
+
+    describe("DELETE /projects/:project_id/samples", () => {
+        test("DELETE /projects/:project_id/samples returns one deletion task for the given samples", async () => {
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+            const response = await request(server).delete("/projects/1/samples").send({ sample_ids: [7, 8] })
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(TaskResponseModel_1)
+            expect(mockDeleteSampleUseCase.execute).toBeCalledWith(expect.anything(), 1, [7, 8])
+        });
+        test("DELETE /projects/:project_id/samples fail for No samples to delete should return 422", async () => {
+            const expectedResponse = { errors: ["No samples to delete"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("No samples to delete")))
+            const response = await request(server).delete("/projects/1/samples").send({ sample_ids: [7] })
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("DELETE /projects/:project_id/samples fail while the project is being deleted should return 409", async () => {
+            const expectedResponse = { errors: ["The project is being deleted"] }
+            jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("The project is being deleted")))
+            const response = await request(server).delete("/projects/1/samples").send({ sample_ids: [7] })
+            expect(response.status).toBe(409)
             expect(response.body).toStrictEqual(expectedResponse)
         });
     });

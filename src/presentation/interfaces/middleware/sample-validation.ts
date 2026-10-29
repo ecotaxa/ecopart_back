@@ -8,6 +8,7 @@ export interface IMiddlewareSampleValidation {
     rulesSelectSampleCoordinates: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesPreviewQcGraphs: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesRegeneratePivots: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
+    rulesDeleteSamples: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
 }
 
 

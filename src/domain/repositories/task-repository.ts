@@ -675,4 +675,13 @@ export class TaskRepositoryImpl implements TaskRepository {
             task_id: task_to_update.task_id, task_result: this.withoutServerRoot(task_result)
         })
     }
+
+    // The task rows of a project go with it (ON DELETE CASCADE): the task that deletes a project is
+    // unlinked from it first, so it outlives the project and keeps its log.
+    async detachTaskFromProject(task_id: number): Promise<void> {
+        const task = await this.ensureTaskExists(task_id);
+        if (task.task_project_id === undefined || task.task_project_id === null) return;
+        await this.taskDataSource.updateOne({ task_id: task.task_id, task_project_id: null });
+        await this.logMessage(task.task_log_file_path, `Task detached from project ${task.task_project_id}`);
+    }
 }
