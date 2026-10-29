@@ -8,8 +8,13 @@ import { PrivilegeRepository } from "../../interfaces/repositories/privilege-rep
 import { SearchProjectsUseCase } from "../../interfaces/use-cases/project/search-project";
 import { ProjectPrivacyLevel, ProjectResponseModel, PublicProjectResponseModel } from "../../entities/project";
 import { ProjectRole, privacyOf, restrictProjectView } from "./project-access";
+import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { LandMask } from "../../interfaces/geography/land-mask";
+import { ProjectQcStateLabel } from "../../entities/project-stats";
+import { buildProjectQcState } from "./project-stats";
 
 const PRIVACY_LEVELS: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
+const QC_STATES: ProjectQcStateLabel[] = ["empty", "ok", "warning"];
 
 export class SearchProject implements SearchProjectsUseCase {
     userRepository: UserRepository
@@ -17,13 +22,17 @@ export class SearchProject implements SearchProjectsUseCase {
     searchRepository: SearchRepository
     instrumentModelRepository: InstrumentModelRepository
     privilegeRepository: PrivilegeRepository
+    sampleRepository: SampleRepository
+    land: LandMask
 
-    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, searchRepository: SearchRepository, instrumentModelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, searchRepository: SearchRepository, instrumentModelRepository: InstrumentModelRepository, privilegeRepository: PrivilegeRepository, sampleRepository: SampleRepository, land: LandMask) {
         this.userRepository = userRepository
         this.projectRepository = projectRepository
         this.searchRepository = searchRepository
         this.instrumentModelRepository = instrumentModelRepository
         this.privilegeRepository = privilegeRepository
+        this.sampleRepository = sampleRepository
+        this.land = land
     }
     async execute(current_user: UserUpdateModel, options: SearchOptions, filters: FilterSearchOptions[]): Promise<{ projects: PublicProjectResponseModel[], search_info: SearchInfo }> {
         // DONE define wanted cases sensitivity : = is perfect match and LIKE is case insensitive
@@ -38,7 +47,7 @@ export class SearchProject implements SearchProjectsUseCase {
         this.refuseProbingOfHiddenFields(user_is_admin, prepared_options);
 
         // Apply additional filters
-        prepared_options = await this.applyAdditionalFilters(current_user, prepared_options);
+        prepared_options = await this.applyAdditionalFilters(current_user, user_is_admin, prepared_options);
 
         // Fetch projects based on prepared search options
         const result: SearchResult<ProjectResponseModel> = await this.projectRepository.standardGetProjects(prepared_options);
@@ -69,12 +78,13 @@ export class SearchProject implements SearchProjectsUseCase {
     }
 
     // Applies additional filters based on specific conditions.
-    private async applyAdditionalFilters(current_user: UserUpdateModel, options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
+    private async applyAdditionalFilters(current_user: UserUpdateModel, user_is_admin: boolean, options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
         if (options.filter.length > 0) {
             options = await this.applyInstrumentModelFilter(options);
             options = await this.applyManagingFilter(current_user, options);
             options = await this.applyContactFilter(options);
             options = await this.applyPrivacyStatusFilter(options);
+            options = await this.applyQcStateFilter(current_user, user_is_admin, options);
             options = await this.applyUserFilters(options, "managers")//, this.privilegeRepository.getProjectsByManagers);
             options = await this.applyUserFilters(options, "members")//, this.privilegeRepository.getProjectsByMembers);
             options = await this.applyUserFilters(options, "granted_users")//, this.privilegeRepository.getProjectsByUsers);
@@ -159,6 +169,35 @@ export class SearchProject implements SearchProjectsUseCase {
             options.filter.push({ field: "project_id", operator: "IN", value: projectIds });
         }
         return options;
+    }
+
+    // qc_state is computed from the samples, it has no column: resolved to the ids of the projects whose
+    // STATS tab warnings give that state now, as the QC state column of the project lists shows it.
+    private async applyQcStateFilter(current_user: UserUpdateModel, user_is_admin: boolean, options: PreparedSearchOptions): Promise<PreparedSearchOptions> {
+        const qcFilter = options.filter.find(f => f.field === "qc_state");
+        if (qcFilter) {
+            options.filter = options.filter.filter(f => f.field !== "qc_state");
+            const states = this.extractQcStates(qcFilter);
+            const granted = new Set(user_is_admin ? [] : await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id }));
+            const now = new Date();
+            const projectIds: number[] = [];
+            for (const project of await this.projectRepository.listProjects()) {
+                const samples = await this.sampleRepository.getProjectStatsSamples(project.project_id);
+                const stored = await this.sampleRepository.getEcoTaxaStats(samples.filter(sample => sample.ecotaxa_sample_imported).map(sample => sample.sample_id));
+                const state = buildProjectQcState(project, samples, stored, user_is_admin || granted.has(project.project_id), this.land, now);
+                if (states.includes(state.qc_state)) projectIds.push(project.project_id);
+            }
+            options.filter.push({ field: "project_id", operator: "IN", value: projectIds });
+        }
+        return options;
+    }
+
+    private extractQcStates(filter: FilterSearchOptions): ProjectQcStateLabel[] {
+        const values = filter.operator === "IN" ? filter.value : filter.operator === "=" ? [filter.value] : null;
+        if (!Array.isArray(values) || values.length === 0 || !values.every(value => QC_STATES.includes(value))) {
+            throw new Error("Unauthorized or unexisting parameters : qc_state");
+        }
+        return values;
     }
 
     private extractPrivacyLevels(filter: FilterSearchOptions): ProjectPrivacyLevel[] {

@@ -119,8 +119,11 @@ describe("GetProjectStats use case", () => {
                 time_range: { start: "2024-06-12T10:20:00.000Z", end: "2024-06-12T10:20:00.000Z" },
                 max_pressure_histogram: expect.arrayContaining([{ max_pressure: 600, nb_profiles: 1 }, { max_pressure: 1600, nb_profiles: 1 }]),
                 nb_instrument_parameter_mismatches: 0,
+                nb_object_size_mismatches: 0,
                 nb_suspicious_dates: 0,
+                time_span_over_a_year: false,
                 nb_suspicious_pressures: 0,
+                unfiltered_uvp5hd: false,
             },
             ecotaxa: {
                 linked: true,

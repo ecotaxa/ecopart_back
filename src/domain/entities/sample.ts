@@ -54,6 +54,7 @@ export interface SampleRequestCreationModel {
     nb_particles_descent_filter?: number | null;
     particle_min_area_px_descent_filter?: number | null;
     particle_max_area_px_descent_filter?: number | null;
+    min_pressure?: number | null;                           // Minimum pressure of the pivot (decibar), null until computed or without readable pressure
 
     visual_qc_validator_user_id: number;                    // Quality check validator user identifier
     sample_type_id: number;                                 // Sample type depth or time
@@ -109,6 +110,7 @@ export interface SampleParticleStats {
     nb_particles_descent_filter: number;
     particle_min_area_px_descent_filter: number | null;
     particle_max_area_px_descent_filter: number | null;
+    min_pressure: number | null;             // lowest readable pressure of the pivot, in decibar; null without any
 }
 export interface PublicSampleModel extends PrivateSampleModel {
     sample_type_label: string;                    // Sample type name

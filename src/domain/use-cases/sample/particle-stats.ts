@@ -1,7 +1,7 @@
 import { SampleParticleStats } from "../../entities/sample";
 import { IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, PerImageColumns } from "../../entities/sample-qc-graph";
 import { PivotImages } from "../../interfaces/repositories/sample-repository";
-import { hasImageFlag, imageIdAt } from "../../utils/per-image-columns";
+import { hasImageFlag, imageIdAt, rawPressureAt } from "../../utils/per-image-columns";
 import { BinnedSampleSettings, minimumAreaPx } from "../export/binned-computation";
 import { selectUsedImages } from "./qc-graphs-builder";
 
@@ -16,6 +16,7 @@ export const NO_PARTICLE_STATS = {
     nb_particles_descent_filter: null,
     particle_min_area_px_descent_filter: null,
     particle_max_area_px_descent_filter: null,
+    min_pressure: null,
 };
 
 class ParticleTally {
@@ -34,7 +35,8 @@ class ParticleTally {
  * the lit, not over-exposed images whose area reaches the minimum area the instrument kept, over the
  * images of the operator window, then over those the descent filter keeps too (the selection of the
  * QC graphs and of the binned export when the project enables it). Both are computed whatever the
- * project's setting, which picks one when they are read. */
+ * project's setting, which picks one when they are read. The minimum pressure is read over every
+ * image of the pivot (decibar), for the pressure check of the project statistics. */
 export async function computeParticleStats(settings: BinnedSampleSettings, pivot: PivotImages): Promise<SampleParticleStats> {
     const columns = pivot.columns;
     const in_window = selectImages(settings, columns, false);
@@ -44,9 +46,12 @@ export async function computeParticleStats(settings: BinnedSampleSettings, pivot
 
     const window_tally = new ParticleTally();
     const descent_tally = new ParticleTally();
+    let min_pressure: number | null = null;
     let k = 0;
     for await (const record of pivot.rows()) {
         if (k >= columns.length || record.image_id !== imageIdAt(columns, k)) throw changedWhileRead();
+        const pressure = rawPressureAt(columns, k);
+        if (pressure !== null && (min_pressure === null || pressure < min_pressure)) min_pressure = pressure;
         const counted = in_window[k] === 1 && hasImageFlag(columns, k, IMAGE_FLAG_LIGHT_ON) && !hasImageFlag(columns, k, IMAGE_FLAG_OVER_EXPOSED);
         const descending = kept_by_descent_filter[k] === 1;
         k++;
@@ -66,6 +71,7 @@ export async function computeParticleStats(settings: BinnedSampleSettings, pivot
         nb_particles_descent_filter: descent_tally.nb_particles,
         particle_min_area_px_descent_filter: descent_tally.min_area_px,
         particle_max_area_px_descent_filter: descent_tally.max_area_px,
+        min_pressure,
     };
 }
 

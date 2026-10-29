@@ -10,7 +10,7 @@ const LAND: LandMask = { isOnLand: (latitude, longitude) => Math.abs(latitude - 
 const CLEAN: ProjectQcInputs = {
     raw_backup: { nb_samples_not_backed_up: 0 },
     map: { nb_samples_without_ctd: 0, nb_coordinates_mismatches: 0, nb_samples_on_land: 0 },
-    samples: { nb_instrument_parameter_mismatches: 0, nb_suspicious_dates: 0, nb_suspicious_pressures: 0 },
+    samples: { nb_instrument_parameter_mismatches: 0, nb_object_size_mismatches: 0, nb_suspicious_dates: 0, time_span_over_a_year: false, nb_suspicious_pressures: 0, unfiltered_uvp5hd: false },
     ecotaxa: { linked: true, nb_samples_not_imported: 0, classification_completed: true },
 };
 
@@ -28,7 +28,7 @@ describe("Project QC state builders", () => {
             expect(buildProjectQcWarnings({
                 raw_backup: { nb_samples_not_backed_up: 4 },
                 map: { nb_samples_without_ctd: 3, nb_coordinates_mismatches: 2, nb_samples_on_land: 8 },
-                samples: { nb_instrument_parameter_mismatches: 1, nb_suspicious_dates: 5, nb_suspicious_pressures: 6 },
+                samples: { nb_instrument_parameter_mismatches: 1, nb_object_size_mismatches: 9, nb_suspicious_dates: 5, time_span_over_a_year: true, nb_suspicious_pressures: 6, unfiltered_uvp5hd: true },
                 ecotaxa: { linked: true, nb_samples_not_imported: 7, classification_completed: false },
             })).toEqual([
                 { code: "samples_not_backed_up", nb_samples: 4 },
@@ -36,8 +36,11 @@ describe("Project QC state builders", () => {
                 { code: "coordinates_mismatches", nb_samples: 2 },
                 { code: "samples_on_land", nb_samples: 8 },
                 { code: "instrument_parameter_mismatches", nb_samples: 1 },
+                { code: "object_size_mismatches", nb_samples: 9 },
                 { code: "suspicious_dates", nb_samples: 5 },
+                { code: "time_span_over_a_year", nb_samples: null },
                 { code: "suspicious_pressures", nb_samples: 6 },
+                { code: "unfiltered_uvp5hd", nb_samples: null },
                 { code: "samples_not_imported_in_ecotaxa", nb_samples: 7 },
                 { code: "classification_uncompleted", nb_samples: null },
             ]);
@@ -47,8 +50,9 @@ describe("Project QC state builders", () => {
             expect(buildProjectQcWarnings({ ...CLEAN, raw_backup: null })).toEqual([]);
         });
 
-        test("no EcoTaxa warning for a project not linked to EcoTaxa, as its STATS tab hides the section", () => {
-            expect(buildProjectQcWarnings({ ...CLEAN, ecotaxa: { linked: false, nb_samples_not_imported: 3, classification_completed: false } })).toEqual([]);
+        test("a project not linked to EcoTaxa gets the single warning to link one, as its STATS tab hides the section", () => {
+            expect(buildProjectQcWarnings({ ...CLEAN, ecotaxa: { linked: false, nb_samples_not_imported: 3, classification_completed: false } }))
+                .toEqual([{ code: "ecotaxa_not_linked", nb_samples: null }]);
         });
     });
 
@@ -75,15 +79,18 @@ describe("Project QC state builders", () => {
     });
 
     describe("buildProjectQcState", () => {
-        const project = exploreProject(5, "open", { last_backup_utc_date_time: "2024-07-10T00:00:00.000Z" });
-        const clean = (overrides = {}) => projectStatsSample({ project_id: 5, ctd_imported: true, ...overrides });
+        // Linked to EcoTaxa, backed up: clean samples are imported in EcoTaxa with their stats stored.
+        const project = exploreProject(5, "open", { last_backup_utc_date_time: "2024-07-10T00:00:00.000Z", ecotaxa_project_id: 1234, ecotaxa_instance_id: 1 });
+        const clean = (overrides = {}) => projectStatsSample({ project_id: 5, ctd_imported: true, ecotaxa_sample_imported: true, ...overrides });
+        const storedOf = (samples: ReturnType<typeof clean>[]) => samples.filter(sample => sample.ecotaxa_sample_imported).map(sample => stored(sample.sample_id));
 
         test("empty without any sample", () => {
             expect(buildProjectQcState(project, [], [], true, LAND, NOW)).toEqual({ project_id: 5, qc_state: "empty", warnings: [] });
         });
 
         test("ok without any warning", () => {
-            expect(buildProjectQcState(project, [clean({ sample_id: 1 }), clean({ sample_id: 2 })], [], true, LAND, NOW))
+            const samples = [clean({ sample_id: 1 }), clean({ sample_id: 2 })];
+            expect(buildProjectQcState(project, samples, storedOf(samples), true, LAND, NOW))
                 .toEqual({ project_id: 5, qc_state: "ok", warnings: [] });
         });
 
@@ -95,7 +102,7 @@ describe("Project QC state builders", () => {
                 clean({ sample_id: 4, latitude: 45.76, longitude: 4.83, sample_latitude: 45.76, sample_longitude: 4.83 }),
             ];
 
-            expect(buildProjectQcState(project, samples, [], true, LAND, NOW)).toEqual({
+            expect(buildProjectQcState(project, samples, storedOf(samples), true, LAND, NOW)).toEqual({
                 project_id: 5,
                 qc_state: "warning",
                 warnings: [
@@ -104,35 +111,55 @@ describe("Project QC state builders", () => {
                     { code: "coordinates_mismatches", nb_samples: 1 },
                     { code: "samples_on_land", nb_samples: 1 },
                     { code: "suspicious_dates", nb_samples: 1 },
+                    { code: "time_span_over_a_year", nb_samples: null },
                     { code: "suspicious_pressures", nb_samples: 1 },
                 ],
             });
         });
 
+        test("the project options: no time span warning once disabled, a UVP5HD project must be declared filtered", () => {
+            const samples = [clean({ sample_id: 1 }), clean({ sample_id: 2, sampling_utc_date_time: "2022-01-01T00:00:00Z" })];
+            expect(buildProjectQcState(project, samples, storedOf(samples), true, LAND, NOW).warnings).toEqual([{ code: "time_span_over_a_year", nb_samples: null }]);
+            expect(buildProjectQcState({ ...project, time_duration_check: false }, samples, storedOf(samples), true, LAND, NOW).qc_state).toBe("ok");
+
+            const uvp5hd = { ...project, instrument_model: "UVP5HD", time_duration_check: false };
+            const samples_uvp5 = samples.map(sample => ({ ...sample, instrument_settings_aa: 0.0026, instrument_settings_exp: 1.2284 }));
+            expect(buildProjectQcState(uvp5hd, samples_uvp5, storedOf(samples), true, LAND, NOW).warnings).toEqual([{ code: "unfiltered_uvp5hd", nb_samples: null }]);
+            expect(buildProjectQcState({ ...uvp5hd, filtered_project: true }, samples_uvp5, storedOf(samples), true, LAND, NOW).qc_state).toBe("ok");
+        });
+
         test("the raw backup warning only when the backup state may be seen", () => {
             const samples = [clean({ sample_id: 1, sample_creation_utc_date_time: "2024-07-11T09:00:00.000Z" })];
 
-            expect(buildProjectQcState(project, samples, [], true, LAND, NOW).warnings).toEqual([{ code: "samples_not_backed_up", nb_samples: 1 }]);
-            expect(buildProjectQcState(project, samples, [], false, LAND, NOW)).toEqual({ project_id: 5, qc_state: "ok", warnings: [] });
+            expect(buildProjectQcState(project, samples, storedOf(samples), true, LAND, NOW).warnings).toEqual([{ code: "samples_not_backed_up", nb_samples: 1 }]);
+            expect(buildProjectQcState(project, samples, storedOf(samples), false, LAND, NOW)).toEqual({ project_id: 5, qc_state: "ok", warnings: [] });
         });
 
-        test("a linked project is ok once every sample imported in EcoTaxa is fully validated", () => {
-            const linked = { ...project, ecotaxa_project_id: 1234, ecotaxa_instance_id: 1 };
-            const samples = [clean({ sample_id: 1, ecotaxa_sample_imported: true }), clean({ sample_id: 2, ecotaxa_sample_imported: true })];
+        test("a project not linked to EcoTaxa is told to link one", () => {
+            const unlinked = { ...project, ecotaxa_project_id: null, ecotaxa_instance_id: null };
+            const samples = [clean({ sample_id: 1, ecotaxa_sample_imported: false })];
 
-            expect(buildProjectQcState(linked, samples, [stored(1), stored(2)], true, LAND, NOW).qc_state).toBe("ok");
-            expect(buildProjectQcState(linked, samples, [stored(1), stored(2, { nb_predicted: 3 })], true, LAND, NOW).warnings)
+            expect(buildProjectQcState(unlinked, samples, [], true, LAND, NOW)).toEqual({
+                project_id: 5, qc_state: "warning", warnings: [{ code: "ecotaxa_not_linked", nb_samples: null }],
+            });
+        });
+
+        test("a linked project is ok once every object of its samples imported in EcoTaxa is validated or predicted", () => {
+            const samples = [clean({ sample_id: 1 }), clean({ sample_id: 2 })];
+
+            expect(buildProjectQcState(project, samples, [stored(1), stored(2)], true, LAND, NOW).qc_state).toBe("ok");
+            expect(buildProjectQcState(project, samples, [stored(1), stored(2, { nb_predicted: 3 })], true, LAND, NOW).qc_state).toBe("ok");
+            expect(buildProjectQcState(project, samples, [stored(1), stored(2, { nb_dubious: 3 })], true, LAND, NOW).warnings)
                 .toEqual([{ code: "classification_uncompleted", nb_samples: null }]);
             // Stats never read for sample 2: not reported complete, as the STATS tab while it reads them.
-            expect(buildProjectQcState(linked, samples, [stored(1)], true, LAND, NOW).warnings)
+            expect(buildProjectQcState(project, samples, [stored(1)], true, LAND, NOW).warnings)
                 .toEqual([{ code: "classification_uncompleted", nb_samples: null }]);
         });
 
         test("a linked project warns about the samples not imported in EcoTaxa", () => {
-            const linked = { ...project, ecotaxa_project_id: 1234, ecotaxa_instance_id: 1 };
-            const samples = [clean({ sample_id: 1, ecotaxa_sample_imported: true }), clean({ sample_id: 2 })];
+            const samples = [clean({ sample_id: 1 }), clean({ sample_id: 2, ecotaxa_sample_imported: false })];
 
-            expect(buildProjectQcState(linked, samples, [stored(1)], true, LAND, NOW).warnings)
+            expect(buildProjectQcState(project, samples, [stored(1)], true, LAND, NOW).warnings)
                 .toEqual([{ code: "samples_not_imported_in_ecotaxa", nb_samples: 1 }]);
         });
     });

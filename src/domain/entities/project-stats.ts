@@ -71,8 +71,11 @@ export interface ProjectStatsSamples {
     time_range: { start: string; end: string } | null;
     max_pressure_histogram: PressureHistogramBin[];
     nb_instrument_parameter_mismatches: number;   // samples whose instrument parameters differ from the most common ones
-    nb_suspicious_dates: number;                  // sampled before 2000, in the future, or with an unreadable date
-    nb_suspicious_pressures: number;              // depth samples without a positive max pressure, samples deeper than the instrument rating
+    nb_object_size_mismatches: number;            // samples with objects outside the size classes of the instrument
+    nb_suspicious_dates: number;                  // sampled before 2008, in the future, or with an unreadable date
+    time_span_over_a_year: boolean;               // the samples span more than a year, while the project checks it
+    nb_suspicious_pressures: number;              // min pressure below -5 dbar, max above the instrument rating, depth samples without a positive max
+    unfiltered_uvp5hd: boolean;                   // a UVP5HD project whose data were not declared filtered
 }
 
 export interface ProjectStatsEcoTaxa {
@@ -84,7 +87,7 @@ export interface ProjectStatsEcoTaxa {
     partial: boolean;                         // some samples have no stats yet: they are being read from EcoTaxa, ask again later
     nb_samples_pending: number;
     nb_samples_not_imported: number;          // samples of the project not imported in EcoTaxa
-    classification_completed: boolean;        // every sample imported in EcoTaxa has its stats and is fully validated
+    classification_completed: boolean;        // every sample imported in EcoTaxa has its stats and every object of theirs is validated or predicted
 }
 
 export interface ProjectStatsResponseModel {
@@ -106,8 +109,12 @@ export type ProjectQcWarningCode =
     | "coordinates_mismatches"
     | "samples_on_land"
     | "instrument_parameter_mismatches"
+    | "object_size_mismatches"
     | "suspicious_dates"
+    | "time_span_over_a_year"
     | "suspicious_pressures"
+    | "unfiltered_uvp5hd"
+    | "ecotaxa_not_linked"
     | "samples_not_imported_in_ecotaxa"
     | "classification_uncompleted";
 

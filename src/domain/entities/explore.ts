@@ -76,6 +76,7 @@ export interface ExploreSampleRow {
     longitude: number | null;
     sampling_utc_date_time: string;
     max_pressure: number | null;              // dbar
+    min_pressure: number | null;              // dbar, null until the particle statistics computed it
     sample_type_label: string;
     visual_qc_status_label: string;
     ctd_imported: boolean;

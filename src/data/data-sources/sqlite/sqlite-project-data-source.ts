@@ -30,9 +30,9 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
 
     async create(project: ProjectRequestCreationModel): Promise<number> {
         // Explicit ISO 8601 UTC timestamp (see sqlite-task-data-source).
-        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number, project.ecotaxa_project_id, project.ecotaxa_project_name, project.ecotaxa_instance_id, new Date().toISOString()]
+        const params = [project.root_folder_path, project.project_title, project.project_acronym, project.project_description, project.cruise, project.ship, project.data_owner_name, project.data_owner_email, project.operator_name, project.operator_email, project.chief_scientist_name, project.chief_scientist_email, project.override_depth_offset, project.enable_descent_filter, project.filtered_project ? 1 : 0, project.time_duration_check === false ? 0 : 1, project.privacy_duration, project.visible_duration, project.public_duration, project.instrument_model, project.serial_number, project.ecotaxa_project_id, project.ecotaxa_project_name, project.ecotaxa_instance_id, new Date().toISOString()]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, cruise_wmo, ship_floatref, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, privacy_duration, visible_duration, public_duration, instrument_model, serial_number, ecotaxa_project_id, ecotaxa_project_name, ecotaxa_instance_id, project_creation_utc_date_time) VALUES  (` + placeholders + `);`;
+        const sql = `INSERT INTO project (root_folder_path, project_title, project_acronym, project_description, cruise_wmo, ship_floatref, data_owner_name, data_owner_email, operator_name, operator_email, chief_scientist_name, chief_scientist_email, override_depth_offset, enable_descent_filter, filtered_project, time_duration_check, privacy_duration, visible_duration, public_duration, instrument_model, serial_number, ecotaxa_project_id, ecotaxa_project_name, ecotaxa_instance_id, project_creation_utc_date_time) VALUES  (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -93,6 +93,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             chief_scientist_email: row.chief_scientist_email,
                             override_depth_offset: row.override_depth_offset,
                             enable_descent_filter: row.enable_descent_filter == 1 ? true : false,
+                            filtered_project: row.filtered_project == 1,
+                            time_duration_check: row.time_duration_check != 0,
                             privacy_duration: row.privacy_duration,
                             visible_duration: row.visible_duration,
                             public_duration: row.public_duration,
@@ -135,7 +137,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         const params: any[] = []
         let placeholders: string = ""
         for (const [key, value] of Object.entries(projectData)) {
-            if (key == "enable_descent_filter") {
+            if (key == "enable_descent_filter" || key == "filtered_project" || key == "time_duration_check") {
                 params.push(value == true || value == "true" ? 1 : 0) // TODO clean
             } else {
                 params.push(value)
@@ -264,6 +266,8 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             chief_scientist_email: row.chief_scientist_email,
                             override_depth_offset: row.override_depth_offset,
                             enable_descent_filter: row.enable_descent_filter == 1 ? true : false,
+                            filtered_project: row.filtered_project == 1,
+                            time_duration_check: row.time_duration_check != 0,
                             privacy_duration: row.privacy_duration,
                             visible_duration: row.visible_duration,
                             public_duration: row.public_duration,

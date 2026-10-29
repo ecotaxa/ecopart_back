@@ -297,7 +297,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new CreateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, fsStorage, 'data_storage/ecopart_data_to_import/'),
             new DeleteProject(userRepo, projectRepo, privilegeRepo, sampleRepo, ecotaxaAccountRepo),
             new UpdateProject(userRepo, projectRepo, instrumentModelRepo, privilegeRepo, ecotaxaAccountRepo, sampleRepo, 'data_storage/ecopart_data_to_import/'),
-            new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo),
+            new SearchProject(userRepo, projectRepo, searchRepo, instrumentModelRepo, privilegeRepo, sampleRepo, new NaturalEarthLandMask()),
             new GetProject(userRepo, projectRepo, privilegeRepo),
             new BackupProject(userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage),
             new ExportBackupedProject(userRepo, privilegeRepo, projectRepo, taskRepo, fsStorage, exportDir, "http://localhost:0"),

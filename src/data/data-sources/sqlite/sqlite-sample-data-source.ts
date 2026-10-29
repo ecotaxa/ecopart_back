@@ -26,6 +26,7 @@ function mapRowToPublicSample(row: any): PublicSampleModel {
         comment: row.comment,
         instrument_serial_number: row.instrument_serial_number,
         max_pressure: row.max_pressure,
+        min_pressure: row.min_pressure ?? null,
         station_id: row.station_id,
         sampling_utc_date_time: row.sampling_utc_date_time,
         latitude: row.latitude,
@@ -117,6 +118,7 @@ function mapRowToExploreSample(row: any): ExploreSampleRow {
         longitude: row.longitude ?? null,
         sampling_utc_date_time: row.sampling_utc_date_time,
         max_pressure: row.max_pressure ?? null,
+        min_pressure: row.min_pressure ?? null,
         sample_type_label: row.sample_type_label,
         visual_qc_status_label: row.visual_qc_status_label,
         ctd_imported: !!row.ctd_imported,
@@ -204,6 +206,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             sample.nb_vignettes, sample.nb_black,
             sample.nb_particles ?? null, sample.particle_min_area_px ?? null, sample.particle_max_area_px ?? null,
             sample.nb_particles_descent_filter ?? null, sample.particle_min_area_px_descent_filter ?? null, sample.particle_max_area_px_descent_filter ?? null,
+            sample.min_pressure ?? null,
             // Explicit ISO 8601 UTC timestamp for sample_creation_utc_date_time
             // (see sqlite-task-data-source about why we no longer rely on DEFAULT CURRENT_TIMESTAMP).
             new Date().toISOString(),
@@ -230,6 +233,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             nb_vignettes, nb_black,
             nb_particles, particle_min_area_px, particle_max_area_px,
             nb_particles_descent_filter, particle_min_area_px_descent_filter, particle_max_area_px_descent_filter,
+            min_pressure,
             sample_creation_utc_date_time
         ) VALUES  (` + placeholders + `);`;
 
@@ -528,7 +532,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
         const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id,
                 ${EXPLORE_LATITUDE} AS latitude, ${EXPLORE_LONGITUDE} AS longitude,
-                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
+                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure, sample.min_pressure,
                 sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
                 sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
                 sample.nb_vignettes, ${PARTICLE_STATS_OF_PROJECT},
@@ -553,7 +557,7 @@ export class SQLiteSampleDataSource implements SampleDataSource {
     async getProjectStatsSamples(project_id: number): Promise<ProjectStatsSampleRow[]> {
         const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id,
                 ${EXPLORE_LATITUDE} AS latitude, ${EXPLORE_LONGITUDE} AS longitude,
-                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure,
+                ${EXPLORE_SAMPLING_TIME} AS sampling_utc_date_time, sample.max_pressure, sample.min_pressure,
                 sample_type.sample_type_label, visual_quality_check_status.visual_qc_status_label,
                 sample.ctd_imported, sample.ctd_file_extension, sample.ecotaxa_sample_imported, sample.ecotaxa_sample_id,
                 sample.nb_vignettes, ${PARTICLE_STATS_OF_PROJECT},

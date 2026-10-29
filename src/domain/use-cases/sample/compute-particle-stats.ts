@@ -108,7 +108,9 @@ export class ComputeParticleStats implements ComputeParticleStatsUseCase {
 
     private async computeSample(project: ProjectResponseModel, sample: PublicSampleModel, force: boolean): Promise<{ outcome: SampleOutcome, message: string }> {
         const name = sample.sample_name;
-        if (!force && typeof sample.nb_particles === "number" && typeof sample.nb_particles_descent_filter === "number") {
+        // The minimum pressure came later than the counts: a sample with a pressure but no minimum is computed again.
+        const min_pressure_known = typeof sample.min_pressure === "number" || sample.max_pressure === null;
+        if (!force && typeof sample.nb_particles === "number" && typeof sample.nb_particles_descent_filter === "number" && min_pressure_known) {
             return { outcome: "skipped", message: `${name}: particle statistics already computed, kept` };
         }
         const instrument_model = project.instrument_model;

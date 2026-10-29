@@ -8,13 +8,16 @@ import {
     COORDINATES_MISMATCH_KM,
     countInstrumentParameterMismatches,
     countStations,
+    countObjectSizeMismatches,
     countSuspiciousDates,
     countSuspiciousPressures,
     distanceKm,
     EMPTY_ECOTAXA_SUMMARY,
     isInland,
+    isTimeSpanOverAYear,
     LAND_MARGIN_KM,
     MAX_PLAUSIBLE_PRESSURE_DBAR,
+    MIN_PLAUSIBLE_PRESSURE_DBAR,
 } from "../../../../src/domain/use-cases/project/project-stats";
 import { LandMask } from "../../../../src/domain/interfaces/geography/land-mask";
 import { exploreProject, projectStatsSample } from "../explore/explore-fixtures";
@@ -136,20 +139,32 @@ describe("Project statistics builders", () => {
     });
 
     describe("countSuspiciousDates", () => {
-        test("before 2000, in the future, or unreadable", () => {
+        test("before 2008, in the future, or unreadable", () => {
             expect(countSuspiciousDates([
                 projectStatsSample({ sampling_utc_date_time: "1997-05-02T00:00:00Z" }),
+                projectStatsSample({ sampling_utc_date_time: "2007-12-31T23:59:59Z" }),
+                projectStatsSample({ sampling_utc_date_time: "2008-01-01T00:00:00Z" }),
                 projectStatsSample({ sampling_utc_date_time: "2026-10-26T00:00:00Z" }),
                 projectStatsSample({ sampling_utc_date_time: "not a date" }),
                 projectStatsSample({ sampling_utc_date_time: "2024-06-12T10:20:00Z" }),
                 // Dated in the local time of the operator: a day of slack.
                 projectStatsSample({ sampling_utc_date_time: "2026-10-24T08:00:00Z" }),
-            ], NOW)).toBe(3);
+            ], NOW)).toBe(4);
+        });
+    });
+
+    describe("isTimeSpanOverAYear", () => {
+        test("the readable dates span more than a year", () => {
+            const first = projectStatsSample({ sampling_utc_date_time: "2024-06-12T10:20:00Z" });
+            expect(isTimeSpanOverAYear([first, projectStatsSample({ sampling_utc_date_time: "2025-06-12T10:20:00Z" })])).toBe(false);
+            expect(isTimeSpanOverAYear([first, projectStatsSample({ sampling_utc_date_time: "2025-06-13T10:20:00Z" })])).toBe(true);
+            expect(isTimeSpanOverAYear([first, projectStatsSample({ sampling_utc_date_time: "not a date" })])).toBe(false);
+            expect(isTimeSpanOverAYear([])).toBe(false);
         });
     });
 
     describe("countSuspiciousPressures", () => {
-        test("depth samples without a positive pressure, any sample deeper than the rating", () => {
+        test("depth samples without a positive pressure, any sample deeper than the rating or starting above the surface", () => {
             expect(countSuspiciousPressures([
                 projectStatsSample({ max_pressure: null }),
                 projectStatsSample({ max_pressure: 0 }),
@@ -157,7 +172,37 @@ describe("Project statistics builders", () => {
                 projectStatsSample({ max_pressure: 3056 }),
                 projectStatsSample({ sample_type_label: "Time", max_pressure: null }),
                 projectStatsSample({ sample_type_label: "Time", max_pressure: 7000 }),
-            ])).toBe(4);
+                projectStatsSample({ min_pressure: MIN_PLAUSIBLE_PRESSURE_DBAR - 0.1 }),
+                projectStatsSample({ min_pressure: MIN_PLAUSIBLE_PRESSURE_DBAR }),
+                projectStatsSample({ min_pressure: null }),
+                projectStatsSample({ sample_type_label: "Time", max_pressure: null, min_pressure: -12 }),
+            ])).toBe(6);
+        });
+    });
+
+    describe("countObjectSizeMismatches", () => {
+        test("the samples whose objects fall outside the size classes of the instrument", () => {
+            expect(countObjectSizeMismatches([
+                projectStatsSample(),
+                // 1 px with a tiny Aa: an object of about 1 µm, under the first UVP6 class (50.8 µm).
+                projectStatsSample({ instrument_settings_aa: 1 }),
+                // An object of about 28 mm, over the last class (26 mm).
+                projectStatsSample({ particle_max_area_px: 60000 }),
+                projectStatsSample({ particle_min_area_px: null }),
+                projectStatsSample({ instrument_settings_exp: 0 }),
+            ], "UVP6LP")).toBe(2);
+        });
+
+        test("a model without size classes is not checked", () => {
+            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 1 })], "UVP6MHP")).toBe(0);
+            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 1 })], "CPICS")).toBe(0);
+        });
+
+        test("each model has its own first class", () => {
+            // About 70 µm: in the UVP5HD classes (from 50.8 µm), under the UVP5SD ones (from 102 µm).
+            const sample = projectStatsSample({ instrument_settings_aa: 0.0026, instrument_settings_exp: 1.2284, particle_min_area_px: 1.5, particle_max_area_px: 100 });
+            expect(countObjectSizeMismatches([sample], "UVP5HD")).toBe(0);
+            expect(countObjectSizeMismatches([sample], "UVP5SD")).toBe(1);
         });
     });
 
@@ -173,29 +218,44 @@ describe("Project statistics builders", () => {
             profiles: [],
         };
 
-        test("takes the ranges of the summary and adds the three warnings", () => {
-            expect(buildProjectStatsSamples(summary, [projectStatsSample(), projectStatsSample({ max_pressure: null, instrument_settings_aa: 1 })], NOW)).toEqual({
+        test("takes the ranges of the summary and adds the warnings of the section", () => {
+            const samples = [projectStatsSample(), projectStatsSample({ max_pressure: null, instrument_settings_aa: 1, sampling_utc_date_time: "2022-01-01T00:00:00Z" })];
+            expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open"), NOW)).toEqual({
                 sample_types: { depth: 2, time: 0, total: 2 },
                 pressure_range: { min: 0, max: 512.4 },
                 size_range: { min: 42, max: 81000 },
                 time_range: { start: "2024-06-12T10:20:00.000Z", end: "2024-06-13T10:20:00.000Z" },
                 max_pressure_histogram: [{ max_pressure: 100, nb_profiles: 0 }],
                 nb_instrument_parameter_mismatches: 1,
+                nb_object_size_mismatches: 1,
                 nb_suspicious_dates: 0,
+                time_span_over_a_year: true,
                 nb_suspicious_pressures: 1,
+                unfiltered_uvp5hd: false,
             });
         });
 
+        test("the time duration check is the project's to disable, the filtering is asked of a UVP5HD project", () => {
+            const samples = [projectStatsSample(), projectStatsSample({ sampling_utc_date_time: "2022-01-01T00:00:00Z" })];
+            expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open", { time_duration_check: false }), NOW).time_span_over_a_year).toBe(false);
+            expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open", { instrument_model: "UVP5HD" }), NOW).unfiltered_uvp5hd).toBe(true);
+            expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open", { instrument_model: "UVP5HD", filtered_project: true }), NOW).unfiltered_uvp5hd).toBe(false);
+            expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open", { instrument_model: "UVP5SD" }), NOW).unfiltered_uvp5hd).toBe(false);
+        });
+
         test("without any sample: empty ranges and no warning", () => {
-            expect(buildProjectStatsSamples(null, [], NOW)).toEqual({
+            expect(buildProjectStatsSamples(null, [], exploreProject(5, "open"), NOW)).toEqual({
                 sample_types: { depth: 0, time: 0, total: 0 },
                 pressure_range: null,
                 size_range: null,
                 time_range: null,
                 max_pressure_histogram: [],
                 nb_instrument_parameter_mismatches: 0,
+                nb_object_size_mismatches: 0,
                 nb_suspicious_dates: 0,
+                time_span_over_a_year: false,
                 nb_suspicious_pressures: 0,
+                unfiltered_uvp5hd: false,
             });
         });
     });
@@ -252,17 +312,19 @@ describe("Project statistics builders", () => {
         };
         const imported = () => projectStatsSample({ ecotaxa_sample_imported: true, ecotaxa_sample_id: 9001 });
 
-        test("complete when every imported sample has its stats and only validated objects", () => {
+        test("complete when every imported sample has its stats and only validated or predicted objects", () => {
             expect(buildProjectStatsEcoTaxa(summary, [imported(), imported(), projectStatsSample()], true)).toEqual({
                 linked: true,
                 ...summary,
                 nb_samples_not_imported: 1,
                 classification_completed: true,
             });
+            const predicted = { ...summary, objects: { total: 30, validated: 20, predicted: 10 } };
+            expect(buildProjectStatsEcoTaxa(predicted, [imported(), imported()], true).classification_completed).toBe(true);
         });
 
         test.each([
-            ["an object is not validated", { ...summary, objects: { total: 30, validated: 29, predicted: 1 } }, [imported(), imported()]],
+            ["an object is dubious or unclassified", { ...summary, objects: { total: 30, validated: 28, predicted: 1 } }, [imported(), imported()]],
             ["a sample has no stats yet", { ...summary, nb_samples_with_stats: 1 }, [imported(), imported()]],
             ["the stats are partial", { ...summary, partial: true, nb_samples_pending: 1 }, [imported(), imported()]],
             ["no sample is imported", summary, [projectStatsSample()]],

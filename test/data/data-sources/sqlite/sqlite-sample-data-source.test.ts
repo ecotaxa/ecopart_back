@@ -164,7 +164,7 @@ describe('SQLiteSampleDataSource', () => {
 
             expect(ligurian).toEqual({
                 sample_id: ids['ligurian_001'], sample_name: 'ligurian_001', project_id: P1, latitude: 43.4, longitude: 7.87,
-                sampling_utc_date_time: '2024-06-12T10:20:00Z', max_pressure: 500, sample_type_label: 'Depth', visual_qc_status_label: 'VALIDATED',
+                sampling_utc_date_time: '2024-06-12T10:20:00Z', max_pressure: 500, min_pressure: null, sample_type_label: 'Depth', visual_qc_status_label: 'VALIDATED',
                 ctd_imported: false, ctd_file_extension: null, ecotaxa_sample_imported: false, ecotaxa_sample_id: null,
                 nb_vignettes: 0, nb_particles: 345678, particle_min_area_px: 1, particle_max_area_px: 4000,
                 filter_first_image: '3432', filter_last_image: '107843', instrument_settings_depth_offset_m: 999,
