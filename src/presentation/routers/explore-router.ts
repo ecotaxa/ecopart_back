@@ -31,7 +31,7 @@ export default function ExploreRouter(
         const msg: string = err?.message || "";
         if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
         else if (msg === "Login required") res.status(401).send({ errors: [msg] })
-        else if (msg.startsWith("pressure_bin must") || msg.startsWith("time_bin must") || msg.startsWith("count must") || msg.startsWith("mode must")) res.status(422).send({ errors: [msg] })
+        else if (msg.startsWith("pressure_bin must") || msg.startsWith("time_bin must") || msg.startsWith("count must") || msg.startsWith("mode must") || msg.startsWith("size_classes must")) res.status(422).send({ errors: [msg] })
         else res.status(500).send({ errors: [fallback] })
     }
 
@@ -277,7 +277,8 @@ export default function ExploreRouter(
      *   post:
      *     summary: Curves of the Explore selection
      *     description: |
-     *       Particle abundance and biovolume per reduced size class, and the CTD variables, of every
+     *       Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by
+     *       default, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every
      *       sample of the selection whose project lets the caller see figures (members and managers
      *       always, anyone once the project is visible), binned on the depth axis (`mode: depth`,
      *       `pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned
@@ -315,6 +316,7 @@ export default function ExploreRouter(
             res.status(200).send(await getExploreGraphsUseCase.execute(userOf(req), {
                 mode: req.body.mode, filters: req.body.filters ?? null,
                 pressure_bin: req.body.pressure_bin ?? undefined, time_bin: req.body.time_bin ?? undefined,
+                size_classes: req.body.size_classes ?? undefined,
             }))
         } catch (err) {
             sendError(res, err, "Cannot get the explore graphs")

@@ -1,8 +1,8 @@
 import { CtdRows } from "../../../../src/domain/entities/ctd";
 import { ExploreSampleRow } from "../../../../src/domain/entities/explore";
-import { REDUCED_CLASS_COUNT } from "../../../../src/domain/constants/size-classes";
+import { SIZE_CLASS_COUNT } from "../../../../src/domain/constants/size-classes";
 import { ExploreEcoTaxaService } from "../../../../src/domain/use-cases/explore/explore-ecotaxa";
-import { EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, ReducedBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
+import { EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, ParticleBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { ExploreSelectionRepositories } from "../../../../src/domain/use-cases/explore/explore-selection";
 import { GetExploreGraphs } from "../../../../src/domain/use-cases/explore/get-explore-graphs";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
@@ -15,13 +15,14 @@ const OPEN = exploreProject(1, "open", { project_title: "Ligurian profiles", ena
 const PRIVATE = exploreProject(2, "private", { project_title: "Arctic moorings" });
 const VISIBLE = exploreProject(3, "visible", { project_title: "Tara Pacific" });
 
-// Every sample sees the 64-128 µm class: one bin of 10 particles in 2 litres.
-const BINS: ReducedBins = {
+// Every sample sees the 64-128 µm reduced class (detailed classes 19-21, 0-based 18-20): one bin of
+// 10 particles of 64-80.6 µm in 2 litres. The bins are detailed, as `binsOf` serves them.
+const BINS: ParticleBins = {
     positions: [2.5],
     volumes: [2],
-    counts: [Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => k === 6 ? 10 : 0)],
-    biovolumes_mm3: [Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => k === 6 ? 0.4 : 0)],
-    visible: Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => k === 6),
+    counts: [Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d === 18 ? 10 : 0)],
+    biovolumes_mm3: [Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d === 18 ? 0.4 : 0)],
+    visible: Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d >= 18 && d <= 20),
 };
 
 // Down to 6 dbar, back up to 4 dbar: the descent filter drops the 30 °C row.
@@ -101,6 +102,25 @@ describe("GetExploreGraphs", () => {
         expect(graphs.abundance.series["64-128 µm"][0].points).toEqual([{ position: 2.5, value: 5 }]);
         expect(graphs.biovolume.series["64-128 µm"][0].points).toEqual([{ position: 2.5, value: 0.2 }]);
         expect(graphs.ecotaxa).toEqual({ keys: [], axis_labels: {}, series: {} });
+        expect(graphs.size_classes).toBe("reduced");
+    });
+
+    test("draws the detailed classes when asked, from the same cached bins", async () => {
+        const graphs = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, size_classes: "detailed" });
+
+        expect(graphs.size_classes).toBe("detailed");
+        expect(graphs.abundance.keys).toEqual(["64-80.6 µm", "80.6-102 µm", "102-128 µm"]);
+        expect(graphs.abundance.axis_labels["64-80.6 µm"]).toBe("Particle det. class cl19 (64-80.6 µm) # l-1");
+        expect(graphs.biovolume.axis_labels["102-128 µm"]).toBe("Biovolume det. class bv21 (102-128 µm) mm3 l-1");
+        expect(graphs.abundance.series["64-80.6 µm"][0].points).toEqual([{ position: 2.5, value: 5 }]);
+        expect(graphs.abundance.series["80.6-102 µm"][0].points).toEqual([{ position: 2.5, value: 0 }]);
+        expect(particleBins.binsOf).toBeCalledWith(samples[0], expect.anything(), "depth", 5);
+    });
+
+    test("an unknown histogram is refused before the selection is resolved", async () => {
+        await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, size_classes: "raw" as "detailed" }))
+            .rejects.toThrow("size_classes must be one of reduced, detailed");
+        expect(projectRepository.listProjects).toBeCalledTimes(0);
     });
 
     test("one hidden sample: singular warning; a manager of the private project sees everything", async () => {

@@ -1337,6 +1337,15 @@
                 "maximum": 24,
                 "default": 1,
                 "description": "Time bin in hours."
+              },
+              "size_classes": {
+                "type": "string",
+                "enum": [
+                  "reduced",
+                  "detailed"
+                ],
+                "default": "reduced",
+                "description": "The particle histogram: the 15 reduced or the 45 detailed size classes of legacy EcoPart."
               }
             }
           }
@@ -1751,6 +1760,14 @@
       "ExploreGraphs": {
         "type": "object",
         "properties": {
+          "size_classes": {
+            "type": "string",
+            "enum": [
+              "reduced",
+              "detailed"
+            ],
+            "description": "The histogram of `abundance` and `biovolume`."
+          },
           "abundance": {
             "$ref": "#/components/schemas/GraphDataset"
           },
@@ -5104,7 +5121,7 @@
     "/explore/graphs": {
       "post": {
         "summary": "Curves of the Explore selection",
-        "description": "Particle abundance and biovolume per reduced size class, and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn; `warnings` tells what was left out. Login required.\n",
+        "description": "Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by\ndefault, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn; `warnings` tells what was left out. Login required.\n",
         "tags": [
           "Explore"
         ],

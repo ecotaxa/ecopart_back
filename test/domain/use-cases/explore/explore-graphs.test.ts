@@ -16,7 +16,10 @@ import {
     ExploreParticleBins,
     LruCache,
     mapWithConcurrency,
-    ReducedBins,
+    detailBinnedSample,
+    exploreSizeClasses,
+    ParticleBins,
+    reduceParticleBins,
     reduceBinnedSample,
 } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
@@ -68,7 +71,7 @@ function binnedSample(axis: "depth" | "time", bins: SampleBin[], visible_classes
     return { axis, visible_classes, minimum_area_px: 1, black_images_recorded: true, used_images: 100, particles_below_minimum_area: 0, bins };
 }
 
-function reducedBins(rows: Array<{ position: number; volume: number; counts?: Record<number, number>; biovolumes?: Record<number, number> }>, visible_classes: number[]): ReducedBins {
+function reducedBins(rows: Array<{ position: number; volume: number; counts?: Record<number, number>; biovolumes?: Record<number, number> }>, visible_classes: number[]): ParticleBins {
     const fill = (values: Record<number, number> = {}) => { const array = new Array<number>(REDUCED_CLASS_COUNT).fill(0); for (const [k, v] of Object.entries(values)) array[Number(k)] = v; return array; };
     return {
         positions: rows.map(row => row.position),
@@ -121,6 +124,48 @@ describe("reduceBinnedSample", () => {
         expect(reduced.positions.length).toBeLessThanOrEqual(EXPLORE_GRAPH_MAX_POINTS);
         expect(reduced.counts.reduce((sum, row) => sum + row[6], 0)).toBe(3001);
         expect(reduced.volumes.reduce((sum, volume) => sum + volume, 0)).toBe(3001);
+    });
+});
+
+describe("exploreSizeClasses", () => {
+    test("reduced by default, detailed when asked, anything else refused", () => {
+        expect(exploreSizeClasses(undefined)).toBe("reduced");
+        expect(exploreSizeClasses(null as unknown as undefined)).toBe("reduced");
+        expect(exploreSizeClasses("detailed")).toBe("detailed");
+        expect(() => exploreSizeClasses("raw")).toThrow("size_classes must be one of reduced, detailed");
+    });
+});
+
+describe("detailBinnedSample", () => {
+    test("keeps the 45 detailed classes, the invisible ones at zero", () => {
+        const detailed = detailBinnedSample(binnedSample("depth", [
+            bin({ depth_start_m: 0, depth_stop_m: 5, water_volume_l: 2.5, counts: withValues({ 15: 100, 17: 7, 18: 3 }), biovolumes_mm3: withValues({ 17: 0.07 }) }),
+        ]));
+
+        expect(detailed.positions).toEqual([2.5]);
+        expect(detailed.counts[0]).toHaveLength(SIZE_CLASS_COUNT);
+        // Class 15 is not visible on a UVP6: its 100 particles are left out.
+        expect(detailed.counts[0][15]).toBe(0);
+        expect(detailed.counts[0][17]).toBe(7);
+        expect(detailed.counts[0][18]).toBe(3);
+        expect(detailed.biovolumes_mm3[0][17]).toBeCloseTo(0.07, 10);
+        expect(detailed.visible).toEqual(UVP6_VISIBLE);
+    });
+
+    test("reducing the detailed bins sums each group of three classes", () => {
+        const sample = binnedSample("depth", [
+            bin({ depth_start_m: 0, depth_stop_m: 5, counts: withValues({ 17: 7, 18: 3, 19: 2, 44: 1 }) }),
+            bin({ index: 1, depth_start_m: 5, depth_stop_m: 10, counts: withValues({ 20: 4 }) }),
+        ]);
+
+        const reduced = reduceParticleBins(detailBinnedSample(sample));
+
+        expect(reduced).toEqual(reduceBinnedSample(sample));
+        expect(reduced.counts.map(row => row.length)).toEqual([REDUCED_CLASS_COUNT, REDUCED_CLASS_COUNT]);
+        expect(reduced.counts[0][5]).toBe(7);
+        expect(reduced.counts[0][6]).toBe(5);
+        expect(reduced.counts[1][6]).toBe(4);
+        expect(reduced.counts[0][14]).toBe(1);
     });
 });
 
@@ -211,10 +256,10 @@ describe("ExploreParticleBins", () => {
         }));
     });
 
-    test("bins the pivot with the binned export computation, then keeps the reduced classes", async () => {
+    test("bins the pivot with the binned export computation, keeping the detailed classes", async () => {
         const bins = await particleBins.binsOf(sample, context, "depth", 5);
 
-        const expected = reduceBinnedSample(computeBinnedSample(binnedSampleSettingsOf(sample, project), records, { axis: "depth", step: 5 }));
+        const expected = detailBinnedSample(computeBinnedSample(binnedSampleSettingsOf(sample, project), records, { axis: "depth", step: 5 }));
         expect(bins).toEqual(expected);
         expect(bins.positions.length).toBeGreaterThan(0);
         expect(sampleRepository.getPivotFileStamp).toBeCalledWith(1, "moose_ge_2024_031", "UVP6LP");
@@ -320,6 +365,22 @@ describe("buildParticleDatasets", () => {
         expect(datasets.abundance.keys).toEqual([">16.4 mm"]);
         expect(datasets.abundance.axis_labels[">16.4 mm"]).toBe("Particle red. class cl15 (>16.4 mm) # l-1");
         expect(datasets.abundance.series["32-64 µm"]).toBeUndefined();
+    });
+
+    test("the detailed histogram: one key per detailed class drawn, with legacy class numbers", () => {
+        const bins: ParticleBins = {
+            positions: [2.5], volumes: [2],
+            counts: [Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d === 0 ? 8 : 0)],
+            biovolumes_mm3: [Array.from({ length: SIZE_CLASS_COUNT }, () => 0)],
+            visible: Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d === 0 || d === 44),
+        };
+
+        const datasets = buildParticleDatasets([{ sample: sample_a, bins }], "detailed");
+
+        expect(datasets.abundance.keys).toEqual(["1-1.26 µm", ">26 mm"]);
+        expect(datasets.abundance.axis_labels["1-1.26 µm"]).toBe("Particle det. class cl1 (1-1.26 µm) # l-1");
+        expect(datasets.biovolume.axis_labels[">26 mm"]).toBe("Biovolume det. class bv45 (>26 mm) mm3 l-1");
+        expect(datasets.abundance.series["1-1.26 µm"][0].points).toEqual([{ position: 2.5, value: 4 }]);
     });
 
     test("no sample: empty datasets", () => {

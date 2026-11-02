@@ -3,7 +3,7 @@ import { UserUpdateModel } from "../../entities/user";
 import { GetExploreGraphsUseCase } from "../../interfaces/use-cases/explore/get-explore-graphs";
 import { BinAxis } from "../export/binned-computation";
 import { ExploreEcoTaxaService } from "./explore-ecotaxa";
-import { binCtdRows, buildCtdDataset, buildParticleDatasets, CtdBins, EXPLORE_GRAPH_CONCURRENCY, EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, exploreGraphSteps, mapWithConcurrency, ReducedBins } from "./explore-graphs";
+import { binCtdRows, buildCtdDataset, buildParticleDatasets, CtdBins, EXPLORE_GRAPH_CONCURRENCY, EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, exploreGraphSteps, exploreSizeClasses, mapWithConcurrency, ParticleBins, reduceParticleBins } from "./explore-graphs";
 import { ExploreProjectContext, ExploreSelectionRepositories, resolveExploreSelection } from "./explore-selection";
 
 const EMPTY_DATASET: GraphDataset = { keys: [], axis_labels: {}, series: {} };
@@ -21,6 +21,7 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
     async execute(current_user: UserUpdateModel | null, request: ExploreGraphsRequest): Promise<ExploreGraphs> {
         if (!current_user) throw new Error("Login required");
         const steps = exploreGraphSteps(request.pressure_bin, request.time_bin);
+        const size_classes = exploreSizeClasses(request.size_classes);
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
         const axis: BinAxis = request.mode;
         const step = axis === "depth" ? steps.pressure_bin : steps.time_bin;
@@ -34,7 +35,7 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
 
         const contextOf = (sample: ExploreSampleRow) => selection.projects.get(sample.project_id) as ExploreProjectContext;
         const particle_failures: string[] = [];
-        const particles = await mapWithConcurrency(drawn, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: ReducedBins } | null> => {
+        const particles = await mapWithConcurrency(drawn, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: ParticleBins } | null> => {
             try {
                 return { sample, bins: await this.particleBins.binsOf(sample, contextOf(sample), axis, step) };
             } catch (error) {
@@ -60,8 +61,12 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
         });
         if (ctd_failures.length > 0) warnings.push(`${ctd_failures.length} CTD file${ctd_failures.length > 1 ? "s" : ""} could not be read: ${describe(ctd_failures)}`);
 
-        const datasets = buildParticleDatasets(particles.filter((entry): entry is { sample: ExploreSampleRow; bins: ReducedBins } => entry !== null));
+        // The cached bins hold the detailed classes.
+        const datasets = buildParticleDatasets(particles
+            .filter((entry): entry is { sample: ExploreSampleRow; bins: ParticleBins } => entry !== null)
+            .map(({ sample, bins }) => ({ sample, bins: size_classes === "reduced" ? reduceParticleBins(bins) : bins })), size_classes);
         return {
+            size_classes,
             abundance: datasets.abundance,
             biovolume: datasets.biovolume,
             ctd: buildCtdDataset(ctd.filter((entry): entry is { sample: ExploreSampleRow; bins: CtdBins } => entry !== null)),

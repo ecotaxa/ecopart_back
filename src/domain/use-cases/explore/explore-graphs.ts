@@ -1,18 +1,19 @@
 import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from "../../constants/binned-export";
 import { CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS } from "../../constants/ctd-columns";
-import { DETAILED_CLASSES_PER_REDUCED, PART_RED_CLASS_LIMITS_MM, REDUCED_CLASS_COUNT, sizeClassLabel } from "../../constants/size-classes";
+import { DETAILED_CLASSES_PER_REDUCED, PART_DET_CLASS_LIMITS_MM, PART_RED_CLASS_LIMITS_MM, REDUCED_CLASS_COUNT, SIZE_CLASS_COUNT, sizeClassLabel } from "../../constants/size-classes";
 import { CtdRows } from "../../entities/ctd";
-import { ExploreSampleRow, GraphDataset, ProfileSeries } from "../../entities/explore";
+import { ExploreSampleRow, ExploreSizeClasses, GraphDataset, ProfileSeries } from "../../entities/explore";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { CTD_PRESSURE_COLUMN, CTD_TIME_COLUMN } from "../../utils/ctd-rows";
 import { BinAxis, BinnedSample, BinnedSampleBuilder, BinnedSampleSettings } from "../export/binned-computation";
 import { binnedSampleSettingsOf } from "../export/binned-settings";
 import { ExploreProjectContext } from "./explore-selection";
 
-/* The curves of the "Selected data graphs" tab: particle abundance and biovolume per reduced size
- * class, and CTD variables, per sample, binned on the depth or on the time axis with the binned
- * export computation. A sample's bins are computed once per (axis, step, project settings, pivot
- * file) and kept in memory: exploring is iterative, and reading a pivot is the whole cost. */
+/* The curves of the "Selected data graphs" tab: particle abundance and biovolume per size class
+ * (the reduced or the detailed histogram of legacy EcoPart), and CTD variables, per sample, binned
+ * on the depth or on the time axis with the binned export computation. A sample's bins are computed
+ * once per (axis, step, project settings, pivot file) and kept in memory with the detailed classes,
+ * the reduced ones being sums of them: exploring is iterative, and reading a pivot is the whole cost. */
 
 export const EXPLORE_GRAPH_MAX_SAMPLES = 100;
 // Beyond this many bins, adjacent bins are merged: a curve of a long time series stays drawable.
@@ -37,58 +38,79 @@ export function exploreGraphSteps(pressure_bin: number | undefined, time_bin: nu
     return { pressure_bin: step(pressure_bin, BINNED_DEPTH_STEP_M, "pressure_bin"), time_bin: step(time_bin, BINNED_TIME_STEP_H, "time_bin") };
 }
 
-// The compact result of a sample: one row per bin, the reduced classes only.
-export interface ReducedBins {
-    positions: number[];                      // bin centre: depth in m, or epoch ms
-    volumes: number[];                        // imaged water volume, litres
-    counts: number[][];                       // [bin][reduced class], particles of the visible detailed classes
-    biovolumes_mm3: number[][];               // [bin][reduced class]
-    visible: boolean[];                       // per reduced class: at least one detailed class visible on the sample
+export const EXPLORE_SIZE_CLASSES: readonly ExploreSizeClasses[] = ["reduced", "detailed"];
+
+// The histogram of the particle curves, reduced by default (the legacy graphs page offers both).
+export function exploreSizeClasses(value: string | undefined): ExploreSizeClasses {
+    if (value === undefined || value === null) return "reduced";
+    if (!EXPLORE_SIZE_CLASSES.includes(value as ExploreSizeClasses)) throw new Error(`size_classes must be one of ${EXPLORE_SIZE_CLASSES.join(", ")}`);
+    return value as ExploreSizeClasses;
 }
 
-export function reduceBinnedSample(sample: BinnedSample): ReducedBins {
-    const visible = Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => {
-        for (let d = k * DETAILED_CLASSES_PER_REDUCED; d < (k + 1) * DETAILED_CLASSES_PER_REDUCED; d++) if (sample.visible_classes[d]) return true;
-        return false;
-    });
-    const reduced: ReducedBins = { positions: [], volumes: [], counts: [], biovolumes_mm3: [], visible };
+// The compact result of a sample: one row per bin, one column per size class (detailed or reduced).
+export interface ParticleBins {
+    positions: number[];                      // bin centre: depth in m, or epoch ms
+    volumes: number[];                        // imaged water volume, litres
+    counts: number[][];                       // [bin][class], particles of the visible classes
+    biovolumes_mm3: number[][];               // [bin][class]
+    visible: boolean[];                       // per class: visible on the sample
+}
+
+// The detailed classes of each bin, the classes the sample cannot see left at zero.
+export function detailBinnedSample(sample: BinnedSample): ParticleBins {
+    const visible = Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => Boolean(sample.visible_classes[d]));
+    const detailed: ParticleBins = { positions: [], volumes: [], counts: [], biovolumes_mm3: [], visible };
     for (const bin of sample.bins) {
         const position = sample.axis === "depth"
             ? ((bin.depth_start_m ?? 0) + (bin.depth_stop_m ?? 0)) / 2
             : ((bin.time_start_ms ?? 0) + (bin.time_stop_ms ?? 0)) / 2;
-        const counts = new Array<number>(REDUCED_CLASS_COUNT).fill(0);
-        const biovolumes = new Array<number>(REDUCED_CLASS_COUNT).fill(0);
-        for (let d = 0; d < sample.visible_classes.length; d++) {
-            if (!sample.visible_classes[d]) continue;
-            const k = Math.floor(d / DETAILED_CLASSES_PER_REDUCED);
-            counts[k] += bin.counts[d];
-            biovolumes[k] += bin.biovolumes_mm3[d];
-        }
-        reduced.positions.push(position);
-        reduced.volumes.push(bin.water_volume_l);
-        reduced.counts.push(counts);
-        reduced.biovolumes_mm3.push(biovolumes);
+        detailed.positions.push(position);
+        detailed.volumes.push(bin.water_volume_l);
+        detailed.counts.push(visible.map((seen, d) => seen ? bin.counts[d] : 0));
+        detailed.biovolumes_mm3.push(visible.map((seen, d) => seen ? bin.biovolumes_mm3[d] : 0));
     }
-    return coarsen(reduced, EXPLORE_GRAPH_MAX_POINTS);
+    return coarsen(detailed, EXPLORE_GRAPH_MAX_POINTS);
+}
+
+// The reduced classes: each the sum of three consecutive detailed classes, visible when any of them is.
+export function reduceParticleBins(detailed: ParticleBins): ParticleBins {
+    const reduce = (row: number[]) => Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => {
+        let sum = 0;
+        for (let d = k * DETAILED_CLASSES_PER_REDUCED; d < (k + 1) * DETAILED_CLASSES_PER_REDUCED; d++) sum += row[d];
+        return sum;
+    });
+    return {
+        positions: detailed.positions,
+        volumes: detailed.volumes,
+        counts: detailed.counts.map(reduce),
+        biovolumes_mm3: detailed.biovolumes_mm3.map(reduce),
+        visible: Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) =>
+            detailed.visible.slice(k * DETAILED_CLASSES_PER_REDUCED, (k + 1) * DETAILED_CLASSES_PER_REDUCED).some(Boolean)),
+    };
+}
+
+export function reduceBinnedSample(sample: BinnedSample): ParticleBins {
+    return reduceParticleBins(detailBinnedSample(sample));
 }
 
 // Merges groups of adjacent bins until at most `max_points` remain; sums stay sums, so that the
 // concentrations of a merged bin are those of the larger bin.
-export function coarsen(bins: ReducedBins, max_points: number): ReducedBins {
+export function coarsen(bins: ParticleBins, max_points: number): ParticleBins {
     const n = bins.positions.length;
     if (n <= max_points) return bins;
+    const class_count = bins.visible.length;
     const group = Math.ceil(n / max_points);
-    const result: ReducedBins = { positions: [], volumes: [], counts: [], biovolumes_mm3: [], visible: bins.visible };
+    const result: ParticleBins = { positions: [], volumes: [], counts: [], biovolumes_mm3: [], visible: bins.visible };
     for (let start = 0; start < n; start += group) {
         const end = Math.min(n, start + group);
         let position = 0;
         let volume = 0;
-        const counts = new Array<number>(REDUCED_CLASS_COUNT).fill(0);
-        const biovolumes = new Array<number>(REDUCED_CLASS_COUNT).fill(0);
+        const counts = new Array<number>(class_count).fill(0);
+        const biovolumes = new Array<number>(class_count).fill(0);
         for (let i = start; i < end; i++) {
             position += bins.positions[i];
             volume += bins.volumes[i];
-            for (let k = 0; k < REDUCED_CLASS_COUNT; k++) {
+            for (let k = 0; k < class_count; k++) {
                 counts[k] += bins.counts[i][k];
                 biovolumes[k] += bins.biovolumes_mm3[i][k];
             }
@@ -122,23 +144,24 @@ export class LruCache<V> {
 
 export interface SampleBins {
     sample: ExploreSampleRow;
-    bins: ReducedBins;
+    bins: ParticleBins;
 }
 
 export class ExploreParticleBins {
-    private readonly cache = new LruCache<ReducedBins>(EXPLORE_GRAPH_CACHE_ENTRIES);
+    private readonly cache = new LruCache<ParticleBins>(EXPLORE_GRAPH_CACHE_ENTRIES);
 
     constructor(private readonly sampleRepository: SampleRepository) { }
 
+    // The detailed classes of the sample (`reduceParticleBins` gives the reduced ones).
     // Throws "Sample X has no particle data" for a UVP5 without pivot, or the reading error.
-    async binsOf(sample: ExploreSampleRow, context: ExploreProjectContext, axis: BinAxis, step: number): Promise<ReducedBins> {
+    async binsOf(sample: ExploreSampleRow, context: ExploreProjectContext, axis: BinAxis, step: number): Promise<ParticleBins> {
         const settings = binnedSampleSettingsOf(sample, context.project);
         const stamp = await this.sampleRepository.getPivotFileStamp(sample.project_id, sample.sample_name, context.project.instrument_model);
         if (stamp === null) throw new Error(`Sample ${sample.sample_name} has no particle data`);
         const key = `${sample.sample_id}|${axis}|${step}|${settings.descent_filter_enabled}|${settings.depth_offset_m}|${settings.filter_first_image}|${settings.filter_last_image}|${stamp}`;
         const cached = this.cache.get(key);
         if (cached) return cached;
-        const bins = reduceBinnedSample(await this.compute(settings, sample, context, axis, step));
+        const bins = detailBinnedSample(await this.compute(settings, sample, context, axis, step));
         this.cache.set(key, bins);
         return bins;
     }
@@ -167,15 +190,19 @@ export async function mapWithConcurrency<T, R>(items: T[], concurrency: number, 
 
 /* ─── datasets ─── */
 
-export function reducedClassKey(k: number): string {
-    return sizeClassLabel(PART_RED_CLASS_LIMITS_MM, k);
-}
+const HISTOGRAMS: Record<ExploreSizeClasses, { limits: readonly number[]; abbreviation: string }> = {
+    reduced: { limits: PART_RED_CLASS_LIMITS_MM, abbreviation: "red." },
+    detailed: { limits: PART_DET_CLASS_LIMITS_MM, abbreviation: "det." },
+};
 
-export function buildParticleDatasets(samples: SampleBins[]): { abundance: GraphDataset; biovolume: GraphDataset } {
+
+// `samples` hold the classes of `size_classes` (detailed bins, reduced with `reduceParticleBins`).
+export function buildParticleDatasets(samples: SampleBins[], size_classes: ExploreSizeClasses = "reduced"): { abundance: GraphDataset; biovolume: GraphDataset } {
+    const { limits, abbreviation } = HISTOGRAMS[size_classes];
     const abundance: GraphDataset = { keys: [], axis_labels: {}, series: {} };
     const biovolume: GraphDataset = { keys: [], axis_labels: {}, series: {} };
-    for (let k = 0; k < REDUCED_CLASS_COUNT; k++) {
-        const key = reducedClassKey(k);
+    for (let k = 0; k < limits.length - 1; k++) {
+        const key = sizeClassLabel(limits, k);
         const abundance_series: ProfileSeries[] = [];
         const biovolume_series: ProfileSeries[] = [];
         for (const { sample, bins } of samples) {
@@ -193,12 +220,12 @@ export function buildParticleDatasets(samples: SampleBins[]): { abundance: Graph
             biovolume_series.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, points: biovolume_points });
         }
         if (abundance_series.length === 0) continue;
-        // Legacy EcoPart numbers the reduced classes from 1.
+        // Legacy EcoPart numbers the classes from 1.
         abundance.keys.push(key);
-        abundance.axis_labels[key] = `Particle red. class cl${k + 1} (${key}) # l-1`;
+        abundance.axis_labels[key] = `Particle ${abbreviation} class cl${k + 1} (${key}) # l-1`;
         abundance.series[key] = abundance_series;
         biovolume.keys.push(key);
-        biovolume.axis_labels[key] = `Biovolume red. class bv${k + 1} (${key}) mm3 l-1`;
+        biovolume.axis_labels[key] = `Biovolume ${abbreviation} class bv${k + 1} (${key}) mm3 l-1`;
         biovolume.series[key] = biovolume_series;
     }
     return { abundance, biovolume };

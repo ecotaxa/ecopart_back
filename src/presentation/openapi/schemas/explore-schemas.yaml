@@ -49,6 +49,7 @@ components:
             mode: { type: string, enum: [depth, time], description: "The axis of the curves: one sample type (`all` is refused)." }
             pressure_bin: { type: number, minimum: 1, maximum: 100, default: 5, description: Depth bin in metres (dbar). }
             time_bin: { type: number, minimum: 0.5, maximum: 24, default: 1, description: Time bin in hours. }
+            size_classes: { type: string, enum: [reduced, detailed], default: reduced, description: "The particle histogram: the 15 reduced or the 45 detailed size classes of legacy EcoPart." }
     ExploreProjectOption:
       type: object
       properties:
@@ -204,6 +205,7 @@ components:
     ExploreGraphs:
       type: object
       properties:
+        size_classes: { type: string, enum: [reduced, detailed], description: The histogram of `abundance` and `biovolume`. }
         abundance: { $ref: '#/components/schemas/GraphDataset' }
         biovolume: { $ref: '#/components/schemas/GraphDataset' }
         ctd: { $ref: '#/components/schemas/GraphDataset' }
