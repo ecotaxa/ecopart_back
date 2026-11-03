@@ -147,3 +147,36 @@ describe("getPivotImages", () => {
         await expect(repo.getPivotImages(5, "lisst_1", "LISST")).rejects.toThrow("Unknown instrument model");
     });
 });
+
+describe("readPivotImages", () => {
+    let base_folder: string;
+    let repo: SampleRepositoryImpl;
+    const collect = async (rows: AsyncIterable<PivotImageRecord>) => { const out: PivotImageRecord[] = []; for await (const row of rows) out.push(row); return out; };
+
+    beforeEach(() => {
+        base_folder = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-pivot-rows-"));
+        repo = new SampleRepositoryImpl({} as any, "storage");
+        repo.base_folder = base_folder;
+    });
+
+    afterEach(() => {
+        fs.rmSync(base_folder, { recursive: true, force: true });
+    });
+
+    test("reads the rows of the file once, in their order", async () => {
+        const sample_folder = path.join(base_folder, "storage", "19", "HS1447C1");
+        fs.mkdirSync(sample_folder, { recursive: true });
+        await writeZip(path.join(sample_folder, "HS1447C1_Particule.zip"), { "particules.csv": "HW_CONF,000112LP\n20230406-144332-1,1.2,28,1:1,12,30.1,9.0\n20230406-144333-1,1.3,28,1:1,5,30.1,9.0\n" });
+        const read_columns = jest.spyOn(repo as any, "readParticulesCsvColumns");
+
+        const rows = await collect(repo.readPivotImages(19, "HS1447C1", "UVP6HF"));
+
+        expect(rows.map(r => [r.image_index, r.image_id, r.raw_pressure, r.blocks[0].nb_particles])).toEqual([[0, "20230406-144332-1", 1.2, 12], [1, "20230406-144333-1", 1.3, 5]]);
+        expect(read_columns).not.toHaveBeenCalled();
+    });
+
+    test("a missing file and an unknown instrument are reported when the rows are read", async () => {
+        await expect(collect(repo.readPivotImages(5, "s1c1", "UVP5HD"))).rejects.toThrow(/^Cannot read the particle file of sample s1c1/);
+        await expect(collect(repo.readPivotImages(5, "lisst_1", "LISST"))).rejects.toThrow("Unknown instrument model");
+    });
+});

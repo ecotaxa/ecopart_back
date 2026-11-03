@@ -2463,39 +2463,37 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages> {
-        let zip_path: string;
-        if (instrument_model.startsWith("UVP5")) {
-            zip_path = this.getPivotZipPath(project_id, sample_name);
-        } else if (instrument_model.startsWith("UVP6")) {
-            zip_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}_Particule.zip`);
-        } else {
-            throw new Error("Unknown instrument model");
-        }
-        const cannotRead = (error: unknown) => new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+        const zip_path = this.pivotZipPathOf(project_id, sample_name, instrument_model);
         let columns: PerImageColumns;
         try {
             columns = await this.readParticulesCsvColumns(zip_path);
         } catch (error) {
-            throw cannotRead(error);
+            throw this.cannotReadParticleFile(sample_name, error);
         }
-        const readLines = (): AsyncGenerator<string> => this.readZipEntryLines(zip_path, "particules.csv");
-        const parseRow = (line: string, image_index: number) => this.parsePivotParticulesCsvRow(line, image_index);
-        return {
-            columns,
-            rows: async function* () {
-                let image_index = 0;
-                try {
-                    for await (const line of readLines()) {
-                        const record = parseRow(line, image_index);
-                        if (!record) continue;
-                        image_index++;
-                        yield record;
-                    }
-                } catch (error) {
-                    throw cannotRead(error);
-                }
-            },
-        };
+        return { columns, rows: () => this.pivotRows(zip_path, sample_name) };
+    }
+
+    async *readPivotImages(project_id: number, sample_name: string, instrument_model: string): AsyncIterable<PivotImageRecord> {
+        yield* this.pivotRows(this.pivotZipPathOf(project_id, sample_name, instrument_model), sample_name);
+    }
+
+    // The data rows of the file, parsed one by one as they are read.
+    private async *pivotRows(zip_path: string, sample_name: string): AsyncGenerator<PivotImageRecord> {
+        let image_index = 0;
+        try {
+            for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
+                const record = this.parsePivotParticulesCsvRow(line, image_index);
+                if (!record) continue;
+                image_index++;
+                yield record;
+            }
+        } catch (error) {
+            throw this.cannotReadParticleFile(sample_name, error);
+        }
+    }
+
+    private cannotReadParticleFile(sample_name: string, error: unknown): Error {
+        return new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
     }
 
     private async getPerImageRecordsUVP5(project_folder: string, sample_name: string, spectrum = true): Promise<PerImageColumns> {

@@ -79,6 +79,9 @@ export interface SampleRepository {
     // The UVP6-format particle file the computed products read (the pivot for a UVP5 sample, the
     // imported particules.csv for a UVP6), read in two passes, see PivotImages.
     getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages>;
+    // The rows of a sample's pivot, read once from the file in their order, blocks and mean grey
+    // included: what a single-pass computation needs, without the columns of getPivotImages.
+    readPivotImages(project_id: number, sample_name: string, instrument_model: string): AsyncIterable<PivotImageRecord>;
 
     // Explore
     // Every sample matching the query, as light rows (one query).

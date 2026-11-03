@@ -356,12 +356,12 @@ function operatorWindow(instrument_model: string, records: PerImageColumns, firs
 }
 
 // Header bounds as trimmed strings ("" = unset); the INI reader may hand over plain numbers.
-function normalizeBound(bound: string | null | undefined): string | null {
+export function normalizeBound(bound: string | null | undefined): string | null {
     if (bound === null || bound === undefined) return null;
     return String(bound).trim() || null;
 }
 
-function numericBound(bound: string | null): number | null {
+export function numericBound(bound: string | null): number | null {
     if (bound === null) return null;
     const n = Number(bound);
     return Number.isFinite(n) ? n : null;
