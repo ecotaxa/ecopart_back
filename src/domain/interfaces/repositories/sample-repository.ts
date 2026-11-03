@@ -1,5 +1,5 @@
 import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, SampleParticleStats, Uvp5WorkFilesCheckModel } from "../../entities/sample";
-import { PerImageColumns, SampleSourceQcMetadata } from "../../entities/sample-qc-graph";
+import { PerImageColumns, SampleSourceQcMetadata, PerImageReadOptions } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
 import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
@@ -54,7 +54,7 @@ export interface SampleRepository {
 
     // Import-time QC graphs
     // Reads the sample's raw files and returns one normalised record per acquired image/frame, in columns.
-    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
+    getPerImageRecords(project_id: number, sample_name: string, instrument_model: string, options?: PerImageReadOptions): Promise<PerImageColumns>;
     // Pre-import variant: reads the per-image records straight from the project source folder
     // (root_folder_path) for a sample that has not been imported yet.
     getPerImageRecordsFromSource(root_folder_path: string, sample_name: string, instrument_model: string): Promise<PerImageColumns>;
@@ -79,6 +79,9 @@ export interface SampleRepository {
     // The UVP6-format particle file the computed products read (the pivot for a UVP5 sample, the
     // imported particules.csv for a UVP6), read in two passes, see PivotImages.
     getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages>;
+    // The rows of a sample's pivot, read once from the file in their order, blocks and mean grey
+    // included: what a single-pass computation needs, without the columns of getPivotImages.
+    readPivotImages(project_id: number, sample_name: string, instrument_model: string): AsyncIterable<PivotImageRecord>;
 
     // Explore
     // Every sample matching the query, as light rows (one query).

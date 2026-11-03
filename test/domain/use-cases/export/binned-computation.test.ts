@@ -20,6 +20,7 @@ import {
     visibleSizeClasses,
 } from "../../../../src/domain/use-cases/export/binned-computation";
 import { serialize } from "../../../../src/domain/use-cases/export/tsv";
+import { selectUsedImages } from "../../../../src/domain/use-cases/sample/qc-graphs-builder";
 
 const T0 = Date.UTC(2024, 5, 12, 10, 20, 0);
 
@@ -232,39 +233,131 @@ describe("computeBinnedSample, bin bounds and range", () => {
         expect(() => computeBinnedSample(UVP6, sequence([img(1), img(99999)]), { axis: "depth", step: 1 }))
             .toThrow("Sample uvp6_sample would need 99999 depth bins of 1 m (from 1 m to 100000 m)");
     });
-    test("the bin range is checked from the first pass, before any particle is read", () => {
-        const records = sequence([img(1), img(99999)]);
-        expect(() => new BinnedSampleBuilder(UVP6, toPerImageColumns(records), { axis: "depth", step: 1 }))
-            .toThrow("Sample uvp6_sample would need 99999 depth bins of 1 m (from 1 m to 100000 m)");
+    test("the range is measured to the end of the file, the bins being dropped once it exceeds the limit", () => {
+        const builder = new BinnedSampleBuilder(UVP6, { axis: "depth", step: 1 });
+        sequence([img(1, [[1, 7, 10]]), img(99999, [[1, 7, 10]]), img(50000, [[1, 7, 10]])]).forEach((record) => builder.add(record));
+        expect(() => builder.finish()).toThrow("Sample uvp6_sample would need 99999 depth bins of 1 m (from 1 m to 100000 m)");
     });
 });
 
-describe("BinnedSampleBuilder, two passes over the pivot", () => {
-    const records = sequence([img(1, [[1, 7, 10]]), img(2, [[2, 3, 20]]), img(3, [[3, 1, 30]])]);
+describe("BinnedSampleBuilder, one pass over the pivot", () => {
+    const records = sequence([img(1, [[1, 7, 10]]), img(2, [[2, 3, 20]]), img(3, [[3, 1, 30]]), img(4, [[1, 2, 40]])]);
+    const binsOf = (settings: Partial<BinnedSampleSettings>, rows = records) =>
+        computeBinnedSample({ ...UVP6, ...settings }, rows, { axis: "depth", step: 1 }).bins.map((b) => [b.index, b.nb_images, b.counts[17] + b.counts[18] + b.counts[19]]);
+    const usedOf = (settings: Partial<BinnedSampleSettings>, rows = records) => computeBinnedSample({ ...UVP6, ...settings }, rows, { axis: "depth", step: 1 }).used_images;
 
-    test("gives the bins of computeBinnedSample, the rows bringing only their blocks", () => {
-        const builder = new BinnedSampleBuilder(UVP6, toPerImageColumns(records), { axis: "depth", step: 1 });
-        // The second pass carries the blocks; position, time and flags come from the first pass.
-        for (const record of records) builder.add({ ...record, raw_pressure: null, image_time_ms: null, light_on: false });
-
-        expect(builder.finish()).toEqual(computeBinnedSample(UVP6, records, { axis: "depth", step: 1 }));
+    test("counts the rows of the file and the images with a position on the axis, used or not", () => {
+        const rows = sequence([img(1, [], { image_time_ms: null }), img(null), img(2, [], { light_on: false }), img(null, [], { image_time_ms: null })]);
+        // Ranks 0 to 3: endimg 0 keeps the first row only
+        const depth = computeBinnedSample({ ...UVP6, filter_last_image: "0" }, rows, { axis: "depth", step: 1 });
+        expect([depth.total_images, depth.positioned_images, depth.used_images]).toEqual([4, 2, 1]);
+        const time = computeBinnedSample({ ...UVP6, is_depth_profile: false }, rows, { axis: "time", step: 1 });
+        expect([time.total_images, time.positioned_images, time.used_images]).toEqual([4, 2, 4]);
     });
 
-    test("refuses a file that changed between the two passes", () => {
-        const changedWhileRead = "The particle file of sample uvp6_sample changed while it was read. Relaunch the export.";
-        const columns = toPerImageColumns(records);
+    test("a bound naming an image id starts the window at its first occurrence and ends it at its last one", () => {
+        expect(binsOf({ filter_first_image: "img1" })).toEqual([[2, 1, 3], [3, 1, 1], [4, 1, 2]]);
+        expect(binsOf({ filter_last_image: "img2" })).toEqual([[1, 1, 7], [2, 1, 3], [3, 1, 1]]);
+        expect(binsOf({ filter_first_image: "img1", filter_last_image: "img2" })).toEqual([[2, 1, 3], [3, 1, 1]]);
+        // The id occurring twice: the window ends at the last occurrence
+        const twice = records.map((record, i) => (i === 1 || i === 3 ? { ...record, image_id: "dup" } : record));
+        expect(binsOf({ filter_last_image: "dup" }, twice)).toEqual([[1, 1, 7], [2, 1, 3], [3, 1, 1], [4, 1, 2]]);
+        expect(binsOf({ filter_last_image: "dup" }, twice.slice(0, 3))).toEqual([[1, 1, 7], [2, 1, 3]]);
+    });
 
-        const other_row = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
-        other_row.add(records[0]);
-        expect(() => other_row.add(records[2])).toThrow(changedWhileRead);
+    test("an id that never occurs leaves its end of the window open", () => {
+        expect(usedOf({ filter_first_image: "nope" })).toBe(4);
+        expect(usedOf({ filter_last_image: "nope" })).toBe(4);
+        expect(binsOf({ filter_first_image: "nope", filter_last_image: "nope" })).toEqual([[1, 1, 7], [2, 1, 3], [3, 1, 1], [4, 1, 2]]);
+    });
 
-        const fewer_rows = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
-        records.slice(0, 2).forEach((record) => fewer_rows.add(record));
-        expect(() => fewer_rows.finish()).toThrow(changedWhileRead);
+    test("endimg before firstimage: nothing is used, unless endimg occurs again after it", () => {
+        expect(usedOf({ filter_first_image: "img2", filter_last_image: "img0" })).toBe(0);
+        expect(binsOf({ filter_first_image: "img2", filter_last_image: "img0" })).toEqual([]);
+        const again = records.map((record, i) => (i === 0 || i === 3 ? { ...record, image_id: "dup" } : record));
+        expect(binsOf({ filter_first_image: "img2", filter_last_image: "dup" }, again)).toEqual([[3, 1, 1], [4, 1, 2]]);
+    });
 
-        const more_rows = new BinnedSampleBuilder(UVP6, columns, { axis: "depth", step: 1 });
-        records.forEach((record) => more_rows.add(record));
-        expect(() => more_rows.add({ ...records[0], image_id: "img3" })).toThrow(changedWhileRead);
+    test("the descent filter starts over from firstimage", () => {
+        const yoyo = sequence([img(5, [[1, 1, 10]]), img(2, [[1, 1, 10]]), img(3, [[1, 1, 10]]), img(1, [[1, 1, 10]])]);
+        expect(usedOf({ descent_filter_enabled: true }, yoyo)).toBe(1);
+        expect(usedOf({ descent_filter_enabled: true, filter_first_image: "img1" }, yoyo)).toBe(2);
+    });
+
+    test("the rows added after the last occurrence of endimg change nothing", () => {
+        const builder = new BinnedSampleBuilder({ ...UVP6, filter_last_image: "img1" }, { axis: "depth", step: 1 });
+        records.forEach((record) => builder.add(record));
+        const finished = builder.finish();
+        const up_to_endimg = computeBinnedSample(UVP6, records.slice(0, 2), { axis: "depth", step: 1 });
+        expect([finished.used_images, finished.particles_below_minimum_area, finished.bins]).toEqual([up_to_endimg.used_images, up_to_endimg.particles_below_minimum_area, up_to_endimg.bins]);
+        // The file itself is counted whole
+        expect([finished.total_images, finished.positioned_images]).toEqual([4, 4]);
+    });
+
+    /* The images used are those the QC graphs select: random files and windows, the selection of
+     * `selectUsedImages` over the columns (two passes) against the builder's single pass. */
+    test("uses exactly the images the QC graphs select, on 300 random files and windows", () => {
+        const PRIME = 2654435761;
+        for (let seed = 1; seed <= 300; seed++) {
+            let x = seed;
+            const rnd = () => { x = (Math.imul(x, 1103515245) + 12345) & 0x7fffffff; return x / 0x80000000; };
+            const pick = <T,>(items: T[]): T => items[Math.floor(rnd() * items.length)];
+            const n = 1 + Math.floor(rnd() * 12);
+            let time = Date.UTC(2024, 5, 12, 10, 20, 0);
+            const rows: PivotImageRecord[] = [];
+            for (let i = 0; i < n; i++) {
+                time += Math.floor(rnd() * 90) * 60_000;
+                const blocks: Array<[number, number, number | null]> = Array.from({ length: Math.floor(rnd() * 3) }, () => [1 + Math.floor(rnd() * 5), 1 + Math.floor(rnd() * 9), 30]);
+                rows.push(img(rnd() < 0.1 ? null : Math.round((rnd() * 32 - 2) * 10) / 10, blocks, {
+                    image_index: i, image_id: `img${i}`, image_time_ms: rnd() < 0.1 ? null : time, light_on: rnd() < 0.8,
+                    particle_data_flag: pick<PivotImageRecord["particle_data_flag"]>([undefined, undefined, undefined, undefined, "OVER_EXPOSED", "EMPTY_IMAGE"]),
+                }));
+            }
+            const dup = [Math.floor(rnd() * n), Math.floor(rnd() * n)];
+            if (rnd() < 0.3) dup.forEach((i) => { rows[i] = { ...rows[i], image_id: "dup" }; });
+            const bound = (): string | null => pick([null, null, "100", `${100 + Math.floor(rnd() * n)}`, `img${Math.floor(rnd() * n)}`, "dup", "nope"]);
+            const uvp5 = rnd() < 0.2;
+            const settings: BinnedSampleSettings = {
+                ...UVP6, instrument_model: uvp5 ? "UVP5HD" : "UVP6LP", aa: uvp5 ? 0.0023 : 2300,
+                is_depth_profile: rnd() < 0.6, descent_filter_enabled: rnd() < 0.5, filter_first_image: bound(), filter_last_image: bound(),
+                depth_offset_m: pick([0, 1.2, null]),
+            };
+            const axis = rnd() < 0.6 ? "depth" : "time";
+            const step = axis === "depth" ? pick([1, 2.5, 5]) : pick([0.5, 1, 2]);
+
+            const selected = selectUsedImages({
+                sample_id: null, sample_name: "s", instrument_model: "UVP6", visual_qc_status_label: "",
+                filter_first_image: uvp5 ? null : settings.filter_first_image, filter_last_image: uvp5 ? null : settings.filter_last_image,
+                instrument_settings_depth_offset_m: settings.depth_offset_m, instrument_settings_image_volume_l: settings.image_volume_l,
+                is_depth_profile: settings.is_depth_profile, descent_filter_enabled: settings.descent_filter_enabled, records: toPerImageColumns(rows),
+            });
+            const step_units = Math.round(step * (axis === "depth" ? 1_000_000 : 3_600_000));
+            const times = rows.filter((_, k) => selected[k] === 1).map((r) => r.image_time_ms).filter((t): t is number => t !== null);
+            const origin = times.length > 0 ? Math.floor(Math.min(...times) / 3_600_000) * 3_600_000 : null;
+            const binOf = (r: PivotImageRecord): number | null => axis === "depth"
+                ? (r.raw_pressure === null ? null : Math.floor(Math.round(Math.max(0, r.raw_pressure + (settings.depth_offset_m ?? 0)) * 1_000_000) / step_units))
+                : (r.image_time_ms === null || origin === null ? null : Math.floor((r.image_time_ms - origin) / step_units));
+            const by_bin = new Map<number, [number, number]>();
+            rows.forEach((r, k) => {
+                const bin = selected[k] === 1 ? binOf(r) : null;
+                if (bin === null) return;
+                const counts = by_bin.get(bin) ?? [0, 0];
+                if (!r.light_on) counts[1]++;
+                else if (r.particle_data_flag !== "OVER_EXPOSED") counts[0]++;
+                by_bin.set(bin, counts);
+            });
+            const indexes = [...by_bin.keys()];
+            const expected_bins: number[][] = [];
+            if (indexes.length > 0) {
+                for (let index = Math.min(...indexes); index <= Math.max(...indexes); index++) expected_bins.push([index, ...(by_bin.get(index) ?? [0, 0])]);
+            }
+            const expected = { seed, used: selected.reduce((sum, s) => sum + s, 0), bins: expected_bins };
+
+            const binned = computeBinnedSample(settings, rows, { axis, step });
+            const actual = { seed, used: binned.used_images, bins: binned.bins.map((b) => [b.index, b.nb_images, b.nb_black_images]) };
+            expect(actual).toEqual(expected);
+        }
+        expect(PRIME).toBeGreaterThan(0);
     });
 });
 
@@ -282,6 +375,12 @@ describe("computeBinnedSample, time bins", () => {
     test("bins start at the UTC hour of the first image, an image without time is left out", () => {
         expect(binned.bins.map((b) => [b.index, b.nb_images])).toEqual([[0, 1], [1, 2], [2, 0], [3, 1]]);
         expect(binned.bins[1]).toMatchObject({ time_start_ms: at(10, 30), time_stop_ms: at(11, 0) });
+    });
+
+    test("an image used that comes earlier than the first one falls in a bin of negative index", () => {
+        const backwards = sequence([img(2, [[1, 1, 10]], { image_time_ms: at(10, 20) }), img(2, [[1, 1, 10]], { image_time_ms: at(9, 50) })]);
+        const binned_backwards = computeBinnedSample({ ...UVP6, is_depth_profile: false }, backwards, { axis: "time", step: 1 });
+        expect(binned_backwards.bins.map((b) => [b.index, b.time_start_ms, b.nb_images])).toEqual([[-1, at(9, 0), 1], [0, at(10, 0), 1]]);
     });
 
     test("the origin is the hour of the first image used, not of an image the window leaves out", () => {

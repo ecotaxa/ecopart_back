@@ -189,9 +189,9 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
     }
 
     // One line per sample: why its axis, what its particle file held, and the range its rows cover.
-    private describeBinnedSample(sample: PublicSampleModel, bin_mode: BinnedExportBinMode, file_images: number, binned: BinnedSample): string {
+    private describeBinnedSample(sample: PublicSampleModel, bin_mode: BinnedExportBinMode, binned: BinnedSample): string {
         const axis_origin = bin_mode === "auto" ? `${sample.sample_type_label} sample` : `bin_mode ${bin_mode}`;
-        const parts = [`${binned.used_images} of ${file_images} image(s) of the particle file used`];
+        const parts = [`${binned.used_images} of ${binned.total_images} image(s) of the particle file used`];
         if (binned.bins.length > 0) {
             const first = binned.bins[0];
             const last = binned.bins[binned.bins.length - 1];
@@ -245,7 +245,8 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
 
             await this.taskRepository.throwIfCancelled(task_id);
             await this.taskRepository.updateTaskProgress({ task_id }, 5, "Step 1/2 metadata: start");
-            await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, false, plan.format);
+            await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, false, plan.format,
+                { from: 5, to: 15, label: "Step 1/2 metadata" });
             await this.taskRepository.updateTaskProgress({ task_id }, 15, "Step 1/2 metadata: done");
 
             if (class_indexes.length > 0) {
@@ -260,10 +261,9 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
                 const axis = this.axisOf(sample, plan.bin_mode);
                 const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
-                // Two passes over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
-                const pivot = await this.sampleRepository.getPivotImages(sample.project_id, sample.sample_name, settings.instrument_model);
-                const builder = new BinnedSampleBuilder(settings, pivot.columns, { axis, step });
-                for await (const record of pivot.rows()) builder.add(record);
+                // One pass over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
+                const builder = new BinnedSampleBuilder(settings, { axis, step });
+                for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, settings.instrument_model)) builder.add(record);
                 const binned = builder.finish();
                 for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
                     await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
@@ -272,13 +272,11 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
 
                 const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
                 await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round(((i + 1) / samples.length) * 75), `Step 2/2 particles: ${summary}`);
-                await log(this.describeBinnedSample(sample, plan.bin_mode, pivot.columns.length, binned));
+                await log(this.describeBinnedSample(sample, plan.bin_mode, binned));
                 if (binned.bins.length === 0) {
                     const position = axis === "depth" ? "pressure" : "readable time";
-                    const positions = axis === "depth" ? pivot.columns.raw_pressure : pivot.columns.image_time_ms;
-                    const placeable = positions.some(position => !Number.isNaN(position));
-                    const reason = pivot.columns.length === 0 ? "its particle file holds no image"
-                        : !placeable ? `none of its images has a ${position}`
+                    const reason = binned.total_images === 0 ? "its particle file holds no image"
+                        : binned.positioned_images === 0 ? `none of its images has a ${position}`
                             : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
                                 : `none of its ${binned.used_images} image(s) used has a ${position}`;
                     await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);

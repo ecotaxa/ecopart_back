@@ -5,6 +5,7 @@ import { EcoTaxaImportedSample, ExploreSampleRow, StoredEcoTaxaStats } from "../
 import { ProjectStatsSampleRow } from "../../src/domain/entities/project-stats";
 import { CtdRows } from "../../src/domain/entities/ctd";
 import { Uvp5PivotReport } from "../../src/domain/entities/pivot";
+import { PivotImageRecord } from "../../src/domain/entities/binned-export";
 import { PivotImages, SampleRepository } from "../../src/domain/interfaces/repositories/sample-repository";
 
 export class MockSampleRepository implements SampleRepository {
@@ -121,6 +122,9 @@ export class MockSampleRepository implements SampleRepository {
     }
     getPivotImages(): Promise<PivotImages> {
         throw new Error("Method not implemented for getPivotImages");
+    }
+    readPivotImages(): AsyncIterable<PivotImageRecord> {
+        throw new Error("Method not implemented for readPivotImages");
     }
     getExploreSamples(): Promise<ExploreSampleRow[]> {
         throw new Error("Method not implemented for getExploreSamples");

@@ -7,7 +7,7 @@ import { SampleDataSource } from "../../data/interfaces/data-sources/sample-data
 // import { SampleRepository } from "../interfaces/repositories/sample-repository";
 
 import { ComputeVignettesModel, EcoTaxaSampleSummary, HeaderSampleModel, ImportableCTDSampleModel, MetadataIniSampleModel, MinimalSampleRequestModel, PublicHeaderSampleResponseModel, PublicImportableEcoTaxaSampleResponseModel, PublicSampleModel, RawFileCategory, SampleFromConfigurationDataModel, SampleFromCruiseInfoModel, SampleFromInstallConfigModel, SampleFromMetaHeaderModel, SampleFromWorkDatfileModel, SampleFromWorkHDRModel, SampleIdModel, SampleRequestCreationModel, SampleRequestModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, SampleParticleStats, Uvp5WorkFilesCheckModel } from "../entities/sample";
-import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata } from "../entities/sample-qc-graph";
+import { IMAGE_FLAG_EMPTY_IMAGE, IMAGE_FLAG_LIGHT_ON, IMAGE_FLAG_OVER_EXPOSED, ParticleDataFlag, PerImageColumns, PerImageRecord, SampleSourceQcMetadata, PerImageReadOptions } from "../entities/sample-qc-graph";
 import { PerImageColumnsBuilder } from "../utils/per-image-columns";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { PivotImages, SampleRepository } from "../interfaces/repositories/sample-repository";
@@ -2288,25 +2288,26 @@ export class SampleRepositoryImpl implements SampleRepository {
     // ─── Import-time QC graphs: per-image raw extraction ───
     // Returns one normalised record per acquired image/frame. IO only — binning into
     // depth profiles is domain logic done in the GetSampleQcGraphs use case.
-    async getPerImageRecords(project_id: number, sample_name: string, instrument_model: string): Promise<PerImageColumns> {
+    async getPerImageRecords(project_id: number, sample_name: string, instrument_model: string, options?: PerImageReadOptions): Promise<PerImageColumns> {
         const project_folder = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`);
+        const spectrum = options?.spectrum ?? true;
         if (instrument_model.startsWith("UVP6")) {
-            return this.getPerImageRecordsUVP6(project_folder, sample_name);
+            return this.getPerImageRecordsUVP6(project_folder, sample_name, spectrum);
         } else if (instrument_model.startsWith("UVP5")) {
-            return this.getPerImageRecordsUVP5(project_folder, sample_name);
+            return this.getPerImageRecordsUVP5(project_folder, sample_name, spectrum);
         }
         throw new Error("Unknown instrument model");
     }
 
-    private async getPerImageRecordsUVP6(project_folder: string, sample_name: string): Promise<PerImageColumns> {
-        return this.readParticulesCsvColumns(path.join(project_folder, sample_name, `${sample_name}_Particule.zip`));
+    private async getPerImageRecordsUVP6(project_folder: string, sample_name: string, spectrum = true): Promise<PerImageColumns> {
+        return this.readParticulesCsvColumns(path.join(project_folder, sample_name, `${sample_name}_Particule.zip`), spectrum);
     }
 
-    private async readParticulesCsvColumns(zip_path: string): Promise<PerImageColumns> {
+    private async readParticulesCsvColumns(zip_path: string, spectrum = true): Promise<PerImageColumns> {
         const columns = new PerImageColumnsBuilder();
         let image_index = 0;
         for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
-            if (this.pushParticulesCsvQcRow(columns, line, image_index)) image_index++;
+            if (this.pushParticulesCsvQcRow(columns, line, image_index, spectrum)) image_index++;
         }
         return columns.build();
     }
@@ -2323,8 +2324,9 @@ export class SampleRepositoryImpl implements SampleRepository {
     /* What the QC graphs read of a particules.csv row, pushed straight into the columns: the grammar of
      * parsePivotParticulesCsvRow, but only the 1 to 3 pixel blocks are kept and no object is built per
      * row or block, which reads a mooring of millions of rows several times faster. A test holds both
-     * parsers to the same result. Returns false for a line that is not a data row. */
-    private pushParticulesCsvQcRow(columns: PerImageColumnsBuilder, line: string, image_index: number): boolean {
+     * parsers to the same result. Without `spectrum` the blocks are not walked and the counts stay 0.
+     * Returns false for a line that is not a data row. */
+    private pushParticulesCsvQcRow(columns: PerImageColumnsBuilder, line: string, image_index: number, spectrum = true): boolean {
         if (!/^\d{8}/.test(line)) return false;
         const c1 = line.indexOf(",");
         const c2 = c1 === -1 ? -1 : line.indexOf(",", c1 + 1);
@@ -2339,18 +2341,20 @@ export class SampleRepositoryImpl implements SampleRepository {
         // particle count is read only for an area of 1 to 3 pixels, and in place: parseIntAt stops at
         // the first ',' like parseInt, so it reads a block's first or second field.
         const counts = [0, 0, 0];
-        let start = c4 === -1 ? line.length : c4 + 1;
-        for (let block = 0; ; block++) {
-            const semicolon = line.indexOf(";", start);
-            const end = semicolon === -1 ? line.length : semicolon;
-            const area_px = block === 0 ? first_class : parseIntAt(line, start, end);
-            if (area_px >= 1 && area_px <= 3) {
-                const comma = block === 0 ? start - 1 : line.indexOf(",", start);
-                const nb_particles = comma === -1 || comma >= end ? NaN : parseIntAt(line, comma + 1, end);
-                if (!isNaN(nb_particles)) counts[area_px - 1] = nb_particles;
+        if (spectrum) {
+            let start = c4 === -1 ? line.length : c4 + 1;
+            for (let block = 0; ; block++) {
+                const semicolon = line.indexOf(";", start);
+                const end = semicolon === -1 ? line.length : semicolon;
+                const area_px = block === 0 ? first_class : parseIntAt(line, start, end);
+                if (area_px >= 1 && area_px <= 3) {
+                    const comma = block === 0 ? start - 1 : line.indexOf(",", start);
+                    const nb_particles = comma === -1 || comma >= end ? NaN : parseIntAt(line, comma + 1, end);
+                    if (!isNaN(nb_particles)) counts[area_px - 1] = nb_particles;
+                }
+                if (semicolon === -1) break;
+                start = semicolon + 1;
             }
-            if (semicolon === -1) break;
-            start = semicolon + 1;
         }
         const image_id = line.slice(0, c1).trim();
         const pressure = parseFloat(line.slice(c1 + 1, c2));
@@ -2459,53 +2463,54 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async getPivotImages(project_id: number, sample_name: string, instrument_model: string): Promise<PivotImages> {
-        let zip_path: string;
-        if (instrument_model.startsWith("UVP5")) {
-            zip_path = this.getPivotZipPath(project_id, sample_name);
-        } else if (instrument_model.startsWith("UVP6")) {
-            zip_path = path.join(this.base_folder, this.DATA_STORAGE_FS_STORAGE, `${project_id}`, sample_name, `${sample_name}_Particule.zip`);
-        } else {
-            throw new Error("Unknown instrument model");
-        }
-        const cannotRead = (error: unknown) => new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+        const zip_path = this.pivotZipPathOf(project_id, sample_name, instrument_model);
         let columns: PerImageColumns;
         try {
             columns = await this.readParticulesCsvColumns(zip_path);
         } catch (error) {
-            throw cannotRead(error);
+            throw this.cannotReadParticleFile(sample_name, error);
         }
-        const readLines = (): AsyncGenerator<string> => this.readZipEntryLines(zip_path, "particules.csv");
-        const parseRow = (line: string, image_index: number) => this.parsePivotParticulesCsvRow(line, image_index);
-        return {
-            columns,
-            rows: async function* () {
-                let image_index = 0;
-                try {
-                    for await (const line of readLines()) {
-                        const record = parseRow(line, image_index);
-                        if (!record) continue;
-                        image_index++;
-                        yield record;
-                    }
-                } catch (error) {
-                    throw cannotRead(error);
-                }
-            },
-        };
+        return { columns, rows: () => this.pivotRows(zip_path, sample_name) };
     }
 
-    private async getPerImageRecordsUVP5(project_folder: string, sample_name: string): Promise<PerImageColumns> {
+    async *readPivotImages(project_id: number, sample_name: string, instrument_model: string): AsyncIterable<PivotImageRecord> {
+        yield* this.pivotRows(this.pivotZipPathOf(project_id, sample_name, instrument_model), sample_name);
+    }
+
+    // The data rows of the file, parsed one by one as they are read.
+    private async *pivotRows(zip_path: string, sample_name: string): AsyncGenerator<PivotImageRecord> {
+        let image_index = 0;
+        try {
+            for await (const line of this.readZipEntryLines(zip_path, "particules.csv")) {
+                const record = this.parsePivotParticulesCsvRow(line, image_index);
+                if (!record) continue;
+                image_index++;
+                yield record;
+            }
+        } catch (error) {
+            throw this.cannotReadParticleFile(sample_name, error);
+        }
+    }
+
+    private cannotReadParticleFile(sample_name: string, error: unknown): Error {
+        return new Error(`Cannot read the particle file of sample ${sample_name} (${(error as Error).message})`);
+    }
+
+    private async getPerImageRecordsUVP5(project_folder: string, sample_name: string, spectrum = true): Promise<PerImageColumns> {
         const workZip = path.join(project_folder, sample_name, `${sample_name}_work.zip`);
         // 1. datfile → per-frame raw_pressure (col idx 2), keyed by frame index (col idx 0).
         const datfileContent = await this.readFileFromZip(workZip, `${sample_name}_datfile.txt`, undefined);
         const frames = this.parseDatfileFrames(datfileContent);
         // 2. .bru → per-particle pixel area (col idx 2 in the post-import bru1 variant), grouped by frame.
+        // One line per particle: the file weighs tens of MB and is skipped when the spectrum is not needed.
         let spectraByFrame = new Map<number, Record<number, number>>();
-        try {
-            for await (const line of this.readZipEntryLines(workZip, `${sample_name}.bru`)) this.addBruSpectrumLine(spectraByFrame, line);
-        } catch {
-            spectraByFrame = new Map();
-            // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
+        if (spectrum) {
+            try {
+                for await (const line of this.readZipEntryLines(workZip, `${sample_name}.bru`)) this.addBruSpectrumLine(spectraByFrame, line);
+            } catch {
+                spectraByFrame = new Map();
+                // .bru missing/unreadable — graphs 1 & 2 still work; particle spectrum stays empty.
+            }
         }
         return this.uvp5FramesToColumns(frames, spectraByFrame);
     }

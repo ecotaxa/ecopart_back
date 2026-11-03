@@ -156,6 +156,13 @@ export interface PerImageColumns {
     image_id_ends: Int32Array;
 }
 
+// How much of a sample's raw files to read into its columns. Without the spectrum, the pixel
+// counts stay at 0 and only what places an image is read (id, pressure, time, flags): a UVP5
+// .bru, one line per particle, is then not opened at all.
+export interface PerImageReadOptions {
+    spectrum?: boolean;     // default true
+}
+
 export const IMAGE_FLAG_LIGHT_ON = 1;
 export const IMAGE_FLAG_OVER_EXPOSED = 2;
 export const IMAGE_FLAG_EMPTY_IMAGE = 4;

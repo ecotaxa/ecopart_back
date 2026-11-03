@@ -144,9 +144,8 @@ export class ExploreParticleBins {
     }
 
     private async compute(settings: BinnedSampleSettings, sample: ExploreSampleRow, context: ExploreProjectContext, axis: BinAxis, step: number): Promise<BinnedSample> {
-        const pivot = await this.sampleRepository.getPivotImages(sample.project_id, sample.sample_name, context.project.instrument_model);
-        const builder = new BinnedSampleBuilder(settings, pivot.columns, { axis, step });
-        for await (const record of pivot.rows()) builder.add(record);
+        const builder = new BinnedSampleBuilder(settings, { axis, step });
+        for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, context.project.instrument_model)) builder.add(record);
         return builder.finish();
     }
 }

@@ -121,4 +121,16 @@ describe("UVP5 pivot storage", () => {
         expect(await (repo as any).readFileFromZip(path.join(sample_folder, "pivot", "s1c1_Particule.zip"), "particules.csv")).toBe("20200806-221354-586,13.6,,1:3,500,10.0,\n");
         expect(recordsOf(await repo.getPerImageRecords(5, "s1c1", "UVP5HD")).map(record => record.spectrum_counts)).toEqual([{ 3: 500 }]);
     });
+
+    test("reads only the datfile when the spectrum is not needed: the .bru is not opened", async () => {
+        const read_lines = jest.spyOn(repo as any, "readZipEntryLines");
+
+        const positions = recordsOf(await repo.getPerImageRecords(5, "s1c1", "UVP5HD", { spectrum: false }));
+
+        expect(read_lines).not.toHaveBeenCalled();
+        read_lines.mockRestore();
+        const full = recordsOf(await repo.getPerImageRecords(5, "s1c1", "UVP5HD"));
+        expect(full.map(record => record.spectrum_counts)).toEqual([{ 3: 2 }]);
+        expect(positions).toEqual(full.map(record => ({ ...record, spectrum_counts: {} })));
+    });
 });

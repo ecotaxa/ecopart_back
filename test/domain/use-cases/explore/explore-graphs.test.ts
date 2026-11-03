@@ -19,7 +19,6 @@ import {
     ReducedBins,
     reduceBinnedSample,
 } from "../../../../src/domain/use-cases/explore/explore-graphs";
-import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { exploreContext, exploreProject, exploreSample } from "./explore-fixtures";
 
@@ -65,7 +64,7 @@ const withValues = (values: Record<number, number>) => { const array = zeros(); 
 const UVP6_VISIBLE = Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d >= 17);
 
 function binnedSample(axis: "depth" | "time", bins: SampleBin[], visible_classes = UVP6_VISIBLE): BinnedSample {
-    return { axis, visible_classes, minimum_area_px: 1, black_images_recorded: true, used_images: 100, particles_below_minimum_area: 0, bins };
+    return { axis, visible_classes, minimum_area_px: 1, black_images_recorded: true, used_images: 100, particles_below_minimum_area: 0, total_images: 100, positioned_images: 100, bins };
 }
 
 function reducedBins(rows: Array<{ position: number; volume: number; counts?: Record<number, number>; biovolumes?: Record<number, number> }>, visible_classes: number[]): ReducedBins {
@@ -205,10 +204,7 @@ describe("ExploreParticleBins", () => {
         particleBins = new ExploreParticleBins(sampleRepository);
         stamp = "1718187600000:52113";
         jest.spyOn(sampleRepository, "getPivotFileStamp").mockImplementation(async () => stamp);
-        jest.spyOn(sampleRepository, "getPivotImages").mockImplementation(async () => ({
-            columns: toPerImageColumns(records),
-            rows: async function* () { for (const record of records) yield record; },
-        }));
+        jest.spyOn(sampleRepository, "readPivotImages").mockImplementation(() => (async function* () { yield* records; })());
     });
 
     test("bins the pivot with the binned export computation, then keeps the reduced classes", async () => {
@@ -218,27 +214,27 @@ describe("ExploreParticleBins", () => {
         expect(bins).toEqual(expected);
         expect(bins.positions.length).toBeGreaterThan(0);
         expect(sampleRepository.getPivotFileStamp).toBeCalledWith(1, "moose_ge_2024_031", "UVP6LP");
-        expect(sampleRepository.getPivotImages).toBeCalledWith(1, "moose_ge_2024_031", "UVP6LP");
+        expect(sampleRepository.readPivotImages).toBeCalledWith(1, "moose_ge_2024_031", "UVP6LP");
     });
 
     test("a sample without pivot has no particle data", async () => {
         stamp = null;
 
         await expect(particleBins.binsOf(sample, context, "depth", 5)).rejects.toThrow("Sample moose_ge_2024_031 has no particle data");
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(0);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(0);
     });
 
     test("serves the same pivot from the cache, recomputes when the pivot file changes", async () => {
         const first = await particleBins.binsOf(sample, context, "depth", 5);
         const second = await particleBins.binsOf(sample, context, "depth", 5);
         expect(second).toBe(first);
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(1);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(1);
         expect(sampleRepository.getPivotFileStamp).toBeCalledTimes(2);
 
         stamp = "1718191200000:52200";
         const third = await particleBins.binsOf(sample, context, "depth", 5);
         expect(third).not.toBe(first);
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(2);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(2);
     });
 
     test("another step, axis or project setting is another entry", async () => {
@@ -246,18 +242,18 @@ describe("ExploreParticleBins", () => {
         await particleBins.binsOf(sample, context, "depth", 10);
         await particleBins.binsOf(sample, context, "time", 1);
         await particleBins.binsOf(sample, exploreContext({ ...project, enable_descent_filter: true }), "depth", 5);
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(4);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(4);
 
         await particleBins.binsOf(sample, context, "depth", 10);
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(4);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(4);
     });
 
     test("a reading error is passed on and nothing is cached", async () => {
-        jest.spyOn(sampleRepository, "getPivotImages").mockRejectedValueOnce(new Error("ENOENT: no such file"));
+        jest.spyOn(sampleRepository, "readPivotImages").mockImplementationOnce(() => (async function* () { throw new Error("ENOENT: no such file"); })());
 
         await expect(particleBins.binsOf(sample, context, "depth", 5)).rejects.toThrow("ENOENT: no such file");
         await expect(particleBins.binsOf(sample, context, "depth", 5)).resolves.toBeDefined();
-        expect(sampleRepository.getPivotImages).toBeCalledTimes(2);
+        expect(sampleRepository.readPivotImages).toBeCalledTimes(2);
     });
 });
 
