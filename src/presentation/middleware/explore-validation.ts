@@ -112,7 +112,9 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const modeRule = (modes: string[]) =>
-    check("mode").exists().withMessage("mode is required.").isIn(modes).withMessage(`mode must be one of: ${modes.join(", ")}.`);
+    check("mode").exists().withMessage("mode is required.")
+        .isString().withMessage("mode must be a string.")
+        .isIn(modes).withMessage(`mode must be one of: ${modes.join(", ")}.`);
 
 const filtersRule = check("filters")
     .custom(value => { parseExploreFilters(value); return true; })

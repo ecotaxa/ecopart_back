@@ -208,6 +208,8 @@ describe("ExploreRouter", () => {
         test.each([
             ["/explore/map", { filters: null }],
             ["/explore/selection", { mode: "profile", filters: null }],
+            ["/explore/selection", { mode: ["depth"], filters: null }],
+            ["/explore/graphs", { mode: ["time"], filters: null }],
             ["/explore/ecotaxa", { mode: "depth", filters: { months: [13] } }],
             ["/explore/images", { mode: "depth", filters: null, count: 20 }],
             ["/explore/graphs", { mode: "depth", filters: null, pressure_bin: 0 }],
