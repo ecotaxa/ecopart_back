@@ -127,6 +127,17 @@ export const SAMPLE_COLUMNS: TableColumn[] = [
     { name: "number_of_black", type: "integer" },
 ];
 
+// The descent-filter pass reads one file per sample and takes most of the metadata step: the task
+// progress goes from `from` to `to` while it runs, under the step's `label` ("Step 1/2 metadata").
+export interface MetadataProgress {
+    from: number;
+    to: number;
+    label: string;
+}
+
+// A log line marks every that many samples read by the descent-filter pass.
+export const DESCENT_FILTER_LOG_EVERY = 100;
+
 function serializeUserList(users: MinimalUserModel[]): string {
     return users.map(u => `${u.user_name} <${u.email}>`).join("; ");
 }
@@ -155,6 +166,7 @@ export class ExportMetadataWriter {
         export_started_at: Date,
         ecotaxa_in_export: boolean,
         format: ExportTableFormat,
+        progress: MetadataProgress,
     ): Promise<void> {
         await fsPromises.mkdir(dir, { recursive: true });
 
@@ -235,7 +247,7 @@ export class ExportMetadataWriter {
         const ordered_samples = [...samples].sort((a, b) =>
             a.project_id - b.project_id || a.sample_id - b.sample_id);
 
-        const filtering_by_sample_id = await this.computeImageFiltering(task, ordered_samples, projects_by_id);
+        const filtering_by_sample_id = await this.computeImageFiltering(task, ordered_samples, projects_by_id, progress);
 
         const sample_rows: Record<string, TableValue>[] = ordered_samples.map(sample => ({
             ecopart_project_id: cell(sample.project_id),
@@ -318,9 +330,12 @@ export class ExportMetadataWriter {
     /* Descent-filter outcome per sample, replayed at export time from the stored per-image records
      * with the very same logic the QC graphs use (`buildImageFilteringMetadata`), and honouring the
      * project's `enable_descent_filter`. Nothing is persisted at import, so this is recomputed on
-     * every export — it re-reads each sample's particle file, hence the per-sample error handling:
-     * a sample whose data cannot be read is reported in the task log and leaves the three
-     * `filter_*_used/removed` cells empty rather than failing the whole export.
+     * every export — it re-reads each sample's particle file (without the particle spectrum, which
+     * the filter does not use), hence the per-sample error handling: a sample whose data cannot be
+     * read is reported in the task log and leaves the three `filter_*_used/removed` cells empty
+     * rather than failing the whole export. The pass is long on a large export, so it reports its
+     * progress sample by sample, logs a line every DESCENT_FILTER_LOG_EVERY samples and honours a
+     * cancellation between two samples.
      *
      * Note: this only *reports* the filter. The files the raw export copies are still unfiltered
      * — see the TODO on its writeArtifacts. */
@@ -328,13 +343,20 @@ export class ExportMetadataWriter {
         task: TaskResponseModel,
         samples: PublicSampleModel[],
         projects_by_id: Map<number, ProjectResponseModel>,
+        progress: MetadataProgress,
     ): Promise<Map<number, ImageFilteringMetadata>> {
         const by_sample_id = new Map<number, ImageFilteringMetadata>();
-        for (const sample of samples) {
+        const total = samples.length;
+        for (const [i, sample] of samples.entries()) {
+            // Outside the per-sample catch: a cancellation stops the pass, it is not a sample that cannot be read.
+            await this.taskRepository.throwIfCancelled(task.task_id);
+            await this.taskRepository.updateTaskProgress({ task_id: task.task_id },
+                Math.round(progress.from + (progress.to - progress.from) * (i / total)),
+                `${progress.label}: descent filter of sample ${i + 1}/${total} (${sample.sample_name})`);
             const project = projects_by_id.get(sample.project_id);
             if (!project) continue;
             try {
-                const records = await this.sampleRepository.getPerImageRecords(sample.project_id, sample.sample_name, project.instrument_model);
+                const records = await this.sampleRepository.getPerImageRecords(sample.project_id, sample.sample_name, project.instrument_model, { spectrum: false });
                 by_sample_id.set(sample.sample_id, buildImageFilteringMetadata({
                     sample_id: sample.sample_id,
                     sample_name: sample.sample_name,
@@ -351,6 +373,9 @@ export class ExportMetadataWriter {
             } catch (error) {
                 await this.taskRepository.logMessage(task.task_log_file_path,
                     `Descent filter: cannot compute image filtering for sample '${sample.sample_name}' (${(error as Error).message}) — the filter_* columns stay empty for it`);
+            }
+            if ((i + 1) % DESCENT_FILTER_LOG_EVERY === 0 && i + 1 < total) {
+                await this.taskRepository.logMessage(task.task_log_file_path, `Descent filter: ${i + 1} of ${total} sample(s) read`);
             }
         }
         const with_removed_images = Array.from(by_sample_id.values()).filter(filtering => filtering.removed_images.count > 0).length;

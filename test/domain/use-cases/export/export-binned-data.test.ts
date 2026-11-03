@@ -435,6 +435,18 @@ describe("ExportBinnedData", () => {
             expect(log_messages).toContain("Cleanup after cancellation : removed the working folder binned_export/ of the task folder");
         });
 
+        test("the descent filter of the metadata step reads only image positions and reports its progress between 5 and 15 %", async () => {
+            given([sample(), sample({ sample_id: 8, sample_name: "perle3_002" })], [project()]);
+
+            await exportOf({ sample_ids: [7, 8] });
+
+            expect(await task_finished).toMatchObject({ outcome: "finished" });
+            expect(mockSampleRepository.getPerImageRecords).toHaveBeenCalledWith(1, "perle3_002", "UVP5HD", { spectrum: false });
+            expect(mockTaskRepository.updateTaskProgress).toHaveBeenCalledWith({ task_id: TASK_ID }, 5, `Step 1/2 metadata: descent filter of sample 1/2 (${sample().sample_name})`);
+            expect(mockTaskRepository.updateTaskProgress).toHaveBeenCalledWith({ task_id: TASK_ID }, 10, "Step 1/2 metadata: descent filter of sample 2/2 (perle3_002)");
+            expect(mockTaskRepository.updateTaskProgress).toHaveBeenCalledWith({ task_id: TASK_ID }, 15, "Step 1/2 metadata: done");
+        });
+
         test("UVP5 and UVP6 samples share one table: the union of their classes, NA where a sample cannot see one", async () => {
             const uvp6 = sample({ sample_id: 9, project_id: 2, sample_name: "uvp6_one", instrument_settings_aa: 2300, instrument_settings_exp: 1.136, instrument_settings_particule_minimum_area_pixels: undefined });
             jest.spyOn(mockSampleRepository, "getPivotImages").mockImplementation(((_project_id: number, sample_name: string) => Promise.resolve(pivotOf(

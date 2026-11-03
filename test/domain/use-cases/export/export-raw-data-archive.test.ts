@@ -205,7 +205,7 @@ describe("ExportRawData — produced archive", () => {
     describe("cancellation", () => {
         test("a cancellation before the archive removes the working folder and leaves no archive", async () => {
             const cancelled = new Error(TASK_CANCELLED_MESSAGE);
-            // before the metadata step, then before the archive
+            // before the metadata step, then at the first sample of the descent filter
             jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockRejectedValue(cancelled);
 
             const outcome = await runExport([validated(sampleModel_1, { sample_id: 7, project_id: 1 })], ["metadata"], [project({ project_id: 1 })]);
@@ -248,6 +248,47 @@ describe("ExportRawData — produced archive", () => {
             // Relative to the application root: the task log never shows the server layout
             expect(log_messages).toContain(`Exported at: ${path.relative(PROJECT_ROOT, zip_path())}`);
             expect(log_messages.some(m => m.includes(PROJECT_ROOT))).toBe(false);
+        });
+
+        test("the descent filter reads each sample without its particle spectrum and reports its progress sample by sample", async () => {
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
+
+            await runExport(samples, ["metadata"], [project({ project_id: 1, instrument_model: "UVP5HD" })]);
+
+            // Samples in table order (by sample id), only what places an image is read
+            expect(mockSampleRepository.getPerImageRecords).toHaveBeenNthCalledWith(1, 1, sampleModel_2.sample_name, "UVP5HD", { spectrum: false });
+            expect(mockSampleRepository.getPerImageRecords).toHaveBeenNthCalledWith(2, 1, sampleModel_1.sample_name, "UVP5HD", { spectrum: false });
+            // The only step runs from 5 to 95 %: the pass starts at 5 and is at 50 before its second sample
+            expect(mockTaskRepository.updateTaskProgress).toHaveBeenCalledWith({ task_id: TASK_ID }, 5, `Step 1/1 metadata: descent filter of sample 1/2 (${sampleModel_2.sample_name})`);
+            expect(mockTaskRepository.updateTaskProgress).toHaveBeenCalledWith({ task_id: TASK_ID }, 50, `Step 1/1 metadata: descent filter of sample 2/2 (${sampleModel_1.sample_name})`);
+        });
+
+        test("a log line marks every 100 samples read by the descent filter", async () => {
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
+            const many = Array.from({ length: 250 }, (_, i) => validated(sampleModel_1, { sample_id: i + 1, project_id: 1, sample_name: `s${i + 1}` }));
+
+            await runExport(many, ["metadata"], [project({ project_id: 1 })]);
+
+            expect(log_messages).toContain("Descent filter: 100 of 250 sample(s) read");
+            expect(log_messages).toContain("Descent filter: 200 of 250 sample(s) read");
+            // The end of the pass is the summary line, not another count
+            expect(log_messages).not.toContain("Descent filter: 250 of 250 sample(s) read");
+            expect(log_messages.some(m => /^Descent filter: image filtering computed for 250 of 250 sample\(s\)/.test(m))).toBe(true);
+        });
+
+        test("a cancellation during the descent filter stops the pass before the next sample", async () => {
+            const cancelled = new Error(TASK_CANCELLED_MESSAGE);
+            jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns([]));
+            // before the metadata step, before the first sample, then before the second
+            jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
+
+            const outcome = await runExport(samples, ["metadata"], [project({ project_id: 1 })]);
+
+            expect(outcome).toEqual({ outcome: "failed", detail: cancelled });
+            expect(mockSampleRepository.getPerImageRecords).toBeCalledTimes(1);
+            // The cancellation is not mistaken for a sample that cannot be read
+            expect(log_messages.some(m => m.startsWith("Descent filter: cannot compute"))).toBe(false);
+            expect(log_messages).toContain("Cleanup after cancellation : removed the working folder raw_export/ of the task folder");
         });
 
         test("format=parquet writes both tables as typed Parquet files, documented as such in the README", async () => {

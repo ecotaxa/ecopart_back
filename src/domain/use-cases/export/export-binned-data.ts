@@ -245,7 +245,8 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
 
             await this.taskRepository.throwIfCancelled(task_id);
             await this.taskRepository.updateTaskProgress({ task_id }, 5, "Step 1/2 metadata: start");
-            await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, false, plan.format);
+            await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, false, plan.format,
+                { from: 5, to: 15, label: "Step 1/2 metadata" });
             await this.taskRepository.updateTaskProgress({ task_id }, 15, "Step 1/2 metadata: done");
 
             if (class_indexes.length > 0) {

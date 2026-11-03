@@ -258,6 +258,9 @@ describe("reading text from sample archives", () => {
             await expect(repo.computeMaxPressure(path.join(tmp, "7"), "mooring_1")).resolves.toBe(12.5);
             await expect(repo.countBlackParticulesUvp6(path.join(tmp, "7"), "mooring_1")).resolves.toBe(1);
             await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP")).resolves.toEqual(toPerImageColumns(repo.parseParticulesCsvRecords(PARTICULES_CSV)));
+            // Without the spectrum: the same images placed, their pixel counts left at 0
+            await expect(repo.getPerImageRecords(7, "mooring_1", "UVP6LP", { spectrum: false })).resolves.toEqual(
+                toPerImageColumns(repo.parseParticulesCsvRecords(PARTICULES_CSV).map(record => ({ ...record, spectrum_counts: {} }))));
             const pivot = await repo.getPivotImages(7, "mooring_1", "UVP6LP");
             const rows = [];
             for await (const row of pivot.rows()) rows.push(row);

@@ -190,7 +190,8 @@ export class ExportRawData implements ExportRawDataUseCase {
                 await this.taskRepository.updateTaskProgress({ task_id }, progressFor(step_index - 1), `Step ${step_index}/${step_count} ${export_type}: start`);
 
                 if (export_type === "metadata") {
-                    await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, export_types.includes("ecotaxa"), format);
+                    await this.metadataWriter.write(task, path.join(work_folder, "metadata"), samples, projects_by_id, export_started_at, export_types.includes("ecotaxa"), format,
+                        { from: progressFor(step_index - 1), to: progressFor(step_index), label: `Step ${step_index}/${step_count} metadata` });
                 } else if (export_type === "lpm" || export_type === "images" || export_type === "instrument_config") {
                     await this.writeArtifacts(log, work_folder, samples, projects_by_id, ARTIFACT_STEPS[export_type]);
                 } else if (export_type === "ctd") {
