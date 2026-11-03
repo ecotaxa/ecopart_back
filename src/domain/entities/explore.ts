@@ -10,6 +10,9 @@ export type ExploreMode = ExploreSampleType | "all";
 
 export type ExploreClassificationState = "all" | "fully_predicted" | "fully_validated";
 
+// The particle histogram of the graphs: the 15 reduced or the 45 detailed size classes of legacy EcoPart.
+export type ExploreSizeClasses = "reduced" | "detailed";
+
 export interface ExploreBounds {
     north: number;
     south: number;
@@ -45,6 +48,7 @@ export interface ExploreGraphsRequest extends ExploreRequest {
     mode: ExploreSampleType;                  // the axis of the curves: one sample type
     pressure_bin?: number;                    // depth step in metres (dbar), see BINNED_DEPTH_STEP_M
     time_bin?: number;                        // time step in hours, see BINNED_TIME_STEP_H
+    size_classes?: ExploreSizeClasses;        // the particle histogram, reduced by default
 }
 
 export interface ExploreImagesRequest extends ExploreRequest {
@@ -239,6 +243,7 @@ export interface GraphDataset {
 }
 
 export interface ExploreGraphs {
+    size_classes: ExploreSizeClasses;         // the histogram of `abundance` and `biovolume`
     abundance: GraphDataset;
     biovolume: GraphDataset;
     ctd: GraphDataset;

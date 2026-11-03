@@ -4,6 +4,7 @@ import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from '../../domain/constants/
 import { ExploreBounds, ExploreClassificationState, ExploreFilters } from '../../domain/entities/explore';
 import { ProjectPrivacyLevel } from '../../domain/entities/project';
 import { EXPLORE_IMAGES_MAX } from '../../domain/use-cases/explore/explore-ecotaxa';
+import { EXPLORE_SIZE_CLASSES } from '../../domain/use-cases/explore/explore-graphs';
 
 export interface IMiddlewareExploreValidation {
     rulesExploreRequest: any[];
@@ -111,7 +112,9 @@ const validate = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const modeRule = (modes: string[]) =>
-    check("mode").exists().withMessage("mode is required.").isIn(modes).withMessage(`mode must be one of: ${modes.join(", ")}.`);
+    check("mode").exists().withMessage("mode is required.")
+        .isString().withMessage("mode must be a string.")
+        .isIn(modes).withMessage(`mode must be one of: ${modes.join(", ")}.`);
 
 const filtersRule = check("filters")
     .custom(value => { parseExploreFilters(value); return true; })
@@ -129,6 +132,9 @@ export class MiddlewareExploreValidation implements IMiddlewareExploreValidation
             .isFloat({ min: BINNED_DEPTH_STEP_M.min, max: BINNED_DEPTH_STEP_M.max }).withMessage(`pressure_bin must be a number between ${BINNED_DEPTH_STEP_M.min} and ${BINNED_DEPTH_STEP_M.max}.`).toFloat(),
         check("time_bin").optional({ nullable: true })
             .isFloat({ min: BINNED_TIME_STEP_H.min, max: BINNED_TIME_STEP_H.max }).withMessage(`time_bin must be a number between ${BINNED_TIME_STEP_H.min} and ${BINNED_TIME_STEP_H.max}.`).toFloat(),
+        check("size_classes").optional({ nullable: true })
+            .isString().withMessage("size_classes must be a string.")
+            .isIn(EXPLORE_SIZE_CLASSES).withMessage(`size_classes must be one of ${EXPLORE_SIZE_CLASSES.join(", ")}.`),
         validate,
     ];
 

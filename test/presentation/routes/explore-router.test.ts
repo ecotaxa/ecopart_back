@@ -66,7 +66,7 @@ const SUMMARY = { categories: ["Copepoda"], classification: { fully_validated: 1
 const ECOTAXA: ExploreEcoTaxaResponse = { all: SUMMARY, exportable: SUMMARY };
 const IMAGES: ExploreImage[] = [{ object_id: 42, image_url: "https://ecotaxa.obs-vlfr.fr/vault/1/42.jpg", sample_name: "moose_001", depth: 12.5, date: null }];
 const EMPTY = { keys: [], axis_labels: {}, series: {} };
-const GRAPHS: ExploreGraphs = { abundance: EMPTY, biovolume: EMPTY, ctd: EMPTY, ecotaxa: EMPTY, warnings: ["1 sample of private projects is not drawn"] };
+const GRAPHS: ExploreGraphs = { size_classes: "reduced", abundance: EMPTY, biovolume: EMPTY, ctd: EMPTY, ecotaxa: EMPTY, warnings: ["1 sample of private projects is not drawn"] };
 
 const FILTERS_SENT = { months: ["6"], ctd_only: "true", classification_state: "fully_validated" };
 const FILTERS_PARSED = {
@@ -190,17 +190,17 @@ describe("ExploreRouter", () => {
         });
 
         test("POST /explore/graphs passes the user and the steps", async () => {
-            const response = await request(anonymous).post("/explore/graphs").send({ mode: "time", filters: FILTERS_SENT, time_bin: "2", pressure_bin: 10 });
+            const response = await request(anonymous).post("/explore/graphs").send({ mode: "time", filters: FILTERS_SENT, time_bin: "2", pressure_bin: 10, size_classes: "detailed" });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(GRAPHS);
-            expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "time", filters: FILTERS_PARSED, pressure_bin: 10, time_bin: 2 });
+            expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "time", filters: FILTERS_PARSED, pressure_bin: 10, time_bin: 2, size_classes: "detailed" });
         });
 
         test("POST /explore/graphs without steps leaves them to the use case", async () => {
             await request(anonymous).post("/explore/graphs").send({ mode: "depth", filters: null, pressure_bin: null });
 
-            expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, pressure_bin: undefined, time_bin: undefined });
+            expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, pressure_bin: undefined, time_bin: undefined, size_classes: undefined });
         });
     });
 
@@ -208,9 +208,13 @@ describe("ExploreRouter", () => {
         test.each([
             ["/explore/map", { filters: null }],
             ["/explore/selection", { mode: "profile", filters: null }],
+            ["/explore/selection", { mode: ["depth"], filters: null }],
+            ["/explore/graphs", { mode: ["time"], filters: null }],
             ["/explore/ecotaxa", { mode: "depth", filters: { months: [13] } }],
             ["/explore/images", { mode: "depth", filters: null, count: 20 }],
             ["/explore/graphs", { mode: "depth", filters: null, pressure_bin: 0 }],
+            ["/explore/graphs", { mode: "depth", filters: null, size_classes: "raw" }],
+            ["/explore/graphs", { mode: "depth", filters: null, size_classes: ["detailed"] }],
         ])("POST %s %j", async (route, body) => {
             const response = await request(anonymous).post(route).send(body);
 
