@@ -131,6 +131,7 @@ export class MiddlewareExploreValidation implements IMiddlewareExploreValidation
         check("time_bin").optional({ nullable: true })
             .isFloat({ min: BINNED_TIME_STEP_H.min, max: BINNED_TIME_STEP_H.max }).withMessage(`time_bin must be a number between ${BINNED_TIME_STEP_H.min} and ${BINNED_TIME_STEP_H.max}.`).toFloat(),
         check("size_classes").optional({ nullable: true })
+            .isString().withMessage("size_classes must be a string.")
             .isIn(EXPLORE_SIZE_CLASSES).withMessage(`size_classes must be one of ${EXPLORE_SIZE_CLASSES.join(", ")}.`),
         validate,
     ];

@@ -1,6 +1,6 @@
 import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from "../../constants/binned-export";
 import { CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS } from "../../constants/ctd-columns";
-import { DETAILED_CLASSES_PER_REDUCED, PART_DET_CLASS_LIMITS_MM, PART_RED_CLASS_LIMITS_MM, REDUCED_CLASS_COUNT, SIZE_CLASS_COUNT, sizeClassLabel } from "../../constants/size-classes";
+import { DETAILED_CLASSES_PER_REDUCED, detailedClassesOf, PART_DET_CLASS_LIMITS_MM, PART_RED_CLASS_LIMITS_MM, REDUCED_CLASS_COUNT, SIZE_CLASS_COUNT, sizeClassLabel } from "../../constants/size-classes";
 import { CtdRows } from "../../entities/ctd";
 import { ExploreSampleRow, ExploreSizeClasses, GraphDataset, ProfileSeries } from "../../entities/explore";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
@@ -16,10 +16,14 @@ import { ExploreProjectContext } from "./explore-selection";
  * the reduced ones being sums of them: exploring is iterative, and reading a pivot is the whole cost. */
 
 export const EXPLORE_GRAPH_MAX_SAMPLES = 100;
+// The detailed histogram has three times the curves: a third of the samples keeps the response as large.
+export const EXPLORE_GRAPH_MAX_DETAILED_SAMPLES = Math.floor(EXPLORE_GRAPH_MAX_SAMPLES / DETAILED_CLASSES_PER_REDUCED);
 // Beyond this many bins, adjacent bins are merged: a curve of a long time series stays drawable.
 export const EXPLORE_GRAPH_MAX_POINTS = 1500;
 export const EXPLORE_GRAPH_CONCURRENCY = 3;
-export const EXPLORE_GRAPH_CACHE_ENTRIES = 300;
+// The cache holds at most this many bins in all, 45 classes each (about 110 MB): a hundred of the
+// longest samples, or several hundred profiles.
+export const EXPLORE_GRAPH_CACHE_BINS = 150_000;
 const MS_PER_HOUR = 3_600_000;
 const QC_FLAG_COLUMN = "qc flag";
 
@@ -72,25 +76,22 @@ export function detailBinnedSample(sample: BinnedSample): ParticleBins {
     return coarsen(detailed, EXPLORE_GRAPH_MAX_POINTS);
 }
 
-// The reduced classes: each the sum of three consecutive detailed classes, visible when any of them is.
-export function reduceParticleBins(detailed: ParticleBins): ParticleBins {
-    const reduce = (row: number[]) => Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => {
-        let sum = 0;
-        for (let d = k * DETAILED_CLASSES_PER_REDUCED; d < (k + 1) * DETAILED_CLASSES_PER_REDUCED; d++) sum += row[d];
-        return sum;
-    });
-    return {
-        positions: detailed.positions,
-        volumes: detailed.volumes,
-        counts: detailed.counts.map(reduce),
-        biovolumes_mm3: detailed.biovolumes_mm3.map(reduce),
-        visible: Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) =>
-            detailed.visible.slice(k * DETAILED_CLASSES_PER_REDUCED, (k + 1) * DETAILED_CLASSES_PER_REDUCED).some(Boolean)),
-    };
+function assertDetailed(bins: ParticleBins): void {
+    if (bins.visible.length !== SIZE_CLASS_COUNT) throw new Error(`Detailed bins expected: ${bins.visible.length} classes instead of ${SIZE_CLASS_COUNT}`);
 }
 
-export function reduceBinnedSample(sample: BinnedSample): ParticleBins {
-    return reduceParticleBins(detailBinnedSample(sample));
+// The reduced classes: each the sum of three consecutive detailed classes, visible when any of them is.
+export function reduceParticleBins(detailed: ParticleBins): ParticleBins {
+    assertDetailed(detailed);
+    const groups = Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => detailedClassesOf(k));
+    const reduce = (row: number[]) => groups.map(group => group.reduce((sum, d) => sum + row[d], 0));
+    return {
+        positions: [...detailed.positions],
+        volumes: [...detailed.volumes],
+        counts: detailed.counts.map(reduce),
+        biovolumes_mm3: detailed.biovolumes_mm3.map(reduce),
+        visible: groups.map(group => group.some(d => detailed.visible[d])),
+    };
 }
 
 // Merges groups of adjacent bins until at most `max_points` remain; sums stay sums, so that the
@@ -123,10 +124,12 @@ export function coarsen(bins: ParticleBins, max_points: number): ParticleBins {
     return result;
 }
 
-// Least recently used entries go first when the cache is full.
+// Least recently used entries go first when the cache is full: it holds at most `max_weight` in
+// all, each entry weighing `weigh(value)` (1 by default, so that `max_weight` is a number of entries).
 export class LruCache<V> {
     private readonly entries = new Map<string, V>();
-    constructor(private readonly max_entries: number) { }
+    private weight = 0;
+    constructor(private readonly max_weight: number, private readonly weigh: (value: V) => number = () => 1) { }
     get(key: string): V | undefined {
         const value = this.entries.get(key);
         if (value === undefined) return undefined;
@@ -135,9 +138,16 @@ export class LruCache<V> {
         return value;
     }
     set(key: string, value: V): void {
-        this.entries.delete(key);
+        this.delete(key);
         this.entries.set(key, value);
-        if (this.entries.size > this.max_entries) this.entries.delete(this.entries.keys().next().value as string);
+        this.weight += this.weigh(value);
+        while (this.weight > this.max_weight && this.entries.size > 0) this.delete(this.entries.keys().next().value as string);
+    }
+    private delete(key: string): void {
+        const value = this.entries.get(key);
+        if (value === undefined) return;
+        this.entries.delete(key);
+        this.weight -= this.weigh(value);
     }
     get size(): number { return this.entries.size; }
 }
@@ -148,7 +158,7 @@ export interface SampleBins {
 }
 
 export class ExploreParticleBins {
-    private readonly cache = new LruCache<ParticleBins>(EXPLORE_GRAPH_CACHE_ENTRIES);
+    private readonly cache = new LruCache<ParticleBins>(EXPLORE_GRAPH_CACHE_BINS, bins => Math.max(1, bins.positions.length));
 
     constructor(private readonly sampleRepository: SampleRepository) { }
 
@@ -195,17 +205,18 @@ const HISTOGRAMS: Record<ExploreSizeClasses, { limits: readonly number[]; abbrev
     detailed: { limits: PART_DET_CLASS_LIMITS_MM, abbreviation: "det." },
 };
 
-
-// `samples` hold the classes of `size_classes` (detailed bins, reduced with `reduceParticleBins`).
-export function buildParticleDatasets(samples: SampleBins[], size_classes: ExploreSizeClasses = "reduced"): { abundance: GraphDataset; biovolume: GraphDataset } {
+// `samples` hold the detailed bins, as `ExploreParticleBins` serves them.
+export function buildParticleDatasets(samples: SampleBins[], size_classes: ExploreSizeClasses): { abundance: GraphDataset; biovolume: GraphDataset } {
+    for (const { bins } of samples) assertDetailed(bins);
     const { limits, abbreviation } = HISTOGRAMS[size_classes];
+    const histogram = size_classes === "reduced" ? samples.map(({ sample, bins }) => ({ sample, bins: reduceParticleBins(bins) })) : samples;
     const abundance: GraphDataset = { keys: [], axis_labels: {}, series: {} };
     const biovolume: GraphDataset = { keys: [], axis_labels: {}, series: {} };
     for (let k = 0; k < limits.length - 1; k++) {
         const key = sizeClassLabel(limits, k);
         const abundance_series: ProfileSeries[] = [];
         const biovolume_series: ProfileSeries[] = [];
-        for (const { sample, bins } of samples) {
+        for (const { sample, bins } of histogram) {
             if (!bins.visible[k]) continue;
             const abundance_points: ProfileSeries["points"] = [];
             const biovolume_points: ProfileSeries["points"] = [];

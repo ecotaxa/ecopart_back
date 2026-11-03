@@ -283,7 +283,8 @@ export default function ExploreRouter(
      *       always, anyone once the project is visible), binned on the depth axis (`mode: depth`,
      *       `pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned
      *       export computation, the descent filter of the project applied to depth profiles. At most
-     *       100 samples are drawn; `warnings` tells what was left out. Login required.
+     *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out.
+     *       Login required.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []

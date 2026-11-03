@@ -212,6 +212,7 @@ describe("ExploreRouter", () => {
             ["/explore/images", { mode: "depth", filters: null, count: 20 }],
             ["/explore/graphs", { mode: "depth", filters: null, pressure_bin: 0 }],
             ["/explore/graphs", { mode: "depth", filters: null, size_classes: "raw" }],
+            ["/explore/graphs", { mode: "depth", filters: null, size_classes: ["detailed"] }],
         ])("POST %s %j", async (route, body) => {
             const response = await request(anonymous).post(route).send(body);
 

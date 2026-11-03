@@ -20,7 +20,6 @@ import {
     exploreSizeClasses,
     ParticleBins,
     reduceParticleBins,
-    reduceBinnedSample,
 } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
@@ -82,9 +81,21 @@ function reducedBins(rows: Array<{ position: number; volume: number; counts?: Re
     };
 }
 
-describe("reduceBinnedSample", () => {
+function detailedBins(rows: Array<{ position: number; volume: number; counts?: Record<number, number>; biovolumes?: Record<number, number> }>, visible_classes: number[]): ParticleBins {
+    return {
+        positions: rows.map(row => row.position),
+        volumes: rows.map(row => row.volume),
+        counts: rows.map(row => withValues(row.counts ?? {})),
+        biovolumes_mm3: rows.map(row => withValues(row.biovolumes ?? {})),
+        visible: Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => visible_classes.includes(d)),
+    };
+}
+
+const reduceSample = (sample: BinnedSample) => reduceParticleBins(detailBinnedSample(sample));
+
+describe("reduceParticleBins of a binned sample", () => {
     test("sums the visible detailed classes of each reduced class, at the depth bin centres", () => {
-        const reduced = reduceBinnedSample(binnedSample("depth", [
+        const reduced = reduceSample(binnedSample("depth", [
             bin({ depth_start_m: 0, depth_stop_m: 5, water_volume_l: 2.5, counts: withValues({ 15: 100, 17: 7, 18: 3, 19: 2, 20: 1, 44: 1 }), biovolumes_mm3: withValues({ 15: 9, 17: 0.07, 18: 0.03, 19: 0.02, 20: 0.01 }) }),
             bin({ index: 1, depth_start_m: 5, depth_stop_m: 10, water_volume_l: 3, counts: withValues({ 18: 4 }), biovolumes_mm3: withValues({ 18: 0.04 }) }),
         ]));
@@ -104,11 +115,11 @@ describe("reduceBinnedSample", () => {
 
     test("a reduced class is visible when any of its detailed classes is", () => {
         const visible = Array.from({ length: SIZE_CLASS_COUNT }, (_, d) => d === 20 || d === 21);
-        expect(reduceBinnedSample(binnedSample("depth", [], visible)).visible.map((v, k) => v ? k : -1).filter(k => k >= 0)).toEqual([6, 7]);
+        expect(reduceSample(binnedSample("depth", [], visible)).visible.map((v, k) => v ? k : -1).filter(k => k >= 0)).toEqual([6, 7]);
     });
 
     test("time series are positioned at the centre of their time bins, in epoch ms", () => {
-        const reduced = reduceBinnedSample(binnedSample("time", [
+        const reduced = reduceSample(binnedSample("time", [
             bin({ time_start_ms: T0, time_stop_ms: T0 + HOUR, depth_start_m: 12, depth_stop_m: 14 }),
             bin({ index: 1, time_start_ms: T0 + HOUR, time_stop_ms: T0 + 2 * HOUR }),
         ]));
@@ -119,7 +130,7 @@ describe("reduceBinnedSample", () => {
     test("a long sample is coarsened to at most the drawable number of points", () => {
         const bins = Array.from({ length: 3001 }, (_, i) => bin({ index: i, depth_start_m: i, depth_stop_m: i + 1, water_volume_l: 1, counts: withValues({ 18: 1 }) }));
 
-        const reduced = reduceBinnedSample(binnedSample("depth", bins));
+        const reduced = reduceSample(binnedSample("depth", bins));
 
         expect(reduced.positions.length).toBeLessThanOrEqual(EXPLORE_GRAPH_MAX_POINTS);
         expect(reduced.counts.reduce((sum, row) => sum + row[6], 0)).toBe(3001);
@@ -158,14 +169,24 @@ describe("detailBinnedSample", () => {
             bin({ index: 1, depth_start_m: 5, depth_stop_m: 10, counts: withValues({ 20: 4 }) }),
         ]);
 
-        const reduced = reduceParticleBins(detailBinnedSample(sample));
+        const detailed = detailBinnedSample(sample);
+        const reduced = reduceParticleBins(detailed);
 
-        expect(reduced).toEqual(reduceBinnedSample(sample));
+        const sums = (row: number[]) => Array.from({ length: REDUCED_CLASS_COUNT }, (_, k) => row[3 * k] + row[3 * k + 1] + row[3 * k + 2]);
+        expect(reduced.counts).toEqual(detailed.counts.map(sums));
+        expect(reduced.biovolumes_mm3).toEqual(detailed.biovolumes_mm3.map(sums));
+        expect(reduced.positions).toEqual(detailed.positions);
+        expect(reduced.positions).not.toBe(detailed.positions);
+        expect(reduced.volumes).not.toBe(detailed.volumes);
         expect(reduced.counts.map(row => row.length)).toEqual([REDUCED_CLASS_COUNT, REDUCED_CLASS_COUNT]);
         expect(reduced.counts[0][5]).toBe(7);
         expect(reduced.counts[0][6]).toBe(5);
         expect(reduced.counts[1][6]).toBe(4);
         expect(reduced.counts[0][14]).toBe(1);
+    });
+
+    test("bins that are not detailed are refused", () => {
+        expect(() => reduceParticleBins(reducedBins([{ position: 2.5, volume: 1 }], [6]))).toThrow("Detailed bins expected: 15 classes instead of 45");
     });
 });
 
@@ -218,6 +239,22 @@ describe("LruCache", () => {
         expect(cache.get("a")).toBe("again");
         expect(cache.get("b")).toBe("second");
         expect(cache.get("missing")).toBeUndefined();
+    });
+
+    test("weighed entries: the oldest go until the total weight fits, whatever their number", () => {
+        const cache = new LruCache<number[]>(10, value => value.length);
+        cache.set("a", [1, 2, 3, 4]);
+        cache.set("b", [1, 2, 3, 4]);
+        cache.set("c", [1, 2]);
+        expect(cache.size).toBe(3);
+
+        cache.set("d", [1, 2, 3]);
+        expect(cache.get("a")).toBeUndefined();
+        expect(cache.size).toBe(3);
+
+        cache.set("b", [1]);
+        expect(cache.size).toBe(3);
+        expect(cache.get("c")).toEqual([1, 2]);
     });
 });
 
@@ -336,17 +373,18 @@ describe("buildParticleDatasets", () => {
     const sample_b = exploreSample({ sample_id: 2, sample_name: "moose_002" });
 
     test("one key per reduced class drawn, with legacy axis labels and concentrations per litre", () => {
+        // Reduced class cl7 (64-128 µm) is the detailed classes 18 to 20 (0-based), cl8 is 21 to 23.
         const datasets = buildParticleDatasets([
             {
-                sample: sample_a, bins: reducedBins([
-                    { position: 2.5, volume: 2, counts: { 6: 10 }, biovolumes: { 6: 0.2 } },
-                    { position: 7.5, volume: 0, counts: { 6: 5 }, biovolumes: { 6: 0.1 } },
-                    { position: 12.5, volume: 4, counts: { 6: 8 }, biovolumes: { 6: 0.4 } },
-                ], [6, 7]),
+                sample: sample_a, bins: detailedBins([
+                    { position: 2.5, volume: 2, counts: { 18: 4, 19: 6 }, biovolumes: { 18: 0.2 } },
+                    { position: 7.5, volume: 0, counts: { 18: 5 }, biovolumes: { 18: 0.1 } },
+                    { position: 12.5, volume: 4, counts: { 20: 8 }, biovolumes: { 20: 0.4 } },
+                ], [18, 19, 20, 21]),
             },
             // Every bin without imaged volume: no curve at all.
-            { sample: sample_b, bins: reducedBins([{ position: 2.5, volume: 0, counts: { 6: 3 } }], [6]) },
-        ]);
+            { sample: sample_b, bins: detailedBins([{ position: 2.5, volume: 0, counts: { 18: 3 } }], [18]) },
+        ], "reduced");
 
         expect(datasets.abundance.keys).toEqual(["64-128 µm", "128-256 µm"]);
         expect(datasets.biovolume.keys).toEqual(["64-128 µm", "128-256 µm"]);
@@ -360,7 +398,7 @@ describe("buildParticleDatasets", () => {
     });
 
     test("a class visible on no sample has no key", () => {
-        const datasets = buildParticleDatasets([{ sample: sample_a, bins: reducedBins([{ position: 2.5, volume: 2, counts: { 0: 4 } }], [14]) }]);
+        const datasets = buildParticleDatasets([{ sample: sample_a, bins: detailedBins([{ position: 2.5, volume: 2, counts: { 0: 4 } }], [44]) }], "reduced");
 
         expect(datasets.abundance.keys).toEqual([">16.4 mm"]);
         expect(datasets.abundance.axis_labels[">16.4 mm"]).toBe("Particle red. class cl15 (>16.4 mm) # l-1");
@@ -383,8 +421,14 @@ describe("buildParticleDatasets", () => {
         expect(datasets.abundance.series["1-1.26 µm"][0].points).toEqual([{ position: 2.5, value: 4 }]);
     });
 
+    test("bins that are not detailed are refused, whatever the histogram", () => {
+        const reduced = reducedBins([{ position: 2.5, volume: 2, counts: { 6: 10 } }], [6]);
+        expect(() => buildParticleDatasets([{ sample: sample_a, bins: reduced }], "reduced")).toThrow("Detailed bins expected: 15 classes instead of 45");
+        expect(() => buildParticleDatasets([{ sample: sample_a, bins: reduced }], "detailed")).toThrow("Detailed bins expected: 15 classes instead of 45");
+    });
+
     test("no sample: empty datasets", () => {
-        expect(buildParticleDatasets([])).toEqual({ abundance: { keys: [], axis_labels: {}, series: {} }, biovolume: { keys: [], axis_labels: {}, series: {} } });
+        expect(buildParticleDatasets([], "reduced")).toEqual({ abundance: { keys: [], axis_labels: {}, series: {} }, biovolume: { keys: [], axis_labels: {}, series: {} } });
     });
 });
 

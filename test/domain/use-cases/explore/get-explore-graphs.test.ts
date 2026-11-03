@@ -2,7 +2,7 @@ import { CtdRows } from "../../../../src/domain/entities/ctd";
 import { ExploreSampleRow } from "../../../../src/domain/entities/explore";
 import { SIZE_CLASS_COUNT } from "../../../../src/domain/constants/size-classes";
 import { ExploreEcoTaxaService } from "../../../../src/domain/use-cases/explore/explore-ecotaxa";
-import { EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, ParticleBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
+import { EXPLORE_GRAPH_MAX_DETAILED_SAMPLES, EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, ParticleBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { ExploreSelectionRepositories } from "../../../../src/domain/use-cases/explore/explore-selection";
 import { GetExploreGraphs } from "../../../../src/domain/use-cases/explore/get-explore-graphs";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
@@ -153,6 +153,21 @@ describe("GetExploreGraphs", () => {
         expect(drawnIds()).not.toContain(EXPLORE_GRAPH_MAX_SAMPLES + 1);
         expect(graphs.warnings).toEqual([`Only the first ${EXPLORE_GRAPH_MAX_SAMPLES} of the ${EXPLORE_GRAPH_MAX_SAMPLES + 1} samples are drawn: narrow the selection`]);
         expect(graphs.abundance.series["64-128 µm"]).toHaveLength(EXPLORE_GRAPH_MAX_SAMPLES);
+    });
+
+    test(`draws at most ${EXPLORE_GRAPH_MAX_DETAILED_SAMPLES} samples with the detailed histogram`, async () => {
+        samples = Array.from({ length: EXPLORE_GRAPH_MAX_DETAILED_SAMPLES + 1 }, (_, i) => sample(i + 1, 1));
+
+        const graphs = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, size_classes: "detailed" });
+
+        expect(particleBins.binsOf).toBeCalledTimes(EXPLORE_GRAPH_MAX_DETAILED_SAMPLES);
+        expect(graphs.warnings).toEqual([`Only the first ${EXPLORE_GRAPH_MAX_DETAILED_SAMPLES} of the ${EXPLORE_GRAPH_MAX_DETAILED_SAMPLES + 1} samples are drawn with the detailed histogram: narrow the selection or use the reduced one`]);
+        expect(graphs.abundance.series["64-80.6 µm"]).toHaveLength(EXPLORE_GRAPH_MAX_DETAILED_SAMPLES);
+
+        (particleBins.binsOf as jest.Mock).mockClear();
+        const reduced = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(particleBins.binsOf).toBeCalledTimes(EXPLORE_GRAPH_MAX_DETAILED_SAMPLES + 1);
+        expect(reduced.warnings).toEqual([]);
     });
 
     test("a sample whose particles cannot be read is a warning, not an error", async () => {
