@@ -13,7 +13,6 @@ Review of 23 Oct 2026, after the Explore branch. The Explore reads are protected
    - An EcoTaxa import interrupted by an EcoPart restart lets the EcoTaxa job finish without the sample being marked imported; relaunching uploads the same files again.
    - To do: have the daily Explore sweep also detect samples that no longer exist in EcoTaxa, and record the EcoTaxa job id of an import so that a recovered task can check its outcome.
 3. **Import files never cleaned up on the EcoTaxa side.** Each import uploads the whole archive (TSV and images) into the generic account's file space (`from_EcoPart/<project_id>`, `importEcoTaxaSamplesInEcoTaxa`) and never removes it, which fills the EcoTaxa disk over time. To do: delete the uploaded files once the import job has ended.
-4. **No per-client limit on the open Explore routes.** `/explore/ecotaxa` and `/explore/images` are served to anonymous users. The shared throttle protects EcoTaxa, but a client looping on them keeps its two slots busy and slows the EcoTaxa part of Explore for everyone. To do: a rate limit per address or session on these routes (see the rate limits in `src/main.ts`).
 
 Structural, to keep in mind (not fixable in EcoPart alone):
 - The generic account is manager of every linked EcoTaxa project: a compromised EcoPart server would have that right everywhere. EcoTaxa has no read-only service role for this case.

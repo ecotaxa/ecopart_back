@@ -148,7 +148,7 @@ export interface ExploreSummary {
 
 export interface ExploreContact {
     user_name: string;
-    email: string;                            // "" for an anonymous caller
+    email: string;
 }
 
 export interface ExploreProjectRow {
@@ -233,7 +233,9 @@ export interface ExploreImage {
 export interface ProfileSeries {
     sample_id: number;
     sample_name: string;
-    points: { position: number; value: number }[];   // position: depth in m, or epoch ms for a time series
+    // One point per index, in columns: a selection holds hundreds of thousands of points.
+    positions: number[];                      // depth in m, or epoch ms for a time series
+    values: number[];                         // 4 significant digits, as many as a chart can show
 }
 
 export interface GraphDataset {

@@ -2420,8 +2420,17 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
     async getPivotFileStamp(project_id: number, sample_name: string, instrument_model: string): Promise<string | null> {
+        return await this.fileStampOf(this.pivotZipPathOf(project_id, sample_name, instrument_model));
+    }
+
+    async getCtdFileStamp(project_id: number, sample_name: string, ctd_file_extension: string): Promise<string | null> {
+        return await this.fileStampOf(this.getCTDFileAbsolutePath(project_id, sample_name, ctd_file_extension));
+    }
+
+    // "<size>-<mtime_ms>" of a file, null when it does not exist.
+    private async fileStampOf(file_path: string): Promise<string | null> {
         try {
-            const stat = await fsPromises.stat(this.pivotZipPathOf(project_id, sample_name, instrument_model));
+            const stat = await fsPromises.stat(file_path);
             return `${stat.size}-${Math.round(stat.mtimeMs)}`;
         } catch (error) {
             if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;

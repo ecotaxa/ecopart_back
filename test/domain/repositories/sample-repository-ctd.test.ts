@@ -153,3 +153,29 @@ describe("CTD import / delete sample updates", () => {
         ]));
     });
 });
+
+describe("getCtdFileStamp", () => {
+    let base_folder: string;
+    let repo: SampleRepositoryImpl;
+
+    beforeEach(() => {
+        base_folder = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-ctd-stamp-"));
+        repo = new SampleRepositoryImpl({} as any, "storage");
+        repo.base_folder = base_folder;
+    });
+
+    afterEach(() => {
+        fs.rmSync(base_folder, { recursive: true, force: true });
+    });
+
+    test("size and modification time of the imported CTD file, null without one", async () => {
+        expect(await repo.getCtdFileStamp(3, "sample_a", "ctd")).toBeNull();
+
+        const file = repo.getCTDFileAbsolutePath(3, "sample_a", "ctd");
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, "pressure [db]\tpH\n10\t8.1\n");
+        fs.utimesSync(file, 1718187600, 1718187600);
+
+        expect(await repo.getCtdFileStamp(3, "sample_a", "ctd")).toBe("24-1718187600000");
+    });
+});

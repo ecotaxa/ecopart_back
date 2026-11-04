@@ -51,15 +51,15 @@ describe("Explore use cases", () => {
     });
 
     describe("ListExploreProjects", () => {
-        test("lists every project to anyone, sorted by title then id, with its number of samples", async () => {
-            const options = await new ListExploreProjects(repositories).execute(null);
+        test("lists every project, private ones included, sorted by title then id, with its number of samples", async () => {
+            const options = await new ListExploreProjects(repositories).execute({ user_id: CAROL.user_id });
 
             expect(options).toEqual([
                 { project_id: 2, project_title: "Arctic moorings", nb_samples: 4 },
                 { project_id: 5, project_title: "Arctic moorings", nb_samples: 0 },
                 { project_id: 1, project_title: "Ligurian profiles", nb_samples: 30 },
             ]);
-            expect(userRepository.ensureUserCanBeUsed).toBeCalledTimes(0);
+            expect(userRepository.ensureUserCanBeUsed).toBeCalledWith(CAROL.user_id);
             expect(sampleRepository.countSamplesPerProject).toBeCalledWith([1, 2, 5]);
         });
 
@@ -76,7 +76,7 @@ describe("Explore use cases", () => {
         test("one point per located sample of the selection, private projects included", async () => {
             const filters = exploreFilters({ months: [6], sample_names: ["moose", "arctic"] });
 
-            const points = await new GetExploreMap(repositories, ecotaxa).execute(null, { mode: "depth", filters });
+            const points = await new GetExploreMap(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters });
 
             expect(sampleRepository.getExploreSamples).toBeCalledWith(toSampleQuery("depth", filters, null));
             expect(points).toEqual([
@@ -95,7 +95,7 @@ describe("Explore use cases", () => {
             jest.spyOn(ecotaxa, "filterByClassificationState").mockResolvedValue([SAMPLES[2]]);
             const filters = exploreFilters({ classification_state: "fully_predicted" });
 
-            const points = await new GetExploreMap(repositories, ecotaxa).execute(null, { mode: "time", filters });
+            const points = await new GetExploreMap(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "time", filters });
 
             expect(ecotaxa.filterByClassificationState).toBeCalledWith(SAMPLES, expect.any(Map), filters);
             expect(points.map(point => point.sample_id)).toEqual([3]);
@@ -113,17 +113,6 @@ describe("Explore use cases", () => {
             expect(response.exportable.summary?.counts.samples).toBe(1);
             expect(response.exportable.projects.map(row => row.project_id)).toEqual([1]);
             expect(response.all.projects[1].contact).toEqual({ user_name: ALICE.user_name, email: ALICE.email });
-        });
-
-        test("an anonymous caller sees the stats, no exportable sample and no e-mail", async () => {
-            const response = await new GetExploreSelection(repositories, ecotaxa).execute(null, { mode: "depth", filters: null });
-
-            expect(response.all.summary?.counts.samples).toBe(3);
-            expect(response.exportable).toEqual({ summary: null, projects: [] });
-            for (const row of response.all.projects) {
-                expect(row.contact?.email).toBe("");
-                expect(row.managers.every(manager => manager.email === "")).toBe(true);
-            }
         });
 
         test("a manager may export the validated samples of the private project", async () => {
@@ -167,10 +156,11 @@ describe("Explore use cases", () => {
         test("passes the 'exclude not living' criterion", async () => {
             jest.spyOn(ecotaxa, "summaryOf").mockResolvedValue(summary(0));
 
-            await new GetExploreEcoTaxa(repositories, ecotaxa).execute(null, { mode: "depth", filters: exploreFilters({ ecotaxa_exclude_not_living: true }) });
+            await new GetExploreEcoTaxa(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters: exploreFilters({ ecotaxa_exclude_not_living: true }) });
 
             expect(ecotaxa.summaryOf).toHaveBeenNthCalledWith(1, SAMPLES, expect.any(Map), true);
-            expect(ecotaxa.summaryOf).toHaveBeenNthCalledWith(2, [], expect.any(Map), true);
+            // Carol may export the validated sample of the open project only.
+            expect(ecotaxa.summaryOf).toHaveBeenNthCalledWith(2, [SAMPLES[0]], expect.any(Map), true);
         });
     });
 
@@ -180,14 +170,14 @@ describe("Explore use cases", () => {
         test(`draws ${EXPLORE_IMAGES_DEFAULT} images by default among the matching samples`, async () => {
             jest.spyOn(ecotaxa, "randomImagesOf").mockResolvedValue(images);
 
-            await expect(new GetExploreImages(repositories, ecotaxa).execute(null, { mode: "depth", filters: null })).resolves.toEqual(images);
+            await expect(new GetExploreImages(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null })).resolves.toEqual(images);
             expect(ecotaxa.randomImagesOf).toBeCalledWith(SAMPLES, expect.any(Map), EXPLORE_IMAGES_DEFAULT);
         });
 
         test("draws the asked number of images", async () => {
             jest.spyOn(ecotaxa, "randomImagesOf").mockResolvedValue(images);
 
-            await new GetExploreImages(repositories, ecotaxa).execute(null, { mode: "depth", filters: null, count: 12 });
+            await new GetExploreImages(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, count: 12 });
 
             expect(ecotaxa.randomImagesOf).toBeCalledWith(SAMPLES, expect.any(Map), 12);
         });
@@ -195,7 +185,7 @@ describe("Explore use cases", () => {
         test.each([0, 13, 2.5])("count %p is refused before anything is read", async (count) => {
             jest.spyOn(ecotaxa, "randomImagesOf").mockResolvedValue(images);
 
-            await expect(new GetExploreImages(repositories, ecotaxa).execute(null, { mode: "depth", filters: null, count })).rejects.toThrow("count must be between 1 and 12");
+            await expect(new GetExploreImages(repositories, ecotaxa).execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, count })).rejects.toThrow("count must be between 1 and 12");
             expect(projectRepository.listProjects).toBeCalledTimes(0);
             expect(ecotaxa.randomImagesOf).toBeCalledTimes(0);
         });

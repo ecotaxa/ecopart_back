@@ -8,7 +8,7 @@ import { ExploreSelectionRepositories, resolveExploreSelection } from "./explore
 export class GetExploreImages implements GetExploreImagesUseCase {
     constructor(private readonly repositories: ExploreSelectionRepositories, private readonly ecotaxa: ExploreEcoTaxaService) { }
 
-    async execute(current_user: UserUpdateModel | null, request: ExploreImagesRequest): Promise<ExploreImage[]> {
+    async execute(current_user: UserUpdateModel, request: ExploreImagesRequest): Promise<ExploreImage[]> {
         const count = request.count ?? EXPLORE_IMAGES_DEFAULT;
         if (!Number.isInteger(count) || count < 1 || count > EXPLORE_IMAGES_MAX) throw new Error(`count must be between 1 and ${EXPLORE_IMAGES_MAX}`);
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));

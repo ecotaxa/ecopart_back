@@ -147,7 +147,7 @@ import { MigrationLogger } from './data/migrations/migration-logger'
 import ExploreRouter from './presentation/routers/explore-router'
 import { MiddlewareExploreValidation } from './presentation/middleware/explore-validation'
 import { ExploreEcoTaxaService } from './domain/use-cases/explore/explore-ecotaxa'
-import { ExploreParticleBins } from './domain/use-cases/explore/explore-graphs'
+import { ExploreCtdBins, ExploreParticleBins } from './domain/use-cases/explore/explore-graphs'
 import { ListExploreProjects } from './domain/use-cases/explore/list-explore-projects'
 import { GetExploreMap } from './domain/use-cases/explore/get-explore-map'
 import { GetExploreSelection } from './domain/use-cases/explore/get-explore-selection'
@@ -463,8 +463,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     ))
 
 
-    // Explore: the selection, its stats and its curves over every project; anonymous callers served
-    // except on the graphs. The EcoTaxa service and the particle bins keep caches shared by every request.
+    // Explore: the selection, its stats and its curves over every project, for logged-in users.
+    // The EcoTaxa service and the particle and CTD bins keep caches shared by every request.
     const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
     // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
     explore_ecotaxa.startSweeper()
@@ -476,7 +476,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetExploreSelection(explore_repositories, explore_ecotaxa),
         new GetExploreEcoTaxa(explore_repositories, explore_ecotaxa),
         new GetExploreImages(explore_repositories, explore_ecotaxa),
-        new GetExploreGraphs(explore_repositories, explore_ecotaxa, new ExploreParticleBins(sample_repo)),
+        new GetExploreGraphs(explore_repositories, explore_ecotaxa, new ExploreParticleBins(sample_repo), new ExploreCtdBins(sample_repo)),
     ))
     server.use("/version", VersionRouter(config.APP_VERSION))
 

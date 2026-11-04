@@ -3,7 +3,7 @@ import { UserUpdateModel } from "../../entities/user";
 import { GetExploreGraphsUseCase } from "../../interfaces/use-cases/explore/get-explore-graphs";
 import { BinAxis } from "../export/binned-computation";
 import { ExploreEcoTaxaService } from "./explore-ecotaxa";
-import { binCtdRows, buildCtdDataset, buildParticleDatasets, CtdBins, EXPLORE_GRAPH_CONCURRENCY, EXPLORE_GRAPH_MAX_DETAILED_SAMPLES, EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, exploreGraphSteps, exploreSizeClasses, mapWithConcurrency, ParticleBins } from "./explore-graphs";
+import { buildCtdDataset, buildParticleDatasets, CtdBins, EXPLORE_GRAPH_CONCURRENCY, EXPLORE_GRAPH_MAX_DETAILED_SAMPLES, EXPLORE_GRAPH_MAX_SAMPLES, ExploreCtdBins, ExploreParticleBins, exploreGraphSteps, exploreSizeClasses, mapWithConcurrency, ParticleBins } from "./explore-graphs";
 import { ExploreProjectContext, ExploreSelectionRepositories, resolveExploreSelection } from "./explore-selection";
 
 const EMPTY_DATASET: GraphDataset = { keys: [], axis_labels: {}, series: {} };
@@ -16,10 +16,10 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
         private readonly repositories: ExploreSelectionRepositories,
         private readonly ecotaxa: ExploreEcoTaxaService,
         private readonly particleBins: ExploreParticleBins,
+        private readonly ctdBins: ExploreCtdBins,
     ) { }
 
-    async execute(current_user: UserUpdateModel | null, request: ExploreGraphsRequest): Promise<ExploreGraphs> {
-        if (!current_user) throw new Error("Login required");
+    async execute(current_user: UserUpdateModel, request: ExploreGraphsRequest): Promise<ExploreGraphs> {
         const steps = exploreGraphSteps(request.pressure_bin, request.time_bin);
         const size_classes = exploreSizeClasses(request.size_classes);
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
@@ -38,30 +38,31 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
 
         const contextOf = (sample: ExploreSampleRow) => selection.projects.get(sample.project_id) as ExploreProjectContext;
         const particle_failures: string[] = [];
-        const particles = await mapWithConcurrency(drawn, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: ParticleBins } | null> => {
-            try {
-                return { sample, bins: await this.particleBins.binsOf(sample, contextOf(sample), axis, step) };
-            } catch (error) {
-                particle_failures.push(sample.sample_name);
-                console.log(new Date().toISOString(), `Explore graphs: sample ${sample.sample_name} skipped`, (error as Error).message);
-                return null;
-            }
-        });
-        if (particle_failures.length > 0) warnings.push(`${particle_failures.length} sample${particle_failures.length > 1 ? "s" : ""} without readable particle data: ${describe(particle_failures)}`);
-
-        const with_ctd = drawn.filter(sample => sample.ctd_imported && sample.ctd_file_extension);
         const ctd_failures: string[] = [];
-        const ctd = await mapWithConcurrency(with_ctd, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: CtdBins } | null> => {
-            try {
-                const context = contextOf(sample);
-                const rows = await this.repositories.sampleRepository.getCtdRows(sample.project_id, sample.sample_name, sample.ctd_file_extension as string);
-                return { sample, bins: binCtdRows(rows, axis, step, axis === "depth" && context.project.enable_descent_filter) };
-            } catch (error) {
-                ctd_failures.push(sample.sample_name);
-                console.log(new Date().toISOString(), `Explore graphs: CTD of sample ${sample.sample_name} skipped`, (error as Error).message);
-                return null;
-            }
-        });
+        const with_ctd = drawn.filter(sample => sample.ctd_imported && sample.ctd_file_extension);
+        // The particle files and the CTD files are read side by side.
+        const [particles, ctd] = await Promise.all([
+            mapWithConcurrency(drawn, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: ParticleBins } | null> => {
+                try {
+                    return { sample, bins: await this.particleBins.binsOf(sample, contextOf(sample), axis, step) };
+                } catch (error) {
+                    particle_failures.push(sample.sample_name);
+                    console.log(new Date().toISOString(), `Explore graphs: sample ${sample.sample_name} skipped`, (error as Error).message);
+                    return null;
+                }
+            }),
+            mapWithConcurrency(with_ctd, EXPLORE_GRAPH_CONCURRENCY, async (sample): Promise<{ sample: ExploreSampleRow; bins: CtdBins } | null> => {
+                try {
+                    const descent_filter = axis === "depth" && contextOf(sample).project.enable_descent_filter;
+                    return { sample, bins: await this.ctdBins.binsOf(sample, sample.ctd_file_extension as string, axis, step, descent_filter) };
+                } catch (error) {
+                    ctd_failures.push(sample.sample_name);
+                    console.log(new Date().toISOString(), `Explore graphs: CTD of sample ${sample.sample_name} skipped`, (error as Error).message);
+                    return null;
+                }
+            }),
+        ]);
+        if (particle_failures.length > 0) warnings.push(`${particle_failures.length} sample${particle_failures.length > 1 ? "s" : ""} without readable particle data: ${describe(particle_failures)}`);
         if (ctd_failures.length > 0) warnings.push(`${ctd_failures.length} CTD file${ctd_failures.length > 1 ? "s" : ""} could not be read: ${describe(ctd_failures)}`);
 
         const datasets = buildParticleDatasets(particles.filter((entry): entry is { sample: ExploreSampleRow; bins: ParticleBins } => entry !== null), size_classes);
