@@ -4,6 +4,7 @@ import { TaskRepository } from "../../../../src/domain/interfaces/repositories/t
 import { MockUserRepository } from "../../../mocks/user-mock";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
+import { validUser } from "../../../entities/user";
 import { CancelTask } from "../../../../src/domain/use-cases/task/cancel-task";
 
 let mockUserRepository: UserRepository;
@@ -13,6 +14,8 @@ let cancelTaskUseCase: CancelTask;
 // TaskResponseModel_1 is owned by user 1
 const running_task = { ...TaskResponseModel_1, task_status_id: 2, task_status: "RUNNING" }
 const cancelling_task = { ...TaskResponseModel_1, task_status_id: 7, task_status: "CANCELLING" }
+const jane = { ...validUser, user_id: 1, first_name: "Jane", last_name: "Doe", email: "jane@doe.com" }
+const john = { ...validUser, user_id: 100, first_name: "John", last_name: "Roe", email: "john@roe.com" }
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -64,11 +67,12 @@ describe("Cancel Task Use Case", () => {
         const current_user: UserUpdateModel = { user_id: 1 }
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
         jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValue(TaskResponseModel_1)
+        jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(jane)
         jest.spyOn(mockTaskRepository, "cancelTask").mockRejectedValue(new Error("Task cannot be cancelled"))
 
         await expect(cancelTaskUseCase.execute(current_user, 1)).rejects.toThrowError("Task cannot be cancelled");
 
-        expect(mockTaskRepository.cancelTask).toBeCalledWith(1);
+        expect(mockTaskRepository.cancelTask).toBeCalledWith(1, "its owner Jane Doe (jane@doe.com)");
     });
 
     test("Owner cancels a running task : returns the task re-read after the request, without the log path", async () => {
@@ -76,12 +80,14 @@ describe("Cancel Task Use Case", () => {
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
         jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValueOnce(running_task).mockResolvedValueOnce(cancelling_task)
         jest.spyOn(mockUserRepository, "isAdmin")
+        jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(jane)
         jest.spyOn(mockTaskRepository, "cancelTask").mockResolvedValue()
 
         const result = await cancelTaskUseCase.execute(current_user, 1);
 
         expect(mockUserRepository.isAdmin).toBeCalledTimes(0);
-        expect(mockTaskRepository.cancelTask).toBeCalledWith(1);
+        expect(mockUserRepository.getUser).toBeCalledWith({ user_id: 1 });
+        expect(mockTaskRepository.cancelTask).toBeCalledWith(1, "its owner Jane Doe (jane@doe.com)");
         expect(mockTaskRepository.getOneTask).toBeCalledTimes(2);
         expect(result).toStrictEqual(toPublicTask(cancelling_task));
         expect(result).not.toHaveProperty("task_log_file_path");
@@ -92,11 +98,25 @@ describe("Cancel Task Use Case", () => {
         jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
         jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValueOnce(running_task).mockResolvedValueOnce(cancelling_task)
         jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+        jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(john)
         jest.spyOn(mockTaskRepository, "cancelTask").mockResolvedValue()
 
         await expect(cancelTaskUseCase.execute(current_user, 1)).resolves.toStrictEqual(toPublicTask(cancelling_task));
 
         expect(mockUserRepository.isAdmin).toBeCalledWith(100);
-        expect(mockTaskRepository.cancelTask).toBeCalledWith(1);
+        expect(mockUserRepository.getUser).toBeCalledWith({ user_id: 100 });
+        expect(mockTaskRepository.cancelTask).toBeCalledWith(1, "administrator John Roe (john@roe.com)");
+    });
+
+    test("A requester whose account cannot be read is named by their id", async () => {
+        const current_user: UserUpdateModel = { user_id: 1 }
+        jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue()
+        jest.spyOn(mockTaskRepository, "getOneTask").mockResolvedValueOnce(running_task).mockResolvedValueOnce(cancelling_task)
+        jest.spyOn(mockUserRepository, "getUser").mockResolvedValue(null)
+        jest.spyOn(mockTaskRepository, "cancelTask").mockResolvedValue()
+
+        await expect(cancelTaskUseCase.execute(current_user, 1)).resolves.toStrictEqual(toPublicTask(cancelling_task));
+
+        expect(mockTaskRepository.cancelTask).toBeCalledWith(1, "its owner user 1");
     });
 });

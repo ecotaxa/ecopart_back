@@ -40,7 +40,7 @@ describe('DELETE /tasks/:task_id (integration)', () => {
     async function taskWithStatus(status: TasksStatus): Promise<number> {
         const task_id = await taskRepo.createTask({ task_type: TaskType.Import, task_status: TasksStatus.Pending, task_owner_id: admin_id, task_params: {} })
         if (status === TasksStatus.Running || status === TasksStatus.Cancelling || status === TasksStatus.Done) await taskRepo.startTask({ task_id })
-        if (status === TasksStatus.Cancelling || status === TasksStatus.Cancelled) await taskRepo.cancelTask(task_id)
+        if (status === TasksStatus.Cancelling || status === TasksStatus.Cancelled) await taskRepo.cancelTask(task_id, 'its owner Jane Doe (jane@doe.com)')
         if (status === TasksStatus.Done) await taskRepo.finishTask({ task_id })
         if (status === TasksStatus.Error) await taskRepo.failedTask(task_id, new Error('boom'))
         expect((await taskDs.getOne({ task_id }))?.task_status).toBe(status)

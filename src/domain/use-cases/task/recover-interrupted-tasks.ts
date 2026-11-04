@@ -1,12 +1,12 @@
 import path from "path";
 import { TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
-import { TASK_CANCELLED_MESSAGE } from "../../constants/task";
+import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from "../../constants/task";
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { RecoverInterruptedTasksUseCase } from "../../interfaces/use-cases/task/recover-interrupted-tasks";
 
-export const TASK_INTERRUPTED_MESSAGE = "Task interrupted by a server restart";
+export { TASK_INTERRUPTED_MESSAGE };
 
 // Run once at startup, before any task can be created: a task still active at that point lost its
 // work when the server stopped, and nothing would ever move it to a final status. Its own failure

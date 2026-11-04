@@ -30,7 +30,9 @@ export interface TaskRepository {
     standardGetTaskStatus(options: PreparedSearchOptions): Promise<SearchResult<TaskStatusResponseModel>>;
     getTasksByUser(user: UserRequestModel): Promise<number[]>;
     toPublicTask(task: TaskResponseModel): PublicTaskResponseModel;
-    cancelTask(task_id: number): Promise<void>;
+    // cancelled_by names who requested the cancellation, e.g. "its owner Jane Doe (jane@doe.com)": it is
+    // kept in the task message (task_progress_msg) until the task ends CANCELLED.
+    cancelTask(task_id: number, cancelled_by: string): Promise<void>;
     throwIfCancelled(task_id: number): Promise<void>;
     createTaskUnlessActive(task: PublicTaskRequestCreationModel, conflicting_types: TaskType[]): Promise<number | null>;
     getActiveTasks(): Promise<TaskResponseModel[]>;

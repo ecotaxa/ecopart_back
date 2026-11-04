@@ -6,13 +6,16 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { PublicPrivilege } from "../entities/privilege";
 // import { TaskRequestCreationModel, PrivateTaskRequestModel, TaskUpdateModel, TaskResponseModel, PublicTaskResponseModel, PublicTaskRequestCreationModel } from "../entities/task";
 import { PrivateTaskRequestCreationModel, PublicTaskRequestCreationModel, PublicTaskRequestModel, PublicTaskResponseModel, TasksStatus, TaskType, TaskVisibilityModel } from "../entities/task";
-import { PrivateTaskRequestModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../entities/task";
-import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE } from "../constants/task";
+import { PrivateTaskRequestModel, PrivateTaskUpdateModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../entities/task";
+import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from "../constants/task";
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { TaskEndListener, TaskRepository } from "../interfaces/repositories/task-repository";
 import path from "path";
 import fs from "fs/promises";
+
+// Message of a task whose cancellation was requested, followed by who requested it (see cancelTask).
+const CANCELLATION_REQUESTED_BY = "Cancellation requested by ";
 
 export class TaskRepositoryImpl implements TaskRepository {
     taskDataSource: TaskDataSource
@@ -136,8 +139,12 @@ export class TaskRepositoryImpl implements TaskRepository {
     async updateTaskProgress(task: PublicTaskRequestModel, progress_pct: number, progress_msg: string): Promise<void> {
         const task_to_update = await this.ensureTaskExists(task.task_id || 0)
 
-        // Update the task progress
-        await this.taskDataSource.updateOne({ task_id: task_to_update.task_id, task_progress_pct: progress_pct, task_progress_msg: progress_msg })
+        // Once a cancellation is requested, the message keeps who requested it until the task ends: the
+        // progress of its last steps goes to the log only. The write is conditional on the status it was
+        // decided from, so a report decided just before the cancellation request cannot overwrite it.
+        const update: PrivateTaskUpdateModel = { task_id: task_to_update.task_id, task_progress_pct: progress_pct }
+        if (task_to_update.task_status !== TasksStatus.Cancelling) update.task_progress_msg = progress_msg
+        await this.taskDataSource.updateOne(update, task_to_update.task_status_id)
 
         // appendFile to log file the progress
         await this.logMessage(task_to_update.task_log_file_path, `Task progress: ${progress_pct}% - ${progress_msg}`)
@@ -445,6 +452,7 @@ export class TaskRepositoryImpl implements TaskRepository {
         // Stopped at a checkpoint after a cancellation request, its own cleanup already done.
         if (task.task_status === TasksStatus.Cancelling && error.message === TASK_CANCELLED_MESSAGE) {
             await this.statusManager({ task_id: task_id }, TasksStatus.Cancelled);
+            await this.taskDataSource.updateOne({ task_id: task_id, task_progress_msg: this.cancelledMessage(task) });
             await this.logMessage(task.task_log_file_path, "Task cancelled");
             return;
         }
@@ -458,8 +466,10 @@ export class TaskRepositoryImpl implements TaskRepository {
     }
 
     async internalFailedTask(task_id: number, error: Error): Promise<void> {
-        // Update the task error message
-        await this.taskDataSource.updateOne({ task_id: task_id, task_error: this.withoutServerRoot(error.message) })
+        // Update the task error, and the task message that tells the outcome of the task
+        const task_error = this.withoutServerRoot(error.message)
+        const task_progress_msg = error.message === TASK_INTERRUPTED_MESSAGE ? task_error : `Task failed: ${task_error}`
+        await this.taskDataSource.updateOne({ task_id: task_id, task_error, task_progress_msg })
 
         // Update the task status to error
         await this.statusManager({
@@ -477,6 +487,14 @@ export class TaskRepositoryImpl implements TaskRepository {
     // errors included, is shown relative to the application root, never as a server path.
     private withoutServerRoot(message: string): string {
         return message.split(this.base_folder + path.sep).join("");
+    }
+
+    // Final message of a cancelled task: who requested the cancellation, as cancelTask recorded it.
+    private cancelledMessage(task: TaskResponseModel): string {
+        const message = task.task_progress_msg ?? "";
+        return message.startsWith(CANCELLATION_REQUESTED_BY)
+            ? `Cancelled by ${message.slice(CANCELLATION_REQUESTED_BY.length)}`
+            : "Cancelled";
     }
     // Define allowed transitions between statuses
     private allowedTransitions: { [key in TasksStatus]: TasksStatus[] } = {
@@ -561,8 +579,9 @@ export class TaskRepositoryImpl implements TaskRepository {
 
     // A pending task is cancelled at once, its work has not started. A running task is marked
     // CANCELLING: its work stops at the next throwIfCancelled checkpoint, cleans up what it produced,
-    // and failedTask then moves it to CANCELLED.
-    async cancelTask(task_id: number): Promise<void> {
+    // and failedTask then moves it to CANCELLED. The task message names who requested the cancellation
+    // from the request on (see updateTaskProgress and cancelledMessage).
+    async cancelTask(task_id: number, cancelled_by: string): Promise<void> {
         for (let attempt = 0; attempt < this.statusUpdateAttempts; attempt++) {
             const task = await this.ensureTaskExists(task_id);
             let target: TasksStatus;
@@ -571,9 +590,12 @@ export class TaskRepositoryImpl implements TaskRepository {
             else throw new Error("Task cannot be cancelled");
 
             if (await this.transition(task, target)) {
+                await this.taskDataSource.updateOne({ task_id: task_id, task_progress_msg: target === TasksStatus.Cancelled
+                    ? `Cancelled by ${cancelled_by} before it started`
+                    : CANCELLATION_REQUESTED_BY + cancelled_by });
                 await this.logMessage(task.task_log_file_path, target === TasksStatus.Cancelled
-                    ? "Task cancelled before it started"
-                    : "Cancellation requested, the task stops at its next checkpoint");
+                    ? `Task cancelled by ${cancelled_by} before it started`
+                    : `Cancellation requested by ${cancelled_by}, the task stops at its next checkpoint`);
                 return;
             }
         }
