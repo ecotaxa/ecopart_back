@@ -22,9 +22,6 @@ class LocalMiddlewareAuth implements MiddlewareAuth {
         (req as CustomRequest).token = LOGGED_TOKEN;
         next();
     };
-    auth_optional = (): void => {
-        throw new Error("Method not implemented for auth_optional");
-    };
     auth_refresh = (): void => {
         throw new Error("Method not implemented for auth_refresh");
     };
@@ -231,7 +228,6 @@ describe("ExploreRouter", () => {
         const send = (route: Route) => route.method === "get" ? request(logged).get(route.path) : request(logged).post(route.path).send(route.body);
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
-            ["Login required", 401],
             ["pressure_bin must be between 1 and 100", 422],
             ["time_bin must be between 0.5 and 24", 422],
             ["count must be between 1 and 12", 422],

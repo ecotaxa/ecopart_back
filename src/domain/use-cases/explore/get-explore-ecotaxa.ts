@@ -8,7 +8,7 @@ import { ExploreSelectionRepositories, resolveExploreSelection } from "./explore
 export class GetExploreEcoTaxa implements GetExploreEcoTaxaUseCase {
     constructor(private readonly repositories: ExploreSelectionRepositories, private readonly ecotaxa: ExploreEcoTaxaService) { }
 
-    async execute(current_user: UserUpdateModel | null, request: ExploreRequest): Promise<ExploreEcoTaxaResponse> {
+    async execute(current_user: UserUpdateModel, request: ExploreRequest): Promise<ExploreEcoTaxaResponse> {
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
         const exclude_not_living = request.filters?.ecotaxa_exclude_not_living ?? false;
         return {

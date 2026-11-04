@@ -1410,8 +1410,7 @@
             "type": "string"
           },
           "email": {
-            "type": "string",
-            "description": "Empty for an anonymous caller."
+            "type": "string"
           }
         }
       },

@@ -72,12 +72,6 @@ describe("GetExploreGraphs", () => {
 
     const drawnIds = () => (particleBins.binsOf as jest.Mock).mock.calls.map(call => call[0].sample_id);
 
-    test("an anonymous caller must log in, before anything is read", async () => {
-        await expect(useCase.execute(null, { mode: "depth", filters: null })).rejects.toThrow("Login required");
-        expect(projectRepository.listProjects).toBeCalledTimes(0);
-        expect(particleBins.binsOf).toBeCalledTimes(0);
-    });
-
     test("a step out of bounds is refused before the selection is resolved", async () => {
         await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, pressure_bin: 0 })).rejects.toThrow("pressure_bin must be between 1 and 100");
         await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "time", filters: null, time_bin: 48 })).rejects.toThrow("time_bin must be between 0.5 and 24");

@@ -1,10 +1,6 @@
 import { aaInMm2, esdMm } from "../../../../src/domain/use-cases/export/binned-computation";
-import { ExploreUser } from "../../../../src/domain/use-cases/explore/explore-selection";
 import { buildExploreMap, buildExploreProjectRows, buildExploreSelection, buildExploreSummary, PRESSURE_HISTOGRAM_STEP_DB, toContact } from "../../../../src/domain/use-cases/explore/explore-stats";
 import { ALICE, BOB, contextsOf, exploreContext, exploreProject, exploreSample, privileges } from "./explore-fixtures";
-
-const ANONYMOUS: ExploreUser = { user_id: null, is_admin: false };
-const LOGGED: ExploreUser = { user_id: BOB.user_id, is_admin: false };
 
 const UVP6 = exploreProject(1, "open", { project_title: "Ligurian profiles", instrument_model: "UVP6LP", ecotaxa_project_name: "Ligurian UVP6" });
 const UVP5 = exploreProject(2, "private", { project_title: "Arctic moorings", instrument_model: "UVP5HD" });
@@ -120,11 +116,10 @@ describe("buildExploreSummary", () => {
 });
 
 describe("toContact", () => {
-    test("the e-mail is only served to a logged-in user", () => {
-        expect(toContact(ALICE, LOGGED)).toEqual({ user_name: "Alice Martin", email: ALICE.email });
-        expect(toContact(ALICE, ANONYMOUS)).toEqual({ user_name: "Alice Martin", email: "" });
-        expect(toContact(null, LOGGED)).toBeNull();
-        expect(toContact(undefined, ANONYMOUS)).toBeNull();
+    test("name and e-mail, null without user", () => {
+        expect(toContact(ALICE)).toEqual({ user_name: "Alice Martin", email: ALICE.email });
+        expect(toContact(null)).toBeNull();
+        expect(toContact(undefined)).toBeNull();
     });
 });
 
@@ -137,7 +132,7 @@ describe("buildExploreProjectRows", () => {
     ];
 
     test("one row per project of the selection, sorted by title, with selected and total sample counts", () => {
-        const rows = buildExploreProjectRows(samples, CONTEXTS, LOGGED);
+        const rows = buildExploreProjectRows(samples, CONTEXTS);
 
         expect(rows.map(row => [row.project_title, row.nb_selected_samples, row.nb_samples])).toEqual([
             ["Arctic moorings", 1, 4],
@@ -158,19 +153,12 @@ describe("buildExploreProjectRows", () => {
         expect(rows[0]).toMatchObject({ ecotaxa_project_name: null, contact: null, managers: [], privacy_status: "private", is_my_project: false });
     });
 
-    test("an anonymous viewer gets empty e-mails", () => {
-        const rows = buildExploreProjectRows(samples, CONTEXTS, ANONYMOUS);
-
-        expect(rows[1].contact).toEqual({ user_name: ALICE.user_name, email: "" });
-        expect(rows[1].managers).toEqual([{ user_name: ALICE.user_name, email: "" }, { user_name: BOB.user_name, email: "" }]);
-    });
-
     test("projects with the same title are ordered by id", () => {
         const twins = contextsOf(
             exploreContext(exploreProject(7, "open", { project_title: "Same title" })),
             exploreContext(exploreProject(3, "open", { project_title: "Same title" })),
         );
-        const rows = buildExploreProjectRows([exploreSample({ project_id: 7 }), exploreSample({ project_id: 3 })], twins, LOGGED);
+        const rows = buildExploreProjectRows([exploreSample({ project_id: 7 }), exploreSample({ project_id: 3 })], twins);
 
         expect(rows.map(row => row.project_id)).toEqual([3, 7]);
     });
@@ -178,8 +166,8 @@ describe("buildExploreProjectRows", () => {
 
 describe("buildExploreSelection", () => {
     test("bundles the summary and the project rows, both empty without sample", () => {
-        expect(buildExploreSelection([], CONTEXTS, LOGGED)).toEqual({ summary: null, projects: [] });
-        const selection = buildExploreSelection([exploreSample({ project_id: 1 })], CONTEXTS, LOGGED);
+        expect(buildExploreSelection([], CONTEXTS)).toEqual({ summary: null, projects: [] });
+        const selection = buildExploreSelection([exploreSample({ project_id: 1 })], CONTEXTS);
         expect(selection.summary?.counts.samples).toBe(1);
         expect(selection.projects.map(row => row.project_id)).toEqual([1]);
     });

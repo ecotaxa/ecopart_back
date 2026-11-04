@@ -31,7 +31,6 @@ export default function ExploreRouter(
         console.log(new Date().toISOString(), err)
         const msg: string = err?.message || "";
         if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
-        else if (msg === "Login required") res.status(401).send({ errors: [msg] })
         else if (msg.startsWith("pressure_bin must") || msg.startsWith("time_bin must") || msg.startsWith("count must") || msg.startsWith("mode must") || msg.startsWith("size_classes must")) res.status(422).send({ errors: [msg] })
         else res.status(500).send({ errors: [fallback] })
     }

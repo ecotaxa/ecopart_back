@@ -10,11 +10,11 @@ import { buildExploreSelection } from "./explore-stats";
 export class GetExploreSelection implements GetExploreSelectionUseCase {
     constructor(private readonly repositories: ExploreSelectionRepositories, private readonly ecotaxa: ExploreEcoTaxaService) { }
 
-    async execute(current_user: UserUpdateModel | null, request: ExploreRequest): Promise<ExploreSelectionResponse> {
+    async execute(current_user: UserUpdateModel, request: ExploreRequest): Promise<ExploreSelectionResponse> {
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
         return {
-            all: buildExploreSelection(selection.samples, selection.projects, selection.user),
-            exportable: buildExploreSelection(selection.exportable, selection.projects, selection.user),
+            all: buildExploreSelection(selection.samples, selection.projects),
+            exportable: buildExploreSelection(selection.exportable, selection.projects),
         };
     }
 }

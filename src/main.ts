@@ -463,8 +463,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     ))
 
 
-    // Explore: the selection, its stats and its curves over every project; anonymous callers served
-    // except on the graphs. The EcoTaxa service and the particle bins keep caches shared by every request.
+    // Explore: the selection, its stats and its curves over every project, for logged-in users.
+    // The EcoTaxa service and the particle and CTD bins keep caches shared by every request.
     const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
     // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
     explore_ecotaxa.startSweeper()

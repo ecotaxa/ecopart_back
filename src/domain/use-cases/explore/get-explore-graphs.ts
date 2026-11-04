@@ -19,8 +19,7 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
         private readonly ctdBins: ExploreCtdBins,
     ) { }
 
-    async execute(current_user: UserUpdateModel | null, request: ExploreGraphsRequest): Promise<ExploreGraphs> {
-        if (!current_user) throw new Error("Login required");
+    async execute(current_user: UserUpdateModel, request: ExploreGraphsRequest): Promise<ExploreGraphs> {
         const steps = exploreGraphSteps(request.pressure_bin, request.time_bin);
         const size_classes = exploreSizeClasses(request.size_classes);
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));

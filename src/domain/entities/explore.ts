@@ -148,7 +148,7 @@ export interface ExploreSummary {
 
 export interface ExploreContact {
     user_name: string;
-    email: string;                            // "" for an anonymous caller
+    email: string;
 }
 
 export interface ExploreProjectRow {

@@ -72,7 +72,7 @@ components:
       type: object
       properties:
         user_name: { type: string }
-        email: { type: string, description: Empty for an anonymous caller. }
+        email: { type: string }
     ExploreProjectRow:
       type: object
       properties:
