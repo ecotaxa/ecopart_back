@@ -4731,15 +4731,14 @@
     "/explore/projects": {
       "get": {
         "summary": "Projects offered by the Explore project criterion",
-        "description": "Every project of the application with its number of samples, for the project filter of the\nExplore page. Anonymous callers are served too: the specification lets anyone see that a\nproject exists, so that access can be requested.\n",
+        "description": "Every project of the application with its number of samples, for the project filter of the\nExplore page. Login required.\n",
         "tags": [
           "Explore"
         ],
         "security": [
           {
             "cookieAccessToken": []
-          },
-          {}
+          }
         ],
         "responses": {
           "200": {
@@ -4761,7 +4760,7 @@
             }
           },
           "401": {
-            "description": "The access cookie is invalid or expired (an absent cookie is accepted).",
+            "description": "Not authenticated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4796,15 +4795,14 @@
     "/explore/map": {
       "post": {
         "summary": "Samples of the Explore selection, for the map",
-        "description": "One point per sample matching the criteria (every sample of the application when `filters`\nis null), with its project's privacy status. `mode` selects the sample type: depth profiles,\ntime series, or both (`all`). Anonymous callers are served.\n",
+        "description": "One point per sample matching the criteria (every sample of the application when `filters`\nis null), with its project's privacy status. `mode` selects the sample type: depth profiles,\ntime series, or both (`all`). Login required.\n",
         "tags": [
           "Explore"
         ],
         "security": [
           {
             "cookieAccessToken": []
-          },
-          {}
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4836,7 +4834,7 @@
             }
           },
           "401": {
-            "description": "The access cookie is invalid or expired.",
+            "description": "Not authenticated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4881,15 +4879,14 @@
     "/explore/selection": {
       "post": {
         "summary": "Statistics and projects of the Explore selection",
-        "description": "The \"Selected data stats\" tab (`all`: every matching sample, private projects included) and\nthe \"Exportable selection\" tab (`exportable`: the samples the caller may export, that is\nsamples with a validated visual QC whose project is public or open, or of which the caller\nis a member or a manager; always empty for an anonymous caller). Contact and manager\ne-mails are only served to logged-in callers. The EcoTaxa part of the tabs is served by\n`/explore/ecotaxa`.\n",
+        "description": "The \"Selected data stats\" tab (`all`: every matching sample, private projects included) and\nthe \"Exportable selection\" tab (`exportable`: the samples the caller may export, that is\nsamples with a validated visual QC whose project is public or open, or of which the caller\nis a member or a manager). The EcoTaxa part of the tabs is served by `/explore/ecotaxa`.\nLogin required.\n",
         "tags": [
           "Explore"
         ],
         "security": [
           {
             "cookieAccessToken": []
-          },
-          {}
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4913,7 +4910,7 @@
             }
           },
           "401": {
-            "description": "The access cookie is invalid or expired.",
+            "description": "Not authenticated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4958,15 +4955,14 @@
     "/explore/ecotaxa": {
       "post": {
         "summary": "EcoTaxa categories and classification state of the Explore selection",
-        "description": "For the samples imported in EcoTaxa, through the generic EcoTaxa account of each instance:\nthe categories used (display names, the non-living ones left out when\n`filters.ecotaxa_exclude_not_living`) and the share of samples fully or partially validated\nor predicted. Samples whose EcoTaxa instance does not answer are left out.\n",
+        "description": "For the samples imported in EcoTaxa, through the generic EcoTaxa account of each instance:\nthe categories used (display names, the non-living ones left out when\n`filters.ecotaxa_exclude_not_living`) and the share of samples fully or partially validated\nor predicted. Samples whose EcoTaxa instance does not answer are left out. Login required.\n",
         "tags": [
           "Explore"
         ],
         "security": [
           {
             "cookieAccessToken": []
-          },
-          {}
+          }
         ],
         "requestBody": {
           "required": true,
@@ -4990,7 +4986,7 @@
             }
           },
           "401": {
-            "description": "The access cookie is invalid or expired.",
+            "description": "Not authenticated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5035,15 +5031,14 @@
     "/explore/images": {
       "post": {
         "summary": "Random object images of the Explore selection",
-        "description": "`count` (default 4, at most 12) objects drawn at random among random samples of the\nselection imported in EcoTaxa, with the URL of their image on the EcoTaxa instance. Call\nagain for another draw.\n",
+        "description": "`count` (default 4, at most 12) objects drawn at random among random samples of the\nselection imported in EcoTaxa, with the URL of their image on the EcoTaxa instance. Call\nagain for another draw. Login required.\n",
         "tags": [
           "Explore"
         ],
         "security": [
           {
             "cookieAccessToken": []
-          },
-          {}
+          }
         ],
         "requestBody": {
           "required": true,
@@ -5075,7 +5070,7 @@
             }
           },
           "401": {
-            "description": "The access cookie is invalid or expired.",
+            "description": "Not authenticated.",
             "content": {
               "application/json": {
                 "schema": {

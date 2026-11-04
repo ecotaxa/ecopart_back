@@ -15,25 +15,22 @@ import { GetExploreGraphsUseCase } from "../../../src/domain/interfaces/use-case
 
 const LOGGED_TOKEN = { user_id: 7, is_admin: false } as DecodedToken;
 
-// `auth` always authenticates; `auth_optional` lets the request through anonymous, or with a token when
-// one is given (a logged-in caller with a valid cookie). Arrow properties, as in MiddlewareAuthCookie:
-// the router hands the bare functions to Express.
+// A logged-in caller: `auth` sets its token. Arrow properties, as in MiddlewareAuthCookie: the router
+// hands the bare functions to Express.
 class LocalMiddlewareAuth implements MiddlewareAuth {
-    constructor(private readonly optional_token: DecodedToken | null = null) { }
     auth = (req: Request, __: Response, next: NextFunction): void => {
         (req as CustomRequest).token = LOGGED_TOKEN;
         next();
     };
-    auth_optional = (req: Request, __: Response, next: NextFunction): void => {
-        if (this.optional_token) (req as CustomRequest).token = this.optional_token;
-        next();
+    auth_optional = (): void => {
+        throw new Error("Method not implemented for auth_optional");
     };
     auth_refresh = (): void => {
         throw new Error("Method not implemented for auth_refresh");
     };
 }
 
-// A caller without cookie: `auth` refuses it, `auth_optional` lets it through.
+// A caller without cookie: `auth` refuses it.
 class AnonymousMiddlewareAuth extends LocalMiddlewareAuth {
     auth = (_: Request, res: Response): void => {
         res.status(401).send({ errors: ["Token missing. Please authenticate."] });
@@ -91,7 +88,7 @@ describe("ExploreRouter", () => {
         return server;
     }
 
-    let anonymous: express.Express;
+    let logged: express.Express;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -108,89 +105,84 @@ describe("ExploreRouter", () => {
         jest.spyOn(getExploreEcoTaxa, "execute").mockResolvedValue(ECOTAXA);
         jest.spyOn(getExploreImages, "execute").mockResolvedValue(IMAGES);
         jest.spyOn(getExploreGraphs, "execute").mockResolvedValue(GRAPHS);
-        anonymous = serverWith(new LocalMiddlewareAuth());
+        logged = serverWith(new LocalMiddlewareAuth());
     });
 
     afterEach(() => {
         jest.restoreAllMocks();
     });
 
-    describe("anonymous callers are served by every route but /graphs", () => {
+    test.each([
+        ["get", "/explore/projects"],
+        ["post", "/explore/map"],
+        ["post", "/explore/selection"],
+        ["post", "/explore/ecotaxa"],
+        ["post", "/explore/images"],
+        ["post", "/explore/graphs"],
+    ] as const)("anonymous callers are refused: %s %s → 401", async (method, path) => {
+        const server = serverWith(new AnonymousMiddlewareAuth());
+
+        const response = method === "get"
+            ? await request(server).get(path)
+            : await request(server).post(path).send({ mode: "depth", filters: null });
+
+        expect(response.status).toBe(401);
+        for (const useCase of [listExploreProjects, getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs]) {
+            expect(useCase.execute).toBeCalledTimes(0);
+        }
+    });
+
+    describe("logged-in callers: the token set by `auth` is the user of the use case", () => {
         test("GET /explore/projects", async () => {
-            const response = await request(anonymous).get("/explore/projects");
+            const response = await request(logged).get("/explore/projects");
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual({ projects: PROJECTS });
-            expect(listExploreProjects.execute).toBeCalledWith(null);
+            expect(listExploreProjects.execute).toBeCalledWith(LOGGED_TOKEN);
         });
 
         test("POST /explore/map", async () => {
-            const response = await request(anonymous).post("/explore/map").send({ mode: "depth", filters: FILTERS_SENT });
+            const response = await request(logged).post("/explore/map").send({ mode: "depth", filters: FILTERS_SENT });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual({ samples: MAP });
-            expect(getExploreMap.execute).toBeCalledWith(null, { mode: "depth", filters: FILTERS_PARSED });
+            expect(getExploreMap.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: FILTERS_PARSED });
         });
 
         test("POST /explore/selection", async () => {
-            const response = await request(anonymous).post("/explore/selection").send({ mode: "time", filters: null });
+            const response = await request(logged).post("/explore/selection").send({ mode: "time", filters: null });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(SELECTION);
-            expect(getExploreSelection.execute).toBeCalledWith(null, { mode: "time", filters: null });
+            expect(getExploreSelection.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "time", filters: null });
         });
 
         test("POST /explore/ecotaxa", async () => {
-            const response = await request(anonymous).post("/explore/ecotaxa").send({ mode: "depth", filters: FILTERS_SENT });
+            const response = await request(logged).post("/explore/ecotaxa").send({ mode: "depth", filters: FILTERS_SENT });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(ECOTAXA);
-            expect(getExploreEcoTaxa.execute).toBeCalledWith(null, { mode: "depth", filters: FILTERS_PARSED });
+            expect(getExploreEcoTaxa.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: FILTERS_PARSED });
         });
 
         test("POST /explore/images, count optional", async () => {
-            const with_count = await request(anonymous).post("/explore/images").send({ mode: "depth", filters: null, count: 6 });
+            const with_count = await request(logged).post("/explore/images").send({ mode: "depth", filters: null, count: 6 });
             expect(with_count.status).toBe(200);
             expect(with_count.body).toEqual({ images: IMAGES });
-            expect(getExploreImages.execute).toBeCalledWith(null, { mode: "depth", filters: null, count: 6 });
+            expect(getExploreImages.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, count: 6 });
 
-            await request(anonymous).post("/explore/images").send({ mode: "depth", filters: null });
-            expect(getExploreImages.execute).toHaveBeenLastCalledWith(null, { mode: "depth", filters: null, count: undefined });
+            await request(logged).post("/explore/images").send({ mode: "depth", filters: null });
+            expect(getExploreImages.execute).toHaveBeenLastCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, count: undefined });
         });
 
         test("a missing filters field is sent as null", async () => {
-            await request(anonymous).post("/explore/map").send({ mode: "depth" });
+            await request(logged).post("/explore/map").send({ mode: "depth" });
 
-            expect(getExploreMap.execute).toBeCalledWith(null, { mode: "depth", filters: null });
-        });
-
-        test("POST /explore/graphs needs the authentication of `auth`", async () => {
-            const server = serverWith(new AnonymousMiddlewareAuth());
-
-            const graphs = await request(server).post("/explore/graphs").send({ mode: "depth", filters: null });
-            expect(graphs.status).toBe(401);
-            expect(getExploreGraphs.execute).toBeCalledTimes(0);
-
-            // The same caller is served elsewhere, through `auth_optional`.
-            const map = await request(server).post("/explore/map").send({ mode: "depth", filters: null });
-            expect(map.status).toBe(200);
-        });
-    });
-
-    describe("logged-in callers", () => {
-        test("the token set by `auth_optional` is the user of the use case", async () => {
-            const token = { user_id: 12, is_admin: false } as DecodedToken;
-            const server = serverWith(new LocalMiddlewareAuth(token));
-
-            await request(server).get("/explore/projects");
-            await request(server).post("/explore/selection").send({ mode: "depth", filters: null });
-
-            expect(listExploreProjects.execute).toBeCalledWith(token);
-            expect(getExploreSelection.execute).toBeCalledWith(token, { mode: "depth", filters: null });
+            expect(getExploreMap.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null });
         });
 
         test("POST /explore/graphs passes the user and the steps", async () => {
-            const response = await request(anonymous).post("/explore/graphs").send({ mode: "time", filters: FILTERS_SENT, time_bin: "2", pressure_bin: 10, size_classes: "detailed" });
+            const response = await request(logged).post("/explore/graphs").send({ mode: "time", filters: FILTERS_SENT, time_bin: "2", pressure_bin: 10, size_classes: "detailed" });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(GRAPHS);
@@ -198,7 +190,7 @@ describe("ExploreRouter", () => {
         });
 
         test("POST /explore/graphs without steps leaves them to the use case", async () => {
-            await request(anonymous).post("/explore/graphs").send({ mode: "depth", filters: null, pressure_bin: null });
+            await request(logged).post("/explore/graphs").send({ mode: "depth", filters: null, pressure_bin: null });
 
             expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, pressure_bin: undefined, time_bin: undefined, size_classes: undefined });
         });
@@ -216,7 +208,7 @@ describe("ExploreRouter", () => {
             ["/explore/graphs", { mode: "depth", filters: null, size_classes: "raw" }],
             ["/explore/graphs", { mode: "depth", filters: null, size_classes: ["detailed"] }],
         ])("POST %s %j", async (route, body) => {
-            const response = await request(anonymous).post(route).send(body);
+            const response = await request(logged).post(route).send(body);
 
             expect(response.status).toBe(422);
             expect(response.body.errors.length).toBeGreaterThan(0);
@@ -236,7 +228,7 @@ describe("ExploreRouter", () => {
             { method: "post", path: "/explore/images", body: { mode: "depth", filters: null }, useCase: () => getExploreImages, fallback: "Cannot get the explore images" },
             { method: "post", path: "/explore/graphs", body: { mode: "depth", filters: null }, useCase: () => getExploreGraphs, fallback: "Cannot get the explore graphs" },
         ];
-        const send = (route: Route) => route.method === "get" ? request(anonymous).get(route.path) : request(anonymous).post(route.path).send(route.body);
+        const send = (route: Route) => route.method === "get" ? request(logged).get(route.path) : request(logged).post(route.path).send(route.body);
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
             ["Login required", 401],
