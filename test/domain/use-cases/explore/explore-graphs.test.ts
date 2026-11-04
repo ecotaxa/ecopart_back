@@ -12,6 +12,7 @@ import {
     coarsenCtd,
     ctdVariableKey,
     EXPLORE_GRAPH_MAX_POINTS,
+    ExploreCtdBins,
     exploreGraphSteps,
     ExploreParticleBins,
     LruCache,
@@ -20,6 +21,8 @@ import {
     exploreSizeClasses,
     ParticleBins,
     reduceParticleBins,
+    roundPosition,
+    roundValue,
 } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
@@ -391,10 +394,10 @@ describe("buildParticleDatasets", () => {
         expect(datasets.abundance.axis_labels["64-128 µm"]).toBe("Particle red. class cl7 (64-128 µm) # l-1");
         expect(datasets.biovolume.axis_labels["64-128 µm"]).toBe("Biovolume red. class bv7 (64-128 µm) mm3 l-1");
         expect(datasets.abundance.axis_labels["128-256 µm"]).toBe("Particle red. class cl8 (128-256 µm) # l-1");
-        expect(datasets.abundance.series["64-128 µm"]).toEqual([{ sample_id: 1, sample_name: "moose_001", points: [{ position: 2.5, value: 5 }, { position: 12.5, value: 2 }] }]);
-        expect(datasets.biovolume.series["64-128 µm"]).toEqual([{ sample_id: 1, sample_name: "moose_001", points: [{ position: 2.5, value: 0.1 }, { position: 12.5, value: 0.1 }] }]);
+        expect(datasets.abundance.series["64-128 µm"]).toEqual([{ sample_id: 1, sample_name: "moose_001", positions: [2.5, 12.5], values: [5, 2] }]);
+        expect(datasets.biovolume.series["64-128 µm"]).toEqual([{ sample_id: 1, sample_name: "moose_001", positions: [2.5, 12.5], values: [0.1, 0.1] }]);
         // A visible class without particle is a curve of zeros, not a missing curve.
-        expect(datasets.abundance.series["128-256 µm"][0].points.map(point => point.value)).toEqual([0, 0]);
+        expect(datasets.abundance.series["128-256 µm"][0].values).toEqual([0, 0]);
     });
 
     test("a class visible on no sample has no key", () => {
@@ -418,7 +421,14 @@ describe("buildParticleDatasets", () => {
         expect(datasets.abundance.keys).toEqual(["1-1.26 µm", ">26 mm"]);
         expect(datasets.abundance.axis_labels["1-1.26 µm"]).toBe("Particle det. class cl1 (1-1.26 µm) # l-1");
         expect(datasets.biovolume.axis_labels[">26 mm"]).toBe("Biovolume det. class bv45 (>26 mm) mm3 l-1");
-        expect(datasets.abundance.series["1-1.26 µm"][0].points).toEqual([{ position: 2.5, value: 4 }]);
+        expect(datasets.abundance.series["1-1.26 µm"][0]).toMatchObject({ positions: [2.5], values: [4] });
+    });
+
+    test("positions to the millimetre (or millisecond), values to 4 significant digits", () => {
+        const datasets = buildParticleDatasets([{ sample: sample_a, bins: detailedBins([{ position: 7.123456, volume: 3, counts: { 18: 1 }, biovolumes: { 18: 0.001 } }], [18]) }], "reduced");
+
+        expect(datasets.abundance.series["64-128 µm"][0]).toMatchObject({ positions: [7.123], values: [0.3333] });
+        expect(datasets.biovolume.series["64-128 µm"][0].values).toEqual([0.0003333]);
     });
 
     test("bins that are not detailed are refused, whatever the histogram", () => {
@@ -532,6 +542,69 @@ describe("coarsenCtd", () => {
     });
 });
 
+describe("roundPosition / roundValue", () => {
+    test("keep what a chart can show", () => {
+        expect(roundPosition(1234.56789)).toBe(1234.568);
+        expect(roundPosition(T0 + 0.25)).toBe(T0 + 0.25);
+        expect(roundValue(123456.7)).toBe(123500);
+        expect(roundValue(0.000123456)).toBe(0.0001235);
+        expect(roundValue(0)).toBe(0);
+    });
+});
+
+describe("ExploreCtdBins", () => {
+    const project = exploreProject(1, "open");
+    const sample = exploreSample({ sample_id: 31, sample_name: "moose_031", project_id: project.project_id });
+    const rows = ctd([[1, 13, 38.1], [7, 12, 38.2]]);
+    let sampleRepository: SampleRepository;
+    let ctdBins: ExploreCtdBins;
+    let stamp: string | null;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        sampleRepository = new MockSampleRepository();
+        ctdBins = new ExploreCtdBins(sampleRepository);
+        stamp = "2048-1718187600000";
+        jest.spyOn(sampleRepository, "getCtdFileStamp").mockImplementation(async () => stamp);
+        jest.spyOn(sampleRepository, "getCtdRows").mockResolvedValue(rows);
+    });
+
+    test("bins the CTD file, then serves it from the cache until the file changes", async () => {
+        const first = await ctdBins.binsOf(sample, "ctd", "depth", 5, false);
+        expect(first).toEqual(binCtdRows(rows, "depth", 5, false));
+        expect(sampleRepository.getCtdFileStamp).toBeCalledWith(1, "moose_031", "ctd");
+        expect(sampleRepository.getCtdRows).toBeCalledWith(1, "moose_031", "ctd");
+
+        expect(await ctdBins.binsOf(sample, "ctd", "depth", 5, false)).toBe(first);
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(1);
+
+        stamp = "2050-1718191200000";
+        expect(await ctdBins.binsOf(sample, "ctd", "depth", 5, false)).not.toBe(first);
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(2);
+    });
+
+    test("another step, axis or descent filter is another entry", async () => {
+        await ctdBins.binsOf(sample, "ctd", "depth", 5, false);
+        await ctdBins.binsOf(sample, "ctd", "depth", 10, false);
+        await ctdBins.binsOf(sample, "ctd", "time", 1, false);
+        await ctdBins.binsOf(sample, "ctd", "depth", 5, true);
+
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(4);
+    });
+
+    test("a missing file is an error, a reading error is passed on and nothing is cached", async () => {
+        stamp = null;
+        await expect(ctdBins.binsOf(sample, "ctd", "depth", 5, false)).rejects.toThrow("Sample moose_031 has no CTD file");
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(0);
+
+        stamp = "2048-1718187600000";
+        jest.spyOn(sampleRepository, "getCtdRows").mockRejectedValueOnce(new Error("Cannot read the CTD file"));
+        await expect(ctdBins.binsOf(sample, "ctd", "depth", 5, false)).rejects.toThrow("Cannot read the CTD file");
+        await expect(ctdBins.binsOf(sample, "ctd", "depth", 5, false)).resolves.toBeDefined();
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(2);
+    });
+});
+
 describe("ctdVariableKey", () => {
     test("the column title without its unit", () => {
         expect(ctdVariableKey("temperature [degc]")).toBe("temperature");
@@ -553,10 +626,10 @@ describe("buildCtdDataset", () => {
 
         expect(dataset.keys).toEqual(["practical salinity", "temperature"]);
         expect(dataset.axis_labels).toEqual({ "practical salinity": "CTD practical salinity [psu]", temperature: "CTD temperature [degc]" });
-        expect(dataset.series["practical salinity"]).toEqual([{ sample_id: 1, sample_name: "moose_001", points: [{ position: 7.5, value: 38.2 }] }]);
+        expect(dataset.series["practical salinity"]).toEqual([{ sample_id: 1, sample_name: "moose_001", positions: [7.5], values: [38.2] }]);
         expect(dataset.series.temperature).toEqual([
-            { sample_id: 1, sample_name: "moose_001", points: [{ position: 2.5, value: 13 }, { position: 7.5, value: 12 }] },
-            { sample_id: 2, sample_name: "moose_002", points: [{ position: 2.5, value: 14 }] },
+            { sample_id: 1, sample_name: "moose_001", positions: [2.5, 7.5], values: [13, 12] },
+            { sample_id: 2, sample_name: "moose_002", positions: [2.5], values: [14] },
         ]);
         // A variable without any value is not offered.
         expect(dataset.series.turbidity).toBeUndefined();
@@ -575,6 +648,6 @@ describe("buildCtdDataset", () => {
         expect(dataset.keys).toEqual(["oxygen [ml l-1]", "oxygen [umol kg-1]", "temperature"]);
         expect(dataset.axis_labels["oxygen [ml l-1]"]).toBe("CTD oxygen [ml l-1]");
         expect(dataset.series["oxygen [ml l-1]"].map(series => series.sample_id)).toEqual([1]);
-        expect(dataset.series["oxygen [umol kg-1]"].map(series => series.points[0].value)).toEqual([245, 250]);
+        expect(dataset.series["oxygen [umol kg-1]"].map(series => series.values[0])).toEqual([245, 250]);
     });
 });

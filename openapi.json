@@ -1714,19 +1714,18 @@
           "sample_name": {
             "type": "string"
           },
-          "points": {
+          "positions": {
             "type": "array",
+            "description": "Bin centres, depth in m or epoch milliseconds; the point i is (positions[i], values[i]).",
             "items": {
-              "type": "object",
-              "properties": {
-                "position": {
-                  "type": "number",
-                  "description": "Bin centre, depth in m or epoch milliseconds."
-                },
-                "value": {
-                  "type": "number"
-                }
-              }
+              "type": "number"
+            }
+          },
+          "values": {
+            "type": "array",
+            "description": "Values of the bins, rounded to 4 significant digits.",
+            "items": {
+              "type": "number"
             }
           }
         }

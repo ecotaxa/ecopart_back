@@ -185,13 +185,14 @@ components:
       properties:
         sample_id: { type: integer }
         sample_name: { type: string }
-        points:
+        positions:
           type: array
-          items:
-            type: object
-            properties:
-              position: { type: number, description: "Bin centre, depth in m or epoch milliseconds." }
-              value: { type: number }
+          description: "Bin centres, depth in m or epoch milliseconds; the point i is (positions[i], values[i])."
+          items: { type: number }
+        values:
+          type: array
+          description: "Values of the bins, rounded to 4 significant digits."
+          items: { type: number }
     GraphDataset:
       type: object
       properties:

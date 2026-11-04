@@ -88,6 +88,8 @@ export interface SampleRepository {
     // Size and modification time of the sample's pivot ("<size>-<mtime_ms>"), null when it has none:
     // a cache key that changes whenever the file is rewritten.
     getPivotFileStamp(project_id: number, sample_name: string, instrument_model: string): Promise<string | null>;
+    // The same stamp for the sample's imported CTD file, null when it has none.
+    getCtdFileStamp(project_id: number, sample_name: string, ctd_file_extension: string): Promise<string | null>;
     // The rows of the sample's imported CTD file (see CtdRows).
     getCtdRows(project_id: number, sample_name: string, ctd_file_extension: string): Promise<CtdRows>;
     // Particle statistics of a sample (nb_particles, extreme areas), written after its pivot is read.

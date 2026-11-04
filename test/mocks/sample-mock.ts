@@ -131,6 +131,9 @@ export class MockSampleRepository implements SampleRepository {
     getPivotFileStamp(): Promise<string | null> {
         throw new Error("Method not implemented for getPivotFileStamp");
     }
+    getCtdFileStamp(): Promise<string | null> {
+        throw new Error("Method not implemented for getCtdFileStamp");
+    }
     getCtdRows(): Promise<CtdRows> {
         throw new Error("Method not implemented for getCtdRows");
     }

@@ -2,7 +2,7 @@ import { CtdRows } from "../../../../src/domain/entities/ctd";
 import { ExploreSampleRow } from "../../../../src/domain/entities/explore";
 import { SIZE_CLASS_COUNT } from "../../../../src/domain/constants/size-classes";
 import { ExploreEcoTaxaService } from "../../../../src/domain/use-cases/explore/explore-ecotaxa";
-import { EXPLORE_GRAPH_MAX_DETAILED_SAMPLES, EXPLORE_GRAPH_MAX_SAMPLES, ExploreParticleBins, ParticleBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
+import { EXPLORE_GRAPH_MAX_DETAILED_SAMPLES, EXPLORE_GRAPH_MAX_SAMPLES, ExploreCtdBins, ExploreParticleBins, ParticleBins } from "../../../../src/domain/use-cases/explore/explore-graphs";
 import { ExploreSelectionRepositories } from "../../../../src/domain/use-cases/explore/explore-selection";
 import { GetExploreGraphs } from "../../../../src/domain/use-cases/explore/get-explore-graphs";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
@@ -52,7 +52,7 @@ describe("GetExploreGraphs", () => {
         repositories = { userRepository, projectRepository, privilegeRepository, sampleRepository };
         ecotaxa = new ExploreEcoTaxaService(new MockEcotaxaAccountRepository(), sampleRepository, projectRepository);
         particleBins = new ExploreParticleBins(sampleRepository);
-        useCase = new GetExploreGraphs(repositories, ecotaxa, particleBins);
+        useCase = new GetExploreGraphs(repositories, ecotaxa, particleBins, new ExploreCtdBins(sampleRepository));
 
         samples = [sample(1, 1), sample(2, 2), sample(3, 3), sample(4, 2)];
         jest.spyOn(userRepository, "ensureUserCanBeUsed").mockResolvedValue();
@@ -61,6 +61,7 @@ describe("GetExploreGraphs", () => {
         jest.spyOn(privilegeRepository, "getPublicPrivilegesOfProjects").mockResolvedValue(new Map([[2, privileges(2, [ALICE])]]));
         jest.spyOn(sampleRepository, "countSamplesPerProject").mockResolvedValue(new Map());
         jest.spyOn(sampleRepository, "getExploreSamples").mockImplementation(async () => samples);
+        jest.spyOn(sampleRepository, "getCtdFileStamp").mockResolvedValue("2048-1718187600000");
         jest.spyOn(sampleRepository, "getCtdRows").mockResolvedValue(YOYO);
         jest.spyOn(particleBins, "binsOf").mockResolvedValue(BINS);
     });
@@ -99,8 +100,8 @@ describe("GetExploreGraphs", () => {
         expect(graphs.warnings).toEqual(["2 samples of private projects are not drawn"]);
         expect(graphs.abundance.keys).toEqual(["64-128 µm"]);
         expect(graphs.abundance.series["64-128 µm"].map(series => series.sample_id)).toEqual([1, 3]);
-        expect(graphs.abundance.series["64-128 µm"][0].points).toEqual([{ position: 2.5, value: 5 }]);
-        expect(graphs.biovolume.series["64-128 µm"][0].points).toEqual([{ position: 2.5, value: 0.2 }]);
+        expect(graphs.abundance.series["64-128 µm"][0]).toMatchObject({ positions: [2.5], values: [5] });
+        expect(graphs.biovolume.series["64-128 µm"][0]).toMatchObject({ positions: [2.5], values: [0.2] });
         expect(graphs.ecotaxa).toEqual({ keys: [], axis_labels: {}, series: {} });
         expect(graphs.size_classes).toBe("reduced");
     });
@@ -112,8 +113,8 @@ describe("GetExploreGraphs", () => {
         expect(graphs.abundance.keys).toEqual(["64-80.6 µm", "80.6-102 µm", "102-128 µm"]);
         expect(graphs.abundance.axis_labels["64-80.6 µm"]).toBe("Particle det. class cl19 (64-80.6 µm) # l-1");
         expect(graphs.biovolume.axis_labels["102-128 µm"]).toBe("Biovolume det. class bv21 (102-128 µm) mm3 l-1");
-        expect(graphs.abundance.series["64-80.6 µm"][0].points).toEqual([{ position: 2.5, value: 5 }]);
-        expect(graphs.abundance.series["80.6-102 µm"][0].points).toEqual([{ position: 2.5, value: 0 }]);
+        expect(graphs.abundance.series["64-80.6 µm"][0]).toMatchObject({ positions: [2.5], values: [5] });
+        expect(graphs.abundance.series["80.6-102 µm"][0]).toMatchObject({ positions: [2.5], values: [0] });
         expect(particleBins.binsOf).toBeCalledWith(samples[0], expect.anything(), "depth", 5);
     });
 
@@ -202,7 +203,7 @@ describe("GetExploreGraphs", () => {
         expect(sampleRepository.getCtdRows).toBeCalledWith(1, "moose_001", "ctd");
         expect(depth.ctd.keys).toEqual(["temperature"]);
         // The project enables the descent filter: the row at 4 dbar after 6 dbar is dropped.
-        expect(depth.ctd.series.temperature).toEqual([{ sample_id: 1, sample_name: "moose_001", points: [{ position: 2.5, value: 10 }, { position: 7.5, value: 20 }] }]);
+        expect(depth.ctd.series.temperature).toEqual([{ sample_id: 1, sample_name: "moose_001", positions: [2.5, 7.5], values: [10, 20] }]);
     });
 
     test("without the project's descent filter every CTD row counts", async () => {
@@ -211,7 +212,7 @@ describe("GetExploreGraphs", () => {
 
         const depth = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
 
-        expect(depth.ctd.series.temperature[0].points).toEqual([{ position: 2.5, value: 20 }, { position: 7.5, value: 20 }]);
+        expect(depth.ctd.series.temperature[0]).toMatchObject({ positions: [2.5, 7.5], values: [20, 20] });
     });
 
     test("a CTD file that cannot be read is a warning", async () => {

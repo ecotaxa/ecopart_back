@@ -205,6 +205,11 @@ const HISTOGRAMS: Record<ExploreSizeClasses, { limits: readonly number[]; abbrev
     detailed: { limits: PART_DET_CLASS_LIMITS_MM, abbreviation: "det." },
 };
 
+// The datasets are sent whole and can hold hundreds of thousands of points: no more digits than a
+// chart can show (a millimetre of depth, a millisecond, 4 significant digits of a value).
+export const roundPosition = (position: number) => Math.round(position * 1000) / 1000;
+export const roundValue = (value: number) => Number(value.toPrecision(4));
+
 // `samples` hold the detailed bins, as `ExploreParticleBins` serves them.
 export function buildParticleDatasets(samples: SampleBins[], size_classes: ExploreSizeClasses): { abundance: GraphDataset; biovolume: GraphDataset } {
     for (const { bins } of samples) assertDetailed(bins);
@@ -218,17 +223,19 @@ export function buildParticleDatasets(samples: SampleBins[], size_classes: Explo
         const biovolume_series: ProfileSeries[] = [];
         for (const { sample, bins } of histogram) {
             if (!bins.visible[k]) continue;
-            const abundance_points: ProfileSeries["points"] = [];
-            const biovolume_points: ProfileSeries["points"] = [];
+            const positions: number[] = [];
+            const abundances: number[] = [];
+            const biovolumes: number[] = [];
             for (let i = 0; i < bins.positions.length; i++) {
                 const volume = bins.volumes[i];
                 if (!(volume > 0)) continue;
-                abundance_points.push({ position: bins.positions[i], value: bins.counts[i][k] / volume });
-                biovolume_points.push({ position: bins.positions[i], value: bins.biovolumes_mm3[i][k] / volume });
+                positions.push(roundPosition(bins.positions[i]));
+                abundances.push(roundValue(bins.counts[i][k] / volume));
+                biovolumes.push(roundValue(bins.biovolumes_mm3[i][k] / volume));
             }
-            if (abundance_points.length === 0) continue;
-            abundance_series.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, points: abundance_points });
-            biovolume_series.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, points: biovolume_points });
+            if (positions.length === 0) continue;
+            abundance_series.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, positions, values: abundances });
+            biovolume_series.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, positions, values: biovolumes });
         }
         if (abundance_series.length === 0) continue;
         // Legacy EcoPart numbers the classes from 1.
@@ -329,6 +336,27 @@ export function coarsenCtd(bins: CtdBins, max_points: number): CtdBins {
     return result;
 }
 
+// The CTD bins of a sample, computed once per (axis, step, descent filter, CTD file) like the particle
+// bins: parsing a 1 Hz mooring file takes far longer than drawing it.
+export class ExploreCtdBins {
+    private readonly cache = new LruCache<CtdBins>(EXPLORE_GRAPH_CACHE_BINS, bins => Math.max(1, bins.positions.length));
+
+    constructor(private readonly sampleRepository: SampleRepository) { }
+
+    // Throws the reading error, or "Sample X has no CTD file" when the file is gone.
+    async binsOf(sample: ExploreSampleRow, ctd_file_extension: string, axis: BinAxis, step: number, descent_filter: boolean): Promise<CtdBins> {
+        const stamp = await this.sampleRepository.getCtdFileStamp(sample.project_id, sample.sample_name, ctd_file_extension);
+        if (stamp === null) throw new Error(`Sample ${sample.sample_name} has no CTD file`);
+        const key = `${sample.sample_id}|${axis}|${step}|${descent_filter}|${ctd_file_extension}|${stamp}`;
+        const cached = this.cache.get(key);
+        if (cached) return cached;
+        const rows = await this.sampleRepository.getCtdRows(sample.project_id, sample.sample_name, ctd_file_extension);
+        const bins = binCtdRows(rows, axis, step, descent_filter);
+        this.cache.set(key, bins);
+        return bins;
+    }
+}
+
 export const ctdVariableKey = (column: string) => column.replace(/\s*\[.*\]\s*$/, "").trim();
 
 export function buildCtdDataset(samples: { sample: ExploreSampleRow; bins: CtdBins }[]): GraphDataset {
@@ -336,14 +364,17 @@ export function buildCtdDataset(samples: { sample: ExploreSampleRow; bins: CtdBi
     const series_by_column = new Map<string, ProfileSeries[]>();
     for (const { sample, bins } of samples) {
         bins.columns.forEach((column, v) => {
-            const points: ProfileSeries["points"] = [];
+            const positions: number[] = [];
+            const values: number[] = [];
             for (let i = 0; i < bins.positions.length; i++) {
                 const value = bins.means[i][v];
-                if (value !== null) points.push({ position: bins.positions[i], value });
+                if (value === null) continue;
+                positions.push(roundPosition(bins.positions[i]));
+                values.push(roundValue(value));
             }
-            if (points.length === 0) return;
+            if (positions.length === 0) return;
             const list = series_by_column.get(column) ?? [];
-            list.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, points });
+            list.push({ sample_id: sample.sample_id, sample_name: sample.sample_name, positions, values });
             series_by_column.set(column, list);
         });
     }
