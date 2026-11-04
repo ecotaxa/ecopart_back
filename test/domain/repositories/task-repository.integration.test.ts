@@ -14,10 +14,12 @@ import { SearchRepositoryImpl } from '../../../src/domain/repositories/search-re
 import { SearchTask } from '../../../src/domain/use-cases/task/search-tasks'
 import { FsAdapter } from '../../../src/infra/files/fs'
 import { TasksStatus, TaskType } from '../../../src/domain/entities/task'
-import { TASK_CANCELLED_MESSAGE } from '../../../src/domain/constants/task'
+import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from '../../../src/domain/constants/task'
 import { migration as migration028 } from '../../../src/data/migrations/028_task_cancellation_and_unused_cleanup'
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..')
+// Who requests the cancellations, as the cancel use case names them
+const CANCELLED_BY = 'its owner Jane Doe (jane@doe.com)'
 
 function run(db: sqlite3.Database, sql: string, params: any[] = []): Promise<number> {
     return new Promise<number>((resolve, reject) =>
@@ -96,7 +98,7 @@ describe('task repository (integration)', () => {
         test('down restores the previous schema, failing cancelled tasks; up runs again cleanly', async () => {
             const all = (sql: string) => new Promise<any[]>((resolve, reject) => db.all(sql, [], (e, rows) => e ? reject(e) : resolve(rows)))
             const cancelled = await newTask()
-            await taskRepo.cancelTask(cancelled)
+            await taskRepo.cancelTask(cancelled, CANCELLED_BY)
 
             await migration028.down(db)
             const labels = (await all('SELECT task_status_label FROM task_status')).map(r => r.task_status_label)
@@ -130,6 +132,18 @@ describe('task repository (integration)', () => {
             const task = await taskRepo.getOneTask({ task_id })
             expect(task?.task_status).toBe(TasksStatus.Error)
             expect(task?.task_error).toBe('boom')
+            expect(task?.task_progress_msg).toBe('Task failed: boom')
+        })
+
+        test('a task interrupted by a server restart says so in its message', async () => {
+            const task_id = await newTask()
+            await taskRepo.startTask({ task_id })
+            await taskRepo.updateTaskProgress({ task_id }, 40, 'Step 2/5')
+            await taskRepo.failedTask(task_id, new Error(TASK_INTERRUPTED_MESSAGE))
+            const task = await taskRepo.getOneTask({ task_id })
+            expect(task?.task_status).toBe(TasksStatus.Error)
+            expect(task?.task_error).toBe(TASK_INTERRUPTED_MESSAGE)
+            expect(task?.task_progress_msg).toBe(TASK_INTERRUPTED_MESSAGE)
         })
 
         test('the log, the error and the result quote paths relative to the application root', async () => {
@@ -170,16 +184,17 @@ describe('task repository (integration)', () => {
     describe('cancellation', () => {
         test('a pending task is cancelled at once and its work does not start', async () => {
             const task_id = await newTask()
-            await taskRepo.cancelTask(task_id)
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
 
             const task = await taskRepo.getOneTask({ task_id })
             expect(task?.task_status).toBe(TasksStatus.Cancelled)
+            expect(task?.task_progress_msg).toBe(`Cancelled by ${CANCELLED_BY} before it started`)
             expect(task?.task_end_utc_date_time).toBeTruthy()
             await expect(taskRepo.startTask({ task_id })).rejects.toThrow(TASK_CANCELLED_MESSAGE)
             // The worker's catch: nothing more to record on a task already cancelled
             await taskRepo.failedTask(task_id, new Error(TASK_CANCELLED_MESSAGE))
             expect(await statusOf(task_id)).toBe(TasksStatus.Cancelled)
-            expect(await logOf(task_id)).toContain('Task cancelled before it started')
+            expect(await logOf(task_id)).toContain(`Task cancelled by ${CANCELLED_BY} before it started`)
         })
 
         test('a running task goes CANCELLING, stops at its checkpoint and ends CANCELLED', async () => {
@@ -187,8 +202,16 @@ describe('task repository (integration)', () => {
             await taskRepo.startTask({ task_id })
             await expect(taskRepo.throwIfCancelled(task_id)).resolves.toBeUndefined()
 
-            await taskRepo.cancelTask(task_id)
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
             expect(await statusOf(task_id)).toBe(TasksStatus.Cancelling)
+            expect((await taskRepo.getOneTask({ task_id }))?.task_progress_msg).toBe(`Cancellation requested by ${CANCELLED_BY}`)
+
+            // The steps before the checkpoint still report their progress, the message keeps the request
+            await taskRepo.updateTaskProgress({ task_id }, 60, 'Step 3/5')
+            const cancelling = await taskRepo.getOneTask({ task_id })
+            expect(cancelling?.task_progress_pct).toBe(60)
+            expect(cancelling?.task_progress_msg).toBe(`Cancellation requested by ${CANCELLED_BY}`)
+            expect(await logOf(task_id)).toContain('Task progress: 60% - Step 3/5')
 
             const checkpoint = taskRepo.throwIfCancelled(task_id)
             await expect(checkpoint).rejects.toThrow(TASK_CANCELLED_MESSAGE)
@@ -196,15 +219,31 @@ describe('task repository (integration)', () => {
 
             const task = await taskRepo.getOneTask({ task_id })
             expect(task?.task_status).toBe(TasksStatus.Cancelled)
+            expect(task?.task_progress_msg).toBe(`Cancelled by ${CANCELLED_BY}`)
             expect(task?.task_error).toBeFalsy()
             expect(task?.task_end_utc_date_time).toBeTruthy()
             expect(await logOf(task_id)).toContain('Task cancelled')
         })
 
+        test('a progress report decided before the cancellation request cannot overwrite it', async () => {
+            const task_id = await newTask()
+            await taskRepo.startTask({ task_id })
+            const running = await taskDs.getOne({ task_id })
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
+
+            // The worker read its task while it was still RUNNING
+            jest.spyOn(taskDs, 'getOne').mockResolvedValueOnce(running)
+            await taskRepo.updateTaskProgress({ task_id }, 60, 'Step 3/5')
+
+            const task = await taskRepo.getOneTask({ task_id })
+            expect(task?.task_progress_msg).toBe(`Cancellation requested by ${CANCELLED_BY}`)
+            expect(task?.task_progress_pct).not.toBe(60)
+        })
+
         test('a cancelling task that reaches its end before a checkpoint still completes', async () => {
             const task_id = await newTask()
             await taskRepo.startTask({ task_id })
-            await taskRepo.cancelTask(task_id)
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
             await taskRepo.finishTask({ task_id })
             expect(await statusOf(task_id)).toBe(TasksStatus.Done)
         })
@@ -212,23 +251,24 @@ describe('task repository (integration)', () => {
         test('a cancelling task that fails for another reason ends in ERROR', async () => {
             const task_id = await newTask()
             await taskRepo.startTask({ task_id })
-            await taskRepo.cancelTask(task_id)
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
             await taskRepo.failedTask(task_id, new Error('disk full'))
             const task = await taskRepo.getOneTask({ task_id })
             expect(task?.task_status).toBe(TasksStatus.Error)
             expect(task?.task_error).toBe('disk full')
+            expect(task?.task_progress_msg).toBe('Task failed: disk full')
         })
 
         test('a finished or already cancelling task cannot be cancelled', async () => {
             const done_id = await newTask()
             await taskRepo.startTask({ task_id: done_id })
             await taskRepo.finishTask({ task_id: done_id })
-            await expect(taskRepo.cancelTask(done_id)).rejects.toThrow('Task cannot be cancelled')
+            await expect(taskRepo.cancelTask(done_id, CANCELLED_BY)).rejects.toThrow('Task cannot be cancelled')
 
             const cancelling_id = await newTask()
             await taskRepo.startTask({ task_id: cancelling_id })
-            await taskRepo.cancelTask(cancelling_id)
-            await expect(taskRepo.cancelTask(cancelling_id)).rejects.toThrow('Task cannot be cancelled')
+            await taskRepo.cancelTask(cancelling_id, CANCELLED_BY)
+            await expect(taskRepo.cancelTask(cancelling_id, CANCELLED_BY)).rejects.toThrow('Task cannot be cancelled')
         })
     })
 
@@ -238,7 +278,7 @@ describe('task repository (integration)', () => {
             await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still PENDING: cancel it before deleting it.`)
             await taskRepo.startTask({ task_id })
             await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still RUNNING: cancel it before deleting it.`)
-            await taskRepo.cancelTask(task_id)
+            await taskRepo.cancelTask(task_id, CANCELLED_BY)
             await expect(taskRepo.deleteTask({ task_id })).rejects.toThrow(`Task ${task_id} is still CANCELLING: cancel it before deleting it.`)
             expect(await statusOf(task_id)).toBe(TasksStatus.Cancelling)
 
@@ -297,7 +337,7 @@ describe('task repository (integration)', () => {
             expect(await taskRepo.hasActiveTask(project_1, [TaskType.Export_Raw])).toBe(false)
 
             await taskRepo.startTask({ task_id: backup })
-            await taskRepo.cancelTask(backup)
+            await taskRepo.cancelTask(backup, CANCELLED_BY)
             expect(await taskRepo.hasActiveTask(project_1, [TaskType.Import_Backup, TaskType.Export_Backup])).toBe(true)
 
             await taskRepo.finishTask({ task_id: backup })
@@ -337,7 +377,7 @@ describe('task repository (integration)', () => {
             const done = await newTask()
             await taskRepo.startTask({ task_id: running })
             await taskRepo.startTask({ task_id: cancelling })
-            await taskRepo.cancelTask(cancelling)
+            await taskRepo.cancelTask(cancelling, CANCELLED_BY)
             await taskRepo.startTask({ task_id: done })
             await taskRepo.finishTask({ task_id: done })
 

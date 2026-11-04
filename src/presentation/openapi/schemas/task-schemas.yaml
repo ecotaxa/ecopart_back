@@ -69,7 +69,10 @@ components:
           example: 100
         task_progress_msg:
           type: string
-          description: Current progress message.
+          description: >-
+            Current progress message. Once the task has ended it tells its outcome:
+            "Task failed: <error>", "Task interrupted by a server restart",
+            "Cancellation requested by <who>" (CANCELLING) then "Cancelled by <who>".
         task_result:
           type: string
           description: Task result summary.

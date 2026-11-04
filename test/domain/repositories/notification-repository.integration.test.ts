@@ -109,7 +109,7 @@ describe('notifications (integration)', () => {
     test('notifies a cancelled task, at its end only', async () => {
         const task_id = await newTask(TaskType.Export_Raw)
         await taskRepo.startTask({ task_id })
-        await taskRepo.cancelTask(task_id)
+        await taskRepo.cancelTask(task_id, 'its owner Jane Doe (jane@doe.com)')
         expect(await notificationsOf(owner_id)).toHaveLength(0)
 
         await taskRepo.failedTask(task_id, new Error(TASK_CANCELLED_MESSAGE))
