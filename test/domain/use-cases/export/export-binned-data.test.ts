@@ -277,7 +277,7 @@ describe("ExportBinnedData", () => {
                 task_type: TaskType.Export,
                 task_status: "PENDING",
                 task_owner_id: 1,
-                task_params: { sample_ids: [7], bin_mode: "auto", bin_size_m: 5, bin_size_h: 1, skip_not_validated: false, format: "tsv" },
+                task_params: { sample_ids: [7], project_ids: [1], bin_mode: "auto", bin_size_m: 5, bin_size_h: 1, skip_not_validated: false, format: "tsv" },
             });
         });
     });

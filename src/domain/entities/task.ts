@@ -92,8 +92,16 @@ export interface TaskVisibilityModel {
     project_ids: number[];
 }
 
+export interface TaskProjectModel {
+    project_id: number;
+    project_title: string;
+}
+
 // API-facing task: the log file path is a server path, the log itself is served by GET /tasks/:id/log.
-export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path">;
+export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path"> & {
+    // The exported projects, on an export task read by GET /tasks/:id.
+    task_projects?: TaskProjectModel[];
+};
 
 export interface PrivateTaskRequestModel {
     task_id?: number;

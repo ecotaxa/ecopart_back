@@ -319,7 +319,7 @@ describe("ExportRawDataUseCase", () => {
 
                 expect(task).toStrictEqual(toPublicTask(TaskResponseModel_1));
                 expect(mockTaskRepository.createTask).toBeCalledWith(expect.objectContaining({
-                    task_params: { sample_ids: [1, 2], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true, format: "tsv" },
+                    task_params: { sample_ids: [1, 2], project_ids: [sampleModel_1.project_id], export_types: ["metadata"], ecotaxa_exclude_not_living: false, skip_not_validated: true, format: "tsv" },
                 }));
                 // Every requested sample's project is authorized, the dropped one included, so that
                 // the gate never names a sample the caller may not see.
@@ -378,6 +378,7 @@ describe("ExportRawDataUseCase", () => {
                 task_owner_id: current_user.user_id,
                 task_params: {
                     sample_ids: [1],
+                    project_ids: [sampleModel_1.project_id],
                     export_types: ["metadata", "ecotaxa"],
                     ecotaxa_exclude_not_living: true,
                     skip_not_validated: false,

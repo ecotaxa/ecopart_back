@@ -48,6 +48,16 @@ components:
         task_project_id:
           type: integer
           description: Associated project ID.
+        task_projects:
+          type: array
+          description: Exported projects. Only on an export task read by GET /tasks/{task_id}; a deleted project or sample is left out.
+          items:
+            type: object
+            properties:
+              project_id:
+                type: integer
+              project_title:
+                type: string
         task_params:
           type: object
           description: Task-specific parameters.

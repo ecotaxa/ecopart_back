@@ -119,7 +119,7 @@ export default function TaskRouter(
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
-     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`.
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `desc(task_id),asc(task_status_id)`. `task_last_update` sorts on the end date, or the creation date of an unfinished task.
      *     tags: [Tasks]
      *     security:
      *       - cookieAccessToken: []

@@ -104,7 +104,8 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             task_status: TasksStatus.Pending,
             task_owner_id: current_user.user_id,
             // Cross-project export: keep task_project_id unset.
-            task_params: { sample_ids: plan.sample_ids, bin_mode: plan.bin_mode, bin_size_m: plan.depth_step_m, bin_size_h: plan.time_step_h, skip_not_validated, format: plan.format },
+            // project_ids: the projects in the archive, read back by GET /tasks/:id.
+            task_params: { sample_ids: plan.sample_ids, project_ids: Array.from(exported_projects.keys()), bin_mode: plan.bin_mode, bin_size_m: plan.depth_step_m, bin_size_h: plan.time_step_h, skip_not_validated, format: plan.format },
         } as PublicTaskRequestCreationModel);
 
         const task = await this.taskRepository.getOneTask({ task_id });

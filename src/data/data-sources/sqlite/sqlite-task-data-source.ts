@@ -123,6 +123,14 @@ export class SQLiteTaskDataSource implements TaskDataSource {
             return "task." + field;
         };
 
+        // Resolve a domain sort field to the SQL column/expression to sort on.
+        // task_last_update is not a real column: an unfinished task has no end date, so it
+        // falls back to its creation date (otherwise desc sorts it after every finished task).
+        const resolveSortColumn = (field: string): string => {
+            if (field === "task_last_update") return "COALESCE(task.task_end_utc_date_time, task.task_creation_utc_date_time)";
+            return field;
+        };
+
         // Get the limited rows and the total count of rows //  WHERE your_condition
         let sql = `SELECT task.*, user.first_name, user.last_name, user.email, task_type.task_type_label, task_status.task_status_label, (SELECT COUNT(*) FROM task` + JOINS
         const params: any[] = []
@@ -184,7 +192,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
         if (options.sort_by.length > 0) {
             sql += ` ORDER BY`;
             for (const sort of options.sort_by) {
-                sql += ` ` + sort.sort_by + ` ` + sort.order_by + `,`;
+                sql += ` ` + resolveSortColumn(sort.sort_by) + ` ` + sort.order_by + `,`;
             }
             // remove last ,
             sql = sql.slice(0, -1);

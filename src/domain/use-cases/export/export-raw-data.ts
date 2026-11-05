@@ -98,7 +98,8 @@ export class ExportRawData implements ExportRawDataUseCase {
             task_status: TasksStatus.Pending,
             task_owner_id: current_user.user_id,
             // Cross-project export: keep task_project_id unset.
-            task_params: { sample_ids, export_types, ecotaxa_exclude_not_living, skip_not_validated, format },
+            // project_ids: the projects in the archive, read back by GET /tasks/:id.
+            task_params: { sample_ids, project_ids: Array.from(new Set(samples.map(s => s.project_id))), export_types, ecotaxa_exclude_not_living, skip_not_validated, format },
         } as PublicTaskRequestCreationModel);
 
         const task = await this.taskRepository.getOneTask({ task_id });

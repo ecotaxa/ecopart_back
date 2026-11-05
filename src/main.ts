@@ -405,7 +405,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareTaskValidation(),
         new DeleteTask(user_repo, task_repo, privilege_repo),
-        new GetOneTask(task_repo, user_repo, privilege_repo),
+        new GetOneTask(task_repo, user_repo, privilege_repo, sample_repo, project_repo),
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
         new StreamZipFile(task_repo, user_repo, privilege_repo),
         new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo),
