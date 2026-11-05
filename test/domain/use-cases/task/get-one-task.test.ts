@@ -5,12 +5,16 @@ import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositor
 import { MockUserRepository } from "../../../mocks/user-mock";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
+import { MockProjectRepository } from "../../../mocks/project-mock";
+import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { GetOneTask } from "../../../../src/domain/use-cases/task/get-one-task";
 
 let mockUserRepository: UserRepository;
 let mockTaskRepository: TaskRepository;
 let mockPrivilegeRepository: PrivilegeRepository;
+let mockSampleRepository: MockSampleRepository;
+let mockProjectRepository: MockProjectRepository;
 
 let getOneTaskUseCase: GetOneTask;
 
@@ -20,7 +24,10 @@ beforeEach(async () => {
     mockTaskRepository = new MockTaskRepository()
     mockPrivilegeRepository = new MockPrivilegeRepository()
 
-    getOneTaskUseCase = new GetOneTask(mockTaskRepository, mockUserRepository, mockPrivilegeRepository)
+    mockSampleRepository = new MockSampleRepository()
+    mockProjectRepository = new MockProjectRepository()
+
+    getOneTaskUseCase = new GetOneTask(mockTaskRepository, mockUserRepository, mockPrivilegeRepository, mockSampleRepository, mockProjectRepository)
     jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask)
 })
 
@@ -134,6 +141,56 @@ describe("Get One Task Use Case", () => {
         expect(mockTaskRepository.getOneTask).toBeCalledWith({ task_id: 1 });
         expect(mockUserRepository.isAdmin).toBeCalledTimes(1);
         expect(mockPrivilegeRepository.isGranted).toBeCalledWith({ user_id: current_user.user_id, project_id: 5 });
+    });
+
+    describe("Exported projects", () => {
+        const owner: UserUpdateModel = { user_id: 1 }
+        const getProject = async ({ project_id }: { project_id?: number }) =>
+            (project_id === 404 ? null : { project_id, project_title: `Project ${project_id}` }) as any
+
+        beforeEach(() => {
+            jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementation(() => Promise.resolve())
+            jest.spyOn(mockProjectRepository, "getProject").mockImplementation(getProject as any)
+            jest.spyOn(mockSampleRepository, "getSamplesByIds").mockImplementation(() => Promise.resolve(
+                [{ project_id: 534 }, { project_id: 533 }, { project_id: 534 }, { project_id: 404 }] as any))
+        })
+
+        test("Cross-project export : the distinct projects of its samples, stored as JSON text : ok", async () => {
+            const export_task = { ...TaskResponseModel_1, task_type: "EXPORT_RAW", task_project_id: undefined, task_params: '{"sample_ids":[1,2,3,4]}' as any }
+            jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(export_task))
+
+            const task = await getOneTaskUseCase.execute(owner, 1);
+
+            expect(mockSampleRepository.getSamplesByIds).toBeCalledWith([1, 2, 3, 4]);
+            expect(task.task_projects).toStrictEqual([
+                { project_id: 533, project_title: "Project 533" },
+                { project_id: 534, project_title: "Project 534" },
+            ]);
+        });
+
+        test("Backup export : its own project : ok", async () => {
+            const export_task = { ...TaskResponseModel_1, task_type: "EXPORT_BACKUP", task_project_id: 5, task_params: { out_to_ftp: false } }
+            jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(export_task))
+
+            const task = await getOneTaskUseCase.execute(owner, 1);
+
+            expect(mockSampleRepository.getSamplesByIds).toBeCalledTimes(0);
+            expect(task.task_projects).toStrictEqual([{ project_id: 5, project_title: "Project 5" }]);
+        });
+
+        test("Export without samples : no project : ok", async () => {
+            const export_task = { ...TaskResponseModel_1, task_type: "EXPORT", task_project_id: undefined, task_params: {} }
+            jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(export_task))
+
+            expect((await getOneTaskUseCase.execute(owner, 1)).task_projects).toStrictEqual([]);
+            expect(mockSampleRepository.getSamplesByIds).toBeCalledTimes(0);
+        });
+
+        test("Other task type : no task_projects : ok", async () => {
+            jest.spyOn(mockTaskRepository, "getOneTask").mockImplementation(() => Promise.resolve(TaskResponseModel_1))
+
+            expect(await getOneTaskUseCase.execute(owner, 1)).not.toHaveProperty("task_projects");
+        });
     });
 
 });

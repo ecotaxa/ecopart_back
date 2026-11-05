@@ -56,4 +56,32 @@ describe('SQLiteTaskDataSource', () => {
         expect(await repository.countExportTasks(1)).toBe(4)
         expect(await repository.countExportTasks(3)).toBe(0)
     })
+
+    test('task_last_update: sorts on the end date, or the creation date of an unfinished task', async () => {
+        const dates: [string, string | null][] = [
+            ['2026-03-01T00:00:00.000Z', '2026-03-02T00:00:00.000Z'], // finished last, after being created first
+            ['2026-03-03T00:00:00.000Z', null],                       // running, the most recent
+            ['2026-03-01T12:00:00.000Z', '2026-03-01T13:00:00.000Z'],
+            ['2026-03-01T15:00:00.000Z', null],                       // running, between the two finished tasks
+        ]
+        for (const [creation, end] of dates) {
+            await run(db, `INSERT INTO task (task_type_id, task_status_id, task_owner_id, task_project_id, task_creation_utc_date_time, task_end_utc_date_time) VALUES (?, 5, 1, 4, ?, ?)`,
+                [await typeId('EXPORT'), creation, end])
+        }
+
+        const repository = new TaskRepositoryImpl(dataSource, {} as any, 'data_storage')
+        const result = await repository.standardGetTasks({
+            filter: [{ field: 'task_project_id', operator: '=', value: 4 }],
+            sort_by: [{ sort_by: 'task_last_update', order_by: 'desc' }, { sort_by: 'task_id', order_by: 'desc' }],
+            page: 1,
+            limit: 10,
+        })
+
+        expect(result.items.map(task => task.task_creation_utc_date_time)).toEqual([
+            '2026-03-03T00:00:00.000Z',
+            '2026-03-01T00:00:00.000Z',
+            '2026-03-01T15:00:00.000Z',
+            '2026-03-01T12:00:00.000Z',
+        ])
+    })
 })

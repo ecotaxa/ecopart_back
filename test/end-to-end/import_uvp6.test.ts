@@ -329,7 +329,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new MiddlewareAuthCookie(jwtAdapter, ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET),
             new MiddlewareTaskValidation(),
             new DeleteTask(userRepo, taskRepo, privilegeRepo),
-            new GetOneTask(taskRepo, userRepo, privilegeRepo),
+            new GetOneTask(taskRepo, userRepo, privilegeRepo, sampleRepo, projectRepo),
             new GetLogFileTask(taskRepo, userRepo, privilegeRepo),
             new StreamZipFile(taskRepo, userRepo, privilegeRepo),
             new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo),
