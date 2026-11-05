@@ -44,16 +44,27 @@ export class GetOneTask implements GetOneTaskUseCase {
     }
 
     // A backup export is attached to its project. A raw or binned export can span several projects
-    // and only stores its samples, so its projects are found through them. A deleted project or
-    // sample is left out.
+    // and stores their ids. A deleted project is left out. The projects are read in one query: the
+    // task page reads a running task every few seconds, and a bulk export spans hundreds of projects.
     private async getExportedProjects(task: TaskResponseModel): Promise<TaskProjectModel[]> {
-        const project_ids = task.task_project_id ? [task.task_project_id] : await this.getProjectIdsOfSamples(task);
-        const projects = await Promise.all(project_ids.map(project_id => this.projectRepository.getProject({ project_id })));
-        return projects.flatMap(project => project ? [{ project_id: project.project_id, project_title: project.project_title }] : []);
+        const project_ids = task.task_project_id ? [task.task_project_id] : await this.getExportedProjectIds(task);
+        if (project_ids.length === 0) return [];
+        const projects = await this.projectRepository.standardGetProjects({
+            filter: [{ field: "project_id", operator: "IN", value: project_ids }],
+            sort_by: [{ sort_by: "project_id", order_by: "asc" }],
+            page: 1,
+            limit: project_ids.length,
+        });
+        return projects.items.map(project => ({ project_id: project.project_id, project_title: project.project_title }));
     }
 
-    private async getProjectIdsOfSamples(task: TaskResponseModel): Promise<number[]> {
-        const sample_ids = this.taskParams(task).sample_ids;
+    // An export created before project_ids was stored only has its samples: its projects are found
+    // through them, which reads every sample row. Such a task is finished (an interrupted one is
+    // closed at startup), so the task page reads it once instead of polling it.
+    private async getExportedProjectIds(task: TaskResponseModel): Promise<number[]> {
+        const params = this.taskParams(task);
+        if (Array.isArray(params.project_ids)) return params.project_ids as number[];
+        const sample_ids = params.sample_ids;
         if (!Array.isArray(sample_ids) || sample_ids.length === 0) return [];
         const samples = await this.sampleRepository.getSamplesByIds(sample_ids);
         return Array.from(new Set(samples.map(sample => sample.project_id))).sort((a, b) => a - b);
