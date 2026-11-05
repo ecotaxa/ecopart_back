@@ -36,9 +36,10 @@ describe("exploreGraphSteps", () => {
         expect(exploreGraphSteps(null as unknown as undefined, null as unknown as undefined)).toEqual({ pressure_bin: 5, time_bin: 1 });
     });
 
-    test("accepts steps within the bounds", () => {
+    test("accepts depth steps within the bounds and the time steps that divide 24 h", () => {
         expect(exploreGraphSteps(1, 0.5)).toEqual({ pressure_bin: 1, time_bin: 0.5 });
         expect(exploreGraphSteps(100, 24)).toEqual({ pressure_bin: 100, time_bin: 24 });
+        expect(exploreGraphSteps(2.5, "6" as unknown as number)).toEqual({ pressure_bin: 2.5, time_bin: 6 });
         expect(exploreGraphSteps("10" as unknown as number, undefined)).toEqual({ pressure_bin: 10, time_bin: 1 });
     });
 
@@ -46,8 +47,8 @@ describe("exploreGraphSteps", () => {
         expect(() => exploreGraphSteps(pressure_bin, undefined)).toThrow("pressure_bin must be between 1 and 100");
     });
 
-    test.each([0, 0.4, 25, NaN])("time_bin %p is refused", (time_bin) => {
-        expect(() => exploreGraphSteps(undefined, time_bin)).toThrow("time_bin must be between 0.5 and 24");
+    test.each([0, 0.4, 5, 0.75, 25, NaN])("time_bin %p is refused", (time_bin) => {
+        expect(() => exploreGraphSteps(undefined, time_bin)).toThrow("time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24");
     });
 });
 
@@ -487,7 +488,7 @@ describe("binCtdRows", () => {
         expect(binCtdRows(rows, "depth", 5, false)).toEqual({ positions: [], columns: ["temperature [degc]"], means: [] });
     });
 
-    test("on the time axis, bins start at the UTC hour of the first row", () => {
+    test("on the time axis, bins are aligned on midnight UTC, like the particle bins", () => {
         const rows = ctd([[1, 13, 38.1], [2, 12, 38.2], [3, 11, 38.3], [4, 99, 99]], [T0, T0 + 30 * 60_000, T0 + 80 * 60_000, null]);
 
         const hourly = binCtdRows(rows, "time", 1, false);
@@ -497,6 +498,10 @@ describe("binCtdRows", () => {
 
         const half_hourly = binCtdRows(rows, "time", 0.5, false);
         expect(half_hourly.positions).toEqual([origin + 0.25 * HOUR, origin + 0.75 * HOUR, origin + 1.75 * HOUR]);
+
+        // From 10:20 UTC: the 06:00-12:00 bin for a 6 h step, the calendar day for 24 h.
+        expect(binCtdRows(rows, "time", 6, false).positions).toEqual([Date.UTC(2024, 5, 12, 9, 0, 0)]);
+        expect(binCtdRows(rows, "time", 24, false).positions).toEqual([Date.UTC(2024, 5, 12, 12, 0, 0)]);
 
         // The descent filter only applies to depth profiles.
         expect(binCtdRows(rows, "time", 1, true)).toEqual(hourly);

@@ -65,6 +65,13 @@ const MAX_CACHED_VIGNETTE_COUNTS = 10_000;
 const MAX_CACHED_OPERATOR_EMAIL_CHECKS = 10_000;
 // Sample ids per lookup query in getSamplesByIds (twice this many SQL variables).
 const SAMPLE_IDS_PER_QUERY = 5_000;
+// The `metadata.ini` values a UVP6 import cannot do without: NOT NULL columns of the sample, and
+// the sample type and position computed from the file. A blank one refuses the sample before the copy.
+const UVP6_REQUIRED_METADATA_INI_VALUES: Array<[string, string]> = [
+    ["HW_CONF", "Aa"], ["HW_CONF", "Exp"], ["HW_CONF", "Image_volume"], ["HW_CONF", "Pixel_Size"], ["HW_CONF", "Gain"], ["HW_CONF", "Threshold"],
+    ["ACQ_CONF", "Appendices_ratio"],
+    ["sample_metadata", "sampletype"], ["sample_metadata", "latitude"], ["sample_metadata", "longitude"],
+];
 
 // A value step 4/4 can store in a required text column: a non-blank text. The UVP6 INI parser turns
 // an empty value into the number 0.
@@ -863,9 +870,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             sampling_utc_date_time: this.parseUvpDateToIso(row.filename),
             latitude_raw: row.latitude,
             longitude_raw: row.longitude,
-            wind_direction: row.winddir,
+            wind_direction: this.withoutPlaceholder(row.winddir),
             wind_speed: parseFloat(row.windspeed),
-            sea_state: row.seastate,
+            sea_state: this.withoutPlaceholder(row.seastate),
             nebulousness: parseFloat(row.nebuloussness),
             bottom_depth: parseFloat(row.bottomdepth),
             filename: row.filename,
@@ -892,6 +899,12 @@ export class SampleRepositoryImpl implements SampleRepository {
         if (value === undefined || value === null || String(value).trim() === "") return undefined;
         const parsed = parseFloat(String(value));
         return Number.isNaN(parsed) ? undefined : parsed;
+    }
+
+    // An environment field of a UVP file as it came, unless it is the `NA` / `nan` placeholder or blank.
+    private withoutPlaceholder<T>(value: T): T | undefined {
+        if (value === undefined || value === null) return undefined;
+        return ["", "na", "nan"].includes(String(value).trim().toLowerCase()) ? undefined : value;
     }
 
     // UVP6 `metadata.ini` `HW_CONF.Pressure_offset`, with legacy EcoPart's sanity range: only
@@ -928,8 +941,10 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    parseIniContent(data: string): MetadataIniSampleModel {
-        const ini_content: any = {};
+    // The sections of a UVP6 `metadata.ini`, a value read as a number when it is one. A blank value
+    // stays blank: `Number("")` is 0, which would store a zero nobody measured.
+    private parseIniSections(data: string): Record<string, Record<string, string | number>> {
+        const ini_content: Record<string, Record<string, string | number>> = {};
         let currentSection: string | null = null;
 
         // Split the data into lines and process each line
@@ -951,11 +966,15 @@ export class SampleRepositoryImpl implements SampleRepository {
             else if (currentSection) {
                 const [key, value] = line.split('=').map((part) => part.trim());
                 if (key) {
-                    // Convert the value to a number if possible, otherwise keep as string
-                    (ini_content[currentSection] as any)[key] = isNaN(Number(value)) ? value : Number(value);
+                    ini_content[currentSection][key] = value === undefined || value === "" || isNaN(Number(value)) ? value : Number(value);
                 }
             }
         });
+        return ini_content;
+    }
+
+    parseIniContent(data: string): MetadataIniSampleModel {
+        const ini_content: any = this.parseIniSections(data);
 
         const sample: MetadataIniSampleModel = {
             sample_name: ini_content.sample_metadata['profileid'] as string,
@@ -963,10 +982,11 @@ export class SampleRepositoryImpl implements SampleRepository {
             instrument_serial_number: ini_content.HW_CONF['Camera_ref'] as string,
             station_id: ini_content.sample_metadata['stationid'] as string,
             sampling_utc_date_time: this.parseUvpDateToIso(ini_content.sample_metadata['sampledatetime'] as string),
-            wind_direction: ini_content.sample_metadata['winddir'] as number,
-            wind_speed: ini_content.sample_metadata['windspeed'] as number,
-            sea_state: ini_content.sample_metadata['seastate'] as string,
-            nebulousness: ini_content.sample_metadata['nebuloussness'] as number,
+            // UVPapp writes `NA` or `nan` when the operator left these fields empty: stored NULL, not the text.
+            wind_direction: this.withoutPlaceholder(ini_content.sample_metadata['winddir']) as number | undefined,
+            wind_speed: this.withoutPlaceholder(ini_content.sample_metadata['windspeed']) as number | undefined,
+            sea_state: this.withoutPlaceholder(ini_content.sample_metadata['seastate']) as string | undefined,
+            nebulousness: this.withoutPlaceholder(ini_content.sample_metadata['nebuloussness']) as number | undefined,
             bottom_depth: this.parseOptionalFloat(ini_content.sample_metadata['bottomdepth']),
             instrument_operator_email: ini_content.HW_CONF['Operator_email'] as string,
             filename: ini_content.sample_metadata['filename'] as string,
@@ -988,7 +1008,9 @@ export class SampleRepositoryImpl implements SampleRepository {
             // exists inside <sample>_Images.zip (so it stays empty when no images were imported).
             instrument_settings_process_vignette_resize_factor: undefined,
             instrument_settings_images_post_process: "uvpapp",
-            instrument_settings_aa: ini_content.HW_CONF['Aa'] as number,
+            // `HW_CONF.Aa` is in mm²/px × 10⁶ on the UVP6 (2300 for 0.0023); stored in mm²/px like the
+            // UVP5 one (original spec: "for UVP6, value is divided by 10⁶").
+            instrument_settings_aa: Number(ini_content.HW_CONF['Aa']) / 1e6,
             instrument_settings_exp: ini_content.HW_CONF['Exp'] as number,
             instrument_settings_image_volume_l: ini_content.HW_CONF['Image_volume'] as number,
             // `HW_CONF.Pixel_Size` is in micrometre on the UVP6 (73 on real data); stored in mm like
@@ -2661,6 +2683,16 @@ export class SampleRepositoryImpl implements SampleRepository {
         if (letter === "T" || letter === "H") return "Time";
         if (letter === "D" || letter === "N" || letter === "Y" || letter === "P") return "Depth";
         return null;
+    }
+
+    async checkUvp6SourceMetadataIni(root_folder_path: string, sample_name: string): Promise<string[]> {
+        const zip_path = path.join(this.base_folder, root_folder_path, "ecodata", sample_name, `${sample_name}_Particule.zip`);
+        const sections = this.parseIniSections(await this.readSampleFile(zip_path, 'metadata.ini', 'metadata.ini', undefined));
+        return UVP6_REQUIRED_METADATA_INI_VALUES.flatMap(([section, key]) => {
+            const value = sections[section]?.[key];
+            if (value === undefined) return [`[${section}] ${key} is missing`];
+            return String(value).trim() === "" ? [`[${section}] ${key} is empty`] : [];
+        });
     }
 
     async getSourceMaxPressure(root_folder_path: string, sample_name: string, instrument_model: string): Promise<number | null> {

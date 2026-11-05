@@ -1,6 +1,6 @@
 import { ExploreContact, ExploreMapSample, ExploreProjectRow, ExploreSampleRow, ExploreSelection, ExploreSummary, LabelCount, PressureHistogramBin, ProfilePoint } from "../../entities/explore";
 import { MinimalUserModel } from "../../entities/user";
-import { aaInMm2, esdMm } from "../export/binned-computation";
+import { esdMm } from "../export/binned-computation";
 import { ExploreProjectContext } from "./explore-selection";
 
 /* Pure statistics of a list of samples: what the "Selected data stats" and "Exportable selection"
@@ -40,9 +40,8 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
             histogram.set(bin, (histogram.get(bin) ?? 0) + 1);
         }
         if (context && isFinite(sample.particle_min_area_px) && isFinite(sample.particle_max_area_px) && sample.instrument_settings_aa > 0 && sample.instrument_settings_exp > 0) {
-            const aa_mm2 = aaInMm2(context.project.instrument_model, sample.instrument_settings_aa);
-            const smallest = esdMm(sample.particle_min_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
-            const largest = esdMm(sample.particle_max_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
+            const smallest = esdMm(sample.particle_min_area_px, sample.instrument_settings_aa, sample.instrument_settings_exp) * 1000;
+            const largest = esdMm(sample.particle_max_area_px, sample.instrument_settings_aa, sample.instrument_settings_exp) * 1000;
             if (size_min === null || smallest < size_min) size_min = smallest;
             if (size_max === null || largest > size_max) size_max = largest;
         }

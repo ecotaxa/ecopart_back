@@ -74,7 +74,7 @@ describe("GetExploreGraphs", () => {
 
     test("a step out of bounds is refused before the selection is resolved", async () => {
         await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null, pressure_bin: 0 })).rejects.toThrow("pressure_bin must be between 1 and 100");
-        await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "time", filters: null, time_bin: 48 })).rejects.toThrow("time_bin must be between 0.5 and 24");
+        await expect(useCase.execute({ user_id: CAROL.user_id }, { mode: "time", filters: null, time_bin: 48 })).rejects.toThrow("time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24");
         expect(userRepository.ensureUserCanBeUsed).toBeCalledTimes(0);
         expect(projectRepository.listProjects).toBeCalledTimes(0);
     });

@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
-import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from '../../domain/constants/binned-export';
+import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H, isBinnedTimeStep } from '../../domain/constants/binned-export';
 import { EXPORT_TABLE_FORMATS } from '../../domain/constants/export-format';
 
 const ALLOWED_EXPORT_TYPES = ["metadata", "lpm", "images", "instrument_config", "ctd", "ecotaxa"];
@@ -56,7 +56,8 @@ export class MiddlewareExportValidation implements IMiddlewareExportValidation {
             .isFloat({ min: BINNED_DEPTH_STEP_M.min, max: BINNED_DEPTH_STEP_M.max }).withMessage(`bin_size_m must be a number between ${BINNED_DEPTH_STEP_M.min} and ${BINNED_DEPTH_STEP_M.max}.`),
         check("bin_size_h")
             .optional()
-            .isFloat({ min: BINNED_TIME_STEP_H.min, max: BINNED_TIME_STEP_H.max }).withMessage(`bin_size_h must be a number between ${BINNED_TIME_STEP_H.min} and ${BINNED_TIME_STEP_H.max}.`),
+            .isFloat().withMessage(`bin_size_h must be one of: ${BINNED_TIME_STEP_H.allowed.join(", ")}.`).bail()
+            .custom((value) => isBinnedTimeStep(Number(value))).withMessage(`bin_size_h must be one of: ${BINNED_TIME_STEP_H.allowed.join(", ")}.`),
         // isBoolean also accepts the strings "true"/"false"/"1"/"0": converted here, the string
         // "false" cannot turn the gate opt-out on.
         check("skip_not_validated")

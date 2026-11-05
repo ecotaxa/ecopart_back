@@ -161,7 +161,9 @@ describe("ExportBinnedData", () => {
             [{ sample_ids: [0] }, "sample_ids must be positive integers"],
             [{ bin_mode: "pressure" as any }, "bin_mode must be one of: auto, depth, time"],
             [{ bin_size_m: 0.5 }, "bin_size_m must be between 1 and 100"],
-            [{ bin_size_h: 30 }, "bin_size_h must be between 0.5 and 24"],
+            [{ bin_size_h: 30 }, "bin_size_h must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24"],
+            // A step that does not divide 24 h would put the bins of two days on different bounds.
+            [{ bin_size_h: 5 }, "bin_size_h must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24"],
         ])("an invalid request %j is refused: %s", async (request, message) => {
             jest.spyOn(mockSampleRepository, "getSamplesByIds");
 
@@ -244,9 +246,11 @@ describe("ExportBinnedData", () => {
             jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockResolvedValue(null);
             given([sample()], [project()]);
 
+            // Refused only when no sample remains once those without pivot are left out.
             await expect(exportOf()).rejects.toThrow(`Sample(s) without pivot: ${sampleModel_1.sample_name}. Run the pivot regeneration of their project.`);
+            expect(mockTaskRepository.createTask).toBeCalledTimes(0);
 
-            given([sample({ instrument_settings_aa: 2300, instrument_settings_exp: 1.136 })], [project({ instrument_model: "UVP6LP" })]);
+            given([sample({ instrument_settings_aa: 0.0023, instrument_settings_exp: 1.136 })], [project({ instrument_model: "UVP6LP" })]);
             jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockClear();
             await expect(exportOf()).resolves.toBeDefined();
             expect(mockSampleRepository.getPivotConverterVersion).toBeCalledTimes(0);
@@ -408,6 +412,63 @@ describe("ExportBinnedData", () => {
             });
         });
 
+        test("a UVP5 sample without pivot is left out of the export and named in a WARNING of the task log", async () => {
+            jest.spyOn(mockSampleRepository, "getPivotConverterVersion").mockImplementation(((_project_id: number, sample_name: string) =>
+                Promise.resolve(sample_name === "no_pivot" ? null : "2")) as any);
+            // Without calibration too: left out anyway, it does not make the request fail.
+            given([sample(), sample({ sample_id: 8, sample_name: "no_pivot", instrument_settings_aa: 0 })], [project()]);
+
+            await useCase.execute(current_user, { sample_ids: [7, 8] });
+
+            expect(await task_finished).toMatchObject({ outcome: "finished" });
+            expect(log_messages).toContain("Particles: WARNING 1 UVP5 sample(s) left out of this export because their particle file in the UVP6 format was never built: no_pivot. Run the pivot regeneration of their project, then export them again.");
+            expect(mockSampleRepository.readPivotImages).toBeCalledTimes(1);
+            expect(mockSampleRepository.readPivotImages).toHaveBeenCalledWith(1, sampleModel_1.sample_name, "UVP5HD");
+        });
+
+        test("time bins are aligned on midnight UTC, whatever the time of the first image", async () => {
+            given([sample()], [project()]);
+
+            // The images are at 22:00 UTC: a 24 h bin is the calendar day, a 8 h bin the 16:00-24:00 slice.
+            await exportOf({ bin_mode: "time", bin_size_h: 24 });
+            await task_finished;
+
+            const rows = parseTsv((await zipEntries(zip_path()))["particles.tsv"]);
+            expect(rows.map((r) => [r.subsample_utc_date_time_start, r.subsample_utc_date_time_stop])).toEqual([["2020-08-06T00:00:00.000Z", "2020-08-07T00:00:00.000Z"]]);
+        });
+
+        test("auto on a selection that mixes depth profiles and time series writes one file per axis", async () => {
+            given([sample(), sample({ sample_id: 8, sample_name: "mooring", sample_type_label: "Time" })], [project()]);
+
+            await useCase.execute(current_user, { sample_ids: [7, 8] });
+            await task_finished;
+
+            const entries = await zipEntries(zip_path());
+            expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles_depth.tsv", "particles_time.tsv"]);
+            const depth = parseTsv(entries["particles_depth.tsv"]);
+            const time = parseTsv(entries["particles_time.tsv"]);
+            expect(new Set(depth.map((r) => r.ecopart_sample_id))).toEqual(new Set(["7"]));
+            expect(time.map((r) => r.ecopart_sample_id)).toEqual(["8"]);
+            // Each file keeps one meaning per column: bin bounds in depth for the profile, in time for the series.
+            expect(depth[0]).toMatchObject({ subsample_depth_start: "0", subsample_depth_stop: "5" });
+            expect(time[0]).toMatchObject({ subsample_utc_date_time_start: "2020-08-06T22:00:00.000Z", subsample_depth_stop: "" });
+            expect(entries["README.md"]).toContain("the depth bins are in `particles_depth.tsv`, the time bins in `particles_time.tsv`");
+            expect(entries["README.md"]).toContain("├── particles_depth.tsv");
+            expect(entries["README.md"]).toContain("└── particles_time.tsv");
+            expect(entries["README.md"]).toContain("## `particles_depth.tsv` and `particles_time.tsv`");
+            expect(log_messages).toContain("Particles: the selection mixes depth profiles and time series and bin_mode is auto, so the depth bins and the time bins go to two files: particles_depth.tsv (1 sample(s)), particles_time.tsv (1 sample(s))");
+            expect(log_messages.some(m => /^Particles: particles_time\.tsv written, 1 row\(s\) for 1 sample\(s\), /.test(m))).toBe(true);
+        });
+
+        test("a forced axis keeps a mixed selection in one file", async () => {
+            given([sample(), sample({ sample_id: 8, sample_name: "mooring", sample_type_label: "Time" })], [project()]);
+
+            await useCase.execute(current_user, { sample_ids: [7, 8], bin_mode: "depth" });
+            await task_finished;
+
+            expect(Object.keys(await zipEntries(zip_path())).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles.tsv"]);
+        });
+
         test("a particle file that cannot be read fails the task and leaves no archive", async () => {
             jest.spyOn(mockSampleRepository, "readPivotImages").mockImplementation(() => (async function* () { throw new Error("Cannot read the particle file of sample perle3_001 (no such file)"); })());
             given([sample()], [project()]);
@@ -447,7 +508,7 @@ describe("ExportBinnedData", () => {
         });
 
         test("UVP5 and UVP6 samples share one table: the union of their classes, NA where a sample cannot see one", async () => {
-            const uvp6 = sample({ sample_id: 9, project_id: 2, sample_name: "uvp6_one", instrument_settings_aa: 2300, instrument_settings_exp: 1.136, instrument_settings_particule_minimum_area_pixels: undefined });
+            const uvp6 = sample({ sample_id: 9, project_id: 2, sample_name: "uvp6_one", instrument_settings_aa: 0.0023, instrument_settings_exp: 1.136, instrument_settings_particule_minimum_area_pixels: undefined });
             jest.spyOn(mockSampleRepository, "readPivotImages").mockImplementation(((_project_id: number, sample_name: string) => rowsOf(
                 sample_name === "uvp6_one"
                     ? [pivotLine(2, 1, 50, 30, 0), { ...pivotLine(3, 1, 7, 10, 1), light_on: false }]
@@ -493,7 +554,7 @@ describe("ExportBinnedData", () => {
 
             expect(log_messages).toContain("Request: 2 sample(s) from 1 project(s), bin_mode auto, depth bins of 5 m, time bins of 1 h, format tsv");
             expect(log_messages).toContain("Request: project 1 'Perle 3' (UVP5HD): 2 sample(s)");
-            expect(log_messages).toContain("Particles: 26 size class(es) exported, from 80p6um_102um to 26000um_inf");
+            expect(log_messages).toContain("Particles: particles.tsv, 26 size class(es) exported, from 80p6um_102um to 26000um_inf");
             // Pressures 1 and 12 on 5 m bins: 0-5 m and 10-15 m hold an image, 5-10 m is crossed without one
             expect(log_messages).toContain(`Particles: ${sampleModel_1.sample_name} (depth axis, Depth sample): 2 of 2 image(s) of the particle file used, 3 row(s) from 0 m to 15 m, 1 of them without imaged volume, 2.24 L imaged`);
             expect(log_messages).toContain("Particles: no_pressure (depth axis, Depth sample): 0 of 1 image(s) of the particle file used");
@@ -502,7 +563,7 @@ describe("ExportBinnedData", () => {
             expect(log_messages).toContain(`Exported at: ${path.relative(PROJECT_ROOT, zip_path())}`);
             expect(log_messages.some(m => m.includes(PROJECT_ROOT))).toBe(false);
             // The size classes are announced with the particle step, after the metadata
-            expect(log_messages.findIndex(m => m.startsWith("Particles: 26 size class"))).toBeGreaterThan(log_messages.findIndex(m => m.startsWith("Metadata: samples.tsv")));
+            expect(log_messages.findIndex(m => m.startsWith("Particles: particles.tsv, 26 size class"))).toBeGreaterThan(log_messages.findIndex(m => m.startsWith("Metadata: samples.tsv")));
         });
 
         test("the samples dropped by skip_not_validated are named in the task log", async () => {

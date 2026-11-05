@@ -1,4 +1,4 @@
-import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from "../../constants/binned-export";
+import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H, isBinnedTimeStep } from "../../constants/binned-export";
 import { CTD_LATITUDE_COLUMNS, CTD_LONGITUDE_COLUMNS } from "../../constants/ctd-columns";
 import { DETAILED_CLASSES_PER_REDUCED, detailedClassesOf, PART_DET_CLASS_LIMITS_MM, PART_RED_CLASS_LIMITS_MM, REDUCED_CLASS_COUNT, SIZE_CLASS_COUNT, sizeClassLabel } from "../../constants/size-classes";
 import { CtdRows } from "../../entities/ctd";
@@ -39,7 +39,12 @@ export function exploreGraphSteps(pressure_bin: number | undefined, time_bin: nu
         if (!Number.isFinite(n) || n < bounds.min || n > bounds.max) throw new Error(`${name} must be between ${bounds.min} and ${bounds.max}`);
         return n;
     };
-    return { pressure_bin: step(pressure_bin, BINNED_DEPTH_STEP_M, "pressure_bin"), time_bin: step(time_bin, BINNED_TIME_STEP_H, "time_bin") };
+    let time_step = BINNED_TIME_STEP_H.default;
+    if (time_bin !== undefined && time_bin !== null) {
+        time_step = Number(time_bin);
+        if (!isBinnedTimeStep(time_step)) throw new Error(`time_bin must be one of: ${BINNED_TIME_STEP_H.allowed.join(", ")}`);
+    }
+    return { pressure_bin: step(pressure_bin, BINNED_DEPTH_STEP_M, "pressure_bin"), time_bin: time_step };
 }
 
 export const EXPLORE_SIZE_CLASSES: readonly ExploreSizeClasses[] = ["reduced", "detailed"];
@@ -268,15 +273,16 @@ export function binCtdRows(rows: CtdRows, axis: BinAxis, step: number, descent_f
     const pressure_index = rows.columns.indexOf(CTD_PRESSURE_COLUMN);
     if (axis === "depth" && pressure_index < 0) return empty;
 
+    const step_units = axis === "depth" ? step : step * MS_PER_HOUR;
     let origin_ms = 0;
     if (axis === "time") {
         // A loop, not Math.min(...times): a 1 Hz mooring file holds hundreds of thousands of rows.
         let earliest: number | null = null;
         for (const t of rows.time_ms) if (t !== null && (earliest === null || t < earliest)) earliest = t;
         if (earliest === null) return empty;
-        origin_ms = Math.floor(earliest / MS_PER_HOUR) * MS_PER_HOUR;
+        // Aligned on midnight UTC, like the particle bins of the same graphs.
+        origin_ms = Math.floor(earliest / step_units) * step_units;
     }
-    const step_units = axis === "depth" ? step : step * MS_PER_HOUR;
     const sums = new Map<number, { sum: number[]; n: number[] }>();
     let deepest = -Infinity;
     for (let r = 0; r < rows.values.length; r++) {

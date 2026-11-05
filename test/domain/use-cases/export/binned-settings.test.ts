@@ -54,7 +54,7 @@ describe("binnedSampleSettingsOf", () => {
             filter_last_image: "107843",
             depth_offset_m: 999,
             image_volume_l: 0.63,
-            aa: 1130,
+            aa: 0.00113,
             exp: 1.313,
             particle_minimum_area_px: 2,
         });

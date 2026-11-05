@@ -189,8 +189,9 @@ describe("MiddlewareExploreValidation", () => {
         test.each([
             [{ pressure_bin: 0 }, "pressure_bin must be a number between 1 and 100."],
             [{ pressure_bin: 101 }, "pressure_bin must be a number between 1 and 100."],
-            [{ time_bin: 0.25 }, "time_bin must be a number between 0.5 and 24."],
-            [{ time_bin: "a day" }, "time_bin must be a number between 0.5 and 24."],
+            [{ time_bin: 0.25 }, "time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24."],
+            [{ time_bin: 5 }, "time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24."],
+            [{ time_bin: "a day" }, "time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24."],
         ])("refuses %j", async (steps, message) => {
             const response = await request(app).post("/graphs").send({ mode: "depth", filters: null, ...steps });
 

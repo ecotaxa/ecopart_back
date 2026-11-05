@@ -185,7 +185,7 @@ describe("Project statistics builders", () => {
             expect(countObjectSizeMismatches([
                 projectStatsSample(),
                 // 1 px with a tiny Aa: an object of about 1 µm, under the first UVP6 class (50.8 µm).
-                projectStatsSample({ instrument_settings_aa: 1 }),
+                projectStatsSample({ instrument_settings_aa: 0.000001 }),
                 // An object of about 28 mm, over the last class (26 mm).
                 projectStatsSample({ particle_max_area_px: 60000 }),
                 projectStatsSample({ particle_min_area_px: null }),
@@ -194,8 +194,8 @@ describe("Project statistics builders", () => {
         });
 
         test("a model without size classes is not checked", () => {
-            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 1 })], "UVP6MHP")).toBe(0);
-            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 1 })], "CPICS")).toBe(0);
+            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 0.000001 })], "UVP6MHP")).toBe(0);
+            expect(countObjectSizeMismatches([projectStatsSample({ instrument_settings_aa: 0.000001 })], "CPICS")).toBe(0);
         });
 
         test("each model has its own first class", () => {
@@ -219,7 +219,7 @@ describe("Project statistics builders", () => {
         };
 
         test("takes the ranges of the summary and adds the warnings of the section", () => {
-            const samples = [projectStatsSample(), projectStatsSample({ max_pressure: null, instrument_settings_aa: 1, sampling_utc_date_time: "2022-01-01T00:00:00Z" })];
+            const samples = [projectStatsSample(), projectStatsSample({ max_pressure: null, instrument_settings_aa: 0.000001, sampling_utc_date_time: "2022-01-01T00:00:00Z" })];
             expect(buildProjectStatsSamples(summary, samples, exploreProject(5, "open"), NOW)).toEqual({
                 sample_types: { depth: 2, time: 0, total: 2 },
                 pressure_range: { min: 0, max: 512.4 },

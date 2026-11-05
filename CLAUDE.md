@@ -138,7 +138,7 @@ test/                          Mirrors src/ (see Testing)
   contract `IMiddlewareXxxValidation`, infra adapters `XxxAdapter`, mocks `MockXxx`.
 - DB columns, entity fields, query parameters and JSON bodies: `snake_case`. Dates in
   `*_utc_date_time` columns, ISO 8601 strings in UTC.
-- Code, comments and API messages in English. Commit messages in French (see Git workflow).
+- Code, comments, API messages and commit messages in English (see Git workflow).
 
 ## Dependency injection
 
@@ -351,7 +351,7 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   from `main`, snake_case name saying what it does (`export_task_logs`, `fix_large_text_crash`).
   Several branches live in parallel: `git worktree add ../ecopart_back_<branch> <branch>` then
   `npm install` in the worktree (tests run without `.env`).
-- Commit messages, in French: `FEAT - <Area> : <what changed, as a user would say it>`,
+- Commit messages, in English: `FEAT - <Area>: <what changed, as a user would say it>`,
   `FIX - ...`, `DEV - ...` for internal work. One meaningful commit per branch is the norm; squash
   fix-ups before merging.
 - Merge into `main` with `git merge --no-ff origin/<branch>` or a GitHub PR targeting `main`.

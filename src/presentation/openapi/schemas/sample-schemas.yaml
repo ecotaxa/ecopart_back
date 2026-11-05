@@ -124,7 +124,7 @@ components:
           description: Image post-processing details.
         instrument_settings_aa:
           type: number
-          description: "Aa value for UVP6 (divided by 10^6)."
+          description: "Aa coefficient, in mm² per pixel for every instrument (the UVP6 `HW_CONF.Aa` is divided by 10^6 at import)."
         instrument_settings_exp:
           type: number
           description: Exp value.

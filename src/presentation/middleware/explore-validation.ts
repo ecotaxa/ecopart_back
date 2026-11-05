@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { check, validationResult } from 'express-validator';
-import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from '../../domain/constants/binned-export';
+import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H, isBinnedTimeStep } from '../../domain/constants/binned-export';
 import { ExploreBounds, ExploreClassificationState, ExploreFilters } from '../../domain/entities/explore';
 import { ProjectPrivacyLevel } from '../../domain/entities/project';
 import { EXPLORE_IMAGES_MAX } from '../../domain/use-cases/explore/explore-ecotaxa';
@@ -131,7 +131,7 @@ export class MiddlewareExploreValidation implements IMiddlewareExploreValidation
         check("pressure_bin").optional({ nullable: true })
             .isFloat({ min: BINNED_DEPTH_STEP_M.min, max: BINNED_DEPTH_STEP_M.max }).withMessage(`pressure_bin must be a number between ${BINNED_DEPTH_STEP_M.min} and ${BINNED_DEPTH_STEP_M.max}.`).toFloat(),
         check("time_bin").optional({ nullable: true })
-            .isFloat({ min: BINNED_TIME_STEP_H.min, max: BINNED_TIME_STEP_H.max }).withMessage(`time_bin must be a number between ${BINNED_TIME_STEP_H.min} and ${BINNED_TIME_STEP_H.max}.`).toFloat(),
+            .custom((value) => isBinnedTimeStep(Number(value))).withMessage(`time_bin must be one of: ${BINNED_TIME_STEP_H.allowed.join(", ")}.`).toFloat(),
         check("size_classes").optional({ nullable: true })
             .isString().withMessage("size_classes must be a string.")
             .isIn(EXPLORE_SIZE_CLASSES).withMessage(`size_classes must be one of ${EXPLORE_SIZE_CLASSES.join(", ")}.`),
