@@ -229,7 +229,7 @@ describe("ExploreRouter", () => {
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
             ["pressure_bin must be between 1 and 100", 422],
-            ["time_bin must be between 0.5 and 24", 422],
+            ["time_bin must be one of: 0.5, 1, 2, 3, 4, 6, 8, 12, 24", 422],
             ["count must be between 1 and 12", 422],
         ];
 

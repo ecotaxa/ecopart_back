@@ -79,6 +79,7 @@ beforeEach(async () => {
     jest.spyOn(mockSampleRepository, "getSourceMaxPressure").mockResolvedValue(150);
     // and looks for the work files of every UVP5 sample there.
     jest.spyOn(mockSampleRepository, "checkUvp5WorkFiles").mockImplementation(async (_root_folder_path, sample_name) => ({ work_source: `work/${sample_name}.tar.zst`, files_count: 3, missing: [] }));
+    jest.spyOn(mockSampleRepository, "checkUvp6SourceMetadataIni").mockResolvedValue([]);
 
     // Step 3/4 reads the particle statistics of every sample from its pivot (an empty one by default).
     jest.spyOn(mockSampleRepository, "getSampleType").mockResolvedValue({ sample_type_id: 1, sample_type_label: "Depth", sample_type_description: "Depth profile" });
@@ -1172,6 +1173,30 @@ describe("Delete Sample Use Case", () => {
             expect(mockTaskRepository.finishTask).toBeCalledTimes(0);
         });
 
+        test("refuses before any copy every UVP6 sample whose metadata.ini has a blank required value, all in one error", async () => {
+            const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M" };
+            jest.spyOn(mockSampleRepository, "checkUvp6SourceMetadataIni")
+                .mockResolvedValueOnce(["[HW_CONF] Exp is empty", "[sample_metadata] latitude is missing"])
+                .mockResolvedValueOnce([]);
+
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
+
+            expect(mockSampleRepository.checkUvp6SourceMetadataIni).toBeCalledTimes(2);
+            expect(mockSampleRepository.checkUvp6SourceMetadataIni).toBeCalledWith(uvp6_project.root_folder_path, "Mooring_0N_23W_201910_850m");
+            expect(mockTaskRepository.failedTask).toBeCalledWith(TaskResponseModel_1.task_id, new Error(
+                "Samples with an incomplete metadata.ini: perle3_001 ([HW_CONF] Exp is empty, [sample_metadata] latitude is missing). "
+                + "Fill the values in the metadata.ini of their _Particule.zip, then relaunch the import."));
+            expect(loggedMessages()).toContain("Step 1/4 sample validation : perle3_001 : metadata.ini incomplete, [HW_CONF] Exp is empty, [sample_metadata] latitude is missing");
+            expect(mockSampleRepository.UVP6copySamplesToImportFolder).toBeCalledTimes(0);
+            expect(mockSampleRepository.createManySamples).toBeCalledTimes(0);
+        });
+
+        test("does not read a metadata.ini in a UVP5 project", async () => {
+            await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP5HD", projectResponseModel, { user_id: 1 });
+
+            expect(mockSampleRepository.checkUvp6SourceMetadataIni).toBeCalledTimes(0);
+        });
+
         test("does not look for work files in a UVP6 project", async () => {
             const uvp6_project = { ...projectResponseModel, instrument_model: "UVP6M" };
 
@@ -1396,8 +1421,8 @@ describe("particle statistics at import", () => {
 
     test("a cancellation during the statistics removes the copied sources and creates no sample", async () => {
         const cancelled = new Error(TASK_CANCELLED_MESSAGE);
-        // before the copy, after the copy, before the first statistics, then before the second
-        jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
+        // the metadata.ini of both samples, before the copy, after the copy, before the first statistics, then before the second
+        jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockResolvedValueOnce().mockRejectedValue(cancelled);
 
         await (importSamplesUseCase as any).startImportTask(TaskResponseModel_1, samples, "UVP6M", uvp6_project, { user_id: 1 });
 

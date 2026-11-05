@@ -3,7 +3,7 @@ import { ProjectResponseModel } from "../../entities/project";
 import { ProjectQcStateModel, ProjectQcWarning, ProjectStatsEcoTaxa, ProjectStatsMap, ProjectStatsMapSample, ProjectStatsPrivacy, ProjectStatsRawBackup, ProjectStatsSampleRow, ProjectStatsSamples } from "../../entities/project-stats";
 import { computeProjectPrivacy, privacyMilestones } from "../../utils/project-privacy";
 import { classificationSharesOf, objectCountsOf, toSampleStat, totalOf } from "../explore/explore-ecotaxa";
-import { aaInMm2, esdMm } from "../export/binned-computation";
+import { esdMm } from "../export/binned-computation";
 import { LandMask } from "../../interfaces/geography/land-mask";
 
 /* The pure part of a project's statistics: what each section of the STATS tab shows, and its
@@ -148,9 +148,8 @@ export function countObjectSizeMismatches(samples: ProjectStatsSampleRow[], inst
     if (!range) return 0;
     return samples.filter(sample => {
         if (!isFinite(sample.particle_min_area_px) || !isFinite(sample.particle_max_area_px) || !(sample.instrument_settings_aa > 0) || !(sample.instrument_settings_exp > 0)) return false;
-        const aa_mm2 = aaInMm2(instrument_model, sample.instrument_settings_aa);
-        const smallest_um = esdMm(sample.particle_min_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
-        const largest_um = esdMm(sample.particle_max_area_px, aa_mm2, sample.instrument_settings_exp) * 1000;
+        const smallest_um = esdMm(sample.particle_min_area_px, sample.instrument_settings_aa, sample.instrument_settings_exp) * 1000;
+        const largest_um = esdMm(sample.particle_max_area_px, sample.instrument_settings_aa, sample.instrument_settings_exp) * 1000;
         return smallest_um < range.min || largest_um > range.max;
     }).length;
 }

@@ -64,6 +64,9 @@ export interface SampleRepository {
     // Pre-import variant: max raw pressure of the particle file in the project source folder, null
     // when no line has a readable pressure.
     getSourceMaxPressure(root_folder_path: string, sample_name: string, instrument_model: string): Promise<number | null>;
+    // UVP6 pre-import check: the values of the source `metadata.ini` the import cannot do without
+    // that are blank or absent, each as `[SECTION] Key is empty` / `is missing`.
+    checkUvp6SourceMetadataIni(root_folder_path: string, sample_name: string): Promise<string[]>;
     // UVP5 pre-import check: which of the files read after the copy (datfile, HDR*.txt, .bru) the
     // work entry of the sample lacks. Only the work entry is looked at.
     checkUvp5WorkFiles(root_folder_path: string, sample_name: string): Promise<Uvp5WorkFilesCheckModel>;

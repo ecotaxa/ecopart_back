@@ -56,7 +56,8 @@ describe("parseIniContent (UVP6 metadata.ini)", () => {
         expect(sample.instrument_settings_acq_threshold).toBe(20);
         expect(sample.instrument_settings_acq_vignette_roi_enlargement_ratio).toBe(1.5);
         expect(sample.instrument_settings_image_volume_l).toBe(0.53);
-        expect(sample.instrument_settings_aa).toBe(2300);
+        // `HW_CONF.Aa` 2300 is stored in mm²/px, like the UVP5 aa.
+        expect(sample.instrument_settings_aa).toBe(0.0023);
         expect(sample.instrument_settings_exp).toBe(1.136);
         // HW_CONF.Pixel_Size is in µm (73), stored in mm like the UVP5 one.
         expect(sample.instrument_settings_pixel_size_mm).toBe(0.073);
@@ -95,10 +96,39 @@ describe("parseIniContent (UVP6 metadata.ini)", () => {
         const ini = UVP6_METADATA_INI.replace("Vignetting_lower_limit_size=620\n", "");
         expect(repo.parseIniContent(ini).instrument_settings_vignette_minimum_area_pixels).toBeUndefined();
 
-        // A key present with a blank value is a different story: parseIniContent turns "" into 0
-        // (Number("") === 0), so the area legitimately computes to 0 rather than staying empty.
+        // A blank value too: it stays blank, not the 0 of Number("").
         const blank = UVP6_METADATA_INI.replace("Vignetting_lower_limit_size=620", "Vignetting_lower_limit_size=");
-        expect(repo.parseIniContent(blank).instrument_settings_vignette_minimum_area_pixels).toBe(0);
+        expect(repo.parseIniContent(blank).instrument_settings_vignette_minimum_area_pixels).toBeUndefined();
+    });
+
+    test("the environment fields keep no `NA` / `nan` placeholder, and keep a real value as it came", () => {
+        const empty = repo.parseIniContent(UVP6_METADATA_INI);
+        expect([empty.wind_direction, empty.wind_speed, empty.sea_state, empty.nebulousness]).toEqual([undefined, undefined, undefined, undefined]);
+
+        const nan_ini = UVP6_METADATA_INI.replace("winddir=NA", "winddir=nan").replace("windspeed=NA", "windspeed=nan")
+            .replace("seastate=NA", "seastate=nan").replace("nebuloussness=NA", "nebuloussness=nan");
+        const nan = repo.parseIniContent(nan_ini);
+        expect([nan.wind_direction, nan.wind_speed, nan.sea_state, nan.nebulousness]).toEqual([undefined, undefined, undefined, undefined]);
+
+        const filled_ini = UVP6_METADATA_INI.replace("winddir=NA", "winddir=270").replace("windspeed=NA", "windspeed=5.5")
+            .replace("seastate=NA", "seastate=moderate").replace("nebuloussness=NA", "nebuloussness=8");
+        const filled = repo.parseIniContent(filled_ini);
+        expect([filled.wind_direction, filled.wind_speed, filled.sea_state, filled.nebulousness]).toEqual([270, 5.5, "moderate", 8]);
+        // A text where a number is expected is kept, as before; only the placeholders are dropped.
+        expect(repo.parseIniContent(UVP6_METADATA_INI.replace("winddir=NA", "winddir=NW")).wind_direction).toBe("NW");
+    });
+
+    test("a blank value stays blank: never the 0 of `Number(\"\")`", () => {
+        const blank = repo.parseIniContent(UVP6_METADATA_INI
+            .replace("comment=NA", "comment=").replace("endimg=2469", "endimg=").replace("bottomdepth=NA", "bottomdepth=")
+            .replace("Shutter=52", "Shutter=").replace("Pressure_offset=0.000", "Pressure_offset=").replace("seastate=NA", "seastate="));
+        expect(blank.comment).toBe("");
+        // A blank endimg used to be 0, a window ending at the first image.
+        expect(blank.filter_last_image).toBe("");
+        expect(blank.bottom_depth).toBeUndefined();
+        expect(blank.instrument_settings_acq_exposure).toBeUndefined();
+        expect(blank.instrument_settings_depth_offset_m).toBeUndefined();
+        expect(blank.sea_state).toBeUndefined();
     });
 
     test("bottomdepth is read from [sample_metadata] and tolerates the `NA` / `nan` placeholders", () => {
@@ -147,6 +177,12 @@ describe("parseMetaHeader (UVP5 / UVP6 meta header)", () => {
         expect(sample.instrument_settings_exp).toBe(1.397);
         expect(sample.instrument_settings_image_volume_l).toBe(0.48);
         expect(sample.instrument_settings_integration_time).toBeUndefined();
+        expect([sample.wind_direction, sample.sea_state]).toEqual(["300", "1"]);
+    });
+
+    test("a `nan` wind direction or sea state is not kept as text", () => {
+        const sample = repo.parseMetaHeader(EXTENDED_HEADER, "uvp6_header_sn000158hf_20230406_ae2307.txt", "HS1447C1");
+        expect([sample.wind_direction, sample.sea_state]).toEqual([undefined, undefined]);
     });
 
     test("the extended format fills integrationtime, and a `nan` cell does not become NaN", () => {

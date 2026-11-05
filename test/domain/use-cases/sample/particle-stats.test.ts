@@ -41,7 +41,7 @@ const UVP6: BinnedSampleSettings = {
     filter_last_image: null,
     depth_offset_m: 0,
     image_volume_l: 0.5,
-    aa: 2300,
+    aa: 0.0023,
     exp: 1.136,
     particle_minimum_area_px: null,
 };

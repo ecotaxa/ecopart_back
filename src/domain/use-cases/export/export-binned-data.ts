@@ -6,7 +6,7 @@ import { ProjectResponseModel } from "../../entities/project";
 import { PublicSampleModel } from "../../entities/sample";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import { BinnedExportBinMode } from "../../entities/binned-export";
-import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H } from "../../constants/binned-export";
+import { BINNED_DEPTH_STEP_M, BINNED_TIME_STEP_H, isBinnedTimeStep } from "../../constants/binned-export";
 import { DEFAULT_EXPORT_TABLE_FORMAT, EXPORT_TABLE_FORMATS } from "../../constants/export-format";
 import { ExportTableFormat } from "../../entities/export";
 
@@ -32,6 +32,12 @@ import { sizeClassSuffix } from "../../constants/size-classes";
 const BIN_MODES: BinnedExportBinMode[] = ["auto", "depth", "time"];
 // The particle table is appended this many rows at a time, so a long sample never sits whole in memory.
 const ROWS_PER_WRITE = 1000;
+
+// The rows of one particle file: every sample, or the samples of one axis when `auto` meets both.
+interface ParticleTable {
+    stem: string;
+    samples: PublicSampleModel[];
+}
 
 interface BinnedExportPlan {
     sample_ids: number[];
@@ -88,16 +94,22 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         if (not_validated.length > 0 && !skip_not_validated) {
             throw new Error(`Sample(s) not validated: ${not_validated.map(s => s.sample_name).join(", ")}`);
         }
-        const samples = all_samples
+        const validated_samples = all_samples
             .filter(s => s.visual_qc_status_label === "VALIDATED")
             .sort((a, b) => a.project_id - b.project_id || a.sample_id - b.sample_id);
-        if (samples.length === 0) {
+        if (validated_samples.length === 0) {
             throw new Error(`Sample(s) not validated: ${not_validated.map(s => s.sample_name).join(", ")}`);
         }
-        const exported_projects = new Map(samples.map(s => [s.project_id, projects_by_id.get(s.project_id) as ProjectResponseModel]));
 
-        // A sample that cannot be binned is reported before any task exists, all of them at once.
-        await this.ensureSamplesCanBeBinned(samples, exported_projects);
+        // A sample that cannot be binned is reported before any task exists, all of them at once. A
+        // UVP5 sample without pivot is only left out (decided on 4 November 2026), unless none remains.
+        const without_pivot = await this.ensureSamplesCanBeBinned(validated_samples, projects_by_id);
+        const samples = validated_samples.filter(s => !without_pivot.has(s.sample_id));
+        if (samples.length === 0) {
+            throw new Error(`Sample(s) without pivot: ${validated_samples.map(s => s.sample_name).join(", ")}. Run the pivot regeneration of their project.`);
+        }
+        const skipped_without_pivot = validated_samples.filter(s => without_pivot.has(s.sample_id)).map(s => s.sample_name);
+        const exported_projects = new Map(samples.map(s => [s.project_id, projects_by_id.get(s.project_id) as ProjectResponseModel]));
 
         const task_id = await this.taskRepository.createTask({
             task_type: TaskType.Export,
@@ -114,7 +126,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         // Fire-and-forget: the route returns the task immediately and the frontend polls. runExport
         // records its own failures; only a failure to record one (the task deleted meanwhile, the
         // database unavailable) reaches this catch, which keeps it from stopping the server.
-        this.runExport(task, samples, exported_projects, plan, export_started_at, skipped_not_validated)
+        this.runExport(task, samples, exported_projects, plan, export_started_at, skipped_not_validated, skipped_without_pivot)
             .catch((error) => console.log(new Date().toISOString(), `Binned export task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
@@ -136,19 +148,19 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         if (!EXPORT_TABLE_FORMATS.includes(format)) {
             throw new Error(`format must be one of: ${EXPORT_TABLE_FORMATS.join(", ")}`);
         }
-        const step = (value: number | null | undefined, bounds: { default: number; min: number; max: number }, name: string): number => {
-            if (value === undefined || value === null) return bounds.default;
-            const n = Number(value);
-            if (!Number.isFinite(n) || n < bounds.min || n > bounds.max) throw new Error(`${name} must be between ${bounds.min} and ${bounds.max}`);
-            return n;
-        };
-        return {
-            sample_ids,
-            bin_mode,
-            depth_step_m: step(request.bin_size_m, BINNED_DEPTH_STEP_M, "bin_size_m"),
-            time_step_h: step(request.bin_size_h, BINNED_TIME_STEP_H, "bin_size_h"),
-            format,
-        };
+        let depth_step_m = BINNED_DEPTH_STEP_M.default;
+        if (request.bin_size_m !== undefined && request.bin_size_m !== null) {
+            depth_step_m = Number(request.bin_size_m);
+            if (!Number.isFinite(depth_step_m) || depth_step_m < BINNED_DEPTH_STEP_M.min || depth_step_m > BINNED_DEPTH_STEP_M.max) {
+                throw new Error(`bin_size_m must be between ${BINNED_DEPTH_STEP_M.min} and ${BINNED_DEPTH_STEP_M.max}`);
+            }
+        }
+        let time_step_h = BINNED_TIME_STEP_H.default;
+        if (request.bin_size_h !== undefined && request.bin_size_h !== null) {
+            time_step_h = Number(request.bin_size_h);
+            if (!isBinnedTimeStep(time_step_h)) throw new Error(`bin_size_h must be one of: ${BINNED_TIME_STEP_H.allowed.join(", ")}`);
+        }
+        return { sample_ids, bin_mode, depth_step_m, time_step_h, format };
     }
 
     // Who may export follows the project's privacy (M11, matrix of the original spec): admins, and
@@ -159,14 +171,20 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         throw new Error(`Logged user cannot export binned data from project ${project.project_id}`);
     }
 
-    private async ensureSamplesCanBeBinned(samples: PublicSampleModel[], projects_by_id: Map<number, ProjectResponseModel>): Promise<void> {
+    // Throws for a sample that cannot be binned; returns the UVP5 samples without pivot.
+    private async ensureSamplesCanBeBinned(samples: PublicSampleModel[], projects_by_id: Map<number, ProjectResponseModel>): Promise<Set<number>> {
         const unsupported: string[] = [];
         const uncalibrated: string[] = [];
-        const without_pivot: string[] = [];
+        const without_pivot = new Set<number>();
         for (const sample of samples) {
             const instrument_model = (projects_by_id.get(sample.project_id) as ProjectResponseModel).instrument_model;
             if (!instrument_model.startsWith("UVP5") && !instrument_model.startsWith("UVP6")) {
                 unsupported.push(`${sample.sample_name} (${instrument_model})`);
+                continue;
+            }
+            // Left out anyway: its calibration does not matter.
+            if (instrument_model.startsWith("UVP5") && await this.sampleRepository.getPivotConverterVersion(sample.project_id, sample.sample_name) === null) {
+                without_pivot.add(sample.sample_id);
                 continue;
             }
             const missing_settings = [
@@ -175,18 +193,25 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 ...(sample.instrument_settings_image_volume_l > 0 ? [] : ["image volume"]),
             ];
             if (missing_settings.length > 0) uncalibrated.push(`${sample.sample_name} (${missing_settings.join(", ")})`);
-            if (instrument_model.startsWith("UVP5") && await this.sampleRepository.getPivotConverterVersion(sample.project_id, sample.sample_name) === null) {
-                without_pivot.push(sample.sample_name);
-            }
         }
         if (unsupported.length > 0) throw new Error(`Instrument not supported by the binned export: ${unsupported.join(", ")}`);
         if (uncalibrated.length > 0) throw new Error(`Sample(s) without calibration: ${uncalibrated.join(", ")}`);
-        if (without_pivot.length > 0) throw new Error(`Sample(s) without pivot: ${without_pivot.join(", ")}. Run the pivot regeneration of their project.`);
+        return without_pivot;
     }
 
     private axisOf(sample: PublicSampleModel, bin_mode: BinnedExportBinMode): BinAxis {
         if (bin_mode !== "auto") return bin_mode;
         return sample.sample_type_label === "Depth" ? "depth" : "time";
+    }
+
+    // One file, unless `auto` meets both depth profiles and time series: their rows then go to
+    // `particles_depth` and `particles_time`, so that every column keeps one meaning in a file
+    // (decided on 4 November 2026).
+    private particleTables(samples: PublicSampleModel[], bin_mode: BinnedExportBinMode): ParticleTable[] {
+        const depth = samples.filter(s => this.axisOf(s, bin_mode) === "depth");
+        const time = samples.filter(s => this.axisOf(s, bin_mode) === "time");
+        if (depth.length === 0 || time.length === 0) return [{ stem: "particles", samples }];
+        return [{ stem: "particles_depth", samples: depth }, { stem: "particles_time", samples: time }];
     }
 
     // One line per sample: why its axis, what its particle file held, and the range its rows cover.
@@ -215,6 +240,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         plan: BinnedExportPlan,
         export_started_at: Date,
         skipped_not_validated: string[],
+        skipped_without_pivot: string[],
     ): Promise<void> {
         const task_id = task.task_id;
         const log: TaskLogger = (message) => this.taskRepository.logMessage(task.task_log_file_path, message);
@@ -235,6 +261,9 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             if (skipped_not_validated.length > 0) {
                 await log(`QC: ${skipped_not_validated.length} sample(s) excluded from this export because they are not VALIDATED: ${skipped_not_validated.join(", ")}`);
             }
+            if (skipped_without_pivot.length > 0) {
+                await log(`Particles: WARNING ${skipped_without_pivot.length} UVP5 sample(s) left out of this export because their particle file in the UVP6 format was never built: ${skipped_without_pivot.join(", ")}. Run the pivot regeneration of their project, then export them again.`);
+            }
 
             await fsPromises.mkdir(work_folder, { recursive: true });
             work_folder_created = true;
@@ -242,7 +271,10 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             // The columns only depend on each sample's calibration, so they are known before any
             // file is read and the rows can be written sample by sample.
             const settings_by_id = new Map(samples.map(s => [s.sample_id, binnedSampleSettingsOf(s, projects_by_id.get(s.project_id) as ProjectResponseModel)]));
-            const class_indexes = exportedSizeClasses(samples.map(s => sampleVisibleSizeClasses(settings_by_id.get(s.sample_id) as BinnedSampleSettings)));
+            const tables = this.particleTables(samples, plan.bin_mode).map(table => ({
+                ...table,
+                class_indexes: exportedSizeClasses(table.samples.map(s => sampleVisibleSizeClasses(settings_by_id.get(s.sample_id) as BinnedSampleSettings))),
+            }));
 
             await this.taskRepository.throwIfCancelled(task_id);
             await this.taskRepository.updateTaskProgress({ task_id }, 5, "Step 1/2 metadata: start");
@@ -250,53 +282,61 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 { from: 5, to: 15, label: "Step 1/2 metadata" });
             await this.taskRepository.updateTaskProgress({ task_id }, 15, "Step 1/2 metadata: done");
 
-            if (class_indexes.length > 0) {
-                await log(`Particles: ${class_indexes.length} size class(es) exported, from ${sizeClassSuffix(class_indexes[0])} to ${sizeClassSuffix(class_indexes[class_indexes.length - 1])}`);
+            if (tables.length > 1) {
+                await log(`Particles: the selection mixes depth profiles and time series and bin_mode is auto, so the depth bins and the time bins go to two files: ${tables.map(t => `${t.stem}.${plan.format} (${t.samples.length} sample(s))`).join(", ")}`);
             }
-            const particles_writer = await openTableWriter(plan.format, path.join(work_folder, "particles"), particleTableColumns(class_indexes), { formatNumber });
-            particles = particles_writer;
-            const particles_file = path.basename(particles_writer.file_path);
-            let particle_rows = 0;
-            for (const [i, sample] of samples.entries()) {
-                await this.taskRepository.throwIfCancelled(task_id);
-                const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
-                const axis = this.axisOf(sample, plan.bin_mode);
-                const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
-                // One pass over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
-                const builder = new BinnedSampleBuilder(settings, { axis, step });
-                for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, settings.instrument_model)) builder.add(record);
-                const binned = builder.finish();
-                for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
-                    await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
+            let samples_done = 0;
+            for (const table of tables) {
+                const class_indexes = table.class_indexes;
+                const particles_writer = await openTableWriter(plan.format, path.join(work_folder, table.stem), particleTableColumns(class_indexes), { formatNumber });
+                particles = particles_writer;
+                const particles_file = path.basename(particles_writer.file_path);
+                if (class_indexes.length > 0) {
+                    await log(`Particles: ${particles_file}, ${class_indexes.length} size class(es) exported, from ${sizeClassSuffix(class_indexes[0])} to ${sizeClassSuffix(class_indexes[class_indexes.length - 1])}`);
                 }
-                particle_rows += binned.bins.length;
+                let particle_rows = 0;
+                for (const sample of table.samples) {
+                    await this.taskRepository.throwIfCancelled(task_id);
+                    const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
+                    const axis = this.axisOf(sample, plan.bin_mode);
+                    const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
+                    // One pass over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
+                    const builder = new BinnedSampleBuilder(settings, { axis, step });
+                    for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, settings.instrument_model)) builder.add(record);
+                    const binned = builder.finish();
+                    for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
+                        await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
+                    }
+                    particle_rows += binned.bins.length;
 
-                const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
-                await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round(((i + 1) / samples.length) * 75), `Step 2/2 particles: ${summary}`);
-                await log(this.describeBinnedSample(sample, plan.bin_mode, binned));
-                if (binned.bins.length === 0) {
-                    const position = axis === "depth" ? "pressure" : "readable time";
-                    const reason = binned.total_images === 0 ? "its particle file holds no image"
-                        : binned.positioned_images === 0 ? `none of its images has a ${position}`
-                            : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
-                                : `none of its ${binned.used_images} image(s) used has a ${position}`;
-                    await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
+                    samples_done++;
+                    const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
+                    await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round((samples_done / samples.length) * 75), `Step 2/2 particles: ${summary}`);
+                    await log(this.describeBinnedSample(sample, plan.bin_mode, binned));
+                    if (binned.bins.length === 0) {
+                        const position = axis === "depth" ? "pressure" : "readable time";
+                        const reason = binned.total_images === 0 ? "its particle file holds no image"
+                            : binned.positioned_images === 0 ? `none of its images has a ${position}`
+                                : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
+                                    : `none of its ${binned.used_images} image(s) used has a ${position}`;
+                        await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
+                    }
+                    if (binned.particles_below_minimum_area > 0) {
+                        await log(`${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
+                    }
                 }
-                if (binned.particles_below_minimum_area > 0) {
-                    await log(`${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
-                }
+
+                await particles_writer.close();
+                particles = null;
+                await log(`Particles: ${particles_file} written, ${particle_rows} row(s) for ${table.samples.length} sample(s), ${await fileSizeLabel(particles_writer.file_path)}`);
             }
-
-            await particles_writer.close();
-            particles = null;
-            await log(`Particles: ${particles_file} written, ${particle_rows} row(s) for ${samples.length} sample(s), ${await fileSizeLabel(particles_writer.file_path)}`);
 
             await fsPromises.writeFile(path.join(work_folder, "README.md"), renderBinnedReadme({
                 format: plan.format,
                 bin_mode: plan.bin_mode,
                 depth_step_m: plan.depth_step_m,
                 time_step_h: plan.time_step_h,
-                class_indexes,
+                tables: tables.map(table => ({ stem: table.stem, class_indexes: table.class_indexes })),
             }));
 
             await this.taskRepository.throwIfCancelled(task_id);

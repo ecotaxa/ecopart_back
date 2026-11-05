@@ -48,7 +48,7 @@ components:
           properties:
             mode: { type: string, enum: [depth, time], description: "The axis of the curves: one sample type (`all` is refused)." }
             pressure_bin: { type: number, minimum: 1, maximum: 100, default: 5, description: Depth bin in metres (dbar). }
-            time_bin: { type: number, minimum: 0.5, maximum: 24, default: 1, description: Time bin in hours. }
+            time_bin: { type: number, enum: [0.5, 1, 2, 3, 4, 6, 8, 12, 24], default: 1, description: "Time bin in hours: a divisor of 24 h, the bins being aligned on midnight UTC." }
             size_classes: { type: string, enum: [reduced, detailed], default: reduced, description: "The particle histogram: the 15 reduced or the 45 detailed size classes of legacy EcoPart." }
     ExploreProjectOption:
       type: object

@@ -1,4 +1,4 @@
-import { aaInMm2, esdMm } from "../../../../src/domain/use-cases/export/binned-computation";
+import { esdMm } from "../../../../src/domain/use-cases/export/binned-computation";
 import { buildExploreMap, buildExploreProjectRows, buildExploreSelection, buildExploreSummary, PRESSURE_HISTOGRAM_STEP_DB, toContact } from "../../../../src/domain/use-cases/explore/explore-stats";
 import { ALICE, BOB, contextsOf, exploreContext, exploreProject, exploreSample, privileges } from "./explore-fixtures";
 
@@ -54,13 +54,13 @@ describe("buildExploreSummary", () => {
         expect(buildExploreSummary([exploreSample({ max_pressure: null })], CONTEXTS)?.max_pressure_histogram).toEqual([]);
     });
 
-    test("the size range is the ESD in µm of the smallest and largest particle areas, with the UVP6 Aa divided by 10⁶", () => {
-        const uvp6 = exploreSample({ sample_id: 1, project_id: 1, particle_min_area_px: 1, particle_max_area_px: 4000, instrument_settings_aa: 2300, instrument_settings_exp: 1.136 });
+    test("the size range is the ESD in µm of the smallest and largest particle areas, aa in mm² per pixel on every instrument", () => {
+        const uvp6 = exploreSample({ sample_id: 1, project_id: 1, particle_min_area_px: 1, particle_max_area_px: 4000, instrument_settings_aa: 0.0023, instrument_settings_exp: 1.136 });
         const uvp5 = exploreSample({ sample_id: 2, project_id: 2, particle_min_area_px: 2, particle_max_area_px: 100, instrument_settings_aa: 0.0032, instrument_settings_exp: 1.36 });
 
         const only_uvp6 = buildExploreSummary([uvp6], CONTEXTS)?.size_range;
         expect(only_uvp6?.min).toBeCloseTo(54.1, 1);
-        expect(only_uvp6?.max).toBeCloseTo(esdMm(4000, aaInMm2("UVP6LP", 2300), 1.136) * 1000, 6);
+        expect(only_uvp6?.max).toBeCloseTo(esdMm(4000, 0.0023, 1.136) * 1000, 6);
 
         const only_uvp5 = buildExploreSummary([uvp5], CONTEXTS)?.size_range;
         expect(only_uvp5?.min).toBeCloseTo(esdMm(2, 0.0032, 1.36) * 1000, 6);

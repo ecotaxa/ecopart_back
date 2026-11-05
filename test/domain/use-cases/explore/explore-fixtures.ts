@@ -71,7 +71,7 @@ export function exploreSample(overrides: Partial<ExploreSampleRow> = {}): Explor
         filter_last_image: null,
         instrument_settings_depth_offset_m: 1.2,
         instrument_settings_image_volume_l: 0.5,
-        instrument_settings_aa: 2300,
+        instrument_settings_aa: 0.0023,
         instrument_settings_exp: 1.136,
         instrument_settings_particule_minimum_area_pixels: null,
         ...overrides,

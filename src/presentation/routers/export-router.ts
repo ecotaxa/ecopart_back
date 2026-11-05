@@ -78,8 +78,8 @@ export default function ExportRouter(
      *         without images.
      *       - `ctd_latitude` / `ctd_longitude`: the start position read from the CTD file `LAT`/`LON` columns;
      *         empty without an imported CTD or when the file has no position (UVP5 files have none).
-     *       - **Units are instrument-dependent**: `instrument_settings_aa` is 10^6 times larger on the UVP6.
-     *         See the archive README, column by column.
+     *       - `instrument_settings_aa` is in mm² per pixel for every instrument; inside the copied UVP6 `lpm` artifacts,
+     *         `HW_CONF.Aa` keeps the instrument's unit (10^6 times larger). See the archive README, column by column.
      *       - The header values *inside* the copied `lpm` / `instrument_config` artifacts are still the original
      *         acquisition values and can disagree with `metadata/samples.tsv` (re-processed lat/long, ISO-normalised
      *         dates, serial-number convention).
@@ -195,9 +195,9 @@ export default function ExportRouter(
      *       2. **Resolution** — all `sample_ids` must resolve; any unknown id aborts the export (`404`).
      *       3. **Visual QC gate** — same rule as `/exports/raw`: every sample must be `VALIDATED`, unless
      *          `skip_not_validated=true` drops the others (listed in the task log).
-     *       4. **Checks** — every sample must come from a UVP5 or UVP6 project, carry its calibration (`aa`, `exp`,
-     *          image volume) and, for a UVP5, have its UVP6-format pivot; all the faulty samples are named at once
-     *          (`409`).
+     *       4. **Checks** — every sample must come from a UVP5 or UVP6 project and carry its calibration (`aa`, `exp`,
+     *          image volume); all the faulty samples are named at once (`409`). A UVP5 sample without its UVP6-format
+     *          pivot is left out and named in a WARNING line of the task log (`409` only when no sample remains).
      *       5. **Task** — an `EXPORT` task is created and returned immediately, not tied to a `task_project_id`.
      *       6. **Background build** — the bins are computed on the fly from each sample's UVP6-format particle file
      *          (the pivot built at import for a UVP5, the imported `particules.csv` for a UVP6), sample by sample.
@@ -206,14 +206,16 @@ export default function ExportRouter(
      *       - `bin_mode`: `auto` (default) bins depth profiles by depth and time series by time; `depth` or `time`
      *         forces one axis for every sample.
      *       - Depth bins are uniform slices of `bin_size_m` metres from 0 m; time bins uniform slices of `bin_size_h`
-     *         hours from the UTC hour of the first image used.
+     *         hours aligned on midnight UTC (the step divides 24 h, so every sample has the same bin bounds).
      *       - Images used: operator window, then the project's descent filter on depth profiles, lit images only —
      *         exactly the images the import QC graphs show as selected.
      *       - Every bin between the first and the last image used is written, an empty one with a zero volume.
      *
      *       ### Archive contents
      *       - `metadata/projects.<format>`, `metadata/samples.<format>` — identical to the raw export's.
-     *       - `particles.<format>` — one row per bin: 8 context columns, a pixel block (`count_1px`, `count_2px` and the
+     *       - `particles.<format>` — one row per bin. When `bin_mode` is `auto` and the selection mixes depth profiles and
+     *         time series, the rows go to `particles_depth.<format>` and `particles_time.<format>` instead, with the same
+     *         columns, so that each column keeps one meaning in a file. Columns: 8 context columns, a pixel block (`count_1px`, `count_2px` and the
      *         number of black images `nb_black_images`), then one block per quantity (`count_`, `concentration_`,
      *         `biovolume_`, `intensity_`, `qcflag_`) with one column per size class, named by its bounds in µm
      *         (`concentration_50p8um_64um`). Only the classes visible on
@@ -254,10 +256,9 @@ export default function ExportRouter(
      *                 description: Thickness of the depth bins, in metres.
      *               bin_size_h:
      *                 type: number
-     *                 minimum: 0.5
-     *                 maximum: 24
+     *                 enum: [0.5, 1, 2, 3, 4, 6, 8, 12, 24]
      *                 default: 1
-     *                 description: Duration of the time bins, in hours.
+     *                 description: Duration of the time bins, in hours. A divisor of 24 h, the bins being aligned on midnight UTC.
      *               skip_not_validated:
      *                 type: boolean
      *                 default: false
@@ -283,8 +284,9 @@ export default function ExportRouter(
      *         description: Sample or project not found — no sample resolved, or some requested ids do not exist.
      *       409:
      *         description: >
-     *           A sample is not VALIDATED, comes from an instrument the binned export does not support, lacks its
-     *           calibration, or (UVP5) has no pivot yet. The message names every sample at fault.
+     *           A sample is not VALIDATED, comes from an instrument the binned export does not support, or lacks its
+     *           calibration; or no sample remains once the UVP5 samples without pivot are left out. The message names
+     *           every sample at fault.
      *       422:
      *         description: Validation error.
      *       500:

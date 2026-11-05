@@ -168,7 +168,7 @@ describe('SQLiteSampleDataSource', () => {
                 ctd_imported: false, ctd_file_extension: null, ecotaxa_sample_imported: false, ecotaxa_sample_id: null,
                 nb_vignettes: 0, nb_particles: 345678, particle_min_area_px: 1, particle_max_area_px: 4000,
                 filter_first_image: '3432', filter_last_image: '107843', instrument_settings_depth_offset_m: 999,
-                instrument_settings_image_volume_l: 0.63, instrument_settings_aa: 1130, instrument_settings_exp: 1.313,
+                instrument_settings_image_volume_l: 0.63, instrument_settings_aa: 0.00113, instrument_settings_exp: 1.313,
                 instrument_settings_particule_minimum_area_pixels: 2,
             })
             const [pacific] = await dataSource.getExploreSamples(query({ sample_names: ['pacific_002'] }))

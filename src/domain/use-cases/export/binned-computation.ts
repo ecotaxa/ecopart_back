@@ -28,7 +28,7 @@ export interface BinnedSampleSettings {
     filter_last_image: string | null;
     depth_offset_m: number | null;          // the project override, else the sample's offset
     image_volume_l: number;
-    aa: number;                             // as stored: mm²/px for a UVP5, × 10⁶ for a UVP6
+    aa: number;                             // mm²/px, for every instrument
     exp: number;
     particle_minimum_area_px: number | null;
 }
@@ -67,11 +67,6 @@ export interface BinnedSample {
     bins: SampleBin[];
 }
 
-// The UVP6 stores Aa multiplied by 10⁶ (original spec: "for UVP6, value is divided by 10⁶").
-export function aaInMm2(instrument_model: string, aa: number): number {
-    return instrument_model.startsWith("UVP6") ? aa / 1e6 : aa;
-}
-
 // Legacy `uvp_sample_import.py:684`: esd = 2 × sqrt(area ^ exp × aa / π).
 export function esdMm(area_px: number, aa_mm2: number, exp: number): number {
     return 2 * Math.sqrt((Math.pow(area_px, exp) * aa_mm2) / Math.PI);
@@ -99,8 +94,8 @@ export function visibleSizeClasses(aa_mm2: number, exp: number, min_area_px: num
     });
 }
 
-export function sampleVisibleSizeClasses(settings: Pick<BinnedSampleSettings, "instrument_model" | "aa" | "exp" | "particle_minimum_area_px">): boolean[] {
-    return visibleSizeClasses(aaInMm2(settings.instrument_model, settings.aa), settings.exp, minimumAreaPx(settings.particle_minimum_area_px));
+export function sampleVisibleSizeClasses(settings: Pick<BinnedSampleSettings, "aa" | "exp" | "particle_minimum_area_px">): boolean[] {
+    return visibleSizeClasses(settings.aa, settings.exp, minimumAreaPx(settings.particle_minimum_area_px));
 }
 
 interface BinAccumulator {
@@ -137,8 +132,10 @@ function emptyAccumulator(): BinAccumulator {
  * a second pass: the builder starts over when `firstimage` occurs, and keeps the bins as they
  * are at each occurrence of `endimg`, which it returns when the file does not end there. A UVP5
  * pivot was cut to the operator window at conversion (D2), so no window applies to it.
- * Time bins start at the UTC hour of the first image used that has a time, like the legacy and
- * the QC graphs: an image used that comes earlier in time falls in a bin of negative index. */
+ * Time bins are aligned on midnight UTC (multiples of the step since the epoch, the steps dividing
+ * 24 h): the same bounds for every sample, and for a 1 h step the UTC hours of the legacy and the
+ * QC graphs. Their numbering starts at the bin of the first image used that has a time: an image
+ * used that comes earlier in time falls in a bin of negative index. */
 export class BinnedSampleBuilder {
     private readonly aa_mm2: number;
     private readonly minimum_area_px: number;
@@ -159,7 +156,7 @@ export class BinnedSampleBuilder {
     private positioned_images = 0;
 
     constructor(private readonly settings: BinnedSampleSettings, private readonly options: BinningOptions) {
-        this.aa_mm2 = aaInMm2(settings.instrument_model, settings.aa);
+        this.aa_mm2 = settings.aa;
         this.minimum_area_px = minimumAreaPx(settings.particle_minimum_area_px);
         this.visible_classes = visibleSizeClasses(this.aa_mm2, settings.exp, this.minimum_area_px);
         this.step_units = Math.round(options.step * (options.axis === "depth" ? UM_PER_M : MS_PER_HOUR));
@@ -233,7 +230,7 @@ export class BinnedSampleBuilder {
     private accumulate(record: PivotImageRecord): void {
         const state = this.state;
         if (this.options.axis === "time" && state.time_origin_ms === null && record.image_time_ms !== null) {
-            state.time_origin_ms = Math.floor(record.image_time_ms / MS_PER_HOUR) * MS_PER_HOUR;
+            state.time_origin_ms = Math.floor(record.image_time_ms / this.step_units) * this.step_units;
         }
         const bin = this.binOf(record, state.time_origin_ms);
         if (bin === null) return;

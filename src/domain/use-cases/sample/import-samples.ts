@@ -168,6 +168,7 @@ export class ImportSamples implements ImportSamplesUseCase {
         this.ensureSamplesPassQcLvl1(samples, samples_names_to_import);
         await log(`Step 1/4 sample validation : ${samples_names_to_import.length} sample(s) to import out of ${samples.length} importable`);
         await this.ensureWorkFilesArePresent(task_id, log, project, samples_names_to_import);
+        await this.ensureUvp6MetadataIniIsComplete(task_id, log, project, samples_names_to_import);
         await this.ensureDepthProfilesHavePressure(project, samples_names_to_import);
         //TODO LATER add more validation
         const samples_by_name = new Map(samples.map(sample => [sample.sample_name, sample]));
@@ -224,6 +225,24 @@ export class ImportSamples implements ImportSamplesUseCase {
         }
         if (incomplete.length > 0) {
             throw new Error("Samples with missing work files: " + incomplete.join(", ") + ". Only the work entry of each sample is read: add the files there, then relaunch the import.");
+        }
+    }
+
+    // UVP6: a blank calibration, acquisition setting, sample type or position in `metadata.ini` would
+    // only fail at step 4/4, after the copy, or be stored as a value nobody measured: every sample
+    // is checked first, so that all the incomplete ones are reported at once.
+    async ensureUvp6MetadataIniIsComplete(task_id: number, log: TaskLogger, project: ProjectResponseModel, samples_names_to_import: string[]): Promise<void> {
+        if (!project.instrument_model.startsWith('UVP6')) return;
+        const incomplete: string[] = [];
+        for (const sample_name of samples_names_to_import) {
+            await this.taskRepository.throwIfCancelled(task_id);
+            const problems = await this.sampleRepository.checkUvp6SourceMetadataIni(project.root_folder_path, sample_name);
+            if (problems.length === 0) continue;
+            await log(`Step 1/4 sample validation : ${sample_name} : metadata.ini incomplete, ${problems.join(", ")}`);
+            incomplete.push(`${sample_name} (${problems.join(", ")})`);
+        }
+        if (incomplete.length > 0) {
+            throw new Error("Samples with an incomplete metadata.ini: " + incomplete.join(", ") + ". Fill the values in the metadata.ini of their _Particule.zip, then relaunch the import.");
         }
     }
 

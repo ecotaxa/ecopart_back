@@ -1,7 +1,6 @@
 import { PivotImageRecord, PivotParticleBlock } from "../../../../src/domain/entities/binned-export";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import {
-    aaInMm2,
     BinnedSampleBuilder,
     BinnedSampleSettings,
     computeBinnedSample,
@@ -44,7 +43,7 @@ function sequence(records: PivotImageRecord[]): PivotImageRecord[] {
     return records.map((r, i) => ({ ...r, image_index: i, image_id: `img${i}`, image_time_ms: r.image_time_ms === T0 ? T0 + i * 60_000 : r.image_time_ms }));
 }
 
-// A UVP6 with Aa 2300 and Exp 1.136: 1 px falls in class 17 (50.8-64 µm), 2 px in 18, 3 px in 19.
+// A UVP6 with aa 0.0023 mm²/px (Aa 2300 in its metadata.ini) and Exp 1.136: 1 px falls in class 17 (50.8-64 µm), 2 px in 18, 3 px in 19.
 const UVP6: BinnedSampleSettings = {
     sample_name: "uvp6_sample",
     instrument_model: "UVP6LP",
@@ -54,7 +53,7 @@ const UVP6: BinnedSampleSettings = {
     filter_last_image: null,
     depth_offset_m: 0,
     image_volume_l: 0.5,
-    aa: 2300,
+    aa: 0.0023,
     exp: 1.136,
     particle_minimum_area_px: null,
 };
@@ -63,11 +62,6 @@ const firstVisible = (visible: boolean[]) => visible.indexOf(true);
 const invisibleAfterFirst = (visible: boolean[]) => visible.flatMap((v, i) => (!v && i > firstVisible(visible) ? [i] : []));
 
 describe("calibration", () => {
-    test("the UVP6 Aa is stored multiplied by 10⁶, the UVP5 aa is already in mm² per pixel", () => {
-        expect(aaInMm2("UVP6HF", 2300)).toBeCloseTo(0.0023, 10);
-        expect(aaInMm2("UVP5HD", 0.0026)).toBe(0.0026);
-    });
-
     test("ESD follows legacy EcoPart: 2 × sqrt(area ^ exp × aa / π)", () => {
         expect(esdMm(1, 0.0023, 1.136)).toBeCloseTo(0.0541, 4);
         expect(esdMm(2, 0.0023, 1.136)).toBeCloseTo(0.0802, 4);
@@ -210,9 +204,22 @@ describe("computeBinnedSample, bin bounds and range", () => {
         expect(depth.bins.map((b) => [b.index, b.depth_start_m, b.depth_stop_m])).toEqual([[3, 3.3, 4.4]]);
 
         const origin = Date.UTC(2024, 5, 12, 10, 0, 0);
-        const records = sequence([img(1, [], { image_time_ms: origin }), img(1, [], { image_time_ms: origin + 34.4 * 3_600_000 })]);
-        const time = computeBinnedSample({ ...UVP6, is_depth_profile: false }, records, { axis: "time", step: 0.8 });
-        expect(time.bins[time.bins.length - 1]).toMatchObject({ index: 43, time_start_ms: origin + 34.4 * 3_600_000 });
+        const records = sequence([img(1, [], { image_time_ms: origin }), img(1, [], { image_time_ms: origin + 34.5 * 3_600_000 })]);
+        const time = computeBinnedSample({ ...UVP6, is_depth_profile: false }, records, { axis: "time", step: 0.5 });
+        expect(time.bins[time.bins.length - 1]).toMatchObject({ index: 69, time_start_ms: origin + 34.5 * 3_600_000 });
+    });
+
+    test("time bins are aligned on midnight UTC: the same bounds for every sample, a 24 h bin is a calendar day", () => {
+        const at = (hours: number, minutes: number) => Date.UTC(2024, 5, 12, hours, minutes, 0);
+        const bounds = (first_image_ms: number, step: number) => {
+            const binned = computeBinnedSample({ ...UVP6, is_depth_profile: false }, sequence([img(1, [], { image_time_ms: first_image_ms })]), { axis: "time", step });
+            return binned.bins.map((b) => [new Date(b.time_start_ms as number).toISOString(), new Date(b.time_stop_ms as number).toISOString()]);
+        };
+        expect(bounds(at(13, 20), 6)).toEqual([["2024-06-12T12:00:00.000Z", "2024-06-12T18:00:00.000Z"]]);
+        expect(bounds(at(8, 5), 6)).toEqual([["2024-06-12T06:00:00.000Z", "2024-06-12T12:00:00.000Z"]]);
+        expect(bounds(at(13, 20), 24)).toEqual([["2024-06-12T00:00:00.000Z", "2024-06-13T00:00:00.000Z"]]);
+        // A 1 h step keeps the UTC hours of the legacy and the QC graphs.
+        expect(bounds(at(13, 20), 1)).toEqual([["2024-06-12T13:00:00.000Z", "2024-06-12T14:00:00.000Z"]]);
     });
 
     test("a black or over-exposed image widens the range without adding volume", () => {
@@ -318,7 +325,7 @@ describe("BinnedSampleBuilder, one pass over the pivot", () => {
             const bound = (): string | null => pick([null, null, "100", `${100 + Math.floor(rnd() * n)}`, `img${Math.floor(rnd() * n)}`, "dup", "nope"]);
             const uvp5 = rnd() < 0.2;
             const settings: BinnedSampleSettings = {
-                ...UVP6, instrument_model: uvp5 ? "UVP5HD" : "UVP6LP", aa: uvp5 ? 0.0023 : 2300,
+                ...UVP6, instrument_model: uvp5 ? "UVP5HD" : "UVP6LP", aa: 0.0023,
                 is_depth_profile: rnd() < 0.6, descent_filter_enabled: rnd() < 0.5, filter_first_image: bound(), filter_last_image: bound(),
                 depth_offset_m: pick([0, 1.2, null]),
             };
@@ -333,7 +340,7 @@ describe("BinnedSampleBuilder, one pass over the pivot", () => {
             });
             const step_units = Math.round(step * (axis === "depth" ? 1_000_000 : 3_600_000));
             const times = rows.filter((_, k) => selected[k] === 1).map((r) => r.image_time_ms).filter((t): t is number => t !== null);
-            const origin = times.length > 0 ? Math.floor(Math.min(...times) / 3_600_000) * 3_600_000 : null;
+            const origin = times.length > 0 ? Math.floor(Math.min(...times) / step_units) * step_units : null;
             const binOf = (r: PivotImageRecord): number | null => axis === "depth"
                 ? (r.raw_pressure === null ? null : Math.floor(Math.round(Math.max(0, r.raw_pressure + (settings.depth_offset_m ?? 0)) * 1_000_000) / step_units))
                 : (r.image_time_ms === null || origin === null ? null : Math.floor((r.image_time_ms - origin) / step_units));
@@ -372,7 +379,7 @@ describe("computeBinnedSample, time bins", () => {
     ]);
     const binned = computeBinnedSample({ ...UVP6, is_depth_profile: false }, records, { axis: "time", step: 0.5 });
 
-    test("bins start at the UTC hour of the first image, an image without time is left out", () => {
+    test("bins are counted from the bin of the first image, an image without time is left out", () => {
         expect(binned.bins.map((b) => [b.index, b.nb_images])).toEqual([[0, 1], [1, 2], [2, 0], [3, 1]]);
         expect(binned.bins[1]).toMatchObject({ time_start_ms: at(10, 30), time_stop_ms: at(11, 0) });
     });
@@ -383,7 +390,7 @@ describe("computeBinnedSample, time bins", () => {
         expect(binned_backwards.bins.map((b) => [b.index, b.time_start_ms, b.nb_images])).toEqual([[-1, at(9, 0), 1], [0, at(10, 0), 1]]);
     });
 
-    test("the origin is the hour of the first image used, not of an image the window leaves out", () => {
+    test("the origin is the bin of the first image used, not of an image the window leaves out", () => {
         const windowed = sequence([
             img(2, [], { image_time_ms: at(11, 10) }),
             img(2, [], { image_time_ms: at(11, 20) }),

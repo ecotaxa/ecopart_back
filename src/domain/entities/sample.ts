@@ -34,7 +34,7 @@ export interface SampleRequestCreationModel {
     instrument_settings_process_gamma: number | undefined                  // Process gamma value
     instrument_settings_process_vignette_resize_factor?: number; // Scale factor used to resize vignettes when saving them. UVP5SD=2, UVP5HD=1, UVP6=compute_vignettes.txt scale
     instrument_settings_images_post_process: string;             // Post-process software (Zooprocess for UVP5)
-    instrument_settings_aa: number;                              // Aa coefficient (UVP6: divided by 10^6)
+    instrument_settings_aa: number;                              // Aa coefficient in mm²/px (the UVP6 value divided by 10^6 at import)
     instrument_settings_exp: number;                             // Exp coefficient
     instrument_settings_image_volume_l: number;                  // Image volume in liters
     instrument_settings_pixel_size_mm: number;                   // Pixel size in millimeters
@@ -358,11 +358,11 @@ export interface MetadataIniSampleModel {
     instrument_serial_number: string;          // Instrument serial number
     station_id: string;                        // Station identifier
     sampling_utc_date_time: string;                     // Sampling date in ISO format
-    wind_direction: number;                    // Wind direction (in degrees)
-    wind_speed: number;                        // Wind speed (in relevant unit)
-    sea_state: string;                         // Description or classification of sea state
-    nebulousness: number;                      // Cloud coverage percentage (0-100)
-    bottom_depth: number | undefined;          // [sample_metadata] bottomdepth — often `NA` / `nan`, hence optional
+    wind_direction: number | undefined;        // Wind direction (in degrees); these five are often `nan`, hence optional
+    wind_speed: number | undefined;            // Wind speed (in relevant unit)
+    sea_state: string | undefined;             // Description or classification of sea state
+    nebulousness: number | undefined;          // Cloud coverage percentage (0-100)
+    bottom_depth: number | undefined;          // [sample_metadata] bottomdepth
     instrument_operator_email: string;                    // Operator's email
     filename: string;                          // source file name
 
