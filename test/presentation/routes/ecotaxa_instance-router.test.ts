@@ -142,6 +142,19 @@ describe("EcoTaxaInstanceRouter", () => {
             expect(response.body).toStrictEqual({ errors: ["Logged user cannot create an EcoTaxa instance"] })
         });
 
+        test("Should return 422 with error message : ecotaxa_instance_url must be an http or https URL", async () => {
+            jest.spyOn(mockCreateEcoTaxaInstanceUseCase, "execute").mockImplementation(() => { throw new Error("ecotaxa_instance_url must be an http or https URL") })
+            const response = await request(server).post("/ecotaxa_instances").send({
+                ecotaxa_instance_name: "NEW",
+                ecotaxa_instance_description: "New instance",
+                ecotaxa_instance_url: "javascript:alert(1)"
+            })
+
+            expect(response.status).toBe(422)
+            expect(mockCreateEcoTaxaInstanceUseCase.execute).toBeCalledTimes(1)
+            expect(response.body).toStrictEqual({ errors: ["ecotaxa_instance_url must be an http or https URL"] })
+        });
+
         test("Should return 500 with error message : Cannot create EcoTaxa instance", async () => {
             jest.spyOn(mockCreateEcoTaxaInstanceUseCase, "execute").mockImplementation(() => { throw new Error("Unexpected error") })
             const response = await request(server).post("/ecotaxa_instances").send({
