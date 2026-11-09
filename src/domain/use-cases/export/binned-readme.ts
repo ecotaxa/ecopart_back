@@ -33,8 +33,7 @@ const CONTEXT_COLUMN_DESCRIPTIONS: Record<string, [string, string]> = {
 };
 
 const BLOCK_DESCRIPTIONS: Record<typeof SIZE_CLASS_BLOCKS[number], [string, string]> = {
-    count: ["Particles of the size class in the bin.", "count"],
-    concentration: ["`count` / `subsample_water_volume`.", "# L⁻¹"],
+    concentration: ["Particles of the size class in the bin, divided by `subsample_water_volume`. Multiplied by `subsample_water_volume` and rounded to the nearest integer, it gives back the number of particles.", "# L⁻¹"],
     biovolume: ["Σ particles × (ESD / 2)³ × 4π / 3, divided by `subsample_water_volume`.", "mm³ L⁻¹"],
     intensity: ["Mean grey level of the particles of the class, each weighted by its count. `NA` when the class holds no particle. ⚠️ Not comparable between two UVPs: gain, shutter and illumination differ.", "0–255"],
     qcflag: ["Argo quality flag of the class in the bin. Always `0` (no QC performed) in this version.", ""],

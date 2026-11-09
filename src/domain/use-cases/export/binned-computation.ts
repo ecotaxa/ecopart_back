@@ -381,10 +381,12 @@ export const PARTICLE_CONTEXT_COLUMNS = [
 // counts do not stand for the same size from one instrument to another.
 export const PIXEL_COLUMNS = ["count_1px", "count_2px", "nb_black_images"];
 
-export const SIZE_CLASS_BLOCKS = ["count", "concentration", "biovolume", "intensity", "qcflag"] as const;
+// No block of counts per class: the concentration is divided by the very `subsample_water_volume`
+// written in the row, so multiplying it back gives the count.
+export const SIZE_CLASS_BLOCKS = ["concentration", "biovolume", "intensity", "qcflag"] as const;
 
-// Types of the columns: identifiers, counts and the Argo flags are integers; bounds, volume and
-// the concentration, biovolume and intensity blocks are doubles; the bin times are timestamps.
+// Types of the columns: identifiers, pixel counts and the Argo flags are integers; bounds, volume
+// and the concentration, biovolume and intensity blocks are doubles; the bin times are timestamps.
 export const PARTICLE_CONTEXT_COLUMN_TYPES: Record<string, TableColumnType> = {
     ecopart_sample_id: "integer",
     subsample_bin_type: "string",
@@ -398,7 +400,6 @@ export const PARTICLE_CONTEXT_COLUMN_TYPES: Record<string, TableColumnType> = {
 };
 export const PIXEL_COLUMN_TYPE: TableColumnType = "integer";
 export const SIZE_CLASS_BLOCK_TYPES: Record<typeof SIZE_CLASS_BLOCKS[number], TableColumnType> = {
-    count: "integer",
     concentration: "double",
     biovolume: "double",
     intensity: "double",
@@ -451,9 +452,7 @@ export function particleCells(sample_id: number, sample: BinnedSample, bin: Samp
         // No QC is performed yet: Argo flag 0 (M10).
         if (block === "qcflag") return 0;
         if (!sampled) return NA;
-        const count = bin.counts[class_index];
-        if (block === "count") return count;
-        if (block === "concentration") return count / volume;
+        if (block === "concentration") return bin.counts[class_index] / volume;
         if (block === "biovolume") return bin.biovolumes_mm3[class_index] / volume;
         return bin.grey_weights[class_index] > 0 ? bin.grey_sums[class_index] / bin.grey_weights[class_index] : NA;
     };

@@ -19,6 +19,7 @@ import {
     visibleSizeClasses,
 } from "../../../../src/domain/use-cases/export/binned-computation";
 import { serialize } from "../../../../src/domain/use-cases/export/tsv";
+import { sizeClassSuffix } from "../../../../src/domain/constants/size-classes";
 import { selectUsedImages } from "../../../../src/domain/use-cases/sample/qc-graphs-builder";
 
 const T0 = Date.UTC(2024, 5, 12, 10, 20, 0);
@@ -432,15 +433,16 @@ describe("particles.tsv", () => {
         expect(PIXEL_COLUMNS).toEqual(["count_1px", "count_2px", "nb_black_images"]);
     });
 
-    test("columns: context, pixel counts, then one block per quantity with one column per class", () => {
+    test("columns: context, pixel counts, then one block per quantity with one column per class, no count per class", () => {
         expect(columns.slice(0, PARTICLE_CONTEXT_COLUMNS.length + PIXEL_COLUMNS.length)).toEqual([...PARTICLE_CONTEXT_COLUMNS, ...PIXEL_COLUMNS]);
-        expect(columns).toContain("count_40p3um_50p8um");
+        expect(columns).toContain("concentration_40p3um_50p8um");
         expect(columns).toContain("concentration_50p8um_64um");
         expect(columns).toContain("qcflag_80p6um_102um");
-        expect(columns.length).toBe(PARTICLE_CONTEXT_COLUMNS.length + PIXEL_COLUMNS.length + 5 * classes.length);
+        expect(columns.filter((c) => c.startsWith("count_") && c.endsWith("um"))).toEqual([]);
+        expect(columns.length).toBe(PARTICLE_CONTEXT_COLUMNS.length + PIXEL_COLUMNS.length + 4 * classes.length);
     });
 
-    test("a sampled bin carries counts, concentrations, biovolumes and mean grey", () => {
+    test("a sampled bin carries pixel counts, concentrations, biovolumes and mean grey", () => {
         expect(rows[0]).toMatchObject({
             ecopart_sample_id: "42",
             subsample_depth_start: "0",
@@ -451,11 +453,9 @@ describe("particles.tsv", () => {
             subsample_qcflag: "0",
             count_1px: "10",
             count_2px: "4",
-            count_50p8um_64um: "10",
             concentration_50p8um_64um: "20",
             intensity_50p8um_64um: "20",
             qcflag_50p8um_64um: "0",
-            count_80p6um_102um: "0",
             concentration_80p6um_102um: "0",
             intensity_80p6um_102um: "NA",
         });
@@ -463,7 +463,7 @@ describe("particles.tsv", () => {
     });
 
     test("a class the sample cannot see is NA in every block", () => {
-        for (const block of ["count", "concentration", "biovolume", "intensity", "qcflag"]) {
+        for (const block of ["concentration", "biovolume", "intensity", "qcflag"]) {
             expect(rows[0][`${block}_40p3um_50p8um`]).toBe("NA");
         }
     });
@@ -474,14 +474,25 @@ describe("particles.tsv", () => {
             subsample_water_volume: "0",
             subsample_utc_date_time_start: "",
             count_1px: "NA",
-            count_50p8um_64um: "NA",
             concentration_50p8um_64um: "NA",
+            biovolume_50p8um_64um: "NA",
             qcflag_50p8um_64um: "0",
         });
     });
 
-    test("a mean grey with no grey to average is NA while the count stays", () => {
-        expect(rows[2]).toMatchObject({ count_50p8um_64um: "1", intensity_50p8um_64um: "NA", intensity_80p6um_102um: "50" });
+    test("a mean grey with no grey to average is NA while the concentration stays", () => {
+        expect(rows[2]).toMatchObject({ intensity_50p8um_64um: "NA", intensity_80p6um_102um: "50" });
+        expect(Number(rows[2].concentration_50p8um_64um) * Number(rows[2].subsample_water_volume)).toBeCloseTo(1, 9);
+    });
+
+    test("the concentration times the volume of the row gives back the count of the class", () => {
+        for (const bin of binned.bins.filter((b) => b.water_volume_l > 0)) {
+            const row = Object.fromEntries(columns.map((c, i) => [c, particleRows(42, binned, classes)[bin.index][i]]));
+            classes.filter((class_index) => binned.visible_classes[class_index]).forEach((class_index) => {
+                const concentration = Number(row[`concentration_${sizeClassSuffix(class_index)}`]);
+                expect(Math.round(concentration * Number(row.subsample_water_volume))).toBe(bin.counts[class_index]);
+            });
+        }
     });
 
     test("a UVP5 has no black image column value and no 1 px count below its minimum area", () => {
@@ -512,14 +523,13 @@ describe("particles.tsv", () => {
             subsample_water_volume: 0.5,
             subsample_qcflag: 0,
             count_1px: 10,
-            count_50p8um_64um: 10,
             concentration_50p8um_64um: 20,
             intensity_50p8um_64um: 20,
             intensity_80p6um_102um: "NA",
-            count_40p3um_50p8um: "NA",
+            concentration_40p3um_50p8um: "NA",
         });
         expect(typed(0).subsample_utc_date_time_start).toEqual(new Date(T0));
-        expect(typed(1)).toMatchObject({ subsample_utc_date_time_start: null, subsample_water_volume: 0, count_1px: "NA", count_50p8um_64um: "NA" });
+        expect(typed(1)).toMatchObject({ subsample_utc_date_time_start: null, subsample_water_volume: 0, count_1px: "NA", concentration_50p8um_64um: "NA" });
         for (const bin of binned.bins) {
             const cells = particleCells(42, binned, bin, classes);
             expect(particleRows(42, binned, classes)[bin.index]).toEqual(cells.map((cell) => serialize(cell, formatNumber)));
@@ -551,14 +561,14 @@ describe("particles.tsv", () => {
         }
 
         expect([...empty_in]).toEqual(expect.arrayContaining(["subsample_utc_date_time_start", "subsample_utc_date_time_stop", "subsample_depth_start", "subsample_depth_stop"]));
-        expect([...na_in]).toEqual(expect.arrayContaining(["count_1px", "nb_black_images", "count_40p3um_50p8um", "intensity_80p6um_102um"]));
+        expect([...na_in]).toEqual(expect.arrayContaining(["count_1px", "nb_black_images", "concentration_40p3um_50p8um", "intensity_80p6um_102um"]));
         expect([...empty_in].filter((c) => !PARTICLE_NOT_APPLICABLE_COLUMNS.includes(c))).toEqual([]);
         expect([...na_in].filter((c) => !particleNoValueColumns(classes).includes(c))).toEqual([]);
         expect(PARTICLE_NOT_APPLICABLE_COLUMNS.filter((c) => particleNoValueColumns(classes).includes(c))).toEqual([]);
         expect([...PARTICLE_NOT_APPLICABLE_COLUMNS, ...particleNoValueColumns(classes)].every((c) => columns.includes(c))).toBe(true);
     });
 
-    test("column types: identifiers, counts and flags are integers, measures doubles, bin times timestamps", () => {
+    test("column types: identifiers, pixel counts and flags are integers, measures doubles, bin times timestamps", () => {
         const types = Object.fromEntries(particleTableColumns(classes).map((c) => [c.name, c.type]));
 
         expect(particleTableColumns(classes).map((c) => c.name)).toEqual(columns);
@@ -572,7 +582,6 @@ describe("particles.tsv", () => {
             subsample_qcflag: "integer",
             count_1px: "integer",
             nb_black_images: "integer",
-            count_50p8um_64um: "integer",
             concentration_50p8um_64um: "double",
             biovolume_50p8um_64um: "double",
             intensity_50p8um_64um: "double",
