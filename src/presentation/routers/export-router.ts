@@ -215,7 +215,7 @@ export default function ExportRouter(
      *       - `metadata/projects.<format>`, `metadata/samples.<format>` — identical to the raw export's.
      *       - `particles.<format>` — one row per bin, depth profiles and time series alike: `subsample_bin_type` (`depth` or
      *         `time`) tells the axis of each row, on which the time and depth columns depend. Columns: 9 context columns, a pixel block (`count_1px`, `count_2px` and the
-     *         number of black images `nb_black_images`), then one block per quantity (`count_`, `concentration_`,
+     *         number of black images `nb_black_images`), then one block per quantity (`concentration_`,
      *         `biovolume_`, `intensity_`, `qcflag_`) with one column per size class, named by its bounds in µm
      *         (`concentration_50p8um_64um`). Only the classes visible on
      *         at least one exported sample get columns. `NA` marks a value that does not exist (a class the sample

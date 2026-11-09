@@ -330,14 +330,16 @@ describe("ExportBinnedData", () => {
                 nb_black_images: "NA",
                 count_1px: "NA",
                 count_2px: "10",
-                count_80p6um_102um: "10",
                 intensity_80p6um_102um: "20",
             });
             expect(Number(rows[0].concentration_80p6um_102um)).toBeCloseTo(10 / 1.12, 9);
-            expect(rows[1]).toMatchObject({ subsample_water_volume: "0", count_80p6um_102um: "NA" });
-            expect(rows[2]).toMatchObject({ count_102um_128um: "4", intensity_102um_128um: "40" });
+            expect(rows[1]).toMatchObject({ subsample_water_volume: "0", concentration_80p6um_102um: "NA" });
+            expect(rows[2]).toMatchObject({ intensity_102um_128um: "40" });
+            expect(Math.round(Number(rows[2].concentration_102um_128um) * Number(rows[2].subsample_water_volume))).toBe(4);
+            // No count per size class, only the pixel counts.
+            expect(Object.keys(rows[0]).filter((c) => c.startsWith("count_"))).toEqual(["count_1px", "count_2px"]);
             // The sample's first visible class is the first class column: nothing below 80.6 µm.
-            expect(Object.keys(rows[0]).find((c) => c.startsWith("count_") && c.endsWith("um"))).toBe("count_80p6um_102um");
+            expect(Object.keys(rows[0]).find((c) => c.startsWith("concentration_"))).toBe("concentration_80p6um_102um");
 
             expect(parseTsv(entries["metadata/samples.tsv"])[0]).toMatchObject({ ecopart_sample_id: "7" });
             expect(entries["README.md"]).toContain("# EcoPart binned export");
@@ -363,7 +365,7 @@ describe("ExportBinnedData", () => {
                 { name: "subsample_bin_type", type: "BYTE_ARRAY", converted_type: "UTF8", logical_type: { type: "STRING" }, repetition_type: "OPTIONAL" },
                 { name: "subsample_utc_date_time_start", type: "INT64", converted_type: "TIMESTAMP_MILLIS", logical_type: { type: "TIMESTAMP", isAdjustedToUTC: true, unit: "MILLIS" }, repetition_type: "OPTIONAL" },
             ]);
-            expect(particles.columns.find((c) => c.name === "count_80p6um_102um")?.type).toBe("INT64");
+            expect(particles.columns.some((c) => c.name === "count_80p6um_102um")).toBe(false);
             expect(particles.columns.find((c) => c.name === "concentration_80p6um_102um")?.type).toBe("DOUBLE");
             expect(particles.rows.map((r) => [r.subsample_depth_start, r.subsample_depth_stop, r.subsample_nb_images])).toEqual([[0, 5, BigInt(1)], [5, 10, BigInt(0)], [10, 15, BigInt(1)]]);
             expect(particles.rows[0]).toMatchObject({
@@ -375,13 +377,12 @@ describe("ExportBinnedData", () => {
                 nb_black_images: null,
                 count_1px: null,
                 count_2px: BigInt(10),
-                count_80p6um_102um: BigInt(10),
                 intensity_80p6um_102um: 20,
                 qcflag_80p6um_102um: BigInt(0),
             });
             expect(particles.rows[0].concentration_80p6um_102um).toBeCloseTo(10 / 1.12, 12);
-            expect(particles.rows[1]).toMatchObject({ subsample_water_volume: 0, subsample_utc_date_time_start: null, count_80p6um_102um: null, qcflag_80p6um_102um: BigInt(0) });
-            expect(particles.rows[2]).toMatchObject({ count_102um_128um: BigInt(4), intensity_102um_128um: 40 });
+            expect(particles.rows[1]).toMatchObject({ subsample_water_volume: 0, subsample_utc_date_time_start: null, concentration_80p6um_102um: null, qcflag_80p6um_102um: BigInt(0) });
+            expect(particles.rows[2]).toMatchObject({ intensity_102um_128um: 40 });
 
             const samples_table = await readParquet(await zipEntryBuffer(zip_path(), "metadata/samples.parquet"));
             expect(samples_table.rows[0]).toMatchObject({ ecopart_sample_id: BigInt(7), sample_name: sampleModel_1.sample_name });
@@ -525,9 +526,11 @@ describe("ExportBinnedData", () => {
             // Ordered by project then sample, like samples.tsv.
             expect(rows.map((r) => r.ecopart_sample_id)).toEqual(["7", "9"]);
             // The UVP6 sees 50.8 µm, the UVP5 (2 px minimum) only from 80.6 µm.
-            expect(Object.keys(rows[0]).find((c) => c.startsWith("count_") && c.endsWith("um"))).toBe("count_50p8um_64um");
-            expect(rows[0]).toMatchObject({ count_50p8um_64um: "NA", count_80p6um_102um: "10", nb_black_images: "NA" });
-            expect(rows[1]).toMatchObject({ count_50p8um_64um: "50", count_1px: "50", nb_black_images: "1", count_80p6um_102um: "0" });
+            expect(Object.keys(rows[0]).find((c) => c.startsWith("concentration_"))).toBe("concentration_50p8um_64um");
+            expect(rows[0]).toMatchObject({ concentration_50p8um_64um: "NA", nb_black_images: "NA" });
+            expect(Math.round(Number(rows[0].concentration_80p6um_102um) * Number(rows[0].subsample_water_volume))).toBe(10);
+            expect(rows[1]).toMatchObject({ count_1px: "50", nb_black_images: "1", concentration_80p6um_102um: "0" });
+            expect(Math.round(Number(rows[1].concentration_50p8um_64um) * Number(rows[1].subsample_water_volume))).toBe(50);
         });
 
         test("logs a sample left without any row, and the particles below its minimum area", async () => {
