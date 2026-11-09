@@ -9,26 +9,21 @@ import { BinnedExportBinMode } from "../../entities/binned-export";
 import { ExportTableFormat } from "../../entities/export";
 import { sizeClassSuffix } from "../../constants/size-classes";
 
-// One particle file: `particles`, or `particles_depth` and `particles_time` when `auto` meets both axes.
-export interface BinnedReadmeTable {
-    stem: string;
-    class_indexes: number[];
-}
-
 export interface BinnedReadmeOptions {
     format: ExportTableFormat;
     bin_mode: BinnedExportBinMode;
     depth_step_m: number;
     time_step_h: number;
-    tables: BinnedReadmeTable[];
+    class_indexes: number[];
 }
 
 const CONTEXT_COLUMN_DESCRIPTIONS: Record<string, [string, string]> = {
     ecopart_sample_id: ["Sample of the bin: join key to the `metadata/samples` table.", ""],
-    subsample_utc_date_time_start: ["Depth bins: time of the first image of the bin that adds imaged volume, empty when there is none. Time bins: start of the bin.", "ISO 8601 UTC"],
-    subsample_utc_date_time_stop: ["Depth bins: time of the last image of the bin that adds imaged volume, empty when there is none. Time bins: end of the bin.", "ISO 8601 UTC"],
-    subsample_depth_start: ["Depth bins: upper bound of the bin (the shallower one). Time bins: mean depth of the images of the bin, empty without pressure.", "m"],
-    subsample_depth_stop: ["Depth bins: lower bound of the bin (the deeper one). Time bins: empty.", "m"],
+    subsample_bin_type: ["Axis of the bin: `depth` (a depth bin, the bounds are depths) or `time` (a time bin, the bounds are times). The four columns that follow change meaning with it.", ""],
+    subsample_utc_date_time_start: ["`depth` rows: time of the first image of the bin that adds imaged volume, empty when there is none. `time` rows: start of the bin.", "ISO 8601 UTC"],
+    subsample_utc_date_time_stop: ["`depth` rows: time of the last image of the bin that adds imaged volume, empty when there is none. `time` rows: end of the bin.", "ISO 8601 UTC"],
+    subsample_depth_start: ["`depth` rows: upper bound of the bin (the shallower one). `time` rows: mean depth of the images of the bin, empty without pressure.", "m"],
+    subsample_depth_stop: ["`depth` rows: lower bound of the bin (the deeper one). `time` rows: empty.", "m"],
     subsample_nb_images: ["Images of the bin that add imaged volume: the sampling effort behind its counts.", "count"],
     subsample_water_volume: ["Imaged volume of the bin: `subsample_nb_images` × the sample's image volume, rounded to 6 decimals. `0` for a bin crossed without any image that adds volume.", "L"],
     subsample_qcflag: ["Argo quality flag of the bin. Always `0` (no QC performed) in this version.", ""],
@@ -60,12 +55,8 @@ export function renderBinnedReadme(options: BinnedReadmeOptions): string {
         time: "every sample by time",
     }[options.bin_mode];
     const format = options.format;
-    const files = options.tables.map((table) => `${table.stem}.${format}`);
-    const split = files.length > 1;
-    const files_label = files.map((file) => `\`${file}\``).join(" and ");
-    const smallest = options.tables
-        .filter((table) => table.class_indexes.length > 0)
-        .map((table) => `\`${sizeClassSuffix(table.class_indexes[0])}\`${split ? ` in \`${table.stem}.${format}\`` : ""}`);
+    const particles_file = `particles.${format}`;
+    const first_class = options.class_indexes.length > 0 ? sizeClassSuffix(options.class_indexes[0]) : null;
     // How a cell without value reads in this format; the column descriptions below say `NA`.
     const no_value = format === "parquet" ? "null" : "`NA`";
 
@@ -75,10 +66,8 @@ export function renderBinnedReadme(options: BinnedReadmeOptions): string {
     parts.push("");
     parts.push(`Requested binning: ${mode}; depth bins of ${options.depth_step_m} m, time bins of ${options.time_step_h} h.`);
     parts.push("");
-    if (split) {
-        parts.push(`The selection mixes depth profiles and time series: the depth bins are in \`${files[0]}\`, the time bins in \`${files[1]}\`, so that every column keeps one meaning in a file. Both files have the columns described below, each with the size classes of its own samples.`);
-        parts.push("");
-    }
+    parts.push(`Depth profiles and time series share \`${particles_file}\`: \`subsample_bin_type\` tells whether a row is a depth bin or a time bin.`);
+    parts.push("");
     parts.push("## Contents");
     parts.push("");
     parts.push("```");
@@ -87,17 +76,14 @@ export function renderBinnedReadme(options: BinnedReadmeOptions): string {
     parts.push("├── metadata/");
     parts.push(`│   ├── projects.${format}`);
     parts.push(`│   └── samples.${format}`);
-    files.forEach((file, i) => {
-        const what = split ? `one row per bin of each ${i === 0 ? "depth profile" : "time series"}` : "one row per bin of each sample";
-        parts.push(`${i === files.length - 1 ? "└──" : "├──"} ${file}${" ".repeat(Math.max(1, 21 - file.length))}${what}`);
-    });
+    parts.push(`└── ${particles_file}${" ".repeat(Math.max(1, 21 - particles_file.length))}one row per bin of each sample`);
     parts.push("```");
     parts.push("");
     parts.push("## Conventions");
     parts.push("");
     parts.push(tableConventions(format));
     parts.push("");
-    parts.push(`In ${files_label}:`);
+    parts.push(`In \`${particles_file}\`:`);
     parts.push("- `0` is a counted zero;");
     const no_value_cases = "the size class cannot be seen on this sample (below the smallest particle it records, or a class no whole number of pixels falls in), the bin has no imaged volume, a mean grey has no particle to average, or the instrument never acquires black images (UVP5)";
     const not_applicable = "the times of a depth bin crossed without any image that adds volume, the mean depth of a time bin without pressure, `subsample_depth_stop` of a time bin";
@@ -110,7 +96,7 @@ export function renderBinnedReadme(options: BinnedReadmeOptions): string {
         parts.push(`- in the size-class blocks and in \`count_1px\`, \`count_2px\`, \`nb_black_images\`, \`NA\` means that no value exists: ${no_value_cases};`);
         parts.push(`- in the other columns, an empty cell means that the row has no value there or that the column does not apply to it: ${not_applicable}.`);
         parts.push("");
-        parts.push(`R and pandas read \`NA\` as a missing value by default. In DuckDB, pass it explicitly: \`read_csv('${files[0]}', delim = '\\t', nullstr = ['NA', ''])\`.`);
+        parts.push(`R and pandas read \`NA\` as a missing value by default. In DuckDB, pass it explicitly: \`read_csv('${particles_file}', delim = '\\t', nullstr = ['NA', ''])\`.`);
         parts.push("");
     }
     parts.push(`The position of a sample is in \`metadata/samples.${format}\` (\`sample_latitude\`, \`sample_longitude\`, and \`ctd_latitude\`, \`ctd_longitude\` when a CTD file was imported). This version gives no position per bin.`);
@@ -124,9 +110,9 @@ export function renderBinnedReadme(options: BinnedReadmeOptions): string {
     parts.push(`- **Time bins.** Uniform slices of ${options.time_step_h} h aligned on midnight UTC (the step divides 24 h): every sample has the same bin bounds, and a 24 h bin is a calendar day in UTC.`);
     parts.push(`- **Which bins.** Every bin between the first and the last image used is written, even without any image (its \`subsample_water_volume\` is then \`0\` and its size-class cells ${no_value}). Bins outside that range are not written, as in legacy EcoPart.`);
     parts.push("- **Size classes.** The 45 classes of legacy EcoPart (`PartDetClassLimit`), named by their bounds in µm, `p` standing for the decimal point: `50p8um_64um` is [50.8 µm, 64 µm), lower bound included, upper bound excluded; the last class is open (`26000um_inf`). The ESD of a particle is 2 × √(area ^ exp × aa / π), `area` in pixels and `aa` the sample's `instrument_settings_aa`, in mm² per pixel.");
-    parts.push(`- **Which classes.** Only the classes visible on at least one sample of the file get columns${smallest.length > 0 ? ` (the smallest one here is ${smallest.join(", ")})` : ""}. On each sample, a class is visible when a whole number of pixels, from the smallest particle the sample records (\`instrument_settings_particule_minimum_area_pixels\`) upwards, falls in it; any other class of that sample is ${no_value}.`);
+    parts.push(`- **Which classes.** Only the classes visible on at least one exported sample get columns${first_class ? ` (the smallest one here is \`${first_class}\`)` : ""}. On each sample, a class is visible when a whole number of pixels, from the smallest particle the sample records (\`instrument_settings_particule_minimum_area_pixels\`) upwards, falls in it; any other class of that sample is ${no_value}.`);
     parts.push("");
-    parts.push(`## ${files_label}`);
+    parts.push(`## \`${particles_file}\``);
     parts.push("");
     parts.push(columnTable([
         ...PARTICLE_CONTEXT_COLUMNS.map((name): [string, TableColumnType, string, string] => [name, PARTICLE_CONTEXT_COLUMN_TYPES[name], ...CONTEXT_COLUMN_DESCRIPTIONS[name]]),
