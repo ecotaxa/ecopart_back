@@ -358,8 +358,9 @@ describe("ExportBinnedData", () => {
             expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.parquet", "metadata/samples.parquet", "particles.parquet"]);
 
             const particles = await readParquet(await zipEntryBuffer(zip_path(), "particles.parquet"));
-            expect(particles.columns.slice(0, 2)).toEqual([
+            expect(particles.columns.slice(0, 3)).toEqual([
                 { name: "ecopart_sample_id", type: "INT64", converted_type: undefined, logical_type: undefined, repetition_type: "OPTIONAL" },
+                { name: "subsample_bin_type", type: "BYTE_ARRAY", converted_type: "UTF8", logical_type: { type: "STRING" }, repetition_type: "OPTIONAL" },
                 { name: "subsample_utc_date_time_start", type: "INT64", converted_type: "TIMESTAMP_MILLIS", logical_type: { type: "TIMESTAMP", isAdjustedToUTC: true, unit: "MILLIS" }, repetition_type: "OPTIONAL" },
             ]);
             expect(particles.columns.find((c) => c.name === "count_80p6um_102um")?.type).toBe("INT64");
@@ -367,6 +368,7 @@ describe("ExportBinnedData", () => {
             expect(particles.rows.map((r) => [r.subsample_depth_start, r.subsample_depth_stop, r.subsample_nb_images])).toEqual([[0, 5, BigInt(1)], [5, 10, BigInt(0)], [10, 15, BigInt(1)]]);
             expect(particles.rows[0]).toMatchObject({
                 ecopart_sample_id: BigInt(7),
+                subsample_bin_type: "depth",
                 subsample_utc_date_time_start: new Date(Date.UTC(2020, 7, 6, 22, 0, 0)),
                 subsample_water_volume: 1.12,
                 subsample_qcflag: BigInt(0),
@@ -437,36 +439,37 @@ describe("ExportBinnedData", () => {
             expect(rows.map((r) => [r.subsample_utc_date_time_start, r.subsample_utc_date_time_stop])).toEqual([["2020-08-06T00:00:00.000Z", "2020-08-07T00:00:00.000Z"]]);
         });
 
-        test("auto on a selection that mixes depth profiles and time series writes one file per axis", async () => {
+        test("auto on a selection that mixes depth profiles and time series writes one file, each row saying its axis", async () => {
             given([sample(), sample({ sample_id: 8, sample_name: "mooring", sample_type_label: "Time" })], [project()]);
 
             await useCase.execute(current_user, { sample_ids: [7, 8] });
             await task_finished;
 
             const entries = await zipEntries(zip_path());
-            expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles_depth.tsv", "particles_time.tsv"]);
-            const depth = parseTsv(entries["particles_depth.tsv"]);
-            const time = parseTsv(entries["particles_time.tsv"]);
+            expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles.tsv"]);
+            const rows = parseTsv(entries["particles.tsv"]);
+            const depth = rows.filter((r) => r.subsample_bin_type === "depth");
+            const time = rows.filter((r) => r.subsample_bin_type === "time");
             expect(new Set(depth.map((r) => r.ecopart_sample_id))).toEqual(new Set(["7"]));
             expect(time.map((r) => r.ecopart_sample_id)).toEqual(["8"]);
-            // Each file keeps one meaning per column: bin bounds in depth for the profile, in time for the series.
+            expect(depth.length + time.length).toBe(rows.length);
+            // The axis says what the time and depth columns hold on each row.
             expect(depth[0]).toMatchObject({ subsample_depth_start: "0", subsample_depth_stop: "5" });
             expect(time[0]).toMatchObject({ subsample_utc_date_time_start: "2020-08-06T22:00:00.000Z", subsample_depth_stop: "" });
-            expect(entries["README.md"]).toContain("the depth bins are in `particles_depth.tsv`, the time bins in `particles_time.tsv`");
-            expect(entries["README.md"]).toContain("├── particles_depth.tsv");
-            expect(entries["README.md"]).toContain("└── particles_time.tsv");
-            expect(entries["README.md"]).toContain("## `particles_depth.tsv` and `particles_time.tsv`");
-            expect(log_messages).toContain("Particles: the selection mixes depth profiles and time series and bin_mode is auto, so the depth bins and the time bins go to two files: particles_depth.tsv (1 sample(s)), particles_time.tsv (1 sample(s))");
-            expect(log_messages.some(m => /^Particles: particles_time\.tsv written, 1 row\(s\) for 1 sample\(s\), /.test(m))).toBe(true);
+            expect(entries["README.md"]).toContain("Depth profiles and time series share `particles.tsv`: `subsample_bin_type` tells whether a row is a depth bin or a time bin.");
+            expect(entries["README.md"]).toContain("| `subsample_bin_type` | string |");
+            expect(log_messages.some(m => /^Particles: particles\.tsv written, \d+ row\(s\) for 2 sample\(s\), /.test(m))).toBe(true);
         });
 
-        test("a forced axis keeps a mixed selection in one file", async () => {
+        test("a forced axis bins every sample along it, and the rows say so", async () => {
             given([sample(), sample({ sample_id: 8, sample_name: "mooring", sample_type_label: "Time" })], [project()]);
 
             await useCase.execute(current_user, { sample_ids: [7, 8], bin_mode: "depth" });
             await task_finished;
 
-            expect(Object.keys(await zipEntries(zip_path())).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles.tsv"]);
+            const entries = await zipEntries(zip_path());
+            expect(Object.keys(entries).sort()).toEqual(["README.md", "metadata/projects.tsv", "metadata/samples.tsv", "particles.tsv"]);
+            expect(new Set(parseTsv(entries["particles.tsv"]).map((r) => r.subsample_bin_type))).toEqual(new Set(["depth"]));
         });
 
         test("a particle file that cannot be read fails the task and leaves no archive", async () => {
@@ -554,7 +557,7 @@ describe("ExportBinnedData", () => {
 
             expect(log_messages).toContain("Request: 2 sample(s) from 1 project(s), bin_mode auto, depth bins of 5 m, time bins of 1 h, format tsv");
             expect(log_messages).toContain("Request: project 1 'Perle 3' (UVP5HD): 2 sample(s)");
-            expect(log_messages).toContain("Particles: particles.tsv, 26 size class(es) exported, from 80p6um_102um to 26000um_inf");
+            expect(log_messages).toContain("Particles: 26 size class(es) exported, from 80p6um_102um to 26000um_inf");
             // Pressures 1 and 12 on 5 m bins: 0-5 m and 10-15 m hold an image, 5-10 m is crossed without one
             expect(log_messages).toContain(`Particles: ${sampleModel_1.sample_name} (depth axis, Depth sample): 2 of 2 image(s) of the particle file used, 3 row(s) from 0 m to 15 m, 1 of them without imaged volume, 2.24 L imaged`);
             expect(log_messages).toContain("Particles: no_pressure (depth axis, Depth sample): 0 of 1 image(s) of the particle file used");
@@ -563,7 +566,7 @@ describe("ExportBinnedData", () => {
             expect(log_messages).toContain(`Exported at: ${path.relative(PROJECT_ROOT, zip_path())}`);
             expect(log_messages.some(m => m.includes(PROJECT_ROOT))).toBe(false);
             // The size classes are announced with the particle step, after the metadata
-            expect(log_messages.findIndex(m => m.startsWith("Particles: particles.tsv, 26 size class"))).toBeGreaterThan(log_messages.findIndex(m => m.startsWith("Metadata: samples.tsv")));
+            expect(log_messages.findIndex(m => m.startsWith("Particles: 26 size class"))).toBeGreaterThan(log_messages.findIndex(m => m.startsWith("Metadata: samples.tsv")));
         });
 
         test("the samples dropped by skip_not_validated are named in the task log", async () => {

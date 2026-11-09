@@ -33,12 +33,6 @@ const BIN_MODES: BinnedExportBinMode[] = ["auto", "depth", "time"];
 // The particle table is appended this many rows at a time, so a long sample never sits whole in memory.
 const ROWS_PER_WRITE = 1000;
 
-// The rows of one particle file: every sample, or the samples of one axis when `auto` meets both.
-interface ParticleTable {
-    stem: string;
-    samples: PublicSampleModel[];
-}
-
 interface BinnedExportPlan {
     sample_ids: number[];
     bin_mode: BinnedExportBinMode;
@@ -204,16 +198,6 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
         return sample.sample_type_label === "Depth" ? "depth" : "time";
     }
 
-    // One file, unless `auto` meets both depth profiles and time series: their rows then go to
-    // `particles_depth` and `particles_time`, so that every column keeps one meaning in a file
-    // (decided on 4 November 2026).
-    private particleTables(samples: PublicSampleModel[], bin_mode: BinnedExportBinMode): ParticleTable[] {
-        const depth = samples.filter(s => this.axisOf(s, bin_mode) === "depth");
-        const time = samples.filter(s => this.axisOf(s, bin_mode) === "time");
-        if (depth.length === 0 || time.length === 0) return [{ stem: "particles", samples }];
-        return [{ stem: "particles_depth", samples: depth }, { stem: "particles_time", samples: time }];
-    }
-
     // One line per sample: why its axis, what its particle file held, and the range its rows cover.
     private describeBinnedSample(sample: PublicSampleModel, bin_mode: BinnedExportBinMode, binned: BinnedSample): string {
         const axis_origin = bin_mode === "auto" ? `${sample.sample_type_label} sample` : `bin_mode ${bin_mode}`;
@@ -271,10 +255,7 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
             // The columns only depend on each sample's calibration, so they are known before any
             // file is read and the rows can be written sample by sample.
             const settings_by_id = new Map(samples.map(s => [s.sample_id, binnedSampleSettingsOf(s, projects_by_id.get(s.project_id) as ProjectResponseModel)]));
-            const tables = this.particleTables(samples, plan.bin_mode).map(table => ({
-                ...table,
-                class_indexes: exportedSizeClasses(table.samples.map(s => sampleVisibleSizeClasses(settings_by_id.get(s.sample_id) as BinnedSampleSettings))),
-            }));
+            const class_indexes = exportedSizeClasses(samples.map(s => sampleVisibleSizeClasses(settings_by_id.get(s.sample_id) as BinnedSampleSettings)));
 
             await this.taskRepository.throwIfCancelled(task_id);
             await this.taskRepository.updateTaskProgress({ task_id }, 5, "Step 1/2 metadata: start");
@@ -282,61 +263,55 @@ export class ExportBinnedData implements ExportBinnedDataUseCase {
                 { from: 5, to: 15, label: "Step 1/2 metadata" });
             await this.taskRepository.updateTaskProgress({ task_id }, 15, "Step 1/2 metadata: done");
 
-            if (tables.length > 1) {
-                await log(`Particles: the selection mixes depth profiles and time series and bin_mode is auto, so the depth bins and the time bins go to two files: ${tables.map(t => `${t.stem}.${plan.format} (${t.samples.length} sample(s))`).join(", ")}`);
+            if (class_indexes.length > 0) {
+                await log(`Particles: ${class_indexes.length} size class(es) exported, from ${sizeClassSuffix(class_indexes[0])} to ${sizeClassSuffix(class_indexes[class_indexes.length - 1])}`);
             }
-            let samples_done = 0;
-            for (const table of tables) {
-                const class_indexes = table.class_indexes;
-                const particles_writer = await openTableWriter(plan.format, path.join(work_folder, table.stem), particleTableColumns(class_indexes), { formatNumber });
-                particles = particles_writer;
-                const particles_file = path.basename(particles_writer.file_path);
-                if (class_indexes.length > 0) {
-                    await log(`Particles: ${particles_file}, ${class_indexes.length} size class(es) exported, from ${sizeClassSuffix(class_indexes[0])} to ${sizeClassSuffix(class_indexes[class_indexes.length - 1])}`);
+            // One file for every sample, depth profiles and time series alike (decided on 9 November
+            // 2026): `subsample_bin_type` tells the axis of each row.
+            const particles_writer = await openTableWriter(plan.format, path.join(work_folder, "particles"), particleTableColumns(class_indexes), { formatNumber });
+            particles = particles_writer;
+            const particles_file = path.basename(particles_writer.file_path);
+            let particle_rows = 0;
+            for (const [i, sample] of samples.entries()) {
+                await this.taskRepository.throwIfCancelled(task_id);
+                const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
+                const axis = this.axisOf(sample, plan.bin_mode);
+                const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
+                // One pass over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
+                const builder = new BinnedSampleBuilder(settings, { axis, step });
+                for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, settings.instrument_model)) builder.add(record);
+                const binned = builder.finish();
+                for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
+                    await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
                 }
-                let particle_rows = 0;
-                for (const sample of table.samples) {
-                    await this.taskRepository.throwIfCancelled(task_id);
-                    const settings = settings_by_id.get(sample.sample_id) as BinnedSampleSettings;
-                    const axis = this.axisOf(sample, plan.bin_mode);
-                    const step = axis === "depth" ? plan.depth_step_m : plan.time_step_h;
-                    // One pass over the pivot (see BinnedSampleBuilder): no sample is held whole in memory.
-                    const builder = new BinnedSampleBuilder(settings, { axis, step });
-                    for await (const record of this.sampleRepository.readPivotImages(sample.project_id, sample.sample_name, settings.instrument_model)) builder.add(record);
-                    const binned = builder.finish();
-                    for (let start = 0; start < binned.bins.length; start += ROWS_PER_WRITE) {
-                        await particles_writer.append(binned.bins.slice(start, start + ROWS_PER_WRITE).map(bin => particleCells(sample.sample_id, binned, bin, class_indexes)));
-                    }
-                    particle_rows += binned.bins.length;
+                particle_rows += binned.bins.length;
 
-                    samples_done++;
-                    const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
-                    await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round((samples_done / samples.length) * 75), `Step 2/2 particles: ${summary}`);
-                    await log(this.describeBinnedSample(sample, plan.bin_mode, binned));
-                    if (binned.bins.length === 0) {
-                        const position = axis === "depth" ? "pressure" : "readable time";
-                        const reason = binned.total_images === 0 ? "its particle file holds no image"
-                            : binned.positioned_images === 0 ? `none of its images has a ${position}`
-                                : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
-                                    : `none of its ${binned.used_images} image(s) used has a ${position}`;
-                        await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
-                    }
-                    if (binned.particles_below_minimum_area > 0) {
-                        await log(`${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
-                    }
+                const summary = `${sample.sample_name}: ${binned.bins.length} ${axis} bin(s) of ${step} ${axis === "depth" ? "m" : "h"} from ${binned.used_images} image(s) used`;
+                await this.taskRepository.updateTaskProgress({ task_id }, 15 + Math.round(((i + 1) / samples.length) * 75), `Step 2/2 particles: ${summary}`);
+                await log(this.describeBinnedSample(sample, plan.bin_mode, binned));
+                if (binned.bins.length === 0) {
+                    const position = axis === "depth" ? "pressure" : "readable time";
+                    const reason = binned.total_images === 0 ? "its particle file holds no image"
+                        : binned.positioned_images === 0 ? `none of its images has a ${position}`
+                            : binned.used_images === 0 ? "no image is left after the operator window and the descent filter"
+                                : `none of its ${binned.used_images} image(s) used has a ${position}`;
+                    await log(`${sample.sample_name}: ${reason}, the sample has no row in ${particles_file}`);
                 }
-
-                await particles_writer.close();
-                particles = null;
-                await log(`Particles: ${particles_file} written, ${particle_rows} row(s) for ${table.samples.length} sample(s), ${await fileSizeLabel(particles_writer.file_path)}`);
+                if (binned.particles_below_minimum_area > 0) {
+                    await log(`${sample.sample_name}: ${binned.particles_below_minimum_area} particle(s) smaller than the minimum area of ${binned.minimum_area_px} px are left out of the counts`);
+                }
             }
+
+            await particles_writer.close();
+            particles = null;
+            await log(`Particles: ${particles_file} written, ${particle_rows} row(s) for ${samples.length} sample(s), ${await fileSizeLabel(particles_writer.file_path)}`);
 
             await fsPromises.writeFile(path.join(work_folder, "README.md"), renderBinnedReadme({
                 format: plan.format,
                 bin_mode: plan.bin_mode,
                 depth_step_m: plan.depth_step_m,
                 time_step_h: plan.time_step_h,
-                tables: tables.map(table => ({ stem: table.stem, class_indexes: table.class_indexes })),
+                class_indexes,
             }));
 
             await this.taskRepository.throwIfCancelled(task_id);

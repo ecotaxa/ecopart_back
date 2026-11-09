@@ -365,6 +365,9 @@ function roundTo(value: number, decimals: number): number {
 
 export const PARTICLE_CONTEXT_COLUMNS = [
     "ecopart_sample_id",
+    // `depth` or `time`: the axis of the row's bin. Depth profiles and time series share one file,
+    // and the time and depth columns do not mean the same thing on the two axes.
+    "subsample_bin_type",
     "subsample_utc_date_time_start",
     "subsample_utc_date_time_stop",
     "subsample_depth_start",
@@ -384,6 +387,7 @@ export const SIZE_CLASS_BLOCKS = ["count", "concentration", "biovolume", "intens
 // the concentration, biovolume and intensity blocks are doubles; the bin times are timestamps.
 export const PARTICLE_CONTEXT_COLUMN_TYPES: Record<string, TableColumnType> = {
     ecopart_sample_id: "integer",
+    subsample_bin_type: "string",
     subsample_utc_date_time_start: "timestamp",
     subsample_utc_date_time_stop: "timestamp",
     subsample_depth_start: "double",
@@ -455,6 +459,7 @@ export function particleCells(sample_id: number, sample: BinnedSample, bin: Samp
     };
     return [
         sample_id,
+        sample.axis,
         timeValue(bin.time_start_ms),
         timeValue(bin.time_stop_ms),
         bin.depth_start_m,

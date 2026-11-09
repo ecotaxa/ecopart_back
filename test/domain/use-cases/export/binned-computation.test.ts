@@ -417,9 +417,10 @@ describe("particles.tsv", () => {
     const columns = particleColumns(classes);
     const rows = particleRows(42, binned, classes).map((row) => Object.fromEntries(columns.map((c, i) => [c, row[i]])));
 
-    test("8 context columns, the rev 3 ones without the positions, then the pixel block (M1)", () => {
+    test("9 context columns: the rev 3 ones without the positions, plus the axis of the bin, then the pixel block (M1)", () => {
         expect(PARTICLE_CONTEXT_COLUMNS).toEqual([
             "ecopart_sample_id",
+            "subsample_bin_type",
             "subsample_utc_date_time_start",
             "subsample_utc_date_time_stop",
             "subsample_depth_start",
