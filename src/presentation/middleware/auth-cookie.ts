@@ -55,7 +55,26 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
     };
 
     /**
-    * Middleware function to authenticate using refresh token stored in an HTTP-only cookie
+    * Optional authentication: a request without an access cookie goes on anonymous (no token on the
+    * request), one with a valid cookie carries its decoded token, one with an invalid or expired cookie
+    * is refused like `auth`, so that the client refreshes it and retries instead of browsing as anonymous.
+    */
+    auth_optional = async (req: Request, res: Response, next: NextFunction) => {
+        const token = req.cookies?.access_token;
+        if (!token) return next();
+        try {
+            const decoded = this.jwt.verify(token, this.SECRET_KEY_ACCESS);
+            (req as CustomRequest).token = (decoded as DecodedToken);
+            next();
+        } catch (err) {
+            return res.status(401).send({ errors: ['Token invalid or expired. Please authenticate.'] })
+        }
+    };
+
+    /**
+    * Middleware function to authenticate using refresh token stored in an HTTP-only cookie.
+    * Without a usable refresh token the session is over: its cookies are cleared, or an expired access
+    * cookie would keep refusing this browser on the routes open to anonymous callers (`auth_optional`).
     * @param {Request} req - Express request object.
     * @param {Response} res - Express response object.
     * @param {NextFunction} next - Next middleware function.
@@ -65,7 +84,7 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             // Retrieve the refresh token from the cookie
             const token: string | null = req.cookies?.refresh_token;
             // If token is missing, send a 401 Unauthorized response
-            if (!token) return res.status(401).send({ errors: ['Refresh token missing. Please authenticate.'] })
+            if (!token) return res.clearCookie("access_token").clearCookie("refresh_token").status(401).send({ errors: ['Refresh token missing. Please authenticate.'] })
 
             // Verify the token using the refresh secret key
             const decoded = this.jwt.verify(token, this.SECRET_KEY_REFRESH);
@@ -77,7 +96,7 @@ export class MiddlewareAuthCookie implements MiddlewareAuth {
             next();
         } catch (err) {
             // Send a 401 Unauthorized response for token verification errors
-            return res.status(401).send({ errors: ['Refresh token invalid or expired. Please authenticate.'] });
+            return res.clearCookie("access_token").clearCookie("refresh_token").status(401).send({ errors: ['Refresh token invalid or expired. Please authenticate.'] });
         }
     };
 }

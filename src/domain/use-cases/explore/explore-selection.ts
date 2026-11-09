@@ -8,12 +8,12 @@ import { SampleRepository } from "../../interfaces/repositories/sample-repositor
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { isProjectActionAllowed, privacyOf, ProjectRole } from "../project/project-access";
 
-/* The selection behind every Explore request: the user, every project of the
+/* The selection behind every Explore request: the user (anonymous or not), every project of the
  * application with what the user may do with it, and the samples matching the criteria. Resolved
  * once per request and shared by the map, the stats, the EcoTaxa summary, the images and the graphs. */
 
 export interface ExploreUser {
-    user_id: number;
+    user_id: number | null;                   // null: anonymous
     is_admin: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface ExploreProjectContext {
     privacy: ProjectPrivacyLevel;
     role: ProjectRole;
     is_my_project: boolean;                   // the user is a member or a manager
-    can_export: boolean;                      // export_particles in the access matrix
+    can_export: boolean;                      // export_particles in the access matrix; an anonymous must still log in, /exports refuses them
     can_figures: boolean;                     // figures in the access matrix
     privileges: PublicPrivilege | null;
     nb_samples: number;                       // every sample of the project, both types
@@ -49,14 +49,15 @@ export type ClassificationStateFilter = (samples: ExploreSampleRow[], projects: 
 
 export const SAMPLE_TYPE_OF_MODE: Record<ExploreMode, "Depth" | "Time" | null> = { depth: "Depth", time: "Time", all: null };
 
-export async function resolveExploreUser(userRepository: UserRepository, current_user: UserUpdateModel): Promise<ExploreUser> {
+export async function resolveExploreUser(userRepository: UserRepository, current_user: UserUpdateModel | null | undefined): Promise<ExploreUser> {
+    if (!current_user) return { user_id: null, is_admin: false };
     await userRepository.ensureUserCanBeUsed(current_user.user_id);
     return { user_id: current_user.user_id, is_admin: await userRepository.isAdmin(current_user.user_id) };
 }
 
 function roleOf(user: ExploreUser, privileges: PublicPrivilege | null): ProjectRole {
     if (user.is_admin) return "admin";
-    if (!privileges) return "user";
+    if (user.user_id === null || !privileges) return "user";
     if (privileges.managers.some(manager => manager.user_id === user.user_id)) return "manager";
     if (privileges.members.some(member => member.user_id === user.user_id)) return "member";
     return "user";
@@ -124,7 +125,7 @@ export function isExportable(sample: ExploreSampleRow, projects: Map<number, Exp
 
 export async function resolveExploreSelection(
     repositories: ExploreSelectionRepositories,
-    current_user: UserUpdateModel,
+    current_user: UserUpdateModel | null | undefined,
     request: ExploreRequest,
     classificationStateFilter: ClassificationStateFilter,
     now: Date = new Date(),

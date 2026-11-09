@@ -14,7 +14,8 @@ import { computeProjectPrivacy } from "../../utils/project-privacy";
  *   public   |  V  |    V    |        V         |       X
  *   open     |  V  |    V    |        V         |       V
  *
- * Anonymous users are not served by this API at all: every route needs a login. */
+ * Anonymous users are only served the /explore reads, as a user without any privilege (their contact
+ * e-mails hidden); every other route, the exports included, needs a login. */
 
 export type ProjectRole = "admin" | "manager" | "member" | "user";
 

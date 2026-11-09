@@ -19,6 +19,9 @@ class MockMiddlewareAuth implements MiddlewareAuth {
         (req as CustomRequest).token = ({ user_id: 1, is_admin: false } as DecodedToken);
         next();
     }
+    auth_optional(_: Request, __: Response, next: NextFunction): void {
+        next()
+    }
     auth_refresh(): void {
         throw new Error("Method not implemented for auth_refresh");
     }
@@ -39,6 +42,34 @@ class MockExportBinnedDataUseCase implements ExportBinnedDataUseCase {
 // The real validation middleware is used on purpose: the 422 contract of this route is
 // entirely express-validator's, so mocking it away would test nothing.
 const validation: IMiddlewareExportValidation = new MiddlewareExportValidation();
+
+describe("ExportRouter — anonymous callers", () => {
+    // Explore is open to anonymous users: exporting what it shows still needs a login.
+    class AnonymousMiddlewareAuth extends MockMiddlewareAuth {
+        auth(_: Request, res: Response): void {
+            res.status(401).send({ errors: ["Token missing. Please authenticate."] });
+        }
+    }
+
+    test.each([
+        ["/exports/raw", { sample_ids: [1, 2], export_types: ["metadata"] }],
+        ["/exports/binned", { sample_ids: [1, 2] }],
+    ])("POST %s is refused with a 401, before any use case", async (path, body) => {
+        const server = express();
+        server.use(express.json());
+        const exportRawDataUseCase = new MockExportRawDataUseCase();
+        const exportBinnedDataUseCase = new MockExportBinnedDataUseCase();
+        jest.spyOn(exportRawDataUseCase, "execute");
+        jest.spyOn(exportBinnedDataUseCase, "execute");
+        server.use("/exports", ExportRouter(new AnonymousMiddlewareAuth(), validation, exportRawDataUseCase, exportBinnedDataUseCase));
+
+        const response = await request(server).post(path).send(body);
+
+        expect(response.status).toBe(401);
+        expect(exportRawDataUseCase.execute).toBeCalledTimes(0);
+        expect(exportBinnedDataUseCase.execute).toBeCalledTimes(0);
+    });
+});
 
 describe("ExportRouter — POST /exports/raw", () => {
     let server: express.Express;

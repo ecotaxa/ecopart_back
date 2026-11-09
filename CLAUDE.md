@@ -186,9 +186,10 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
 ## HTTP conventions
 
 - **Auth**: JWT access + refresh tokens in cookies, checked by `MiddlewareAuthCookie.auth`; login
-  sessions are stored (`user_session`) so that logout and purge work. Every route needs a login,
-  Explore included (its anonymous access was removed on 4 Nov 2026): an anonymous user never
-  reaches a use case.
+  sessions are stored (`user_session`) so that logout and purge work. Every route needs a login
+  but the `/explore` reads (`auth_optional`), served to anonymous users as a user without any
+  privilege and without the contact e-mails; a failed refresh clears the session cookies, so that
+  an ended session browses them as anonymous. The exports need a login.
 - **Validation**: express-validator rule arrays in `presentation/middleware/*-validation.ts`,
   exposed through an interface so router tests can replace them with empty rules.
 - **Errors**: always `{ errors: [string] }`. Unknown route = 404, malformed JSON = 400, anything a
@@ -225,7 +226,7 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   raw export returns the files as they were imported: metadata edited in EcoPart is not
   propagated into them (decision deferred). Units follow the export spec in `docs/` (pixel size
   in mm, pressure in dbar).
-- **Explore**: cross-project selection, map, stats and curves, for logged-in users.
+- **Explore**: cross-project selection, map, stats and curves, open to anonymous users.
   EcoTaxa figures are kept per sample (`sample_ecotaxa_stats`), refreshed at most once a day by a
   background sweeper, with at most 2 EcoTaxa calls in flight and batches of 50
   (`use-cases/explore/explore-ecotaxa.ts`). Project stats (STATS tab) and the QC state of the

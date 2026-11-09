@@ -277,7 +277,11 @@ describe("User Router", () => {
 
             expect(response.status).toBe(401)
             expect(response.body).toStrictEqual({ errors: ["Session revoked or expired"] })
-            expect(response.headers['set-cookie']).toBeUndefined();
+            // The session is over: its cookies are cleared, none is reissued.
+            expect(response.headers['set-cookie']).toEqual([
+                expect.stringMatching(/^access_token=;.*Expires=Thu, 01 Jan 1970/),
+                expect.stringMatching(/^refresh_token=;.*Expires=Thu, 01 Jan 1970/),
+            ]);
         });
 
         test("Should handle error during refresh token use case and return a 404 response", async () => {
@@ -294,7 +298,11 @@ describe("User Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
             expect(response.status).toBe(404)
             expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
-            expect(response.headers['set-cookie']).toBeUndefined();
+            // The session is over: its cookies are cleared, none is reissued.
+            expect(response.headers['set-cookie']).toEqual([
+                expect.stringMatching(/^access_token=;.*Expires=Thu, 01 Jan 1970/),
+                expect.stringMatching(/^refresh_token=;.*Expires=Thu, 01 Jan 1970/),
+            ]);
         });
 
         test("Refresh token but user is deleted", async () => {
@@ -310,7 +318,11 @@ describe("User Router", () => {
             expect(response.status).toBe(403)
             expect(mockRefreshTokenUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
-            expect(response.headers['set-cookie']).toBeUndefined(); // Ensure no cookies are set
+            // The session is over: its cookies are cleared, none is reissued.
+            expect(response.headers['set-cookie']).toEqual([
+                expect.stringMatching(/^access_token=;.*Expires=Thu, 01 Jan 1970/),
+                expect.stringMatching(/^refresh_token=;.*Expires=Thu, 01 Jan 1970/),
+            ]);
         });
 
 

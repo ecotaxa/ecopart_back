@@ -34,6 +34,7 @@ describe("Authorization middleware", () => {
             json: jest.fn(),
             status: jest.fn().mockReturnThis(),
             send: jest.fn(),
+            clearCookie: jest.fn().mockReturnThis(),
         };
         nextFunction = jest.fn();
     });
@@ -137,7 +138,7 @@ describe("Authorization middleware", () => {
     })
 
     describe("REFRESH TOKEN TESTS", () => {
-        test('Without "refresh_token" auth cookie - should return error', async () => {
+        test('Without "refresh_token" auth cookie - should return error and clear the session cookies', async () => {
 
             const expectedResponse = { errors: ['Refresh token missing. Please authenticate.'] }
 
@@ -149,10 +150,12 @@ describe("Authorization middleware", () => {
 
             expect(mockResponse.status).toBeCalledWith(401);
             expect(mockResponse.send).toBeCalledWith(expectedResponse);
+            expect(mockResponse.clearCookie).toBeCalledWith("access_token");
+            expect(mockResponse.clearCookie).toBeCalledWith("refresh_token");
             expect(nextFunction).not.toBeCalled();
         });
 
-        test('With expired "refresh_token" auth cookie - should return error', async () => {
+        test('With expired "refresh_token" auth cookie - should return error and clear the session cookies', async () => {
             const expiredRefreshToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoxLCJmaXJzdE5hbWUiOiJKb2huIiwibGFzdE5hbWUiOiJTbWl0aCIsImVtYWlsIjoiam9obkBnbWFpbC5jb20iLCJzdGF0dXMiOiJQZW5kaW5nIiwib3JnYW5pc2F0aW9uIjoiTE9WIiwiY291bnRyeSI6IkZyYW5jZSIsInVzZXJfcGxhbm5lZF91c2FnZSI6Ik1vbiB1c2FnZSIsInVzZXJfY3JlYXRpb25fZGF0ZSI6IjIwMjMtMDctMzEgMTc6MTg6NDcifSwiaWF0IjoxNjkyNjk4MzUyLCJleHAiOjE2OTI2OTgzNTN9.p1Y9u9ikgGjkn8BKWDzaTLAiqSJNwoUGvvvQf1se0ZE"
             const expectedResponse = { errors: ['Refresh token invalid or expired. Please authenticate.'] }
             mockRequest = {
@@ -170,6 +173,8 @@ describe("Authorization middleware", () => {
 
             expect(mockResponse.status).toBeCalledWith(401);
             expect(mockResponse.send).toBeCalledWith(expectedResponse);
+            expect(mockResponse.clearCookie).toBeCalledWith("access_token");
+            expect(mockResponse.clearCookie).toBeCalledWith("refresh_token");
             expect(nextFunction).not.toBeCalled();
         });
 
@@ -233,6 +238,54 @@ describe("Authorization middleware", () => {
             expect((mockRequest as CustomRequest).token).toEqual(expectedDecodedRefreshToken);
             expect(jwt.verify).toHaveBeenCalledWith(valid_refresh_token, TEST_REFRESH_TOKEN_SECRET);
             expect(nextFunction).toBeCalledTimes(1);
+        });
+    })
+    describe("OPTIONAL ACCESS TOKEN TESTS", () => {
+        test('Without cookies at all - goes on anonymous, without token', async () => {
+            jest.spyOn(jwt, "verify");
+
+            await authorizationMiddleware.auth_optional(mockRequest as Request, mockResponse as Response, nextFunction);
+
+            expect(nextFunction).toBeCalledTimes(1);
+            expect((mockRequest as CustomRequest).token).toBeUndefined();
+            expect(jwt.verify).not.toBeCalled();
+            expect(mockResponse.status).not.toBeCalled();
+        });
+
+        test('Without "access_token" cookie - goes on anonymous, without token', async () => {
+            mockRequest = { cookies: { refresh_token: "a refresh token is not an access token" } };
+            jest.spyOn(jwt, "verify");
+
+            await authorizationMiddleware.auth_optional(mockRequest as Request, mockResponse as Response, nextFunction);
+
+            expect(nextFunction).toBeCalledTimes(1);
+            expect((mockRequest as CustomRequest).token).toBeUndefined();
+            expect(jwt.verify).not.toBeCalled();
+        });
+
+        test('With a valid "access_token" cookie - sets the decoded token and calls next', async () => {
+            const decoded = { user_id: 1, first_name: "John", last_name: "Smith", email: "john@gmail.com", is_admin: false, iat: 1692612422, exp: 1692614222 };
+            mockRequest = { cookies: { access_token: "valid.access.token" } };
+            jest.spyOn(jwt, "verify").mockImplementation(() => decoded);
+
+            await authorizationMiddleware.auth_optional(mockRequest as Request, mockResponse as Response, nextFunction);
+
+            expect(jwt.verify).toHaveBeenCalledWith("valid.access.token", TEST_ACCESS_TOKEN_SECRET);
+            expect((mockRequest as CustomRequest).token).toEqual(decoded);
+            expect(nextFunction).toBeCalledTimes(1);
+            expect(mockResponse.status).not.toBeCalled();
+        });
+
+        test('With an invalid or expired "access_token" cookie - 401, so that the client refreshes instead of browsing anonymous', async () => {
+            mockRequest = { cookies: { access_token: "expired.access.token" } };
+            jest.spyOn(jwt, "verify").mockImplementation(() => { throw new Error("jwt expired") });
+
+            await authorizationMiddleware.auth_optional(mockRequest as Request, mockResponse as Response, nextFunction);
+
+            expect(mockResponse.status).toBeCalledWith(401);
+            expect(mockResponse.send).toBeCalledWith({ errors: ['Token invalid or expired. Please authenticate.'] });
+            expect(nextFunction).not.toBeCalled();
+            expect((mockRequest as CustomRequest).token).toBeUndefined();
         });
     })
 });

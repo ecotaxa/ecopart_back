@@ -77,6 +77,7 @@ describe('DELETE /tasks/:task_id (integration)', () => {
 
         const auth: MiddlewareAuth = {
             auth: (req: Request, _: Response, next: NextFunction) => { (req as CustomRequest).token = { user_id: admin_id } as DecodedToken; next() },
+            auth_optional: (_req: Request, _: Response, next: NextFunction) => next(),
             auth_refresh: () => { throw new Error('Method not implemented for auth_refresh') },
         }
         app = express()

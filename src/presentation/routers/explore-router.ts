@@ -11,9 +11,8 @@ import { GetExploreEcoTaxaUseCase } from '../../domain/interfaces/use-cases/expl
 import { GetExploreImagesUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-images'
 import { GetExploreGraphsUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-graphs'
 
-// Explore is for logged-in users only (`auth` on every route): an anonymous caller could load the
-// server with selections over the whole database.
-const userOf = (req: Request) => (req as CustomRequest).token;
+// The user behind an optionally authenticated request: null when anonymous.
+const userOf = (req: Request) => (req as CustomRequest).token ?? null;
 
 export default function ExploreRouter(
     middlewareAuth: MiddlewareAuth,
@@ -42,10 +41,12 @@ export default function ExploreRouter(
      *     summary: Projects offered by the Explore project criterion
      *     description: |
      *       Every project of the application with its number of samples, for the project filter of the
-     *       Explore page. Login required.
+     *       Explore page. Anonymous callers are served too: the specification lets anyone see that a
+     *       project exists, so that access can be requested.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     responses:
      *       200:
      *         description: The projects.
@@ -58,7 +59,7 @@ export default function ExploreRouter(
      *                   type: array
      *                   items: { $ref: '#/components/schemas/ExploreProjectOption' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired (an absent cookie is accepted).
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -67,7 +68,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.get('/projects', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.get('/projects', middlewareAuth.auth_optional, async (req: Request, res: Response) => {
         try {
             res.status(200).send({ projects: await listExploreProjectsUseCase.execute(userOf(req)) })
         } catch (err) {
@@ -83,10 +84,11 @@ export default function ExploreRouter(
      *     description: |
      *       One point per sample matching the criteria (every sample of the application when `filters`
      *       is null), with its project's privacy status. `mode` selects the sample type: depth profiles,
-     *       time series, or both (`all`). Login required.
+     *       time series, or both (`all`). Anonymous callers are served.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     requestBody:
      *       required: true
      *       content:
@@ -104,7 +106,7 @@ export default function ExploreRouter(
      *                   type: array
      *                   items: { $ref: '#/components/schemas/ExploreMapSample' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -116,7 +118,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.post('/map', middlewareAuth.auth, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
+    router.post('/map', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
         try {
             res.status(200).send({ samples: await getExploreMapUseCase.execute(userOf(req), { mode: req.body.mode, filters: req.body.filters ?? null }) })
         } catch (err) {
@@ -133,11 +135,14 @@ export default function ExploreRouter(
      *       The "Selected data stats" tab (`all`: every matching sample, private projects included) and
      *       the "Exportable selection" tab (`exportable`: the samples the caller may export, that is
      *       samples with a validated visual QC whose project is public or open, or of which the caller
-     *       is a member or a manager). The EcoTaxa part of the tabs is served by `/explore/ecotaxa`.
-     *       Login required.
+     *       is a member or a manager). An anonymous caller gets the rights of a user without any
+     *       privilege, for what a login would let them export (`/exports` needs one); contact and
+     *       manager e-mails are only served to logged-in callers. The EcoTaxa part of the tabs is served
+     *       by `/explore/ecotaxa`.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     requestBody:
      *       required: true
      *       content:
@@ -150,7 +155,7 @@ export default function ExploreRouter(
      *           application/json:
      *             schema: { $ref: '#/components/schemas/ExploreSelectionResponse' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -162,7 +167,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.post('/selection', middlewareAuth.auth, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
+    router.post('/selection', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
         try {
             res.status(200).send(await getExploreSelectionUseCase.execute(userOf(req), { mode: req.body.mode, filters: req.body.filters ?? null }))
         } catch (err) {
@@ -179,10 +184,11 @@ export default function ExploreRouter(
      *       For the samples imported in EcoTaxa, through the generic EcoTaxa account of each instance:
      *       the categories used (display names, the non-living ones left out when
      *       `filters.ecotaxa_exclude_not_living`) and the share of samples fully or partially validated
-     *       or predicted. Samples whose EcoTaxa instance does not answer are left out. Login required.
+     *       or predicted. Samples whose EcoTaxa instance does not answer are left out.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     requestBody:
      *       required: true
      *       content:
@@ -195,7 +201,7 @@ export default function ExploreRouter(
      *           application/json:
      *             schema: { $ref: '#/components/schemas/ExploreEcoTaxaResponse' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -207,7 +213,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.post('/ecotaxa', middlewareAuth.auth, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
+    router.post('/ecotaxa', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreRequest, async (req: Request, res: Response) => {
         try {
             res.status(200).send(await getExploreEcoTaxaUseCase.execute(userOf(req), { mode: req.body.mode, filters: req.body.filters ?? null }))
         } catch (err) {
@@ -222,11 +228,12 @@ export default function ExploreRouter(
      *     summary: Random object images of the Explore selection
      *     description: |
      *       `count` (default 4, at most 12) objects drawn at random among random samples of the
-     *       selection imported in EcoTaxa, with the URL of their image on the EcoTaxa instance. Call
-     *       again for another draw. Login required.
+     *       selection imported in EcoTaxa, among the projects that let the caller see figures, with the
+     *       URL of their image on the EcoTaxa instance. Call again for another draw.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     requestBody:
      *       required: true
      *       content:
@@ -244,7 +251,7 @@ export default function ExploreRouter(
      *                   type: array
      *                   items: { $ref: '#/components/schemas/ExploreImage' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -256,7 +263,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.post('/images', middlewareAuth.auth, middlewareExploreValidation.rulesExploreImages, async (req: Request, res: Response) => {
+    router.post('/images', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreImages, async (req: Request, res: Response) => {
         try {
             res.status(200).send({ images: await getExploreImagesUseCase.execute(userOf(req), { mode: req.body.mode, filters: req.body.filters ?? null, count: req.body.count ?? undefined }) })
         } catch (err) {
@@ -277,10 +284,11 @@ export default function ExploreRouter(
      *       `pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned
      *       export computation, the descent filter of the project applied to depth profiles. At most
      *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out.
-     *       Login required.
+     *       Anonymous callers are served, as a user without any privilege.
      *     tags: [Explore]
      *     security:
      *       - cookieAccessToken: []
+     *       - {}
      *     requestBody:
      *       required: true
      *       content:
@@ -293,7 +301,7 @@ export default function ExploreRouter(
      *           application/json:
      *             schema: { $ref: '#/components/schemas/ExploreGraphs' }
      *       401:
-     *         description: Not authenticated.
+     *         description: The access cookie is invalid or expired.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      *       403:
      *         description: The logged user cannot be used.
@@ -305,7 +313,7 @@ export default function ExploreRouter(
      *         description: Internal server error.
      *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
      */
-    router.post('/graphs', middlewareAuth.auth, middlewareExploreValidation.rulesExploreGraphs, async (req: Request, res: Response) => {
+    router.post('/graphs', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreGraphs, async (req: Request, res: Response) => {
         try {
             res.status(200).send(await getExploreGraphsUseCase.execute(userOf(req), {
                 mode: req.body.mode, filters: req.body.filters ?? null,

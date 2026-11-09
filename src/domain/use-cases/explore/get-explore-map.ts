@@ -8,7 +8,7 @@ import { buildExploreMap } from "./explore-stats";
 export class GetExploreMap implements GetExploreMapUseCase {
     constructor(private readonly repositories: ExploreSelectionRepositories, private readonly ecotaxa: ExploreEcoTaxaService) { }
 
-    async execute(current_user: UserUpdateModel, request: ExploreRequest): Promise<ExploreMapSample[]> {
+    async execute(current_user: UserUpdateModel | null, request: ExploreRequest): Promise<ExploreMapSample[]> {
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
         return buildExploreMap(selection.samples, selection.projects);
     }
