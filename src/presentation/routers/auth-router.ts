@@ -161,19 +161,19 @@ export default function AuthRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: Missing or invalid refresh token, or its session was revoked (logout, password change or reset) or has expired.
+     *         description: Missing or invalid refresh token, or its session was revoked (logout, password change or reset) or has expired. The access and refresh token cookies are cleared.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User cannot be used.
+     *         description: User cannot be used. The access and refresh token cookies are cleared.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: User not found.
+     *         description: User not found. The access and refresh token cookies are cleared.
      *         content:
      *           application/json:
      *             schema:
@@ -197,9 +197,10 @@ export default function AuthRouter(
                 .send({ message: "Access token refreshed" })
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "Session revoked or expired") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Cannot find user") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            // The session is over: its cookies go too, see auth_refresh
+            if (err.message === "Session revoked or expired") res.clearCookie("access_token").clearCookie("refresh_token").status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find user") res.clearCookie("access_token").clearCookie("refresh_token").status(404).send({ errors: [err.message] })
+            else if (err.message === "User cannot be used") res.clearCookie("access_token").clearCookie("refresh_token").status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot refresh token"] })
         }
     })

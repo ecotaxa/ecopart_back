@@ -59,6 +59,12 @@ describe("Explore selection", () => {
     });
 
     describe("resolveExploreUser", () => {
+        test.each([null, undefined])("an anonymous caller (%p) is neither checked nor admin", async (current_user) => {
+            await expect(resolveExploreUser(userRepository, current_user)).resolves.toEqual({ user_id: null, is_admin: false });
+            expect(userRepository.ensureUserCanBeUsed).toBeCalledTimes(0);
+            expect(userRepository.isAdmin).toBeCalledTimes(0);
+        });
+
         test("a logged user is checked, then asked whether admin", async () => {
             await expect(resolveExploreUser(userRepository, logged(ADMIN_ID))).resolves.toEqual({ user_id: ADMIN_ID, is_admin: true });
             await expect(resolveExploreUser(userRepository, logged(ALICE.user_id))).resolves.toEqual({ user_id: ALICE.user_id, is_admin: false });
@@ -84,6 +90,21 @@ describe("Explore selection", () => {
             expect(projects.get(1)?.nb_samples).toBe(12);
             expect(projects.get(4)?.nb_samples).toBe(0);
             expect(projects.get(1)?.privileges).toBe(PRIVILEGES.get(1));
+        });
+
+        test("an anonymous user has the rights of a user without any privilege", async () => {
+            const projects = await loadExploreProjects(repositories, { user_id: null, is_admin: false });
+
+            for (const context of projects.values()) {
+                expect(context.role).toBe("user");
+                expect(context.is_my_project).toBe(false);
+            }
+            expect(Array.from(projects.values()).map(context => [context.privacy, context.can_figures, context.can_export])).toEqual([
+                ["open", true, true],
+                ["private", false, false],
+                ["visible", true, false],
+                ["public", true, true],
+            ]);
         });
 
         test("a manager or a member has every right on their projects, private ones included", async () => {
@@ -239,14 +260,14 @@ describe("Explore selection", () => {
         });
 
         test("the all mode asks both sample types", async () => {
-            const selection = await resolveExploreSelection(repositories, logged(CAROL.user_id), { mode: "all", filters: exploreFilters() }, classificationStateFilter);
+            const selection = await resolveExploreSelection(repositories, null, { mode: "all", filters: exploreFilters() }, classificationStateFilter);
 
             expect(sampleRepository.getExploreSamples).toBeCalledWith(expect.objectContaining({ sample_type_label: null }));
             expect(selection.mode).toBe("all");
         });
 
         test("null filters: every sample of the type, no classification filter", async () => {
-            await resolveExploreSelection(repositories, logged(CAROL.user_id), { mode: "depth", filters: null }, classificationStateFilter);
+            await resolveExploreSelection(repositories, null, { mode: "depth", filters: null }, classificationStateFilter);
 
             expect(sampleRepository.getExploreSamples).toBeCalledWith(toSampleQuery("depth", null, null));
             expect(classificationStateFilter).toBeCalledTimes(0);
@@ -271,6 +292,15 @@ describe("Explore selection", () => {
 
             const alice = await resolveExploreSelection(repositories, logged(ALICE.user_id), { mode: "depth", filters: null }, classificationStateFilter);
             expect(alice.exportable.map(sample => sample.sample_id)).toEqual([1, 3, 5]);
+        });
+
+        test("an anonymous caller sees every matching sample, and what a user without privilege may export", async () => {
+            const selection = await resolveExploreSelection(repositories, null, { mode: "depth", filters: null }, classificationStateFilter);
+
+            expect(selection.user).toEqual({ user_id: null, is_admin: false });
+            expect(selection.samples).toHaveLength(5);
+            expect(selection.exportable.map(sample => sample.sample_id)).toEqual([1, 5]);
+            expect(userRepository.ensureUserCanBeUsed).toBeCalledTimes(0);
         });
 
         test("a user who cannot be used gets no sample", async () => {

@@ -4,14 +4,16 @@ import { GetExploreImagesUseCase } from "../../interfaces/use-cases/explore/get-
 import { ExploreEcoTaxaService, EXPLORE_IMAGES_DEFAULT, EXPLORE_IMAGES_MAX } from "./explore-ecotaxa";
 import { ExploreSelectionRepositories, resolveExploreSelection } from "./explore-selection";
 
-// A few random object images of the selection, from EcoTaxa; called again to refresh them.
+// A few random object images of the selection, from EcoTaxa; called again to refresh them. Only from
+// the projects whose figures the user may see, like the graphs: an image of a private project is data.
 export class GetExploreImages implements GetExploreImagesUseCase {
     constructor(private readonly repositories: ExploreSelectionRepositories, private readonly ecotaxa: ExploreEcoTaxaService) { }
 
-    async execute(current_user: UserUpdateModel, request: ExploreImagesRequest): Promise<ExploreImage[]> {
+    async execute(current_user: UserUpdateModel | null, request: ExploreImagesRequest): Promise<ExploreImage[]> {
         const count = request.count ?? EXPLORE_IMAGES_DEFAULT;
         if (!Number.isInteger(count) || count < 1 || count > EXPLORE_IMAGES_MAX) throw new Error(`count must be between 1 and ${EXPLORE_IMAGES_MAX}`);
         const selection = await resolveExploreSelection(this.repositories, current_user, request, (samples, projects, filters) => this.ecotaxa.filterByClassificationState(samples, projects, filters));
-        return this.ecotaxa.randomImagesOf(selection.samples, selection.projects, count);
+        const allowed = selection.samples.filter(sample => selection.projects.get(sample.project_id)?.can_figures);
+        return this.ecotaxa.randomImagesOf(allowed, selection.projects, count);
     }
 }

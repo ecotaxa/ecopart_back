@@ -1,7 +1,7 @@
 import { ExploreContact, ExploreMapSample, ExploreProjectRow, ExploreSampleRow, ExploreSelection, ExploreSummary, LabelCount, PressureHistogramBin, ProfilePoint } from "../../entities/explore";
 import { MinimalUserModel } from "../../entities/user";
 import { esdMm } from "../export/binned-computation";
-import { ExploreProjectContext } from "./explore-selection";
+import { ExploreProjectContext, ExploreUser } from "./explore-selection";
 
 /* Pure statistics of a list of samples: what the "Selected data stats" and "Exportable selection"
  * tabs show, computed from the light rows and the project contexts, without any further IO. */
@@ -77,12 +77,13 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
     };
 }
 
-export function toContact(user: MinimalUserModel | null | undefined): ExploreContact | null {
+// Contact details are personal data: the e-mail is only served to a logged-in user.
+export function toContact(user: MinimalUserModel | null | undefined, viewer: ExploreUser): ExploreContact | null {
     if (!user) return null;
-    return { user_name: user.user_name, email: user.email };
+    return { user_name: user.user_name, email: viewer.user_id === null ? "" : user.email };
 }
 
-export function buildExploreProjectRows(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): ExploreProjectRow[] {
+export function buildExploreProjectRows(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, viewer: ExploreUser): ExploreProjectRow[] {
     const selected = new Map<number, number>();
     for (const sample of samples) selected.set(sample.project_id, (selected.get(sample.project_id) ?? 0) + 1);
     const rows: ExploreProjectRow[] = [];
@@ -98,15 +99,15 @@ export function buildExploreProjectRows(samples: ExploreSampleRow[], projects: M
             nb_samples: context.nb_samples,
             privacy_status: context.privacy,
             is_my_project: context.is_my_project,
-            contact: toContact(context.privileges?.contact),
-            managers: (context.privileges?.managers ?? []).map(manager => toContact(manager) as ExploreContact),
+            contact: toContact(context.privileges?.contact, viewer),
+            managers: (context.privileges?.managers ?? []).map(manager => toContact(manager, viewer) as ExploreContact),
         });
     }
     return rows.sort((a, b) => a.project_title.localeCompare(b.project_title) || a.project_id - b.project_id);
 }
 
-export function buildExploreSelection(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): ExploreSelection {
-    return { summary: buildExploreSummary(samples, projects), projects: buildExploreProjectRows(samples, projects) };
+export function buildExploreSelection(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, viewer: ExploreUser): ExploreSelection {
+    return { summary: buildExploreSummary(samples, projects), projects: buildExploreProjectRows(samples, projects, viewer) };
 }
 
 export function buildExploreMap(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): ExploreMapSample[] {

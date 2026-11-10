@@ -15,10 +15,14 @@ import { GetExploreGraphsUseCase } from "../../../src/domain/interfaces/use-case
 
 const LOGGED_TOKEN = { user_id: 7, is_admin: false } as DecodedToken;
 
-// A logged-in caller: `auth` sets its token. Arrow properties, as in MiddlewareAuthCookie: the router
-// hands the bare functions to Express.
+// A logged-in caller: both middlewares set its token. Arrow properties, as in MiddlewareAuthCookie: the
+// router hands the bare functions to Express.
 class LocalMiddlewareAuth implements MiddlewareAuth {
     auth = (req: Request, __: Response, next: NextFunction): void => {
+        (req as CustomRequest).token = LOGGED_TOKEN;
+        next();
+    };
+    auth_optional = (req: Request, __: Response, next: NextFunction): void => {
         (req as CustomRequest).token = LOGGED_TOKEN;
         next();
     };
@@ -27,10 +31,13 @@ class LocalMiddlewareAuth implements MiddlewareAuth {
     };
 }
 
-// A caller without cookie: `auth` refuses it.
+// A caller without cookie: `auth` refuses it, `auth_optional` lets it through without token.
 class AnonymousMiddlewareAuth extends LocalMiddlewareAuth {
     auth = (_: Request, res: Response): void => {
         res.status(401).send({ errors: ["Token missing. Please authenticate."] });
+    };
+    auth_optional = (_: Request, __: Response, next: NextFunction): void => {
+        next();
     };
 }
 
@@ -110,26 +117,24 @@ describe("ExploreRouter", () => {
     });
 
     test.each([
-        ["get", "/explore/projects"],
-        ["post", "/explore/map"],
-        ["post", "/explore/selection"],
-        ["post", "/explore/ecotaxa"],
-        ["post", "/explore/images"],
-        ["post", "/explore/graphs"],
-    ] as const)("anonymous callers are refused: %s %s → 401", async (method, path) => {
+        ["get", "/explore/projects", () => listExploreProjects],
+        ["post", "/explore/map", () => getExploreMap],
+        ["post", "/explore/selection", () => getExploreSelection],
+        ["post", "/explore/ecotaxa", () => getExploreEcoTaxa],
+        ["post", "/explore/images", () => getExploreImages],
+        ["post", "/explore/graphs", () => getExploreGraphs],
+    ] as const)("anonymous callers are served, as a null user: %s %s", async (method, path, useCase) => {
         const server = serverWith(new AnonymousMiddlewareAuth());
 
         const response = method === "get"
             ? await request(server).get(path)
             : await request(server).post(path).send({ mode: "depth", filters: null });
 
-        expect(response.status).toBe(401);
-        for (const useCase of [listExploreProjects, getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs]) {
-            expect(useCase.execute).toBeCalledTimes(0);
-        }
+        expect(response.status).toBe(200);
+        expect((useCase().execute as jest.Mock).mock.calls[0][0]).toBeNull();
     });
 
-    describe("logged-in callers: the token set by `auth` is the user of the use case", () => {
+    describe("logged-in callers: the token set by `auth_optional` is the user of the use case", () => {
         test("GET /explore/projects", async () => {
             const response = await request(logged).get("/explore/projects");
 
