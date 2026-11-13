@@ -75,8 +75,8 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .isEmail().withMessage('Chief scientist email must be a valid email address.')
             .bail(),
 
-        // Override depth offset Validation 
-        check('override_depth_offset').optional()
+        // Override depth offset Validation: null means no project override, each sample's offset applies
+        check('override_depth_offset').optional({ values: 'null' })
             .isFloat().withMessage('Override depth offset must be a float value.'),
 
         // Enable descent filter Validation
@@ -250,8 +250,8 @@ export class MiddlewareProjectValidation implements IMiddlewareProjectValidation
             .isEmail().withMessage('Chief scientist email must be a valid email address.')
             .bail(),
 
-        // Override depth offset Validation 
-        check('override_depth_offset').optional().optional()
+        // Override depth offset Validation: null means no project override, each sample's offset applies
+        check('override_depth_offset').optional({ values: 'null' })
             .isFloat().withMessage('Override depth offset must be a float value.'),
 
         // Enable descent filter Validation

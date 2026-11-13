@@ -898,9 +898,10 @@ describe("ExploreEcoTaxaService", () => {
 
             const images = await service.randomImagesOf([imported(1, 1, 9001), imported(2, 2, 501)], PROJECTS, 2);
 
+            // The EcoTaxa depth (35.5) plus the sample's offset (1.2 m in the fixture, no project override).
             expect(images).toEqual([
-                { object_id: 9001125, image_url: "https://ecotaxa.obs-vlfr.fr/vault/9001/0612/obj_125.jpg", sample_name: "moose_ge_2024_001", depth: 35.5, date: "2024-06-12T10:20:30.000Z" },
-                { object_id: 501010, image_url: "https://ecotaxa.dev.example.org/vault/501/0612/obj_10.jpg", sample_name: "moose_ge_2024_002", depth: 35.5, date: "2024-06-12T10:20:30.000Z" },
+                { object_id: 9001125, image_url: "https://ecotaxa.obs-vlfr.fr/vault/9001/0612/obj_125.jpg", sample_name: "moose_ge_2024_001", depth: 36.7, date: "2024-06-12T10:20:30.000Z" },
+                { object_id: 501010, image_url: "https://ecotaxa.dev.example.org/vault/501/0612/obj_10.jpg", sample_name: "moose_ge_2024_002", depth: 36.7, date: "2024-06-12T10:20:30.000Z" },
             ]);
             // The number of objects first (a one-object window), then the drawn object.
             expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: [], window_start: 0, window_size: 1 });
@@ -908,6 +909,18 @@ describe("ExploreEcoTaxaService", () => {
             expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.dev.example.org/", "generic-token-dev", 77, { filters: { samples: "501" }, fields: IMAGE_FIELDS, window_start: 10, window_size: 1 });
             // Images never read the stats.
             expect(sampleRepository.getEcoTaxaStats).toBeCalledTimes(0);
+        });
+
+        test.each([
+            { override_depth_offset: 2, sample_offset: 1.2, expected: 37.5, situation: "the project override wins over the sample's offset" },
+            { override_depth_offset: null, sample_offset: null, expected: 35.5, situation: "without any offset, the depth EcoTaxa keeps" },
+        ])("image depth, $situation : ok", async ({ override_depth_offset, sample_offset, expected }) => {
+            randoms = [0, 0.5];
+            const projects = contextsOf(exploreContext({ ...ON_FR, override_depth_offset }));
+
+            const [image] = await service.randomImagesOf([imported(1, 1, 9001, { instrument_settings_depth_offset_m: sample_offset })], projects, 1);
+
+            expect(image.depth).toBe(expected);
         });
 
         test("never returns the same object twice, and gives up after three draws per image", async () => {

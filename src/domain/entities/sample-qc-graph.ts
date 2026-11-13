@@ -4,7 +4,7 @@
  * instrument (UVP5 / UVP6). The vertical axis depends on the sample type (`vertical_axis`):
  *  - Depth samples: DEPTH in metres, derived from the raw pressure as
  *    `depth_m = raw_pressure * gain + depth_offset` (gain: UVP5 = 0.1, UVP6 = 1;
- *    offset = sample.instrument_settings_depth_offset_m). depth_m ≈ pressure in dbar, so it
+ *    offset = the project override, else sample.instrument_settings_depth_offset_m). depth_m ≈ pressure in dbar, so it
  *    serves the "vs pressure" graph titles, and it matches the legacy EcoPart product.
  *  - Time samples: TIME in hours elapsed since `time_origin_utc_date_time` (the UTC hour the first
  *    image falls in), binned by 1 h like the legacy EcoPart time histograms.

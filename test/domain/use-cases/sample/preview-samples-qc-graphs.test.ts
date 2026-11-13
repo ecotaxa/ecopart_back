@@ -92,6 +92,18 @@ describe("PreviewSamplesQcGraphs", () => {
         expect(unfiltered.image_depth_profile.points.map((p) => p.is_selected)).toEqual([true, true]);
     });
 
+    test("the project override wins over the offset read in the source metadata.ini : ok", async () => {
+        jest.spyOn(mockSampleRepository, "getSourceFilterMetadata").mockResolvedValue({ ...meta, instrument_settings_depth_offset_m: 0.5 });
+
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ ...project, override_depth_offset: 2 });
+        const [overridden] = await useCase.execute(current_user, 1, ["s1"]);
+        expect(overridden.image_depth_profile.points.map((p) => p.depth_m)).toEqual([2.5, 3.5]);
+
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ ...project, override_depth_offset: null });
+        const [own_offset] = await useCase.execute(current_user, 1, ["s1"]);
+        expect(own_offset.image_depth_profile.points.map((p) => p.depth_m)).toEqual([1, 2]);
+    });
+
     test("rejects a requested name that is not importable with its reason, before any file read", async () => {
         jest.spyOn(mockSampleRepository, "explainNotImportableSamples").mockResolvedValue(new Map([["sX", "already imported in this project"]]));
         await expect(useCase.execute(current_user, 1, ["s1", "sX"])).rejects.toThrow("Samples not importable: sX (already imported in this project)");

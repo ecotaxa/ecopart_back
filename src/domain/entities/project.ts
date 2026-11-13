@@ -14,7 +14,7 @@ export interface ProjectRequestCreationModel {
     operator_email: string;
     chief_scientist_name: string;
     chief_scientist_email: string;
-    override_depth_offset?: number;
+    override_depth_offset?: number | null;
     enable_descent_filter: boolean;
     filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
     time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
@@ -49,7 +49,7 @@ export interface ProjectResponseModel {
     operator_email: string;
     chief_scientist_name: string;
     chief_scientist_email: string;
-    override_depth_offset?: number;
+    override_depth_offset?: number | null;
     enable_descent_filter: boolean;
     filtered_project: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
     time_duration_check: boolean;     // warn when the samples span more than a year; disabled on a long project
@@ -79,7 +79,7 @@ export interface ProjectUpdateModel {
     operator_email?: string;
     chief_scientist_name?: string;
     chief_scientist_email?: string;
-    override_depth_offset?: number;
+    override_depth_offset?: number | null;
     enable_descent_filter?: boolean;
     filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
     time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
@@ -108,7 +108,7 @@ export interface PublicProjectUpdateModel {
     operator_email?: string;
     chief_scientist_name?: string;
     chief_scientist_email?: string;
-    override_depth_offset?: number;
+    override_depth_offset?: number | null;
     enable_descent_filter?: boolean;
     filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
     time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project
@@ -139,7 +139,7 @@ export interface PublicProjectRequestCreationModel_base {
     operator_email: string;
     chief_scientist_name: string;
     chief_scientist_email: string;
-    override_depth_offset?: number;
+    override_depth_offset?: number | null;
     enable_descent_filter: boolean;
     filtered_project?: boolean;        // the data were filtered before their import (asked of a UVP5HD project)
     time_duration_check?: boolean;     // warn when the samples span more than a year; disabled on a long project

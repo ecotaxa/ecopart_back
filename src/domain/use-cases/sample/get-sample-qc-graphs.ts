@@ -7,6 +7,7 @@ import { SampleRepository } from "../../interfaces/repositories/sample-repositor
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { GetSampleQcGraphsUseCase } from "../../interfaces/use-cases/sample/get-sample-qc-graphs";
 import { buildSampleQcGraphs } from "./qc-graphs-builder";
+import { effectiveDepthOffset } from "../../utils/depth-offset";
 import { ProjectAccessPolicy } from "../project/project-access";
 
 export class GetSampleQcGraphs implements GetSampleQcGraphsUseCase {
@@ -43,7 +44,7 @@ export class GetSampleQcGraphs implements GetSampleQcGraphsUseCase {
             visual_qc_status_label: sample.visual_qc_status_label,
             filter_first_image: sample.filter_first_image ?? null,
             filter_last_image: sample.filter_last_image ?? null,
-            instrument_settings_depth_offset_m: sample.instrument_settings_depth_offset_m ?? null,
+            instrument_settings_depth_offset_m: effectiveDepthOffset(project, sample),
             instrument_settings_image_volume_l: sample.instrument_settings_image_volume_l ?? null,
             is_depth_profile: sample.sample_type_label === "Depth",
             descent_filter_enabled: project.enable_descent_filter,
