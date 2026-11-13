@@ -4739,6 +4739,16 @@
               }
             }
           },
+          "422": {
+            "description": "ecotaxa_instance_url must be an http or https URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {

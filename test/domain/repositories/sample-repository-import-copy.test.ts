@@ -154,4 +154,26 @@ describe("Import copy task log", () => {
         expect(fs.existsSync(path.join(base_folder, "storage/1/s1"))).toBe(false);
         expect(fs.existsSync(path.join(base_folder, "storage/1/s2.zip"))).toBe(false);
     });
+
+    test("zipFolder: a failing run removes its temporary file even when that file gets created after the failure", async () => {
+        // The file is opened asynchronously: on a loaded machine, this happens after the failure.
+        const real_fs = jest.requireActual("fs");
+        const real_open = real_fs.open;
+        const open_spy = jest.spyOn(real_fs, "open").mockImplementation((...args: any[]) => {
+            if (String(args[0]).endsWith(".partial")) setTimeout(() => real_open(...args), 50);
+            else real_open(...args);
+        });
+        write("not_a_folder", "x");
+        const dest_zip = path.join(base_folder, "archive.zip");
+
+        try {
+            await expect(repo.zipFolder(path.join(base_folder, "not_a_folder"), dest_zip)).rejects.toThrow();
+            // Long enough for a file still being opened to show up
+            await new Promise((resolve) => setTimeout(resolve, 150));
+        } finally {
+            open_spy.mockRestore();
+        }
+
+        expect(fs.existsSync(`${dest_zip}.partial`)).toBe(false);
+    });
 });
