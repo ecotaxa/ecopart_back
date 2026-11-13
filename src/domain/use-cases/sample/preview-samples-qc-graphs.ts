@@ -8,6 +8,7 @@ import { SampleRepository } from "../../interfaces/repositories/sample-repositor
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { PreviewSamplesQcGraphsUseCase } from "../../interfaces/use-cases/sample/preview-samples-qc-graphs";
 import { buildSampleQcGraphs } from "./qc-graphs-builder";
+import { effectiveDepthOffset } from "../../utils/depth-offset";
 
 // Status label for a sample that has not been imported yet (no DB row, no visual_qc_status).
 const NOT_IMPORTED_LABEL = "NOT_IMPORTED";
@@ -63,7 +64,7 @@ export class PreviewSamplesQcGraphs implements PreviewSamplesQcGraphsUseCase {
                 visual_qc_status_label: NOT_IMPORTED_LABEL,
                 filter_first_image: meta.filter_first_image,
                 filter_last_image: meta.filter_last_image,
-                instrument_settings_depth_offset_m: meta.instrument_settings_depth_offset_m,
+                instrument_settings_depth_offset_m: effectiveDepthOffset(project, meta),
                 instrument_settings_image_volume_l: meta.instrument_settings_image_volume_l,
                 is_depth_profile: meta.sample_type_label === "Depth",
                 descent_filter_enabled: project.enable_descent_filter,

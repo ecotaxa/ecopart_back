@@ -92,6 +92,32 @@ test("Create a project without override_depth_offset", async () => {
     expect(result).toStrictEqual(created_project);
 });
 
+test("Create a project with a null override_depth_offset keeps no project override : ok", async () => {
+    const InputData: PublicProjectRequestCreationModel = { ...projectRequestCreationModel_withmissingOverrideDepthOffset, override_depth_offset: null }
+    const current_user: UserUpdateModel = {
+        user_id: 1
+    }
+
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "computeDefaultDepthOffset")
+    jest.spyOn(mockProjectRepository, "createProject").mockImplementation(() => Promise.resolve(1))
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockInstrumentModelRepository, "getInstrumentByName").mockImplementation(() => Promise.resolve(instrument_model_response))
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "formatProjectRequestCreationModel").mockImplementation(() => projectRequestCreationModelForRepository)
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementation(() => Promise.resolve(publicPrivileges_WithMemberAndManager))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementation(() => projectResponseModel)
+    jest.spyOn(mockProjectRepository, "createProjectRootFolder").mockImplementation(() => Promise.resolve())
+
+    const createProjectUseCase = new CreateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, DATA_STORAGE_FS_STORAGE, DATA_STORAGE_IMPORT)
+    await createProjectUseCase.execute(current_user, InputData);
+
+    expect(mockProjectRepository.computeDefaultDepthOffset).not.toBeCalled();
+    expect(mockProjectRepository.formatProjectRequestCreationModel).toHaveBeenCalledWith(expect.objectContaining({ override_depth_offset: null }), instrument_model_response);
+});
+
 test("Cannot find the created project.", async () => {
     const InputData: PublicProjectRequestCreationModel = projectRequestCreationModel
     const current_user: UserUpdateModel = {

@@ -15,13 +15,15 @@ Review of 23 Oct 2026, after the Explore branch. The Explore reads are protected
 3. **Import files never cleaned up on the EcoTaxa side.** Each import uploads the whole archive (TSV and images) into the generic account's file space (`from_EcoPart/<project_id>`, `importEcoTaxaSamplesInEcoTaxa`) and never removes it, which fills the EcoTaxa disk over time. To do: delete the uploaded files once the import job has ended.
 4. **No per-client limit on the open Explore routes.** Every `/explore` route is served to anonymous users. On `/explore/ecotaxa` and `/explore/images` the shared throttle protects EcoTaxa, but a client looping on them keeps its two slots busy and slows the EcoTaxa part of Explore for everyone; `/explore/graphs` reads the particle and CTD files of up to 100 samples per request, a cache being the only protection. To do: a rate limit per address or session on these routes (see the rate limits in `src/main.ts`).
 
+5. **Depth offset changes are not propagated to EcoTaxa.** The original spec asks that editing the project depth offset update the object depths of the linked EcoTaxa project. Not done and not decided: EcoPart adds the offset when it reads EcoTaxa depths (Explore images) and leaves the EcoTaxa objects as imported.
+
 Structural, to keep in mind (not fixable in EcoPart alone):
 - The generic account is manager of every linked EcoTaxa project: a compromised EcoPart server would have that right everywhere. EcoTaxa has no read-only service role for this case.
 - Legacy samples are matched to EcoTaxa samples by name (`orig_id`, migration of EcoTaxa projects and id resolution): a name that differs between the two applications breaks the link.
 
 ## Explore
 
-- EcoTaxa concentrations graph (per taxon and depth bin): the dataset is served empty. Needs the object depths from EcoTaxa and the water volume per bin from the pivot.
+- EcoTaxa concentrations graph (per taxon and depth bin): the dataset is served empty. Needs the object depths from EcoTaxa and the water volume per bin from the pivot. EcoTaxa object depths carry no offset: add `effectiveDepthOffset` (`src/domain/utils/depth-offset.ts`) before binning, as legacy EcoPart did (`uvp_sample_import.py:1123`).
 - Access request endpoint: the front opens a `mailto:` to the managers for now.
 - "Export selection" button of the exportable tab: not wired to the export routes yet.
 - Renaming / grouping of EcoTaxa categories (modal of the mockups).

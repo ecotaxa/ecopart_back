@@ -1705,7 +1705,8 @@
           },
           "depth": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "Depth of the object in EcoTaxa plus the sample's depth offset (the project override, else the sample's own), in m"
           },
           "date": {
             "type": "string",
@@ -2013,7 +2014,8 @@
           },
           "override_depth_offset": {
             "type": "number",
-            "description": "Optional depth offset override in meters."
+            "nullable": true,
+            "description": "Depth offset in metres applied to every sample of the project, in place of each sample's own offset (UVP6 metadata.ini Pressure_offset). null = no project override, each sample's offset applies. Absent = the instrument default (1.2 m for a UVP5, none otherwise)."
           },
           "enable_descent_filter": {
             "type": "boolean",
@@ -2180,7 +2182,8 @@
           },
           "override_depth_offset": {
             "type": "number",
-            "description": "Optional depth offset override in meters."
+            "nullable": true,
+            "description": "Depth offset in metres applied to every sample of the project, in place of each sample's own offset (UVP6 metadata.ini Pressure_offset). null = no project override, each sample's offset applies. Absent = unchanged."
           },
           "enable_descent_filter": {
             "type": "boolean",
@@ -2340,7 +2343,8 @@
           },
           "override_depth_offset": {
             "type": "number",
-            "description": "Depth offset override in meters."
+            "nullable": true,
+            "description": "Depth offset in metres applied to every sample of the project, in place of each sample's own offset. null when the project does not override it."
           },
           "enable_descent_filter": {
             "type": "boolean",
@@ -6258,7 +6262,7 @@
     "/projects/searches": {
       "post": {
         "summary": "Search projects",
-        "description": "Returns a paginated, sorted, and filtered list of projects.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `project_id` | number | |\n| `project_title` | string | |\n| `project_acronym` | string | |\n| `project_description` | string | |\n| `cruise` | string | |\n| `ship` | string | |\n| `data_owner_name` | string | |\n| `data_owner_email` | string | |\n| `operator_name` | string | |\n| `operator_email` | string | |\n| `chief_scientist_name` | string | |\n| `chief_scientist_email` | string | |\n| `override_depth_offset` | number | |\n| `enable_descent_filter` | boolean | |\n| `privacy_duration` | number | |\n| `visible_duration` | number | |\n| `public_duration` | number | |\n| `serial_number` | string | |\n| `root_folder_path` | string | |\n| `project_creation_utc_date_time` | string (ISO timestamp) | |\n| `instrument_model` | string | Computed — resolved to instrument model IDs |\n| `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |\n| `privacy_status` | string (`private`, `visible`, `public`, `open`) | Computed — level at the time of the request, operator `=` or `IN` |\n| `contact` | string or number | Computed — resolved to project IDs via privilege system |\n| `managers` | string or number | Computed — resolved to project IDs via privilege system |\n| `members` | string or number | Computed — resolved to project IDs via privilege system |\n| `granted_users` | string or number | Computed — resolved to project IDs via privilege system |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.\n",
+        "description": "Returns a paginated, sorted, and filtered list of projects.\n\n**Filtering** — Send an array of filter objects in the request body. Each filter has `field`, `operator`, and `value`.\n\nSupported operators:\n| Operator | Value type | Description |\n|----------|------------|-------------|\n| `=`      | string, number, boolean | Exact match |\n| `<>`     | string, number, boolean | Not equal |\n| `>` `>=` `<` `<=` | number | Numeric comparison |\n| `IN`     | array | Value is one of the given items |\n| `LIKE`   | string | Case-insensitive pattern match (`%` = any chars, `_` = one char) |\n\nUse the string `\"null\"` as value to match NULL fields (`= \"null\"` → `IS NULL`, `<> \"null\"` → `IS NOT NULL`).\n\n**Filterable fields:**\n| Field | Type | Note |\n|-------|------|------|\n| `project_id` | number | |\n| `project_title` | string | |\n| `project_acronym` | string | |\n| `project_description` | string | |\n| `cruise` | string | |\n| `ship` | string | |\n| `data_owner_name` | string | |\n| `data_owner_email` | string | |\n| `operator_name` | string | |\n| `operator_email` | string | |\n| `chief_scientist_name` | string | |\n| `chief_scientist_email` | string | |\n| `override_depth_offset` | number or null | null removes the project override: each sample's own offset applies |\n| `enable_descent_filter` | boolean | |\n| `privacy_duration` | number | |\n| `visible_duration` | number | |\n| `public_duration` | number | |\n| `serial_number` | string | |\n| `root_folder_path` | string | |\n| `project_creation_utc_date_time` | string (ISO timestamp) | |\n| `instrument_model` | string | Computed — resolved to instrument model IDs |\n| `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |\n| `privacy_status` | string (`private`, `visible`, `public`, `open`) | Computed — level at the time of the request, operator `=` or `IN` |\n| `contact` | string or number | Computed — resolved to project IDs via privilege system |\n| `managers` | string or number | Computed — resolved to project IDs via privilege system |\n| `members` | string or number | Computed — resolved to project IDs via privilege system |\n| `granted_users` | string or number | Computed — resolved to project IDs via privilege system |\n\n**Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).\n\n**Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.\n",
         "tags": [
           "Projects"
         ],
