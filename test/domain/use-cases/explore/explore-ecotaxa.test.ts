@@ -13,7 +13,7 @@ import {
     ECOTAXA_STATS_STALE_AFTER_MS,
     ECOTAXA_SYNC_REFRESH_LIMIT,
     EcoTaxaSampleStat,
-    EXPLORE_IMAGES_MAX_DROPPED,
+    EXPLORE_IMAGES_CALLS_PER_IMAGE,
     ExploreEcoTaxaService,
     matchesClassificationState,
     objectDate,
@@ -763,8 +763,9 @@ describe("ExploreEcoTaxaService", () => {
             await service.summaryOf([imported(7, 1, null)], PROJECTS, false);
             await service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1);
 
-            // Each call ran while it held a slot of the throttle.
-            expect(pending_at).toEqual({ samples: [1], stats: [1], taxa: [1], objects: [1, 1] });
+            // Each call ran while it held a slot of the throttle. The images read the stats of their
+            // sample (none kept), then one object.
+            expect(pending_at).toEqual({ samples: [1], stats: [1, 1], taxa: [1], objects: [1] });
             expect(run).toBeCalledTimes(5);
         });
     });
@@ -878,14 +879,19 @@ describe("ExploreEcoTaxaService", () => {
 
     describe("randomImagesOf", () => {
         const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
+        // The objects each EcoTaxa sample really holds, by EcoTaxa sample id.
         let totals: Record<string, number>;
+        const objectQueries = () => (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls as [string, string, number, EcoTaxaObjectSetQuery][];
+        // The stats EcoPart keeps for a sample: `objects` validated objects, read now.
+        const keep = (sample: ExploreSampleRow, objects: number) =>
+            stored.set(sample.sample_id, storedRow(sample.sample_id, sample.ecotaxa_sample_id as number, clock, { nb_validated: objects }));
 
         beforeEach(() => {
-            totals = { "9001": 250, "501": 40, "9008": 0 };
+            totals = { "9001": 250, "501": 40, "9003": 30 };
             jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockImplementation(async (_url, _token, _project, query: EcoTaxaObjectSetQuery) => {
                 const sample = query.filters.samples;
-                if (query.fields.length === 0) return { total_ids: totals[sample], object_ids: [1], details: [[]] };
                 const start = query.window_start ?? 0;
+                if (start >= (totals[sample] ?? 0)) return { total_ids: totals[sample] ?? 0, object_ids: [], details: [] };
                 return {
                     total_ids: totals[sample],
                     object_ids: [Number(sample) * 1000 + start],
@@ -894,137 +900,148 @@ describe("ExploreEcoTaxaService", () => {
             });
         });
 
-        test("draws a random object of a random sample, with the URL of its image on the instance", async () => {
+        test("draws a random object of a random sample, one call per image, the number of objects from the stats kept : ok", async () => {
+            const [fr, dev] = [imported(1, 1, 9001), imported(2, 2, 501)];
+            keep(fr, 250);
+            keep(dev, 40);
             randoms = [0, 0.5, 0.99, 0.25];
 
-            const images = await service.randomImagesOf([imported(1, 1, 9001), imported(2, 2, 501)], PROJECTS, 2);
+            const images = await service.randomImagesOf([fr, dev], PROJECTS, 2);
 
             // The EcoTaxa depth (35.5) plus the sample's offset (1.2 m in the fixture, no project override).
             expect(images).toEqual([
                 { object_id: 9001125, image_url: "https://ecotaxa.obs-vlfr.fr/vault/9001/0612/obj_125.jpg", sample_name: "moose_ge_2024_001", depth: 36.7, date: "2024-06-12T10:20:30.000Z" },
                 { object_id: 501010, image_url: "https://ecotaxa.dev.example.org/vault/501/0612/obj_10.jpg", sample_name: "moose_ge_2024_002", depth: 36.7, date: "2024-06-12T10:20:30.000Z" },
             ]);
-            // The number of objects first (a one-object window), then the drawn object.
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: [], window_start: 0, window_size: 1 });
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: IMAGE_FIELDS, window_start: 125, window_size: 1 });
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.dev.example.org/", "generic-token-dev", 77, { filters: { samples: "501" }, fields: IMAGE_FIELDS, window_start: 10, window_size: 1 });
-            // Images read the stats EcoPart keeps, never EcoTaxa's.
-            expect(sampleRepository.getEcoTaxaStats).toBeCalledTimes(1);
+            expect(objectQueries()).toEqual([
+                ["https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: IMAGE_FIELDS, window_start: 125, window_size: 1 }],
+                ["https://ecotaxa.dev.example.org/", "generic-token-dev", 77, { filters: { samples: "501" }, fields: IMAGE_FIELDS, window_start: 10, window_size: 1 }],
+            ]);
+            // Fresh stats: EcoTaxa is not asked for them.
             expect(ecotaxaAccountRepository.api_ecotaxa_get_sample_stats).toBeCalledTimes(0);
         });
 
-        test("a single sample holding objects among many empty ones still gives an image", async () => {
-            const empty = manySamples(20, 1, 100, 9100);
-            for (const sample of empty) totals[String(sample.ecotaxa_sample_id)] = 0;
+        test("the samples the stats say hold no object are never asked, however many : ok", async () => {
+            const empty = manySamples(80, 1, 100, 9100);
+            for (const sample of empty) keep(sample, 0);
+            const full = imported(1, 1, 9001);
+            keep(full, 250);
 
-            // Every draw takes the first sample left: the 20 empty ones go before the one with objects.
-            const images = await service.randomImagesOf([...empty, imported(1, 1, 9001)], PROJECTS, 4);
+            const images = await service.randomImagesOf([...empty, full], PROJECTS, 4);
 
-            expect(images.map(image => image.object_id)).toEqual([9001000]);
+            expect(images.length).toBeGreaterThan(0);
+            expect(new Set(objectQueries().map(call => call[3].filters.samples))).toEqual(new Set(["9001"]));
+            expect(ecotaxaAccountRepository.api_ecotaxa_get_sample_stats).toBeCalledTimes(0);
         });
 
-        test("the samples the stored stats say hold objects are drawn first", async () => {
-            const empty = manySamples(30, 1, 100, 9100);
-            for (const sample of empty) {
-                totals[String(sample.ecotaxa_sample_id)] = 0;
-                stored.set(sample.sample_id, storedRow(sample.sample_id, sample.ecotaxa_sample_id as number, clock, { nb_validated: 0 }));
-            }
-            stored.set(1, storedRow(1, 9001, clock));
-
-            const images = await service.randomImagesOf([...empty, imported(1, 1, 9001)], PROJECTS, 1);
-
-            expect(images.map(image => image.object_id)).toEqual([9001000]);
-            const queried = (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.map(call => call[3].filters.samples);
-            expect(new Set(queried)).toEqual(new Set(["9001"]));
-        });
-
-        test(`at most ${EXPLORE_IMAGES_MAX_DROPPED} samples without object are looked at`, async () => {
-            const empty = manySamples(EXPLORE_IMAGES_MAX_DROPPED + 10, 1, 100, 9100);
-            for (const sample of empty) totals[String(sample.ecotaxa_sample_id)] = 0;
+        test("a selection whose samples hold no object: no image and no call to EcoTaxa : ok", async () => {
+            const empty = manySamples(80, 1, 100, 9100);
+            for (const sample of empty) keep(sample, 0);
 
             await expect(service.randomImagesOf(empty, PROJECTS, 4)).resolves.toEqual([]);
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledTimes(EXPLORE_IMAGES_MAX_DROPPED);
+            expect(ecotaxaCalls()).toBe(0);
+        });
+
+        test("samples without stats kept: their stats are read from EcoTaxa in one batch first : ok", async () => {
+            statRows.set(9001, statRow(9001, { nb_validated: 250 }));
+            statRows.set(9003, statRow(9003, { nb_validated: 0 }));
+            randoms = [0, 0.5];
+
+            const images = await service.randomImagesOf([imported(1, 1, 9001), imported(3, 1, 9003)], PROJECTS, 1);
+
+            expect(images.map(image => image.object_id)).toEqual([9001125]);
+            expect(statsCalls()).toEqual([["https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", [9001, 9003]]]);
+            expect(objectQueries().map(call => call[3].filters.samples)).toEqual(["9001"]);
+            // Kept for the next requests.
+            expect(stored.get(1)?.nb_validated).toBe(250);
+        });
+
+        test("stats kept for another EcoTaxa sample are not trusted : ok", async () => {
+            stored.set(1, storedRow(1, 7777, clock, { nb_validated: 250 }));
+            statRows.set(9001, statRow(9001, { nb_validated: 0 }));
+
+            await expect(service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1)).resolves.toEqual([]);
+            expect(objectQueries()).toHaveLength(0);
+        });
+
+        test("objects deleted since the stats were read: the next draw uses the count EcoTaxa gives : ok", async () => {
+            const sample = imported(1, 1, 9001);
+            keep(sample, 250);
+            totals["9001"] = 40;
+            randoms = [0, 0.5, 0, 0.5];
+
+            const images = await service.randomImagesOf([sample], PROJECTS, 1);
+
+            expect(images.map(image => image.object_id)).toEqual([9001020]);
+            expect(objectQueries().map(call => call[3].window_start)).toEqual([125, 20]);
+        });
+
+        test("a sample emptied since the stats were read is left : ok", async () => {
+            const [emptied, full] = [imported(3, 1, 9003), imported(1, 1, 9001)];
+            keep(emptied, 30);
+            keep(full, 250);
+            totals["9003"] = 0;
+            randoms = [0, 0, 0, 0];
+
+            const images = await service.randomImagesOf([emptied, full], PROJECTS, 1);
+
+            expect(images.map(image => image.object_id)).toEqual([9001000]);
+            expect(objectQueries().map(call => call[3].filters.samples)).toEqual(["9003", "9001"]);
         });
 
         test.each([
             { override_depth_offset: 2, sample_offset: 1.2, expected: 37.5, situation: "the project override wins over the sample's offset" },
             { override_depth_offset: null, sample_offset: null, expected: 35.5, situation: "without any offset, the depth EcoTaxa keeps" },
         ])("image depth, $situation : ok", async ({ override_depth_offset, sample_offset, expected }) => {
+            const sample = imported(1, 1, 9001, { instrument_settings_depth_offset_m: sample_offset });
+            keep(sample, 250);
             randoms = [0, 0.5];
             const projects = contextsOf(exploreContext({ ...ON_FR, override_depth_offset }));
 
-            const [image] = await service.randomImagesOf([imported(1, 1, 9001, { instrument_settings_depth_offset_m: sample_offset })], projects, 1);
+            const [image] = await service.randomImagesOf([sample], projects, 1);
 
             expect(image.depth).toBe(expected);
         });
 
-        test("never returns the same object twice, and gives up after three draws per image", async () => {
+        test(`never returns the same object twice, and gives up after ${EXPLORE_IMAGES_CALLS_PER_IMAGE} calls per image : ok`, async () => {
+            const sample = imported(1, 1, 9001);
+            keep(sample, 250);
             randoms = Array.from({ length: 20 }, () => 0.5);
 
-            const images = await service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 2);
+            const images = await service.randomImagesOf([sample], PROJECTS, 2);
 
             expect(images.map(image => image.object_id)).toEqual([9001125]);
-            const image_queries = (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.filter(call => call[3].fields.length > 0);
-            expect(image_queries).toHaveLength(6);
-            // The number of objects of the sample is kept in cache.
-            const total_queries = (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.filter(call => call[3].fields.length === 0);
-            expect(total_queries).toHaveLength(1);
+            expect(objectQueries()).toHaveLength(2 * EXPLORE_IMAGES_CALLS_PER_IMAGE);
         });
 
-        test(`the number of objects of a sample is asked again after ${ECOTAXA_CACHE_TTL_MS} ms`, async () => {
-            await service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1);
-            clock += ECOTAXA_CACHE_TTL_MS - 1;
-            await service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1);
-            const totalQueries = () => (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.filter(call => call[3].fields.length === 0);
-            expect(totalQueries()).toHaveLength(1);
-
-            clock += 1;
-            await service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1);
-            expect(totalQueries()).toHaveLength(2);
-        });
-
-        test("drops a sample with no object", async () => {
-            randoms = [0, 0, 0, 0];
-
-            const images = await service.randomImagesOf([imported(8, 1, 9008)], PROJECTS, 3);
-
-            expect(images).toEqual([]);
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledTimes(1);
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9008" }, fields: [], window_start: 0, window_size: 1 });
-        });
-
-        test("once a sample without object is dropped, the draws go to the others", async () => {
-            randoms = [0, 0.4, 0];
-
-            const images = await service.randomImagesOf([imported(8, 1, 9008), imported(1, 1, 9001)], PROJECTS, 1);
-
-            expect(images.map(image => image.object_id)).toEqual([9001000]);
-            const image_queries = (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.filter(call => call[3].fields.length > 0);
-            expect(image_queries.map(call => call[3].filters.samples)).toEqual(["9001"]);
-        });
-
-        test("a sample whose query fails is dropped and the others still give images", async () => {
-            totals["9002"] = 10;
-            jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockImplementation(async (_url, _token, _project, query: EcoTaxaObjectSetQuery) => {
-                if (query.filters.samples === "9001") throw new Error("EcoTaxa answered 500");
-                return { total_ids: 10, object_ids: [query.window_start ?? 0], details: [["a.jpg", null, null, null, "x"]] };
+        test("a project whose query fails is left, the other projects still give images : ok", async () => {
+            const [failing, sibling, dev] = [imported(1, 1, 9001), imported(3, 1, 9003), imported(2, 2, 501)];
+            keep(failing, 250);
+            keep(sibling, 30);
+            keep(dev, 40);
+            jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockImplementation(async (_url, _token, project, query: EcoTaxaObjectSetQuery) => {
+                if (project === 1450) throw new Error("EcoTaxa answered 403");
+                return { total_ids: 40, object_ids: [query.window_start ?? 0], details: [["a.jpg", null, null, null, "x"]] };
             });
-            randoms = [0, 0, 0.3];
+            randoms = [0, 0, 0, 0.25];
 
-            const images = await service.randomImagesOf([imported(1, 1, 9001), imported(2, 1, 9002)], PROJECTS, 1);
+            const images = await service.randomImagesOf([failing, sibling, dev], PROJECTS, 1);
 
-            expect(images).toEqual([{ object_id: 3, image_url: "https://ecotaxa.obs-vlfr.fr/vault/a.jpg", sample_name: "moose_ge_2024_002", depth: null, date: null }]);
+            expect(images).toEqual([{ object_id: 10, image_url: "https://ecotaxa.dev.example.org/vault/a.jpg", sample_name: "moose_ge_2024_002", depth: null, date: null }]);
+            // One failed call for project 1450: its other sample is not asked.
+            expect(objectQueries().map(call => call[2])).toEqual([1450, 77]);
         });
 
-        test("an object without image file is not returned", async () => {
+        test("an object without image file is not returned : ok", async () => {
+            keep(imported(1, 1, 9001), 5);
             jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockResolvedValue({ total_ids: 5, object_ids: [42], details: [[null, 12, "2024-06-12", "10:00:00", "x"]] });
 
             await expect(service.randomImagesOf([imported(1, 1, 9001)], PROJECTS, 1)).resolves.toEqual([]);
         });
 
-        test("no sample imported in EcoTaxa: no image and no call", async () => {
+        test("no sample imported in EcoTaxa: no image and no call : ok", async () => {
             await expect(service.randomImagesOf([exploreSample()], PROJECTS, 4)).resolves.toEqual([]);
-            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledTimes(0);
+            expect(ecotaxaCalls()).toBe(0);
         });
     });
 });
