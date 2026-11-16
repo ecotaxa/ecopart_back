@@ -13,6 +13,7 @@ import {
     ECOTAXA_STATS_STALE_AFTER_MS,
     ECOTAXA_SYNC_REFRESH_LIMIT,
     EcoTaxaSampleStat,
+    EXPLORE_IMAGES_MAX_DROPPED,
     ExploreEcoTaxaService,
     matchesClassificationState,
     objectDate,
@@ -906,8 +907,42 @@ describe("ExploreEcoTaxaService", () => {
             expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: [], window_start: 0, window_size: 1 });
             expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, { filters: { samples: "9001" }, fields: IMAGE_FIELDS, window_start: 125, window_size: 1 });
             expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledWith("https://ecotaxa.dev.example.org/", "generic-token-dev", 77, { filters: { samples: "501" }, fields: IMAGE_FIELDS, window_start: 10, window_size: 1 });
-            // Images never read the stats.
-            expect(sampleRepository.getEcoTaxaStats).toBeCalledTimes(0);
+            // Images read the stats EcoPart keeps, never EcoTaxa's.
+            expect(sampleRepository.getEcoTaxaStats).toBeCalledTimes(1);
+            expect(ecotaxaAccountRepository.api_ecotaxa_get_sample_stats).toBeCalledTimes(0);
+        });
+
+        test("a single sample holding objects among many empty ones still gives an image", async () => {
+            const empty = manySamples(20, 1, 100, 9100);
+            for (const sample of empty) totals[String(sample.ecotaxa_sample_id)] = 0;
+
+            // Every draw takes the first sample left: the 20 empty ones go before the one with objects.
+            const images = await service.randomImagesOf([...empty, imported(1, 1, 9001)], PROJECTS, 4);
+
+            expect(images.map(image => image.object_id)).toEqual([9001000]);
+        });
+
+        test("the samples the stored stats say hold objects are drawn first", async () => {
+            const empty = manySamples(30, 1, 100, 9100);
+            for (const sample of empty) {
+                totals[String(sample.ecotaxa_sample_id)] = 0;
+                stored.set(sample.sample_id, storedRow(sample.sample_id, sample.ecotaxa_sample_id as number, clock, { nb_validated: 0 }));
+            }
+            stored.set(1, storedRow(1, 9001, clock));
+
+            const images = await service.randomImagesOf([...empty, imported(1, 1, 9001)], PROJECTS, 1);
+
+            expect(images.map(image => image.object_id)).toEqual([9001000]);
+            const queried = (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls.map(call => call[3].filters.samples);
+            expect(new Set(queried)).toEqual(new Set(["9001"]));
+        });
+
+        test(`at most ${EXPLORE_IMAGES_MAX_DROPPED} samples without object are looked at`, async () => {
+            const empty = manySamples(EXPLORE_IMAGES_MAX_DROPPED + 10, 1, 100, 9100);
+            for (const sample of empty) totals[String(sample.ecotaxa_sample_id)] = 0;
+
+            await expect(service.randomImagesOf(empty, PROJECTS, 4)).resolves.toEqual([]);
+            expect(ecotaxaAccountRepository.api_ecotaxa_query_object_set).toBeCalledTimes(EXPLORE_IMAGES_MAX_DROPPED);
         });
 
         test("never returns the same object twice, and gives up after three draws per image", async () => {

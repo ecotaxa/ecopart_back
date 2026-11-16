@@ -54,6 +54,8 @@ export const ECOTAXA_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const ECOTAXA_SWEEP_FIRST_DELAY_MS = 60 * 1000;
 export const EXPLORE_IMAGES_DEFAULT = 4;
 export const EXPLORE_IMAGES_MAX = 12;
+// Samples found without object a request may drop while looking for images (one EcoTaxa call each).
+export const EXPLORE_IMAGES_MAX_DROPPED = 50;
 const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
 
 export const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
@@ -389,19 +391,31 @@ export class ExploreEcoTaxaService {
         return page.total_ids;
     }
 
-    // `count` random objects of random samples, one object per draw; a sample without object is dropped.
+    // `count` random objects of random samples, one object per draw. The samples the stored stats say
+    // hold objects are drawn first, so that a selection where any sample holds objects always gets
+    // images, however many empty samples it has. A sample found without object (or unreachable) is
+    // dropped without using up a draw; at most EXPLORE_IMAGES_MAX_DROPPED are, to bound the EcoTaxa calls.
     async randomImagesOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, count: number): Promise<ExploreImage[]> {
-        const pool = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const entries = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const stored = new Map((await this.sampleRepository.getEcoTaxaStats(entries.map(entry => entry.sample.sample_id))).map(row => [row.sample_id, row]));
+        const holdsObjects = (entry: SampleOnInstance) => {
+            const row = stored.get(entry.sample.sample_id);
+            return row !== undefined && row.ecotaxa_sample_id === entry.sample.ecotaxa_sample_id && totalOf(toSampleStat(row)) > 0;
+        };
+        const pools = [entries.filter(holdsObjects), entries.filter(entry => !holdsObjects(entry))];
         const images: ExploreImage[] = [];
         const seen = new Set<number>();
-        let attempts = 0;
-        while (images.length < count && pool.length > 0 && attempts < count * 3) {
-            attempts++;
+        let draws = 0;
+        let dropped = 0;
+        while (images.length < count && draws < count * 3 && dropped < EXPLORE_IMAGES_MAX_DROPPED) {
+            const pool = pools.find(candidates => candidates.length > 0);
+            if (!pool) break;
             const index = Math.floor(this.random() * pool.length);
             const entry = pool[index];
             try {
                 const total = await this.totalObjectsOf(entry);
-                if (total === 0) { pool.splice(index, 1); continue; }
+                if (total === 0) { pool.splice(index, 1); dropped++; continue; }
+                draws++;
                 const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
                     filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: IMAGE_FIELDS, window_start: Math.floor(this.random() * total), window_size: 1,
                 }));
@@ -419,6 +433,7 @@ export class ExploreEcoTaxaService {
             } catch (error) {
                 console.log(new Date().toISOString(), `Explore: cannot pick an image of sample ${entry.sample.sample_name}`, (error as Error).message);
                 pool.splice(index, 1);
+                dropped++;
             }
         }
         return images;
