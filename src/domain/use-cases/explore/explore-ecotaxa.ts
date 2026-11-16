@@ -4,6 +4,7 @@ import { ClassificationShares, EcoTaxaImportedSample, EcoTaxaObjectCounts, Explo
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
+import { effectiveDepthOffset } from "../../utils/depth-offset";
 import { EcoTaxaThrottle } from "./ecotaxa-throttle";
 import { ExploreProjectContext } from "./explore-selection";
 
@@ -403,6 +404,9 @@ export class ExploreEcoTaxaService {
             return row !== undefined && row.ecotaxa_sample_id === entry.sample.ecotaxa_sample_id && totalOf(toSampleStat(row)) > 0;
         };
         const pools = [entries.filter(holdsObjects), entries.filter(entry => !holdsObjects(entry))];
+        // EcoTaxa keeps the depth the instrument wrote, without the offset: legacy EcoPart added it to
+        // the object depths of its ZOO products, the images show the same depth as the particle curves.
+        const offsets = new Map(samples.map(sample => [sample.sample_id, effectiveDepthOffset(projects.get(sample.project_id)?.project ?? {}, sample) ?? 0]));
         const images: ExploreImage[] = [];
         const seen = new Set<number>();
         let draws = 0;
@@ -427,7 +431,7 @@ export class ExploreEcoTaxaService {
                     object_id,
                     image_url: `${entry.access.base_url}vault/${details[0]}`,
                     sample_name: entry.sample.sample_name,
-                    depth: typeof details[1] === "number" ? details[1] : null,
+                    depth: typeof details[1] === "number" ? details[1] + (offsets.get(entry.sample.sample_id) ?? 0) : null,
                     date: objectDate(details[2], details[3]),
                 });
             } catch (error) {

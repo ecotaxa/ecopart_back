@@ -103,4 +103,59 @@ describe("Domain - Use Cases - Create EcoTaxa Instance", () => {
             expect(error.message).toBe("Cannot find created EcoTaxa instance");
         }
     });
+
+    test("Should accept an https URL", async () => {
+        jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed')
+            .mockResolvedValueOnce();
+        jest.spyOn(mockUserRepository, 'isAdmin')
+            .mockResolvedValueOnce(true);
+        jest.spyOn(mockEcotaxaAccountRepository, 'createEcoTaxaInstance')
+            .mockResolvedValueOnce(1);
+        jest.spyOn(mockEcotaxaAccountRepository, 'getOneEcoTaxaInstance')
+            .mockResolvedValueOnce(ecotaxa_instance_1);
+
+        const createUseCase = new CreateEcoTaxaInstance(mockUserRepository, mockEcotaxaAccountRepository);
+        const instance = { ...instance_to_create, ecotaxa_instance_url: "https://ecotaxa.obs-vlfr.fr/" };
+
+        await expect(createUseCase.execute(current_user, instance)).resolves.toStrictEqual(ecotaxa_instance_1);
+        expect(mockEcotaxaAccountRepository.createEcoTaxaInstance).toHaveBeenCalledWith(instance);
+    });
+
+    test.each([
+        "javascript:alert(1)",
+        "JavaScript:alert(1)",
+        " javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "ecotaxa.obs-vlfr.fr",
+        "",
+        undefined,
+    ])("Should throw when the URL is not http or https: %j", async (ecotaxa_instance_url) => {
+        jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed')
+            .mockResolvedValueOnce();
+        jest.spyOn(mockUserRepository, 'isAdmin')
+            .mockResolvedValueOnce(true);
+        jest.spyOn(mockEcotaxaAccountRepository, 'createEcoTaxaInstance');
+
+        const createUseCase = new CreateEcoTaxaInstance(mockUserRepository, mockEcotaxaAccountRepository);
+        const instance = { ...instance_to_create, ecotaxa_instance_url: ecotaxa_instance_url as string };
+
+        await expect(createUseCase.execute(current_user, instance))
+            .rejects.toThrow("ecotaxa_instance_url must be an http or https URL");
+        expect(mockEcotaxaAccountRepository.createEcoTaxaInstance).not.toHaveBeenCalled();
+    });
+
+    test("Should answer a user who is not admin with the admin error, whatever the URL", async () => {
+        jest.spyOn(mockUserRepository, 'ensureUserCanBeUsed')
+            .mockResolvedValueOnce();
+        jest.spyOn(mockUserRepository, 'isAdmin')
+            .mockResolvedValueOnce(false);
+        jest.spyOn(mockEcotaxaAccountRepository, 'createEcoTaxaInstance');
+
+        const createUseCase = new CreateEcoTaxaInstance(mockUserRepository, mockEcotaxaAccountRepository);
+        const instance = { ...instance_to_create, ecotaxa_instance_url: "javascript:alert(1)" };
+
+        await expect(createUseCase.execute(current_user, instance))
+            .rejects.toThrow("Logged user cannot create an EcoTaxa instance");
+        expect(mockEcotaxaAccountRepository.createEcoTaxaInstance).not.toHaveBeenCalled();
+    });
 });

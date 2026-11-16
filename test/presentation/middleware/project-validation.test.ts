@@ -118,6 +118,25 @@ describe("Project Router", () => {
             expect(mockCreateProjectUseCase.execute).toBeCalledTimes(0)
         });
 
+        test("Accepts a null override_depth_offset, meaning no project override : ok", async () => {
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(projectResponseModel))
+
+            const response = await request(server).post("/projects").send({ ...projectRequestCreationModel, override_depth_offset: null })
+
+            expect(response.status).toBe(201)
+            expect(mockCreateProjectUseCase.execute).toBeCalledWith(undefined, { ...projectRequestCreationModel, override_depth_offset: null })
+        });
+
+        test("Refuses an override_depth_offset that is not a number : ko", async () => {
+            jest.spyOn(mockCreateProjectUseCase, "execute")
+
+            const response = await request(server).post("/projects").send({ ...projectRequestCreationModel, override_depth_offset: "abc" })
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors).toEqual([expect.objectContaining({ path: "override_depth_offset", msg: "Override depth offset must be a float value." })])
+            expect(mockCreateProjectUseCase.execute).toBeCalledTimes(0)
+        });
+
         test("Accepts a root_folder_path with dots that are not a parent segment", async () => {
             jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(projectResponseModel))
 
@@ -255,6 +274,24 @@ describe("Project Router", () => {
             expect(response.status).toBe(200)
             expect(mockUpdateProjectUseCase.execute).toBeCalledWith(undefined, { ...sanitizedInputData, project_id: "1" })
             expect(response.body).toStrictEqual(OutputData)
+        });
+
+        test("update project with a null override_depth_offset clears the project override : ok", async () => {
+            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.resolve(projectResponseModel))
+
+            const response = await request(server).patch("/projects/1").send({ override_depth_offset: null })
+
+            expect(response.status).toBe(200)
+            expect(mockUpdateProjectUseCase.execute).toBeCalledWith(undefined, { override_depth_offset: null, project_id: "1" })
+        });
+
+        test("update project with an override_depth_offset that is not a number : ko", async () => {
+            jest.spyOn(mockUpdateProjectUseCase, "execute")
+
+            const response = await request(server).patch("/projects/1").send({ override_depth_offset: "abc" })
+
+            expect(response.status).toBe(422)
+            expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(0)
         });
 
         test("update project with invalid instrument", async () => {

@@ -207,7 +207,7 @@ export default function ProjectRouter(
      *       | `operator_email` | string | |
      *       | `chief_scientist_name` | string | |
      *       | `chief_scientist_email` | string | |
-     *       | `override_depth_offset` | number | |
+     *       | `override_depth_offset` | number or null | null removes the project override: each sample's own offset applies |
      *       | `enable_descent_filter` | boolean | |
      *       | `privacy_duration` | number | |
      *       | `visible_duration` | number | |

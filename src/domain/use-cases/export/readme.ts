@@ -35,7 +35,7 @@ export const PROJECT_COLUMN_DESCRIPTIONS: Array<[string, string, string]> = [
     ["project_instrument", "BODC code of the instrument used (NERC vocabulary URL).", "EcoPart `instrument_model.bodc_url` (looked up from the project's instrument model)."],
     ["project_instrument_model_name", "Instrument model name (e.g. `UVP5HD`, `UVP6LP`).", "EcoPart `instrument_model.instrument_model_name`."],
     ["project_instrument_serial_number", "Serial number of the instrument unit.", "EcoPart project-creation form."],
-    ["project_override_depth_offset", "Offset in metres between the pressure sensor and the UVP field of view. Can be provided here or for each sample; this project-level setting overrides the per-sample setting when present.", "EcoPart project-creation form."],
+    ["project_override_depth_offset", "Offset in metres between the pressure sensor and the UVP field of view. Can be provided here or for each sample; this project-level setting overrides the per-sample setting when present. Empty when the project does not override it.", "EcoPart project form; 1.2 m proposed for a UVP5 project, as in legacy EcoPart."],
     ["project_enable_descent_filter", "Whether data collected during ascending portions is removed. Useful in regular profiles when the instrument is supposed to be descending regularly but is sometimes going back up because of waves/swell and these portions need to be removed to avoid sampling disturbed water.", "EcoPart project-creation form."],
     ["project_creation_utc_date_time", "ISO UTC timestamp of project creation in EcoPart.", "EcoPart DB (auto at row insert)."],
     ["project_export_utc_date_time", "ISO UTC timestamp of the export event. Same value on every row of the file.", "Captured once at export-task start."],

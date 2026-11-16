@@ -115,6 +115,23 @@ describe("GetSampleQcGraphs", () => {
         expect(res.image_depth_profile.selected_images).toBe(1);
     });
 
+    test.each([
+        { override_depth_offset: 1.2, sample_offset: 0.5, expected_depth_m: 11.2, situation: "the project override wins over the sample's offset" },
+        { override_depth_offset: null, sample_offset: 0.5, expected_depth_m: 10.5, situation: "without project override the sample's offset applies" },
+        { override_depth_offset: null, sample_offset: null, expected_depth_m: 10, situation: "without any offset the depth is the pressure" },
+    ])("depth offset, $situation : ok", async ({ override_depth_offset, sample_offset, expected_depth_m }) => {
+        const records: PerImageRecord[] = [
+            { image_index: 0, image_id: "1", raw_pressure: 100, image_time_ms: null, light_on: true, spectrum_counts: { 1: 4 } },
+        ];
+        jest.spyOn(mockSampleRepository, "getSample").mockResolvedValue(sampleStub({ filter_first_image: null as any, filter_last_image: null as any, instrument_settings_depth_offset_m: sample_offset as any }));
+        jest.spyOn(mockProjectRepository, "getProject").mockResolvedValue({ project_id: 1, instrument_model: "UVP5HD", override_depth_offset } as any);
+        jest.spyOn(mockSampleRepository, "getPerImageRecords").mockResolvedValue(toPerImageColumns(records));
+
+        const res = await useCase.execute(current_user, 1, 10);
+
+        expect(res.image_depth_profile.points[0].depth_m).toBeCloseTo(expected_depth_m);
+    });
+
     test("honours the project's descent filter setting on a depth sample", async () => {
         // depths (UVP5 gain 0.1): 10, 20, 15 (ascent blip), 30.
         const records: PerImageRecord[] = [100, 200, 150, 300].map((raw_pressure, i) => (

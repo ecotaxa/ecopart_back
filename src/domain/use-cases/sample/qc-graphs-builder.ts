@@ -33,7 +33,7 @@ export interface QcGraphInput {
     visual_qc_status_label: string;
     filter_first_image: string | null;
     filter_last_image: string | null;
-    instrument_settings_depth_offset_m: number | null;
+    instrument_settings_depth_offset_m: number | null;   // the offset the depths use: effectiveDepthOffset(project, sample)
     instrument_settings_image_volume_l: number | null;
     is_depth_profile: boolean;           // descent filter only applies to depth (pressure) profiles, not time series
     descent_filter_enabled: boolean;     // the project's enable_descent_filter

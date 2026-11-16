@@ -15,6 +15,7 @@ import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_
 import { InstrumentModelRepository } from "../../interfaces/repositories/instrument_model-repository";
 import { buildImageFilteringMetadata } from "../sample/qc-graphs-builder";
 import { computeProjectPrivacy } from "../../utils/project-privacy";
+import { effectiveDepthOffset } from "../../utils/depth-offset";
 import { dateValue, TableColumn, tableFileName, TableValue, writeTable } from "./table";
 import { fileSizeLabel } from "./export-log";
 
@@ -364,7 +365,7 @@ export class ExportMetadataWriter {
                     visual_qc_status_label: sample.visual_qc_status_label,
                     filter_first_image: sample.filter_first_image ?? null,
                     filter_last_image: sample.filter_last_image ?? null,
-                    instrument_settings_depth_offset_m: project.override_depth_offset ?? sample.instrument_settings_depth_offset_m ?? null,
+                    instrument_settings_depth_offset_m: effectiveDepthOffset(project, sample),
                     instrument_settings_image_volume_l: sample.instrument_settings_image_volume_l ?? null,
                     is_depth_profile: sample.sample_type_label === "Depth",
                     descent_filter_enabled: project.enable_descent_filter,

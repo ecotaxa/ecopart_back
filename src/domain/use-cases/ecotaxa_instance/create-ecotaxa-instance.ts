@@ -23,6 +23,11 @@ export class CreateEcoTaxaInstance implements CreateEcoTaxaInstanceUseCase {
             throw new Error("Logged user cannot create an EcoTaxa instance");
         }
 
+        // Ensure the URL is http(s): it ends up in links of the front and is the target of the EcoTaxa API calls
+        if (!this.isHttpUrl(instance.ecotaxa_instance_url)) {
+            throw new Error("ecotaxa_instance_url must be an http or https URL");
+        }
+
         // Create the instance
         const instance_id = await this.ecotaxaAccountRepository.createEcoTaxaInstance(instance);
 
@@ -33,5 +38,15 @@ export class CreateEcoTaxaInstance implements CreateEcoTaxaInstanceUseCase {
         }
 
         return created_instance;
+    }
+
+    private isHttpUrl(url: unknown): boolean {
+        if (typeof url !== "string") return false;
+        try {
+            const { protocol } = new URL(url);
+            return protocol === "http:" || protocol === "https:";
+        } catch {
+            return false;
+        }
     }
 }

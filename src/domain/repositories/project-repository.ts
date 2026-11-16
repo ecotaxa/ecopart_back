@@ -13,6 +13,7 @@ import { formatBytes } from "../utils/format-bytes";
 import * as fsPromises from 'fs/promises'; // For promise-based file operations//import fs from 'fs'; // Correct import for `createReadStream`
 import * as fs from 'fs'; // For createWriteStream
 
+import { finished } from 'stream/promises';
 import archiver from 'archiver';
 
 import path from "path";
@@ -483,9 +484,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         const tmpZipFile = `${destZipFile}.partial`;
         await fsPromises.rm(tmpZipFile, { force: true });
 
+        const output = fs.createWriteStream(tmpZipFile);
         try {
             await new Promise<void>((resolve, reject) => {
-                const output = fs.createWriteStream(tmpZipFile);
                 const archive = archiver('zip', { zlib: { level: 9 } });
 
                 // Resolve on 'close' and not on finalize(): finalize only marks the end of the input,
@@ -499,6 +500,9 @@ export class ProjectRepositoryImpl implements ProjectRepository {
                 archive.finalize().catch(reject);
             });
         } catch (error) {
+            // Closed before the removal: a stream still opening its file would create it afterwards.
+            output.destroy();
+            await finished(output).catch(() => undefined);
             await fsPromises.rm(tmpZipFile, { force: true }).catch(() => undefined);
             throw error;
         }

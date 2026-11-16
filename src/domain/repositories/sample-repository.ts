@@ -33,7 +33,7 @@ import * as fsPromises from 'fs/promises'; // For promise-based file operations/
 import path from 'path';
 import { constants as buffer_constants } from 'buffer';
 import { PassThrough, pipeline, Readable } from 'stream';
-import { pipeline as pipelinePromise } from 'stream/promises';
+import { finished, pipeline as pipelinePromise } from 'stream/promises';
 import yauzl from 'yauzl';
 import archiver from 'archiver';
 import * as tar from 'tar';
@@ -1995,9 +1995,9 @@ export class SampleRepositoryImpl implements SampleRepository {
         const tmpZipFilePath = `${zipFilePath}.partial`;
         await fsPromises.rm(tmpZipFilePath, { force: true });
 
+        const output = fs.createWriteStream(tmpZipFilePath);
         try {
             await new Promise<void>((resolve, reject) => {
-                const output = fs.createWriteStream(tmpZipFilePath);
                 const archive = archiver('zip', { zlib: { level: 9 } }); // High compression level
 
                 output.on('close', () => resolve());
@@ -2009,6 +2009,9 @@ export class SampleRepositoryImpl implements SampleRepository {
                 archive.finalize().catch(reject);
             });
         } catch (error) {
+            // Closed before the removal: a stream still opening its file would create it afterwards.
+            output.destroy();
+            await finished(output).catch(() => undefined);
             await fsPromises.rm(tmpZipFilePath, { force: true }).catch(() => undefined);
             throw error;
         }

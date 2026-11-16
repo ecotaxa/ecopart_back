@@ -178,7 +178,7 @@ components:
         object_id: { type: integer }
         image_url: { type: string }
         sample_name: { type: string }
-        depth: { type: number, nullable: true }
+        depth: { type: number, nullable: true, description: "Depth of the object in EcoTaxa plus the sample's depth offset (the project override, else the sample's own), in m" }
         date: { type: string, nullable: true, format: date-time }
     ProfileSeries:
       type: object

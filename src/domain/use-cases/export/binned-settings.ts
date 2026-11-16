@@ -1,3 +1,4 @@
+import { effectiveDepthOffset } from "../../utils/depth-offset";
 import { BinnedSampleSettings } from "./binned-computation";
 
 // The sample fields the binned computations read. Structural, so that a stored sample, a sample
@@ -31,7 +32,7 @@ export function binnedSampleSettingsOf(sample: BinnedSettingsSampleInputs, proje
         descent_filter_enabled: project.enable_descent_filter,
         filter_first_image: sample.filter_first_image ?? null,
         filter_last_image: sample.filter_last_image ?? null,
-        depth_offset_m: project.override_depth_offset ?? sample.instrument_settings_depth_offset_m ?? null,
+        depth_offset_m: effectiveDepthOffset(project, sample),
         image_volume_l: sample.instrument_settings_image_volume_l,
         aa: sample.instrument_settings_aa,
         exp: sample.instrument_settings_exp,

@@ -80,6 +80,12 @@ export default function EcoTaxaInstanceRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: ecotaxa_instance_url must be an http or https URL.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       500:
      *         description: Internal server error.
      *         content:
@@ -96,6 +102,7 @@ export default function EcoTaxaInstanceRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot create an EcoTaxa instance") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "ecotaxa_instance_url must be an http or https URL") res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create EcoTaxa instance"] })
         }
     })

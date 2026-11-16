@@ -98,7 +98,8 @@ export class CreateProject implements CreateProjectUseCase {
     }
 
 
-    // Set default depth offset if not provided
+    // An absent offset takes the instrument's default (1.2 m for a UVP5, as legacy EcoPart). null is
+    // kept: the project does not override, each sample's own offset applies.
     private setDefaultDepthOffset(publicProject: PublicProjectRequestCreationModel): void {
         if (publicProject.override_depth_offset === undefined) {
             publicProject.override_depth_offset = this.projectRepository.computeDefaultDepthOffset(publicProject.instrument_model);
