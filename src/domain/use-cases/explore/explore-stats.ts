@@ -1,4 +1,4 @@
-import { ExploreContact, ExploreMapSample, ExploreProjectRow, ExploreSampleRow, ExploreSelection, ExploreSummary, LabelCount, PressureHistogramBin, ProfilePoint } from "../../entities/explore";
+import { ExploreContact, ExploreMapSample, ExploreProjectRow, ExploreSampleRow, ExploreSelection, ExploreSummary, LabelCount, PressureClass, PressureHistogramBin, ProfilePoint } from "../../entities/explore";
 import { MinimalUserModel } from "../../entities/user";
 import { esdMm } from "../export/binned-computation";
 import { ExploreProjectContext, ExploreUser } from "./explore-selection";
@@ -7,6 +7,12 @@ import { ExploreProjectContext, ExploreUser } from "./explore-selection";
  * tabs show, computed from the light rows and the project contexts, without any further IO. */
 
 export const PRESSURE_HISTOGRAM_STEP_DB = 100;
+
+/* Inner edges of the few classes of maximum pressure (dbar): finer near the surface, along the water
+ * layers and the usual casts. Shallow coastal casts stop before 50, the epipelagic layer and the shelf
+ * end near 200, the mesopelagic layer goes down to 1000 (split at 500, a frequent cast depth), most
+ * Argo profiles start from 2000; the last class is open. */
+export const MAX_PRESSURE_CLASS_EDGES_DB = [50, 200, 500, 1000, 2000];
 
 const isFinite = (value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value);
 
@@ -23,6 +29,7 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
     let time_end: number | null = null;
     const instruments = new Map<string, number>();
     const histogram = new Map<number, number>();
+    const classes: number[] = new Array(MAX_PRESSURE_CLASS_EDGES_DB.length + 1).fill(0);
     const profiles: ProfilePoint[] = [];
 
     for (const sample of samples) {
@@ -34,10 +41,13 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
         const instrument = context?.project.instrument_model ?? "unknown";
         instruments.set(instrument, (instruments.get(instrument) ?? 0) + 1);
 
-        if (isFinite(sample.max_pressure)) {
-            if (max_pressure === null || sample.max_pressure > max_pressure) max_pressure = sample.max_pressure;
-            const bin = Math.floor(Math.max(0, sample.max_pressure) / PRESSURE_HISTOGRAM_STEP_DB);
+        const pressure = sample.max_pressure;
+        if (isFinite(pressure)) {
+            if (max_pressure === null || pressure > max_pressure) max_pressure = pressure;
+            const bin = Math.floor(Math.max(0, pressure) / PRESSURE_HISTOGRAM_STEP_DB);
             histogram.set(bin, (histogram.get(bin) ?? 0) + 1);
+            const index = MAX_PRESSURE_CLASS_EDGES_DB.findIndex((edge) => pressure < edge);
+            classes[index === -1 ? MAX_PRESSURE_CLASS_EDGES_DB.length : index]++;
         }
         if (context && isFinite(sample.particle_min_area_px) && isFinite(sample.particle_max_area_px) && sample.instrument_settings_aa > 0 && sample.instrument_settings_exp > 0) {
             const smallest = esdMm(sample.particle_min_area_px, sample.instrument_settings_aa, sample.instrument_settings_exp) * 1000;
@@ -61,6 +71,11 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
             max_pressure_histogram.push({ max_pressure: (bin + 1) * PRESSURE_HISTOGRAM_STEP_DB, nb_profiles: histogram.get(bin) ?? 0 });
         }
     }
+    const max_pressure_classes: PressureClass[] = histogram.size === 0 ? [] : classes.map((nb_profiles, index) => ({
+        min_pressure: index === 0 ? 0 : MAX_PRESSURE_CLASS_EDGES_DB[index - 1],
+        max_pressure: index < MAX_PRESSURE_CLASS_EDGES_DB.length ? MAX_PRESSURE_CLASS_EDGES_DB[index] : null,
+        nb_profiles,
+    }));
     const instrument_counts: LabelCount[] = Array.from(instruments.entries())
         .map(([label, count]) => ({ label, count }))
         .sort((a, b) => a.label.localeCompare(b.label));
@@ -73,6 +88,7 @@ export function buildExploreSummary(samples: ExploreSampleRow[], projects: Map<n
         time_range: time_start === null || time_end === null ? null : { start: new Date(time_start).toISOString(), end: new Date(time_end).toISOString() },
         instruments: instrument_counts,
         max_pressure_histogram,
+        max_pressure_classes,
         profiles,
     };
 }

@@ -1579,6 +1579,27 @@
               }
             }
           },
+          "max_pressure_classes": {
+            "type": "array",
+            "description": "The profiles per class of maximum pressure, 0-50, 50-200, 200-500, 500-1000, 1000-2000 and from 2000 dbar; empty when no sample has a maximum pressure.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "min_pressure": {
+                  "type": "number",
+                  "description": "Lower edge of the class (dbar), included."
+                },
+                "max_pressure": {
+                  "type": "number",
+                  "nullable": true,
+                  "description": "Upper edge of the class (dbar), excluded; null for the deepest class."
+                },
+                "nb_profiles": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
           "profiles": {
             "type": "array",
             "items": {
