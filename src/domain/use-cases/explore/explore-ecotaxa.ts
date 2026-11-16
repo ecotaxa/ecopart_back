@@ -42,7 +42,7 @@ interface SampleOnInstance {
 export type EcoTaxaProjectLink = { project_id: number; ecotaxa_project_id: number | null; ecotaxa_instance_id: number | null };
 
 export const ECOTAXA_STATS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-// Memory caches (instance access, object totals of the images, names looked up) live this long; taxa names never change.
+// Memory caches (instance access, names looked up) live this long; taxa names never change.
 export const ECOTAXA_CACHE_TTL_MS = 10 * 60 * 1000;
 // EcoTaxa reads every object of the samples asked: small batches keep each query short.
 export const ECOTAXA_STATS_BATCH = 50;
@@ -55,6 +55,8 @@ export const ECOTAXA_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const ECOTAXA_SWEEP_FIRST_DELAY_MS = 60 * 1000;
 export const EXPLORE_IMAGES_DEFAULT = 4;
 export const EXPLORE_IMAGES_MAX = 12;
+// EcoTaxa calls a request for images may make, per image asked.
+export const EXPLORE_IMAGES_CALLS_PER_IMAGE = 3;
 const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
 
 export const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
@@ -108,7 +110,6 @@ const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, m
 
 export class ExploreEcoTaxaService {
     private readonly taxa_cache = new Map<string, EcoTaxaTaxon>();
-    private readonly totals_cache = new Map<string, { at: number; total: number }>();
     private readonly access_cache = new Map<number, { at: number; access: InstanceAccess | null }>();
     // EcoTaxa projects whose sample names were looked up: a name EcoTaxa does not know is not asked again for a while.
     private readonly resolved_projects = new Map<number, number>();
@@ -378,40 +379,43 @@ export class ExploreEcoTaxaService {
 
     /* ─── images ─── */
 
-    private async totalObjectsOf(entry: SampleOnInstance): Promise<number> {
-        const key = `${entry.access.instance_id}:${entry.sample.ecotaxa_sample_id}`;
-        const cached = this.totals_cache.get(key);
-        const now = this.now();
-        if (cached && now - cached.at < ECOTAXA_CACHE_TTL_MS) return cached.total;
-        const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
-            filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: [], window_start: 0, window_size: 1,
-        }));
-        this.totals_cache.set(key, { at: now, total: page.total_ids });
-        return page.total_ids;
-    }
-
-    // `count` random objects of random samples, one object per draw; a sample without object is dropped.
+    // `count` random objects of random samples, one EcoTaxa call per draw. Only the samples whose
+    // EcoTaxa stats count objects are drawn, the object within the count those stats give: a
+    // selection without any object costs no call. The stats are the ones EcoPart keeps, read again
+    // from EcoTaxa (in batches) when missing or stale, as for the stats tab. A project whose query
+    // fails is left for the rest of the request, its other samples would fail the same way.
     async randomImagesOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>, count: number): Promise<ExploreImage[]> {
-        const pool = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const entries = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const { stats } = await this.statsOfEntries(entries, ECOTAXA_SYNC_REFRESH_LIMIT);
+        const candidates = entries.flatMap(entry => {
+            const stat = stats.get(entry.sample.sample_id);
+            const total = stat && stat.ecotaxa_sample_id === entry.sample.ecotaxa_sample_id ? totalOf(stat) : 0;
+            return total > 0 ? [{ entry, total }] : [];
+        });
         // EcoTaxa keeps the depth the instrument wrote, without the offset: legacy EcoPart added it to
         // the object depths of its ZOO products, the images show the same depth as the particle curves.
         const offsets = new Map(samples.map(sample => [sample.sample_id, effectiveDepthOffset(projects.get(sample.project_id)?.project ?? {}, sample) ?? 0]));
         const images: ExploreImage[] = [];
         const seen = new Set<number>();
-        let attempts = 0;
-        while (images.length < count && pool.length > 0 && attempts < count * 3) {
-            attempts++;
-            const index = Math.floor(this.random() * pool.length);
-            const entry = pool[index];
+        let calls = 0;
+        while (images.length < count && candidates.length > 0 && calls < count * EXPLORE_IMAGES_CALLS_PER_IMAGE) {
+            const index = Math.floor(this.random() * candidates.length);
+            const candidate = candidates[index];
+            const { entry } = candidate;
+            calls++;
             try {
-                const total = await this.totalObjectsOf(entry);
-                if (total === 0) { pool.splice(index, 1); continue; }
                 const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
-                    filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: IMAGE_FIELDS, window_start: Math.floor(this.random() * total), window_size: 1,
+                    filters: { samples: String(entry.sample.ecotaxa_sample_id) }, fields: IMAGE_FIELDS, window_start: Math.floor(this.random() * candidate.total), window_size: 1,
                 }));
                 const object_id = page.object_ids[0];
+                if (object_id === undefined) {
+                    // Objects deleted since the stats were read: the next draw uses the count EcoTaxa gave.
+                    if (page.total_ids > 0) candidate.total = page.total_ids;
+                    else candidates.splice(index, 1);
+                    continue;
+                }
                 const details = page.details[0] ?? [];
-                if (object_id === undefined || seen.has(object_id) || typeof details[0] !== "string") continue;
+                if (seen.has(object_id) || typeof details[0] !== "string") continue;
                 seen.add(object_id);
                 images.push({
                     object_id,
@@ -421,8 +425,11 @@ export class ExploreEcoTaxaService {
                     date: objectDate(details[2], details[3]),
                 });
             } catch (error) {
-                console.log(new Date().toISOString(), `Explore: cannot pick an image of sample ${entry.sample.sample_name}`, (error as Error).message);
-                pool.splice(index, 1);
+                console.log(new Date().toISOString(), `Explore: cannot pick an image in EcoTaxa project ${entry.ecotaxa_project_id} of instance ${entry.access.instance_id}`, (error as Error).message);
+                for (let i = candidates.length - 1; i >= 0; i--) {
+                    const other = candidates[i].entry;
+                    if (other.access.instance_id === entry.access.instance_id && other.ecotaxa_project_id === entry.ecotaxa_project_id) candidates.splice(i, 1);
+                }
             }
         }
         return images;
