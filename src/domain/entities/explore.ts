@@ -130,6 +130,12 @@ export interface PressureHistogramBin {
     nb_profiles: number;
 }
 
+export interface PressureClass {
+    min_pressure: number;                     // dbar, included
+    max_pressure: number | null;              // dbar, excluded; null for the deepest class, which has no upper edge
+    nb_profiles: number;
+}
+
 export interface ProfilePoint {
     date: string;
     latitude: number;
@@ -143,6 +149,7 @@ export interface ExploreSummary {
     time_range: { start: string; end: string } | null;
     instruments: LabelCount[];
     max_pressure_histogram: PressureHistogramBin[];
+    max_pressure_classes: PressureClass[];
     profiles: ProfilePoint[];
 }
 

@@ -1,6 +1,6 @@
 import { esdMm } from "../../../../src/domain/use-cases/export/binned-computation";
 import { ExploreUser } from "../../../../src/domain/use-cases/explore/explore-selection";
-import { buildExploreMap, buildExploreProjectRows, buildExploreSelection, buildExploreSummary, PRESSURE_HISTOGRAM_STEP_DB, toContact } from "../../../../src/domain/use-cases/explore/explore-stats";
+import { buildExploreMap, buildExploreProjectRows, buildExploreSelection, buildExploreSummary, MAX_PRESSURE_CLASS_EDGES_DB, PRESSURE_HISTOGRAM_STEP_DB, toContact } from "../../../../src/domain/use-cases/explore/explore-stats";
 import { ALICE, BOB, contextsOf, exploreContext, exploreProject, exploreSample, privileges } from "./explore-fixtures";
 
 const ANONYMOUS: ExploreUser = { user_id: null, is_admin: false };
@@ -56,6 +56,21 @@ describe("buildExploreSummary", () => {
             { max_pressure: 500, nb_profiles: 1 },
         ]);
         expect(buildExploreSummary([exploreSample({ max_pressure: null })], CONTEXTS)?.max_pressure_histogram).toEqual([]);
+    });
+
+    test("the classes of maximum pressure are fixed, finer near the surface, the last one open, empty ones included", () => {
+        const summary = buildExploreSummary([-5, 0, 49.9, 50, 199, 650, 999.9, 1000, 1999, 2000, 2010, 5600, null].map((max_pressure, i) => exploreSample({ sample_id: i + 1, max_pressure })), CONTEXTS);
+
+        expect(MAX_PRESSURE_CLASS_EDGES_DB).toEqual([50, 200, 500, 1000, 2000]);
+        expect(summary?.max_pressure_classes).toEqual([
+            { min_pressure: 0, max_pressure: 50, nb_profiles: 3 },
+            { min_pressure: 50, max_pressure: 200, nb_profiles: 2 },
+            { min_pressure: 200, max_pressure: 500, nb_profiles: 0 },
+            { min_pressure: 500, max_pressure: 1000, nb_profiles: 2 },
+            { min_pressure: 1000, max_pressure: 2000, nb_profiles: 2 },
+            { min_pressure: 2000, max_pressure: null, nb_profiles: 3 },
+        ]);
+        expect(buildExploreSummary([exploreSample({ max_pressure: null })], CONTEXTS)?.max_pressure_classes).toEqual([]);
     });
 
     test("the size range is the ESD in µm of the smallest and largest particle areas, aa in mm² per pixel on every instrument", () => {

@@ -215,6 +215,7 @@ describe("Project statistics builders", () => {
             time_range: { start: "2024-06-12T10:20:00.000Z", end: "2024-06-13T10:20:00.000Z" },
             instruments: [{ label: "UVP6LP", count: 2 }],
             max_pressure_histogram: [{ max_pressure: 100, nb_profiles: 0 }],
+            max_pressure_classes: [],
             profiles: [],
         };
 
