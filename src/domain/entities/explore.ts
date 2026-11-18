@@ -258,4 +258,5 @@ export interface ExploreGraphs {
     ctd: GraphDataset;
     ecotaxa: GraphDataset;
     warnings: string[];
+    ctd_warnings: string[];                   // why CTD curves are missing, shown with the CTD graph
 }

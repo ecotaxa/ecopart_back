@@ -67,7 +67,7 @@ const SUMMARY = { categories: ["Copepoda"], classification: { fully_validated: 1
 const ECOTAXA: ExploreEcoTaxaResponse = { all: SUMMARY, exportable: SUMMARY };
 const IMAGES: ExploreImage[] = [{ object_id: 42, image_url: "https://ecotaxa.obs-vlfr.fr/vault/1/42.jpg", sample_name: "moose_001", depth: 12.5, date: null }];
 const EMPTY = { keys: [], axis_labels: {}, series: {} };
-const GRAPHS: ExploreGraphs = { size_classes: "reduced", abundance: EMPTY, biovolume: EMPTY, ctd: EMPTY, ecotaxa: EMPTY, warnings: ["1 sample of private projects is not drawn"] };
+const GRAPHS: ExploreGraphs = { size_classes: "reduced", abundance: EMPTY, biovolume: EMPTY, ctd: EMPTY, ecotaxa: EMPTY, warnings: ["1 sample of private projects is not drawn"], ctd_warnings: [] };
 
 const FILTERS_SENT = { months: ["6"], ctd_only: "true", classification_state: "fully_validated" };
 const FILTERS_PARSED = {

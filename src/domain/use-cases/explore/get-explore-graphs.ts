@@ -1,5 +1,6 @@
 import { ExploreGraphs, ExploreGraphsRequest, ExploreSampleRow, GraphDataset } from "../../entities/explore";
 import { UserUpdateModel } from "../../entities/user";
+import { CTD_PRESSURE_COLUMN, CTD_TIME_COLUMN } from "../../utils/ctd-rows";
 import { GetExploreGraphsUseCase } from "../../interfaces/use-cases/explore/get-explore-graphs";
 import { BinAxis } from "../export/binned-computation";
 import { ExploreEcoTaxaService } from "./explore-ecotaxa";
@@ -63,18 +64,38 @@ export class GetExploreGraphs implements GetExploreGraphsUseCase {
             }),
         ]);
         if (particle_failures.length > 0) warnings.push(`${particle_failures.length} sample${particle_failures.length > 1 ? "s" : ""} without readable particle data: ${describe(particle_failures)}`);
-        if (ctd_failures.length > 0) warnings.push(`${ctd_failures.length} CTD file${ctd_failures.length > 1 ? "s" : ""} could not be read: ${describe(ctd_failures)}`);
 
         const datasets = buildParticleDatasets(particles.filter((entry): entry is { sample: ExploreSampleRow; bins: ParticleBins } => entry !== null), size_classes);
+        const ctd_read = ctd.filter((entry): entry is { sample: ExploreSampleRow; bins: CtdBins } => entry !== null);
         return {
             size_classes,
             abundance: datasets.abundance,
             biovolume: datasets.biovolume,
-            ctd: buildCtdDataset(ctd.filter((entry): entry is { sample: ExploreSampleRow; bins: CtdBins } => entry !== null)),
+            ctd: buildCtdDataset(ctd_read),
             ecotaxa: EMPTY_DATASET,
             warnings,
+            ctd_warnings: ctdWarnings(axis, drawn.length, with_ctd.length, ctd_failures, ctd_read),
         };
     }
+}
+
+// An empty CTD graph looks broken: these say which samples have no CTD curve and why.
+function ctdWarnings(axis: BinAxis, drawn: number, with_ctd: number, failures: string[], read: { sample: ExploreSampleRow; bins: CtdBins }[]): string[] {
+    const warnings: string[] = [];
+    const without_ctd = drawn - with_ctd;
+    if (drawn > 0 && with_ctd === 0) {
+        warnings.push(`${drawn === 1 ? "The sample drawn has no" : `None of the ${drawn} samples drawn has`} CTD data imported: CTD files are imported from the Import tab of the project`);
+    } else if (without_ctd > 0) {
+        warnings.push(`${without_ctd} of the ${drawn} samples drawn ${without_ctd > 1 ? "have" : "has"} no CTD data imported`);
+    }
+    if (failures.length > 0) warnings.push(`${failures.length} CTD file${failures.length > 1 ? "s" : ""} could not be read: ${describe(failures)}`);
+    // A file read without a single bin lacks the column of the axis (a profile CTD has no time column).
+    const unplaced = read.filter(({ bins }) => bins.positions.length === 0).map(({ sample }) => sample.sample_name);
+    if (unplaced.length > 0) {
+        const column = axis === "depth" ? CTD_PRESSURE_COLUMN : CTD_TIME_COLUMN;
+        warnings.push(`${unplaced.length} CTD file${unplaced.length > 1 ? "s have" : " has"} no "${column}" value, so ${unplaced.length > 1 ? "they cannot" : "it cannot"} be drawn ${axis === "depth" ? "on depth" : "over time"}: ${describe(unplaced)}`);
+    }
+    return warnings;
 }
 
 function describe(names: string[]): string {
