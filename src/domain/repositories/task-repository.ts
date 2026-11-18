@@ -7,7 +7,7 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { TaskRequestCreationModel, PrivateTaskRequestModel, TaskUpdateModel, TaskResponseModel, PublicTaskResponseModel, PublicTaskRequestCreationModel } from "../entities/task";
 import { PrivateTaskRequestCreationModel, PublicTaskRequestCreationModel, PublicTaskRequestModel, PublicTaskResponseModel, TasksStatus, TaskType, TaskVisibilityModel } from "../entities/task";
 import { PrivateTaskRequestModel, PrivateTaskUpdateModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../entities/task";
-import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from "../constants/task";
+import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE, TASK_LOG_EXPIRED_MESSAGE, TASK_LOG_RETENTION_DAYS } from "../constants/task";
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { TaskEndListener, TaskRepository } from "../interfaces/repositories/task-repository";
@@ -16,6 +16,7 @@ import fs from "fs/promises";
 
 // Message of a task whose cancellation was requested, followed by who requested it (see cancelTask).
 const CANCELLATION_REQUESTED_BY = "Cancellation requested by ";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class TaskRepositoryImpl implements TaskRepository {
     taskDataSource: TaskDataSource
@@ -390,12 +391,71 @@ export class TaskRepositoryImpl implements TaskRepository {
     toPublicTask(task: TaskResponseModel): PublicTaskResponseModel {
         const public_task: Partial<TaskResponseModel> = { ...task };
         delete public_task.task_log_file_path;
-        return public_task as PublicTaskResponseModel;
+        return { ...public_task, task_log_expiration_utc_date_time: this.logExpiration(task) } as PublicTaskResponseModel;
     }
 
-    async getLogFileTask(task_id: number): Promise<string> {
+    // Date from which the log of a task is no longer served, null while it is kept: only the log of
+    // a task that succeeded expires, TASK_LOG_RETENTION_DAYS after its end.
+    private logExpiration(task: TaskResponseModel): string | null {
+        if (task.task_status !== TasksStatus.Done || !task.task_end_utc_date_time) return null;
+        const end = Date.parse(task.task_end_utc_date_time);
+        if (Number.isNaN(end)) return null;
+        return new Date(end + TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
+    }
+
+    private isLogExpired(task: TaskResponseModel): boolean {
+        const expiration = this.logExpiration(task);
+        return expiration !== null && Date.parse(expiration) <= Date.now();
+    }
+
+    // Removes the log of every task that succeeded more than TASK_LOG_RETENTION_DAYS ago, and its
+    // folder when nothing else is left in it (the archive of an export is not touched). The log is
+    // refused from its expiration on (getLogFileTask), whether or not this has run yet. Returns the
+    // number of log files removed. One file that cannot be removed does not stop the others.
+    async purgeExpiredLogs(): Promise<number> {
+        const [done_status_id] = await this.getStatusIds([TasksStatus.Done]);
+        const ended_before = new Date(Date.now() - TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
+        const limit = 500;
+        let removed = 0;
+        for (let page = 1; ; page++) {
+            const result = await this.taskDataSource.getAll({
+                filter: [
+                    { field: "task_status_id", operator: "=", value: done_status_id },
+                    { field: "task_end_utc_date_time", operator: "<", value: ended_before },
+                ],
+                sort_by: [{ sort_by: "task_id", order_by: "asc" }],
+                page,
+                limit
+            });
+            for (const task of result.items) {
+                if (!task.task_log_file_path) continue;
+                try {
+                    if (await this.removeLogFile(task.task_log_file_path)) removed++;
+                } catch (error) {
+                    console.log(new Date().toISOString(), `Cannot remove the expired log of task ${task.task_id}:`, error);
+                }
+            }
+            if (result.items.length < limit) return removed;
+        }
+    }
+
+    // Returns false when the file was already gone. Its folder goes too once empty.
+    private async removeLogFile(log_file_path: string): Promise<boolean> {
+        try {
+            await fs.unlink(log_file_path);
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+            throw error;
+        }
+        await fs.rmdir(path.dirname(log_file_path)).catch(() => undefined);
+        return true;
+    }
+
+    async getLogFileTask(task_id: number, from?: number): Promise<string> {
         // get task from task.taskid
         const task = await this.taskDataSource.getOne({ task_id: task_id })
+        // The log of a task that succeeded is only kept TASK_LOG_RETENTION_DAYS
+        if (task && this.isLogExpired(task)) throw new Error(TASK_LOG_EXPIRED_MESSAGE)
         // get log file path from task
         const task_log_file_path = task?.task_log_file_path
         // if no log file path found, throw an error
@@ -404,11 +464,28 @@ export class TaskRepositoryImpl implements TaskRepository {
         }
         // read log file
         try {
-            const data = await this.fs.readFile(task_log_file_path, { encoding: 'utf8' });
-            return data;
+            if (from === undefined) return await this.fs.readFile(task_log_file_path, { encoding: 'utf8' });
+            return await this.readLogFrom(task_log_file_path, from);
         } catch (err) {
             // if error, throw an error
             throw new Error("Cannot read log file");
+        }
+    }
+
+    // The log lines written from byte `from` on, so that a client following a running task only fetches what
+    // it has not received yet. Complete lines only: a line still being written comes with the next read, so
+    // the byte length of what was returned is always a valid next `from`.
+    private async readLogFrom(log_file_path: string, from: number): Promise<string> {
+        const file = await fs.open(log_file_path, "r");
+        try {
+            const { size } = await file.stat();
+            if (from >= size) return "";
+            const buffer = Buffer.alloc(size - from);
+            const { bytesRead } = await file.read(buffer, 0, buffer.length, from);
+            const end = buffer.subarray(0, bytesRead).lastIndexOf(0x0a) + 1;
+            return buffer.subarray(0, end).toString("utf8");
+        } finally {
+            await file.close();
         }
     }
 

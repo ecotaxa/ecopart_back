@@ -101,6 +101,8 @@ export interface TaskProjectModel {
 export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path"> & {
     // The exported projects, on an export task read by GET /tasks/:id.
     task_projects?: TaskProjectModel[];
+    // From this date GET /tasks/:id/log answers 410: set on a task that succeeded (DONE), null otherwise.
+    task_log_expiration_utc_date_time?: string | null;
 };
 
 export interface PrivateTaskRequestModel {

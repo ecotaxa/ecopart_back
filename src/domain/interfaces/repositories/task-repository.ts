@@ -37,7 +37,12 @@ export interface TaskRepository {
     createTaskUnlessActive(task: PublicTaskRequestCreationModel, conflicting_types: TaskType[]): Promise<number | null>;
     getActiveTasks(): Promise<TaskResponseModel[]>;
     removeTaskWorkFiles(task_id: number): Promise<string[]>;
-    getLogFileTask(task_id: number): Promise<string>;
+    // Throws TASK_LOG_EXPIRED_MESSAGE once the log of a task that succeeded has expired
+    // (task_log_expiration_utc_date_time of the public task).
+    // With `from` (a byte offset), only the complete lines written from that offset on.
+    getLogFileTask(task_id: number, from?: number): Promise<string>;
+    // Removes the expired logs (startup and daily housekeeping). Returns the number of files removed.
+    purgeExpiredLogs(): Promise<number>;
     getZipFilePath(task_id: number): Promise<string>;
     failedTask(task_id: number, error: Error): Promise<void>;
     logMessage(task_log_file_path: string | undefined, message: string): Promise<void>;

@@ -14,7 +14,7 @@ import { SearchRepositoryImpl } from '../../../src/domain/repositories/search-re
 import { SearchTask } from '../../../src/domain/use-cases/task/search-tasks'
 import { FsAdapter } from '../../../src/infra/files/fs'
 import { TasksStatus, TaskType } from '../../../src/domain/entities/task'
-import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from '../../../src/domain/constants/task'
+import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE, TASK_LOG_EXPIRED_MESSAGE } from '../../../src/domain/constants/task'
 import { migration as migration028 } from '../../../src/data/migrations/028_task_cancellation_and_unused_cleanup'
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..')
@@ -469,6 +469,103 @@ describe('task repository (integration)', () => {
 
         test('an unknown task is refused', async () => {
             await expect(taskRepo.detachTaskFromProject(999)).rejects.toThrow('Task not found')
+        })
+    })
+
+    describe('log read from an offset', () => {
+        test('returns the complete lines written from the offset, whatever their characters', async () => {
+            const task_id = await newTask()
+            const full = await logOf(task_id)
+            const offset = Buffer.byteLength(full)
+            expect(await taskRepo.getLogFileTask(task_id, offset)).toBe('')
+
+            await taskRepo.updateTaskProgress({ task_id }, 10, 'échantillon été')
+            const next = await taskRepo.getLogFileTask(task_id, offset)
+            expect(next).toMatch(/^\S+ Task progress: 10% - échantillon été\n$/)
+            expect(full + next).toBe(await logOf(task_id))
+
+            expect(await taskRepo.getLogFileTask(task_id, offset + Buffer.byteLength(next) + 50)).toBe('')
+        })
+
+        test('a line still being written is left for the next read', async () => {
+            const task_id = await newTask()
+            const log_path = (await taskRepo.getOneTask({ task_id }))!.task_log_file_path!
+            const offset = fs.statSync(log_path).size
+            fs.appendFileSync(log_path, 'complete line\npartial')
+            expect(await taskRepo.getLogFileTask(task_id, offset)).toBe('complete line\n')
+        })
+    })
+
+    describe('log retention', () => {
+        const DAY_MS = 24 * 60 * 60 * 1000
+        async function doneTask(): Promise<number> {
+            const task_id = await newTask()
+            await taskRepo.startTask({ task_id })
+            await taskRepo.finishTask({ task_id })
+            return task_id
+        }
+        async function failedTask(): Promise<number> {
+            const task_id = await newTask()
+            await taskRepo.failedTask(task_id, new Error('boom'))
+            return task_id
+        }
+        async function endedDaysAgo(task_id: number, days: number): Promise<void> {
+            await run(db, 'UPDATE task SET task_end_utc_date_time = ? WHERE task_id = ?', [new Date(Date.now() - days * DAY_MS).toISOString(), task_id])
+        }
+        async function logPathOf(task_id: number): Promise<string> {
+            return (await taskRepo.getOneTask({ task_id }))!.task_log_file_path!
+        }
+
+        test('only a successful task has a log expiration, 30 days after its end', async () => {
+            const done = await taskRepo.getOneTask({ task_id: await doneTask() })
+            const expiration = taskRepo.toPublicTask(done!).task_log_expiration_utc_date_time
+            expect(Date.parse(expiration!) - Date.parse(done!.task_end_utc_date_time!)).toBe(30 * DAY_MS)
+
+            const failed = await taskRepo.getOneTask({ task_id: await failedTask() })
+            expect(taskRepo.toPublicTask(failed!).task_log_expiration_utc_date_time).toBeNull()
+            const pending = await taskRepo.getOneTask({ task_id: await newTask() })
+            expect(taskRepo.toPublicTask(pending!).task_log_expiration_utc_date_time).toBeNull()
+        })
+
+        test('the log of a successful task is refused once expired, even before the purge', async () => {
+            const recent = await doneTask()
+            await endedDaysAgo(recent, 29)
+            expect(await logOf(recent)).toContain('Task is done')
+
+            const old = await doneTask()
+            await endedDaysAgo(old, 31)
+            await expect(logOf(old)).rejects.toThrow(TASK_LOG_EXPIRED_MESSAGE)
+            expect(fs.existsSync(await logPathOf(old))).toBe(true)
+
+            const old_failure = await failedTask()
+            await endedDaysAgo(old_failure, 365)
+            expect(await logOf(old_failure)).toContain('Task failed with error: boom')
+        })
+
+        test('the purge removes the expired logs only, and the task folder when nothing else is in it', async () => {
+            const old = await doneTask()
+            await endedDaysAgo(old, 31)
+            const old_export = await doneTask()
+            await endedDaysAgo(old_export, 31)
+            const archive = path.join(path.dirname(await logPathOf(old_export)), 'export.zip')
+            fs.writeFileSync(archive, 'zip')
+            const recent = await doneTask()
+            await endedDaysAgo(recent, 29)
+            const old_failure = await failedTask()
+            await endedDaysAgo(old_failure, 365)
+
+            expect(await taskRepo.purgeExpiredLogs()).toBe(2)
+
+            expect(fs.existsSync(path.dirname(await logPathOf(old)))).toBe(false)
+            expect(fs.existsSync(await logPathOf(old_export))).toBe(false)
+            expect(fs.existsSync(archive)).toBe(true)
+            expect(fs.existsSync(await logPathOf(recent))).toBe(true)
+            expect(fs.existsSync(await logPathOf(old_failure))).toBe(true)
+            // The tasks themselves stay listed
+            expect(await statusOf(old)).toBe(TasksStatus.Done)
+
+            // Already removed: nothing more to do
+            expect(await taskRepo.purgeExpiredLogs()).toBe(0)
         })
     })
 

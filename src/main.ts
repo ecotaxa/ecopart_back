@@ -314,6 +314,18 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
     if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
+    // Housekeeping, at startup then once a day: the log of a task that succeeded is only kept for a while.
+    // A failure is logged and does not stop the server.
+    const purgeExpiredTaskLogs = async () => {
+        try {
+            const purged_logs = await task_repo.purgeExpiredLogs()
+            if (purged_logs > 0) console.log(new Date().toISOString(), `${purged_logs} expired task log(s) removed`)
+        } catch (error) {
+            console.log(new Date().toISOString(), 'Cannot remove the expired task logs:', error)
+        }
+    }
+    await purgeExpiredTaskLogs()
+    setInterval(purgeExpiredTaskLogs, 24 * 60 * 60 * 1000).unref()
     // Throws at startup when the key is set but malformed
     const ecotaxa_token_cipher = new AesGcmTokenCipher(config.ECOTAXA_TOKEN_ENCRYPTION_KEY)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT, ecotaxa_token_cipher)

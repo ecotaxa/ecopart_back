@@ -1,4 +1,5 @@
 import { UserUpdateModel } from "../../../entities/user";
 export interface GetLogFileTaskUseCase {
-    execute(current_user: UserUpdateModel, task_id: number): Promise<string>;
+    // from: byte offset of the log, to only get the lines written since (see TaskRepository.getLogFileTask)
+    execute(current_user: UserUpdateModel, task_id: number, from?: number): Promise<string>;
 }

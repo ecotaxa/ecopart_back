@@ -373,6 +373,26 @@ describe('TaskRouter', () => {
             expect(getLogFileTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("passes the from offset, and refuses an invalid one", async () => {
+            jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve("next lines\n"))
+            const response = await request(server).get("/tasks/1/log?from=120")
+            expect(response.status).toBe(200)
+            expect(response.text).toBe("next lines\n")
+            expect(getLogFileTaskUseCase.execute).toHaveBeenCalledWith(expect.anything(), 1, 120)
+
+            for (const from of ["-1", "abc", "1.5"]) {
+                const refused = await request(server).get(`/tasks/1/log?from=${from}`)
+                expect(refused.status).toBe(400)
+                expect(refused.body).toStrictEqual({ errors: ["from must be a non-negative integer"] })
+            }
+            expect(getLogFileTaskUseCase.execute).toBeCalledTimes(1)
+        });
+        test("410 once the log of a successful task has expired", async () => {
+            jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task log expired") })
+            const response = await request(server).get("/tasks/1/log")
+            expect(response.status).toBe(410)
+            expect(response.body).toStrictEqual({ errors: ["The log of a successful task is kept 30 days after its end: this one has been removed"] })
+        });
         test("failed if cannot get task log", async () => {
             const expectedResponse = { errors: ["Cannot get task log"] }
             jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => { throw new Error("xyz") })

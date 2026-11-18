@@ -12,6 +12,7 @@ import { StreamZipFileUseCase } from '../../domain/interfaces/use-cases/task/str
 import { CancelTaskUseCase } from '../../domain/interfaces/use-cases/task/cancel-task'
 
 import { CustomRequest } from '../../domain/entities/auth'
+import { TASK_LOG_EXPIRED_MESSAGE, TASK_LOG_RETENTION_DAYS } from '../../domain/constants/task'
 
 export default function TaskRouter(
     middlewareAuth: MiddlewareAuth,
@@ -385,7 +386,7 @@ export default function TaskRouter(
      * /tasks/{task_id}/log:
      *   get:
      *     summary: Get task log
-     *     description: Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers.
+     *     description: Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers. The log of a task that succeeded (DONE) is kept 30 days after its end (task_log_expiration_utc_date_time), the log of a failed or cancelled task is kept.
      *     tags: [Tasks]
      *     security:
      *       - cookieAccessToken: []
@@ -396,6 +397,15 @@ export default function TaskRouter(
      *         schema:
      *           type: integer
      *         description: The task ID.
+     *       - name: from
+     *         in: query
+     *         required: false
+     *         schema:
+     *           type: integer
+     *           minimum: 0
+     *         description: >-
+     *           Byte offset in the log. Only the complete lines written from this offset on are returned, so the
+     *           byte length of a response added to its offset is the next offset to ask for. Without it, the whole log.
      *     responses:
      *       200:
      *         description: Task log content.
@@ -403,6 +413,12 @@ export default function TaskRouter(
      *           application/json:
      *             schema:
      *               type: string
+     *       400:
+     *         description: Invalid from.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
      *         description: User cannot be used or insufficient permissions.
      *         content:
@@ -411,6 +427,12 @@ export default function TaskRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Task not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       410:
+     *         description: The log of this successful task has expired and was removed.
      *         content:
      *           application/json:
      *             schema:
@@ -426,13 +448,19 @@ export default function TaskRouter(
     router.get('/:task_id/log', middlewareAuth.auth, async (req: Request, res: Response) => {
         try {
             const taskId = parseInt(req.params.task_id);
-            const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId);
+            const from_param = req.query.from;
+            if (from_param !== undefined && (typeof from_param !== "string" || !/^\d+$/.test(from_param) || !Number.isSafeInteger(Number(from_param)))) {
+                res.status(400).send({ errors: ["from must be a non-negative integer"] });
+                return;
+            }
+            const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId, from_param === undefined ? undefined : Number(from_param));
             res.status(200).send(logs);
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
+            else if (err.message === TASK_LOG_EXPIRED_MESSAGE) res.status(410).send({ errors: [`The log of a successful task is kept ${TASK_LOG_RETENTION_DAYS} days after its end: this one has been removed`] });
             else res.status(500).send({ errors: ["Cannot get task log"] });
         }
     });

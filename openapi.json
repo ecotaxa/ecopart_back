@@ -3577,6 +3577,11 @@
             "type": "string",
             "description": "Date the task reached DONE, ERROR or CANCELLED (ISO 8601 UTC)."
           },
+          "task_log_expiration_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date from which the log of the task is no longer served (GET /tasks/{task_id}/log answers 410) and is removed: 30 days after the end of a task that succeeded (DONE). Null for any other status, whose log is kept."
+          },
           "task_progress_pct": {
             "type": "number",
             "description": "Task progress percentage (0-100).",
@@ -9345,7 +9350,7 @@
     "/tasks/{task_id}/log": {
       "get": {
         "summary": "Get task log",
-        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers.",
+        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers. The log of a task that succeeded (DONE) is kept 30 days after its end (task_log_expiration_utc_date_time), the log of a failed or cancelled task is kept.",
         "tags": [
           "Tasks"
         ],
@@ -9363,6 +9368,16 @@
               "type": "integer"
             },
             "description": "The task ID."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Byte offset in the log. Only the complete lines written from this offset on are returned, so the byte length of a response added to its offset is the next offset to ask for. Without it, the whole log."
           }
         ],
         "responses": {
@@ -9372,6 +9387,16 @@
               "application/json": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9388,6 +9413,16 @@
           },
           "404": {
             "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The log of this successful task has expired and was removed.",
             "content": {
               "application/json": {
                 "schema": {
