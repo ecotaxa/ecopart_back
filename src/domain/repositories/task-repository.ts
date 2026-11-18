@@ -7,7 +7,7 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 // import { TaskRequestCreationModel, PrivateTaskRequestModel, TaskUpdateModel, TaskResponseModel, PublicTaskResponseModel, PublicTaskRequestCreationModel } from "../entities/task";
 import { PrivateTaskRequestCreationModel, PublicTaskRequestCreationModel, PublicTaskRequestModel, PublicTaskResponseModel, TasksStatus, TaskType, TaskVisibilityModel } from "../entities/task";
 import { PrivateTaskRequestModel, PrivateTaskUpdateModel, TaskResponseModel, TaskStatusResponseModel, TaskTypeResponseModel } from "../entities/task";
-import { EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE, TASK_LOG_EXPIRED_MESSAGE, TASK_LOG_RETENTION_DAYS } from "../constants/task";
+import { DEFAULT_TASK_LOG_RETENTION_DAYS, EXPORT_TASK_TYPES, TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE, TASK_LOG_EXPIRED_MESSAGE, TASK_LOG_WARNING_LINE } from "../constants/task";
 import { UserRequestModel } from "../entities/user";
 // import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { TaskEndListener, TaskRepository } from "../interfaces/repositories/task-repository";
@@ -23,6 +23,9 @@ export class TaskRepositoryImpl implements TaskRepository {
     fs: FsWrapper
     DATA_STORAGE_FOLDER: string
     taskEndListener?: TaskEndListener
+    // FTP export folder: an export copied there has its own <task_id> folder, removed with the task. Empty = none.
+    DATA_STORAGE_EXPORT: string
+    TASK_LOG_RETENTION_DAYS: number
 
     // TODO move to a search repository
     order_by_allow_params: string[] = ["asc", "desc"]
@@ -30,11 +33,17 @@ export class TaskRepositoryImpl implements TaskRepository {
     base_folder = path.join(__dirname, '..', '..', '..');
 
 
-    constructor(taskDataSource: TaskDataSource, fs: FsWrapper, DATA_STORAGE_FOLDER: string, taskEndListener?: TaskEndListener) {
+    constructor(taskDataSource: TaskDataSource, fs: FsWrapper, DATA_STORAGE_FOLDER: string, taskEndListener?: TaskEndListener, DATA_STORAGE_EXPORT = "", TASK_LOG_RETENTION_DAYS = DEFAULT_TASK_LOG_RETENTION_DAYS) {
+        // Checked here so that a wrong .env value stops the server at startup instead of purging at random
+        if (!Number.isInteger(TASK_LOG_RETENTION_DAYS) || TASK_LOG_RETENTION_DAYS < 1) {
+            throw new Error(`TASK_LOG_RETENTION_DAYS must be a whole number of days, at least 1 (got ${TASK_LOG_RETENTION_DAYS})`)
+        }
         this.taskDataSource = taskDataSource
         this.fs = fs
         this.DATA_STORAGE_FOLDER = DATA_STORAGE_FOLDER
         this.taskEndListener = taskEndListener
+        this.DATA_STORAGE_EXPORT = DATA_STORAGE_EXPORT
+        this.TASK_LOG_RETENTION_DAYS = TASK_LOG_RETENTION_DAYS
     }
 
     async createTask(task: PublicTaskRequestCreationModel): Promise<number> {
@@ -192,6 +201,8 @@ export class TaskRepositoryImpl implements TaskRepository {
             if (is_task_folder) folders.add(log_folder);
             else await fs.rm(task.task_log_file_path, { force: true });
         }
+        // The copy of an export in the FTP export folder goes with its task (see exportBackupedProjectToFtp)
+        if (this.DATA_STORAGE_EXPORT) folders.add(path.join(this.base_folder, this.DATA_STORAGE_EXPORT, `${task.task_id}`));
         for (const folder of folders) {
             await fs.rm(folder, { recursive: true, force: true });
         }
@@ -391,16 +402,17 @@ export class TaskRepositoryImpl implements TaskRepository {
     toPublicTask(task: TaskResponseModel): PublicTaskResponseModel {
         const public_task: Partial<TaskResponseModel> = { ...task };
         delete public_task.task_log_file_path;
+        delete public_task.task_log_purged_utc_date_time;
         return { ...public_task, task_log_expiration_utc_date_time: this.logExpiration(task) } as PublicTaskResponseModel;
     }
 
-    // Date from which the log of a task is no longer served, null while it is kept: only the log of
-    // a task that succeeded expires, TASK_LOG_RETENTION_DAYS after its end.
+    // Date from which only the warnings of the log of a task are kept, null while it is kept whole: only
+    // the log of a task that succeeded expires, TASK_LOG_RETENTION_DAYS after its end.
     private logExpiration(task: TaskResponseModel): string | null {
         if (task.task_status !== TasksStatus.Done || !task.task_end_utc_date_time) return null;
         const end = Date.parse(task.task_end_utc_date_time);
         if (Number.isNaN(end)) return null;
-        return new Date(end + TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
+        return new Date(end + this.TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
     }
 
     private isLogExpired(task: TaskResponseModel): boolean {
@@ -408,59 +420,90 @@ export class TaskRepositoryImpl implements TaskRepository {
         return expiration !== null && Date.parse(expiration) <= Date.now();
     }
 
-    // Removes the log of every task that succeeded more than TASK_LOG_RETENTION_DAYS ago, and its
-    // folder when nothing else is left in it (the archive of an export is not touched). The log is
-    // refused from its expiration on (getLogFileTask), whether or not this has run yet. Returns the
-    // number of log files removed. One file that cannot be removed does not stop the others.
+    // Reduces the log of every task that succeeded more than TASK_LOG_RETENTION_DAYS ago to its WARNING
+    // lines, or removes it (and its folder when nothing else is left in it, the archive of an export stays)
+    // when it has none. Each task is done once: it is then marked (task_log_purged_utc_date_time). From its
+    // expiration on, the log is served reduced (getLogFileTask) whether or not this has run yet. Returns the
+    // number of logs reduced or removed. A log that cannot be processed is left for the next run and does
+    // not stop the others.
     async purgeExpiredLogs(): Promise<number> {
         const [done_status_id] = await this.getStatusIds([TasksStatus.Done]);
-        const ended_before = new Date(Date.now() - TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
+        const ended_before = new Date(Date.now() - this.TASK_LOG_RETENTION_DAYS * DAY_MS).toISOString();
+        // Listed before any is marked: marking takes a task out of the search, which would shift its pages.
+        const expired: TaskResponseModel[] = [];
         const limit = 500;
-        let removed = 0;
         for (let page = 1; ; page++) {
             const result = await this.taskDataSource.getAll({
                 filter: [
                     { field: "task_status_id", operator: "=", value: done_status_id },
                     { field: "task_end_utc_date_time", operator: "<", value: ended_before },
+                    { field: "task_log_purged_utc_date_time", operator: "=", value: null },
                 ],
                 sort_by: [{ sort_by: "task_id", order_by: "asc" }],
                 page,
                 limit
             });
-            for (const task of result.items) {
-                if (!task.task_log_file_path) continue;
-                try {
-                    if (await this.removeLogFile(task.task_log_file_path)) removed++;
-                } catch (error) {
-                    console.log(new Date().toISOString(), `Cannot remove the expired log of task ${task.task_id}:`, error);
-                }
-            }
-            if (result.items.length < limit) return removed;
+            expired.push(...result.items);
+            if (result.items.length < limit) break;
         }
+        let purged = 0;
+        for (const task of expired) {
+            try {
+                if (task.task_log_file_path) await this.reduceLogToWarnings(task.task_log_file_path);
+                await this.taskDataSource.updateOne({ task_id: task.task_id, task_log_purged_utc_date_time: new Date().toISOString() });
+                purged++;
+            } catch (error) {
+                console.log(new Date().toISOString(), `Cannot reduce the expired log of task ${task.task_id} to its warnings:`, error);
+            }
+        }
+        return purged;
     }
 
-    // Returns false when the file was already gone. Its folder goes too once empty.
-    private async removeLogFile(log_file_path: string): Promise<boolean> {
+    // Written under a temporary name then renamed: a purge cut short never leaves a truncated log.
+    private async reduceLogToWarnings(log_file_path: string): Promise<void> {
+        const warnings = await this.warningLinesOf(log_file_path);
+        if (warnings) {
+            const partial_path = log_file_path + ".partial";
+            await fs.writeFile(partial_path, warnings);
+            await fs.rename(partial_path, log_file_path);
+            return;
+        }
+        await fs.rm(log_file_path, { force: true });
+        await fs.rmdir(path.dirname(log_file_path)).catch(() => undefined);
+    }
+
+    // The WARNING lines of a log, read line by line; "" when it has none or is gone.
+    private async warningLinesOf(log_file_path: string): Promise<string> {
+        let file: fs.FileHandle;
         try {
-            await fs.unlink(log_file_path);
+            file = await fs.open(log_file_path, "r");
         } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
             throw error;
         }
-        await fs.rmdir(path.dirname(log_file_path)).catch(() => undefined);
-        return true;
+        let warnings = "";
+        // readLines closes the file once read
+        for await (const line of file.readLines({ encoding: "utf8" })) {
+            if (TASK_LOG_WARNING_LINE.test(line)) warnings += line + "\n";
+        }
+        return warnings;
     }
 
     async getLogFileTask(task_id: number, from?: number): Promise<string> {
         // get task from task.taskid
         const task = await this.taskDataSource.getOne({ task_id: task_id })
-        // The log of a task that succeeded is only kept TASK_LOG_RETENTION_DAYS
-        if (task && this.isLogExpired(task)) throw new Error(TASK_LOG_EXPIRED_MESSAGE)
         // get log file path from task
         const task_log_file_path = task?.task_log_file_path
         // if no log file path found, throw an error
-        if (!task_log_file_path) {
+        if (!task || !task_log_file_path) {
             throw new Error("No log file path found for this task")
+        }
+        // Past its retention, the log of a task that succeeded is reduced to its warnings: filtered here too,
+        // for the days before purgeExpiredLogs reduces the file.
+        if (this.isLogExpired(task)) {
+            const warnings = await this.warningLinesOf(task_log_file_path).catch(() => { throw new Error("Cannot read log file") });
+            if (!warnings) throw new Error(TASK_LOG_EXPIRED_MESSAGE);
+            return from === undefined ? warnings : Buffer.from(warnings, "utf8").subarray(from).toString("utf8");
         }
         // read log file
         try {

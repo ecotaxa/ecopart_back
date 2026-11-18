@@ -34,7 +34,7 @@ describe("Instrument model Router", () => {
         mockStreamZipFileUseCase = new MockStreamZipFileUseCase()
         mockSearchTaskUseCase = new MockSearchTaskUseCase()
 
-        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, mockDeleteTaskUseCase, mockGetOneTaskUseCase, mockGetLogFileTaskUseCase, mockStreamZipFileUseCase, mockSearchTaskUseCase, new MockCancelTaskUseCase()))
+        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, mockDeleteTaskUseCase, mockGetOneTaskUseCase, mockGetLogFileTaskUseCase, mockStreamZipFileUseCase, mockSearchTaskUseCase, new MockCancelTaskUseCase(), 30))
     })
 
     beforeEach(() => {
@@ -120,5 +120,42 @@ describe("Instrument model Router", () => {
 
     });
 
-})
+    describe("Test task router rules GetTaskLog", () => {
+        test("from is given to the use case as a number", async () => {
+            jest.spyOn(mockGetLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve("next lines\n"))
+            const response = await request(server).get("/tasks/1/log?from=120")
 
+            expect(response.status).toBe(200)
+            expect(response.text).toBe("next lines\n")
+            // The auth mock of this file sets no token: only the task id and from are checked
+            expect((mockGetLogFileTaskUseCase.execute as jest.Mock).mock.calls[0].slice(1)).toEqual([1, 120])
+        });
+
+        test("without from, the whole log", async () => {
+            jest.spyOn(mockGetLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve("all\n"))
+            const response = await request(server).get("/tasks/1/log")
+
+            expect(response.status).toBe(200)
+            expect((mockGetLogFileTaskUseCase.execute as jest.Mock).mock.calls[0].slice(1)).toEqual([1, undefined])
+        });
+
+        test.each(["-1", "abc", "1.5", "01", ""])("from=%s is refused", async (from) => {
+            jest.spyOn(mockGetLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve(""))
+            const response = await request(server).get(`/tasks/1/log?from=${from}`)
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors[0]).toMatchObject({ path: "from", msg: "from must be a non-negative integer." })
+            expect(mockGetLogFileTaskUseCase.execute).not.toBeCalled()
+        });
+
+        test("from given twice is refused", async () => {
+            jest.spyOn(mockGetLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve(""))
+            const response = await request(server).get("/tasks/1/log?from=1&from=2")
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors[0]).toMatchObject({ path: "from", msg: "from must be given once." })
+            expect(mockGetLogFileTaskUseCase.execute).not.toBeCalled()
+        });
+    });
+
+})

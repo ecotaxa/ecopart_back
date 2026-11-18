@@ -23,6 +23,7 @@ import { SearchTasksResult } from "../../entities/task";
 class MockMiddlewareTaskValidation implements IMiddlewareTaskValidation {
     rulesGetInstrumentModels = []
     rulesGetTasks = []
+    rulesGetTaskLog = []
 }
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(req: Request, __: Response, next: NextFunction): void {
@@ -73,12 +74,22 @@ describe('TaskRouter', () => {
         searchTaskUseCase = new MockSearchTasksUseCase()
         cancelTaskUseCase = new MockCancelTaskUseCase()
 
-        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase, cancelTaskUseCase))
+        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase, cancelTaskUseCase, 30))
     })
 
     beforeEach(() => {
         jest.clearAllMocks();
     })
+
+    describe("Tests for GET /log_retention", () => {
+        test("gives the retention of the logs of successful tasks set on the server, not a task", async () => {
+            jest.spyOn(getOneTaskUseCase, "execute")
+            const response = await request(server).get("/tasks/log_retention")
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual({ task_log_retention_days: 30 })
+            expect(getOneTaskUseCase.execute).toBeCalledTimes(0)
+        });
+    });
 
     describe("Tests for GET /", () => {
         // Test for GET /tasks runs well
@@ -373,25 +384,19 @@ describe('TaskRouter', () => {
             expect(getLogFileTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        test("passes the from offset, and refuses an invalid one", async () => {
+        test("passes the from offset", async () => {
             jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve("next lines\n"))
             const response = await request(server).get("/tasks/1/log?from=120")
             expect(response.status).toBe(200)
             expect(response.text).toBe("next lines\n")
-            expect(getLogFileTaskUseCase.execute).toHaveBeenCalledWith(expect.anything(), 1, 120)
-
-            for (const from of ["-1", "abc", "1.5"]) {
-                const refused = await request(server).get(`/tasks/1/log?from=${from}`)
-                expect(refused.status).toBe(400)
-                expect(refused.body).toStrictEqual({ errors: ["from must be a non-negative integer"] })
-            }
-            expect(getLogFileTaskUseCase.execute).toBeCalledTimes(1)
+            // Validation rules are empty here: rulesGetTaskLog turns it into a number (task-validation.test.ts)
+            expect(getLogFileTaskUseCase.execute).toHaveBeenCalledWith(expect.anything(), 1, "120")
         });
-        test("410 once the log of a successful task has expired", async () => {
+        test("410 once the log of a successful task has expired with no warning to keep", async () => {
             jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task log expired") })
             const response = await request(server).get("/tasks/1/log")
             expect(response.status).toBe(410)
-            expect(response.body).toStrictEqual({ errors: ["The log of a successful task is kept 30 days after its end: this one has been removed"] })
+            expect(response.body).toStrictEqual({ errors: ["The log of this successful task has expired and had no warning to keep: it has been removed"] })
         });
         test("failed if cannot get task log", async () => {
             const expectedResponse = { errors: ["Cannot get task log"] }

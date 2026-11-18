@@ -3580,7 +3580,7 @@
           "task_log_expiration_utc_date_time": {
             "type": "string",
             "nullable": true,
-            "description": "Date from which the log of the task is no longer served (GET /tasks/{task_id}/log answers 410) and is removed: 30 days after the end of a task that succeeded (DONE). Null for any other status, whose log is kept."
+            "description": "Date from which only the WARNING lines of the log are kept and served (GET /tasks/{task_id}/log, 410 when the log has none): GET /tasks/log_retention days (TASK_LOG_RETENTION_DAYS) after the end of a task that succeeded (DONE). Null for any other status, whose log is kept whole."
           },
           "task_progress_pct": {
             "type": "number",
@@ -9123,6 +9123,42 @@
         }
       }
     },
+    "/tasks/log_retention": {
+      "get": {
+        "summary": "Retention of task logs",
+        "description": "How many days after its end the log of a task that succeeded (DONE) is kept whole, before it is reduced to its WARNING lines (removed when it has none). Set on the server by TASK_LOG_RETENTION_DAYS. The log of a failed or cancelled task is kept whole.",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retention in days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "task_log_retention_days"
+                  ],
+                  "properties": {
+                    "task_log_retention_days": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "example": 30
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_id}": {
       "get": {
         "summary": "Get one task",
@@ -9350,7 +9386,7 @@
     "/tasks/{task_id}/log": {
       "get": {
         "summary": "Get task log",
-        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers. The log of a task that succeeded (DONE) is kept 30 days after its end (task_log_expiration_utc_date_time), the log of a failed or cancelled task is kept.",
+        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers. The log of a task that succeeded (DONE) is kept whole until task_log_expiration_utc_date_time (GET /tasks/log_retention days after its end), then only its WARNING lines are given, and 410 when it has none. The log of a failed or cancelled task is kept whole.",
         "tags": [
           "Tasks"
         ],
@@ -9391,16 +9427,6 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid from.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "403": {
             "description": "User cannot be used or insufficient permissions.",
             "content": {
@@ -9422,11 +9448,21 @@
             }
           },
           "410": {
-            "description": "The log of this successful task has expired and was removed.",
+            "description": "The log of this successful task has expired and had no warning to keep, it was removed.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (from is not a non-negative integer).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
                 }
               }
             }

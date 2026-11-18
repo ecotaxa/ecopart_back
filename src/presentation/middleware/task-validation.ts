@@ -18,4 +18,19 @@ export class MiddlewareTaskValidation implements IMiddlewareTaskValidation {
             next();
         },
     ];
+
+    // from: byte offset in the log (GET /tasks/:task_id/log), turned into a number for the router
+    rulesGetTaskLog = [
+        query('from').optional()
+            .not().isArray().withMessage('from must be given once.').bail()
+            .isInt({ min: 0, allow_leading_zeroes: false }).withMessage('from must be a non-negative integer.').bail()
+            .toInt(),
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ];
 }

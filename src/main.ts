@@ -57,6 +57,7 @@ import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
 import { CancelTask } from './domain/use-cases/task/cancel-task'
 import { RecoverInterruptedTasks } from './domain/use-cases/task/recover-interrupted-tasks'
+import { DEFAULT_TASK_LOG_RETENTION_DAYS } from './domain/constants/task'
 
 import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
 import { ImportSamples } from './domain/use-cases/sample/import-samples'
@@ -175,6 +176,9 @@ const config = {
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
     DATA_STORAGE_EXPORT: process.env.DATA_STORAGE_EXPORT || '',
     DATA_STORAGE_IMPORT: process.env.DATA_STORAGE_IMPORT || '',
+    // Days the log of a successful task is kept whole before only its warnings are kept. A wrong value stops
+    // the server at startup (TaskRepositoryImpl).
+    TASK_LOG_RETENTION_DAYS: process.env.TASK_LOG_RETENTION_DAYS ? Number(process.env.TASK_LOG_RETENTION_DAYS) : DEFAULT_TASK_LOG_RETENTION_DAYS,
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -309,19 +313,20 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     // Notifies the owner of a task when it ends
     const notification_repo = new NotificationRepositoryImpl(notification_dataSource, project_dataSource)
-    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER, notification_repo)
+    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER, notification_repo, config.DATA_STORAGE_EXPORT, config.TASK_LOG_RETENTION_DAYS)
+    console.log(new Date().toISOString(), `Logs of successful tasks kept whole ${config.TASK_LOG_RETENTION_DAYS} days, then only their warnings (TASK_LOG_RETENTION_DAYS)`)
 
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
     if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
-    // Housekeeping, at startup then once a day: the log of a task that succeeded is only kept for a while.
+    // Housekeeping, at startup then once a day: the log of a task that succeeded is only kept whole for a while.
     // A failure is logged and does not stop the server.
     const purgeExpiredTaskLogs = async () => {
         try {
             const purged_logs = await task_repo.purgeExpiredLogs()
-            if (purged_logs > 0) console.log(new Date().toISOString(), `${purged_logs} expired task log(s) removed`)
+            if (purged_logs > 0) console.log(new Date().toISOString(), `${purged_logs} expired task log(s) reduced to their warnings or removed`)
         } catch (error) {
-            console.log(new Date().toISOString(), 'Cannot remove the expired task logs:', error)
+            console.log(new Date().toISOString(), 'Cannot purge the expired task logs:', error)
         }
     }
     await purgeExpiredTaskLogs()
@@ -421,7 +426,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
         new StreamZipFile(task_repo, user_repo, privilege_repo),
         new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo),
-        new CancelTask(task_repo, user_repo)
+        new CancelTask(task_repo, user_repo),
+        config.TASK_LOG_RETENTION_DAYS
     )
 
     // Registered before the routers. Password guessing on login, and e-mail flooding through registration and

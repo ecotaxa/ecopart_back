@@ -78,6 +78,8 @@ export interface TaskResponseModel {
     task_start_utc_date_time?: string;
     task_end_utc_date_time?: string;
     task_log_file_path?: string;
+    // Set once the expired log of a successful task was reduced to its warnings or removed (purgeExpiredLogs)
+    task_log_purged_utc_date_time?: string | null;
 
     task_progress_pct: number;
     task_progress_msg?: string;
@@ -98,10 +100,11 @@ export interface TaskProjectModel {
 }
 
 // API-facing task: the log file path is a server path, the log itself is served by GET /tasks/:id/log.
-export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path"> & {
+export type PublicTaskResponseModel = Omit<TaskResponseModel, "task_log_file_path" | "task_log_purged_utc_date_time"> & {
     // The exported projects, on an export task read by GET /tasks/:id.
     task_projects?: TaskProjectModel[];
-    // From this date GET /tasks/:id/log answers 410: set on a task that succeeded (DONE), null otherwise.
+    // From this date GET /tasks/:id/log only gives the WARNING lines of the log (410 when it has none): set
+    // on a task that succeeded (DONE), null otherwise.
     task_log_expiration_utc_date_time?: string | null;
 };
 
@@ -140,6 +143,7 @@ export interface PrivateTaskUpdateModel {
     task_start_utc_date_time?: string;
     task_end_utc_date_time?: string;
     task_log_file_path?: string;
+    task_log_purged_utc_date_time?: string | null;
 
     task_progress_pct?: number;
     task_progress_msg?: string;

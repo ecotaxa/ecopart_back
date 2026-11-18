@@ -71,7 +71,8 @@ transient hints.
 | `DATA_STORAGE_FOLDER` | Root of everything persistent: `tasks/<task_id>/`, `migrations.log`. |
 | `DATA_STORAGE_FS_STORAGE` | Imported sample files: `<project_id>/<sample_name>/` (raw files, `pivot/<sample>_Particule.zip`), `<project_id>/l0b_backup/`. |
 | `DATA_STORAGE_IMPORT` | Import sources; the import browser lists `remote/` (symlinks allowed, README). |
-| `DATA_STORAGE_EXPORT` | Export working folder. |
+| `DATA_STORAGE_EXPORT` | FTP export folder: `<task_id>/` per export copied there, removed with its task. |
+| `TASK_LOG_RETENTION_DAYS` | Days the log of a DONE task is kept whole before only its `WARNING` lines are kept (README, Task logs). Empty = 30, invalid = startup failure. |
 | `GENERIC_ECOTAXA_ACCOUNT_EMAIL`, `ECOPART_USER_*` | The EcoPart application user, seeded at boot, that owns the generic EcoTaxa accounts. |
 | `ECOTAXA_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for EcoTaxa tokens at rest. Empty locally. Malformed = startup failure. |
 | `ECOTAXA_ALLOW_SELF_SIGNED_CERT` | Only for a local EcoTaxa. Implied by `NODE_ENV=DEV`. |

@@ -75,9 +75,9 @@ components:
           type: string
           nullable: true
           description: >-
-            Date from which the log of the task is no longer served (GET /tasks/{task_id}/log answers 410)
-            and is removed: 30 days after the end of a task that succeeded (DONE). Null for any other
-            status, whose log is kept.
+            Date from which only the WARNING lines of the log are kept and served (GET /tasks/{task_id}/log,
+            410 when the log has none): GET /tasks/log_retention days (TASK_LOG_RETENTION_DAYS) after the end
+            of a task that succeeded (DONE). Null for any other status, whose log is kept whole.
         task_progress_pct:
           type: number
           description: Task progress percentage (0-100).
