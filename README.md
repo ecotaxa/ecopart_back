@@ -401,6 +401,16 @@ Local development needs no key: leave the variable empty.
 - **Copying a database** to another server or to a development machine leaves its tokens unreadable there, unless the source server's key is used. That is the intended protection: accounts log in to EcoTaxa again on the copy.
 - **Deleting an EcoPart user** also deletes their EcoTaxa accounts, except the generic account (`GENERIC_ECOTAXA_ACCOUNT_EMAIL`), which EcoPart itself uses.
 
+### Task logs and export archives
+
+Every task writes a log in `<DATA_STORAGE_FOLDER>/tasks/<task_id>/`, shown in the LOG FILE tab of the task.
+
+- **Successful tasks (DONE)**: the log is kept whole for `TASK_LOG_RETENTION_DAYS` days after the task ended (30 when the variable is empty). After that, only its `WARNING` lines are kept, the lines that tell a degraded result (a sample without particle statistics, a black frame count set to 0...). A log without any warning is deleted. The front shows the delay (`GET /tasks/log_retention`) and the date of each task.
+- **Failed or cancelled tasks**: the log is kept whole, it tells why the task stopped.
+- **Export archives**: kept until their export task is deleted, and deleted with it, the copy in the FTP export folder (`<DATA_STORAGE_EXPORT>/<task_id>/`) included.
+
+To change the delay, set `TASK_LOG_RETENTION_DAYS` in the server's `.env` (a whole number of days, at least 1) and restart the container. A wrong value stops the server at startup, and the startup log gives the delay in use. The purge runs at startup then once a day: shortening the delay reduces the older logs at the next start, lengthening it does not bring back what was already reduced.
+
 ### Database
 
 EcoPart uses **SQLite** as its database. The database file location is configured via the `DBSOURCE_FOLDER` and `DBSOURCE_NAME` environment variables in the `.env` file.

@@ -71,6 +71,13 @@ components:
         task_end_utc_date_time:
           type: string
           description: Date the task reached DONE, ERROR or CANCELLED (ISO 8601 UTC).
+        task_log_expiration_utc_date_time:
+          type: string
+          nullable: true
+          description: >-
+            Date from which only the WARNING lines of the log are kept and served (GET /tasks/{task_id}/log,
+            410 when the log has none): GET /tasks/log_retention days (TASK_LOG_RETENTION_DAYS) after the end
+            of a task that succeeded (DONE). Null for any other status, whose log is kept whole.
         task_progress_pct:
           type: number
           description: Task progress percentage (0-100).

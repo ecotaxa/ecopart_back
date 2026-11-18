@@ -12,6 +12,7 @@ import { StreamZipFileUseCase } from '../../domain/interfaces/use-cases/task/str
 import { CancelTaskUseCase } from '../../domain/interfaces/use-cases/task/cancel-task'
 
 import { CustomRequest } from '../../domain/entities/auth'
+import { TASK_LOG_EXPIRED_MESSAGE } from '../../domain/constants/task'
 
 export default function TaskRouter(
     middlewareAuth: MiddlewareAuth,
@@ -21,7 +22,9 @@ export default function TaskRouter(
     getLogFileTaskUseCase: GetLogFileTaskUseCase,
     streamZipFileUseCase: StreamZipFileUseCase,
     searchTaskUseCase: SearchTasksUseCase,
-    cancelTaskUseCase: CancelTaskUseCase
+    cancelTaskUseCase: CancelTaskUseCase,
+    // Configuration of the server (TASK_LOG_RETENTION_DAYS in .env), shown by the front next to the task lists
+    task_log_retention_days: number
 ) {
     const router = express.Router()
     /**
@@ -184,6 +187,37 @@ export default function TaskRouter(
             else if (err.message === "Task managing filter value is not valid") res.status(401).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
+    })
+
+    /**
+     * @openapi
+     * /tasks/log_retention:
+     *   get:
+     *     summary: Retention of task logs
+     *     description: >-
+     *       How many days after its end the log of a task that succeeded (DONE) is kept whole, before it is reduced
+     *       to its WARNING lines (removed when it has none). Set on the server by TASK_LOG_RETENTION_DAYS. The log of
+     *       a failed or cancelled task is kept whole.
+     *     tags: [Tasks]
+     *     security:
+     *       - cookieAccessToken: []
+     *     responses:
+     *       200:
+     *         description: The retention in days.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               required: [task_log_retention_days]
+     *               properties:
+     *                 task_log_retention_days:
+     *                   type: integer
+     *                   minimum: 1
+     *                   example: 30
+     */
+    // Before '/:task_id/': "log_retention" is not a task id
+    router.get('/log_retention', middlewareAuth.auth, (_req: Request, res: Response) => {
+        res.status(200).send({ task_log_retention_days })
     })
 
     /**
@@ -385,7 +419,11 @@ export default function TaskRouter(
      * /tasks/{task_id}/log:
      *   get:
      *     summary: Get task log
-     *     description: Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers.
+     *     description: >-
+     *       Fetch the log file content for a specific task. Available to admins, task owners, and project
+     *       members/managers. The log of a task that succeeded (DONE) is kept whole until task_log_expiration_utc_date_time
+     *       (GET /tasks/log_retention days after its end), then only its WARNING lines are given, and 410 when it has none.
+     *       The log of a failed or cancelled task is kept whole.
      *     tags: [Tasks]
      *     security:
      *       - cookieAccessToken: []
@@ -396,6 +434,15 @@ export default function TaskRouter(
      *         schema:
      *           type: integer
      *         description: The task ID.
+     *       - name: from
+     *         in: query
+     *         required: false
+     *         schema:
+     *           type: integer
+     *           minimum: 0
+     *         description: >-
+     *           Byte offset in the log. Only the complete lines written from this offset on are returned, so the
+     *           byte length of a response added to its offset is the next offset to ask for. Without it, the whole log.
      *     responses:
      *       200:
      *         description: Task log content.
@@ -415,6 +462,18 @@ export default function TaskRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       410:
+     *         description: The log of this successful task has expired and had no warning to keep, it was removed.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error (from is not a non-negative integer).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
      *       500:
      *         description: Internal server error.
      *         content:
@@ -423,16 +482,18 @@ export default function TaskRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      */
     // Fetch log for admin or task owner or project member/managers
-    router.get('/:task_id/log', middlewareAuth.auth, async (req: Request, res: Response) => {
+    router.get('/:task_id/log', middlewareAuth.auth, middlewareTaskValidation.rulesGetTaskLog, async (req: Request, res: Response) => {
         try {
             const taskId = parseInt(req.params.task_id);
-            const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId);
+            // Turned into a number by rulesGetTaskLog
+            const logs = await getLogFileTaskUseCase.execute((req as CustomRequest).token, taskId, req.query.from as unknown as number | undefined);
             res.status(200).send(logs);
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task log"] });
+            else if (err.message === TASK_LOG_EXPIRED_MESSAGE) res.status(410).send({ errors: ["The log of this successful task has expired and had no warning to keep: it has been removed"] });
             else res.status(500).send({ errors: ["Cannot get task log"] });
         }
     });

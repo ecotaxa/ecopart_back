@@ -15,7 +15,7 @@ export class GetLogFileTask implements GetLogFileTaskUseCase {
         this.privilegeRepository = privilegeRepository
     }
 
-    async execute(current_user: UserUpdateModel, task_id: number): Promise<string> {
+    async execute(current_user: UserUpdateModel, task_id: number, from?: number): Promise<string> {
         // Ensure the user is valid and can be used
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
 
@@ -27,7 +27,7 @@ export class GetLogFileTask implements GetLogFileTaskUseCase {
         // Ensure the current user has permission to get the task
         await this.ensureUserCanGet(current_user, task.task_owner_id, task.task_project_id);
 
-        const file = await this.taskRepository.getLogFileTask(task_id);
+        const file = await this.taskRepository.getLogFileTask(task_id, from);
 
         return file;
     }

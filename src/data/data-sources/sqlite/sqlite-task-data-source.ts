@@ -229,6 +229,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
+                            task_log_purged_utc_date_time: row.task_log_purged_utc_date_time,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
@@ -293,6 +294,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
+                            task_log_purged_utc_date_time: row.task_log_purged_utc_date_time,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
