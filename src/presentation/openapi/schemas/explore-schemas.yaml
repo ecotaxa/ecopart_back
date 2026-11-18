@@ -221,3 +221,4 @@ components:
         ctd: { $ref: '#/components/schemas/GraphDataset' }
         ecotaxa: { $ref: '#/components/schemas/GraphDataset' }
         warnings: { type: array, items: { type: string } }
+        ctd_warnings: { type: array, items: { type: string }, description: "Why samples drawn have no CTD curve: no CTD imported, unreadable file, no pressure or time column." }

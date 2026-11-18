@@ -283,7 +283,9 @@ export default function ExploreRouter(
      *       always, anyone once the project is visible), binned on the depth axis (`mode: depth`,
      *       `pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned
      *       export computation, the descent filter of the project applied to depth profiles. At most
-     *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out.
+     *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out,
+     *       `ctd_warnings` which samples have no CTD curve and why (no CTD imported, unreadable file, no
+     *       pressure or time column). The EcoTaxa dataset is not computed yet and comes back empty.
      *       Anonymous callers are served, as a user without any privilege.
      *     tags: [Explore]
      *     security:
