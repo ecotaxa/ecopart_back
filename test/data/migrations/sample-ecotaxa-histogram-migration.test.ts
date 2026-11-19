@@ -2,7 +2,7 @@ import sqlite3 from "sqlite3";
 import fs from "fs";
 
 import { SQLiteDatabaseWrapper } from "../../../src/data/interfaces/data-sources/database-wrapper";
-import { migration } from "../../../src/data/migrations/042_sample_ecotaxa_histogram";
+import { migration } from "../../../src/data/migrations/043_sample_ecotaxa_histogram";
 
 const TEST_DB = "TEST_DB_SAMPLE_ECOTAXA_HISTOGRAM_MIGRATION";
 
@@ -47,7 +47,7 @@ const insertHistogram = (sample_id: number) => runSQL(wrapper(), `INSERT INTO sa
     (sample_id, ecotaxa_sample_id, depth_offset_m, nb_validated, nb_predicted, bins, fetched_utc_date_time)
     VALUES (?, 9000 + ?, 1.2, 10, 3, '[[45072,2,10,3]]', '2026-11-19T08:00:00.000Z');`, [sample_id, sample_id]);
 
-describe("042_sample_ecotaxa_histogram", () => {
+describe("043_sample_ecotaxa_histogram", () => {
     test("creates the table, keyed by sample, twice without error", async () => {
         await migration.up(wrapper());
         await insertHistogram(1);

@@ -6,7 +6,7 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 // array of [classif_id, depth_bin, nb_validated, nb_predicted]; the other columns say what the
 // reading depended on, so that a change of the offset or of the classification asks for a new one.
 export const migration: Migration = {
-    id: "042_sample_ecotaxa_histogram",
+    id: "043_sample_ecotaxa_histogram",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, `
