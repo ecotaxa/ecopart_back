@@ -3,7 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../../domain/entities/explore";
 import { ProjectStatsSampleRow } from "../../../domain/entities/project-stats";
 import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -629,6 +629,59 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             WHERE sample.ecotaxa_sample_imported = 1 ORDER BY sample.sample_id;`;
         const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
         return rows.map(row => ({ sample_id: row.sample_id, sample_name: row.sample_name, project_id: row.project_id, ecotaxa_sample_id: row.ecotaxa_sample_id ?? null, fetched_utc_date_time: row.fetched_utc_date_time ?? null }));
+    }
+
+    async getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]> {
+        if (sample_ids.length === 0) return [];
+        const sql = `SELECT * FROM sample_ecotaxa_histogram WHERE sample_id IN (${sample_ids.map(() => "(?)").join(",")});`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, sample_ids, (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({
+            sample_id: row.sample_id,
+            ecotaxa_sample_id: row.ecotaxa_sample_id,
+            depth_offset_m: row.depth_offset_m,
+            nb_validated: row.nb_validated,
+            nb_predicted: row.nb_predicted,
+            // Stored as [classif_id, depth_bin, nb_validated, nb_predicted] tuples: a sample can hold thousands.
+            bins: (JSON.parse(row.bins) as number[][]).map(([classif_id, depth_bin, nb_validated, nb_predicted]) => ({ classif_id, depth_bin, nb_validated, nb_predicted })),
+            fetched_utc_date_time: row.fetched_utc_date_time,
+        }));
+    }
+
+    async upsertEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void> {
+        const sql = `INSERT OR REPLACE INTO sample_ecotaxa_histogram
+            (sample_id, ecotaxa_sample_id, depth_offset_m, nb_validated, nb_predicted, bins, fetched_utc_date_time)
+            VALUES ((?), (?), (?), (?), (?), (?), (?));`;
+        const bins = JSON.stringify(histogram.bins.map(bin => [bin.classif_id, bin.depth_bin, bin.nb_validated, bin.nb_predicted]));
+        await new Promise<void>((resolve, reject) => this.db.run(sql, [
+            histogram.sample_id, histogram.ecotaxa_sample_id, histogram.depth_offset_m, histogram.nb_validated, histogram.nb_predicted,
+            bins, histogram.fetched_utc_date_time,
+        ], (err) => err ? reject(err) : resolve()));
+    }
+
+    async listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]> {
+        const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id, sample.ecotaxa_sample_id, sample.instrument_settings_depth_offset_m,
+                stats.nb_validated AS stats_nb_validated, stats.nb_predicted AS stats_nb_predicted,
+                histogram.ecotaxa_sample_id AS histogram_ecotaxa_sample_id, histogram.depth_offset_m, histogram.nb_validated, histogram.nb_predicted, histogram.fetched_utc_date_time
+            FROM sample
+            LEFT JOIN sample_ecotaxa_stats stats ON stats.sample_id = sample.sample_id
+            LEFT JOIN sample_ecotaxa_histogram histogram ON histogram.sample_id = sample.sample_id
+            WHERE sample.ecotaxa_sample_imported = 1 ORDER BY sample.sample_id;`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({
+            sample_id: row.sample_id,
+            sample_name: row.sample_name,
+            project_id: row.project_id,
+            ecotaxa_sample_id: row.ecotaxa_sample_id ?? null,
+            instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m ?? null,
+            stats: row.stats_nb_validated === null ? null : { nb_validated: row.stats_nb_validated, nb_predicted: row.stats_nb_predicted },
+            histogram: row.histogram_ecotaxa_sample_id === null ? null : {
+                ecotaxa_sample_id: row.histogram_ecotaxa_sample_id,
+                depth_offset_m: row.depth_offset_m,
+                nb_validated: row.nb_validated,
+                nb_predicted: row.nb_predicted,
+                fetched_utc_date_time: row.fetched_utc_date_time,
+            },
+        }));
     }
 
     async getEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {

@@ -23,7 +23,10 @@ Structural, to keep in mind (not fixable in EcoPart alone):
 
 ## Explore
 
-- EcoTaxa concentrations graph (per taxon and depth bin): the dataset is served empty. Needs the object depths from EcoTaxa and the water volume per bin from the pivot. EcoTaxa object depths carry no offset: add `effectiveDepthOffset` (`src/domain/utils/depth-offset.ts`) before binning, as legacy EcoPart did (`uvp_sample_import.py:1123`).
+- EcoTaxa concentrations (`/explore/graphs/ecotaxa`): the descent filter and the first and last image of the particle settings are not applied to the objects yet, every object with a depth is counted while the water volume only counts the images kept (as legacy EcoPart did). The front card says so. Found on 19 Nov 2026, to decide before coding:
+  - UVP6: exact. The EcoTaxa `orig_id` of an object is `<image id>_<n>`, the image id of the pivot (checked on HS1447C1: the 858 objects find their image in `particules.csv` at the same depth, the filter drops 470 of 62,434 images and 11 objects). The pass of `BinnedSampleBuilder` that gives the volumes can tell which images are kept; the objects would then be read with `obj.orig_id`.
+  - UVP5: no link to the image in EcoTaxa (`orig_id` is the vignette number, `objtime` the start of the profile for every object). The vignettes are numbered in acquisition order and their depth never decreased on the 4 local omer2 samples, whose datfile goes up and down: Zooprocess seems to cut the descent only. Proposal: the same running-maximum rule on the vignettes in their order. To check on real UVP5 projects of the production EcoTaxa first.
+- EcoTaxa concentrations of time series: not drawn (the card says "coming soon"). Legacy EcoPart computed a 1 h histogram from `objdate` + `objtime` (`GenerateTaxonomyHistogram`) but never drew it.
 - Access request endpoint: the front opens a `mailto:` to the managers for now.
 - "Export selection" button of the exportable tab: not wired to the export routes yet.
 - Renaming / grouping of EcoTaxa categories (modal of the mockups).

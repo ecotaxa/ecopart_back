@@ -5,13 +5,14 @@ import ExploreRouter from "../../../src/presentation/routers/explore-router";
 import { MiddlewareExploreValidation } from "../../../src/presentation/middleware/explore-validation";
 import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/auth";
 import { CustomRequest, DecodedToken } from "../../../src/domain/entities/auth";
-import { ExploreEcoTaxaResponse, ExploreGraphs, ExploreImage, ExploreMapSample, ExploreProjectOption, ExploreSelectionResponse } from "../../../src/domain/entities/explore";
+import { ExploreEcoTaxaGraphs, ExploreEcoTaxaResponse, ExploreGraphs, ExploreImage, ExploreMapSample, ExploreProjectOption, ExploreSelectionResponse } from "../../../src/domain/entities/explore";
 import { ListExploreProjectsUseCase } from "../../../src/domain/interfaces/use-cases/explore/list-explore-projects";
 import { GetExploreMapUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-map";
 import { GetExploreSelectionUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-selection";
 import { GetExploreEcoTaxaUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-ecotaxa";
 import { GetExploreImagesUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-images";
 import { GetExploreGraphsUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-graphs";
+import { GetExploreEcoTaxaGraphsUseCase } from "../../../src/domain/interfaces/use-cases/explore/get-explore-ecotaxa-graphs";
 
 const LOGGED_TOKEN = { user_id: 7, is_admin: false } as DecodedToken;
 
@@ -59,6 +60,9 @@ class MockGetExploreImages implements GetExploreImagesUseCase {
 class MockGetExploreGraphs implements GetExploreGraphsUseCase {
     execute(): Promise<ExploreGraphs> { throw new Error("Method not implemented for execute"); }
 }
+class MockGetExploreEcoTaxaGraphs implements GetExploreEcoTaxaGraphsUseCase {
+    execute(): Promise<ExploreEcoTaxaGraphs> { throw new Error("Method not implemented for execute"); }
+}
 
 const PROJECTS: ExploreProjectOption[] = [{ project_id: 1, project_title: "Ligurian profiles", nb_samples: 30 }];
 const MAP: ExploreMapSample[] = [{ sample_id: 1, sample_name: "moose_001", project_id: 1, project_title: "Ligurian profiles", latitude: 43.4, longitude: 7.87, instrument_model: "UVP6LP", privacy_status: "open", is_my_project: false }];
@@ -67,6 +71,11 @@ const SUMMARY = { categories: ["Copepoda"], classification: { fully_validated: 1
 const ECOTAXA: ExploreEcoTaxaResponse = { all: SUMMARY, exportable: SUMMARY };
 const IMAGES: ExploreImage[] = [{ object_id: 42, image_url: "https://ecotaxa.obs-vlfr.fr/vault/1/42.jpg", sample_name: "moose_001", depth: 12.5, date: null }];
 const EMPTY = { keys: [], axis_labels: {}, series: {} };
+const ECOTAXA_GRAPHS: ExploreEcoTaxaGraphs = {
+    keys: ["Copepoda"], axis_labels: { Copepoda: "Copepoda # m-3" },
+    series: { Copepoda: [{ sample_id: 1, sample_name: "moose_001", positions: [0, 25, 40], values: [12, 3.5, 3.5] }] },
+    warnings: ["The objects of 2 samples are being read from EcoTaxa: the curves complete in a moment"], nb_samples_pending: 2,
+};
 const GRAPHS: ExploreGraphs = { size_classes: "reduced", abundance: EMPTY, biovolume: EMPTY, ctd: EMPTY, ecotaxa: EMPTY, warnings: ["1 sample of private projects is not drawn"], ctd_warnings: [] };
 
 const FILTERS_SENT = { months: ["6"], ctd_only: "true", classification_state: "fully_validated" };
@@ -83,12 +92,13 @@ describe("ExploreRouter", () => {
     let getExploreEcoTaxa: GetExploreEcoTaxaUseCase;
     let getExploreImages: GetExploreImagesUseCase;
     let getExploreGraphs: GetExploreGraphsUseCase;
+    let getExploreEcoTaxaGraphs: GetExploreEcoTaxaGraphsUseCase;
 
     function serverWith(auth: MiddlewareAuth): express.Express {
         // A local app rather than src/server, so these routes cannot leak into the other router suites.
         const server = express();
         server.use(express.json());
-        server.use("/explore", ExploreRouter(auth, new MiddlewareExploreValidation(), listExploreProjects, getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs));
+        server.use("/explore", ExploreRouter(auth, new MiddlewareExploreValidation(), listExploreProjects, getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs, getExploreEcoTaxaGraphs));
         return server;
     }
 
@@ -103,12 +113,14 @@ describe("ExploreRouter", () => {
         getExploreEcoTaxa = new MockGetExploreEcoTaxa();
         getExploreImages = new MockGetExploreImages();
         getExploreGraphs = new MockGetExploreGraphs();
+        getExploreEcoTaxaGraphs = new MockGetExploreEcoTaxaGraphs();
         jest.spyOn(listExploreProjects, "execute").mockResolvedValue(PROJECTS);
         jest.spyOn(getExploreMap, "execute").mockResolvedValue(MAP);
         jest.spyOn(getExploreSelection, "execute").mockResolvedValue(SELECTION);
         jest.spyOn(getExploreEcoTaxa, "execute").mockResolvedValue(ECOTAXA);
         jest.spyOn(getExploreImages, "execute").mockResolvedValue(IMAGES);
         jest.spyOn(getExploreGraphs, "execute").mockResolvedValue(GRAPHS);
+        jest.spyOn(getExploreEcoTaxaGraphs, "execute").mockResolvedValue(ECOTAXA_GRAPHS);
         logged = serverWith(new LocalMiddlewareAuth());
     });
 
@@ -123,6 +135,7 @@ describe("ExploreRouter", () => {
         ["post", "/explore/ecotaxa", () => getExploreEcoTaxa],
         ["post", "/explore/images", () => getExploreImages],
         ["post", "/explore/graphs", () => getExploreGraphs],
+        ["post", "/explore/graphs/ecotaxa", () => getExploreEcoTaxaGraphs],
     ] as const)("anonymous callers are served, as a null user: %s %s", async (method, path, useCase) => {
         const server = serverWith(new AnonymousMiddlewareAuth());
 
@@ -196,6 +209,20 @@ describe("ExploreRouter", () => {
 
             expect(getExploreGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, pressure_bin: undefined, time_bin: undefined, size_classes: undefined });
         });
+
+        test("POST /explore/graphs/ecotaxa passes the user and the options", async () => {
+            const response = await request(logged).post("/explore/graphs/ecotaxa").send({ mode: "depth", filters: FILTERS_SENT, include_predicted: true, sum_child_taxa: false });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual(ECOTAXA_GRAPHS);
+            expect(getExploreEcoTaxaGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: FILTERS_PARSED, include_predicted: true, sum_child_taxa: false });
+        });
+
+        test("POST /explore/graphs/ecotaxa without options leaves them to the use case", async () => {
+            await request(logged).post("/explore/graphs/ecotaxa").send({ mode: "depth", filters: null, include_predicted: null });
+
+            expect(getExploreEcoTaxaGraphs.execute).toBeCalledWith(LOGGED_TOKEN, { mode: "depth", filters: null, include_predicted: undefined, sum_child_taxa: undefined });
+        });
     });
 
     describe("validation errors answer 422 before any use case", () => {
@@ -209,12 +236,16 @@ describe("ExploreRouter", () => {
             ["/explore/graphs", { mode: "depth", filters: null, pressure_bin: 0 }],
             ["/explore/graphs", { mode: "depth", filters: null, size_classes: "raw" }],
             ["/explore/graphs", { mode: "depth", filters: null, size_classes: ["detailed"] }],
+            ["/explore/graphs/ecotaxa", { mode: "time", filters: null }],
+            ["/explore/graphs/ecotaxa", { mode: "depth", filters: null, include_predicted: "yes" }],
+            ["/explore/graphs/ecotaxa", { mode: "depth", filters: null, sum_child_taxa: 1 }],
+            ["/explore/graphs/ecotaxa", { mode: "depth", filters: { months: [13] } }],
         ])("POST %s %j", async (route, body) => {
             const response = await request(logged).post(route).send(body);
 
             expect(response.status).toBe(422);
             expect(response.body.errors.length).toBeGreaterThan(0);
-            for (const useCase of [getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs]) {
+            for (const useCase of [getExploreMap, getExploreSelection, getExploreEcoTaxa, getExploreImages, getExploreGraphs, getExploreEcoTaxaGraphs]) {
                 expect(useCase.execute).toBeCalledTimes(0);
             }
         });
@@ -229,6 +260,7 @@ describe("ExploreRouter", () => {
             { method: "post", path: "/explore/ecotaxa", body: { mode: "depth", filters: null }, useCase: () => getExploreEcoTaxa, fallback: "Cannot get the explore EcoTaxa summary" },
             { method: "post", path: "/explore/images", body: { mode: "depth", filters: null }, useCase: () => getExploreImages, fallback: "Cannot get the explore images" },
             { method: "post", path: "/explore/graphs", body: { mode: "depth", filters: null }, useCase: () => getExploreGraphs, fallback: "Cannot get the explore graphs" },
+            { method: "post", path: "/explore/graphs/ecotaxa", body: { mode: "depth", filters: null }, useCase: () => getExploreEcoTaxaGraphs, fallback: "Cannot get the explore EcoTaxa graphs" },
         ];
         const send = (route: Route) => route.method === "get" ? request(logged).get(route.path) : request(logged).post(route.path).send(route.body);
         const cases: Array<[string, number]> = [

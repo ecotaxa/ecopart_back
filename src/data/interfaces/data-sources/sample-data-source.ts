@@ -1,6 +1,6 @@
 import { EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../../domain/entities/explore";
 import { ProjectStatsSampleRow } from "../../../domain/entities/project-stats";
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 //SampleTypeModel, SampleTypeRequestModel, SampleRequestModel, SampleUpdateModel, SampleResponseModel, QualityCheckStatusRequestModel, QualityCheckStatusModel 
@@ -27,4 +27,9 @@ export interface SampleDataSource {
     upsertEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void>;
     // Every sample imported in EcoTaxa, with the date its stats were last read (null when never).
     listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]>;
+    // EcoTaxa objects counted per category and depth bin (table sample_ecotaxa_histogram).
+    getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]>;
+    upsertEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void>;
+    // Every sample imported in EcoTaxa, with its stats counts and what its histogram was read with (no bins).
+    listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]>;
 }

@@ -1393,6 +1393,35 @@
           }
         ]
       },
+      "ExploreEcoTaxaGraphsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExploreRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "depth"
+                ],
+                "description": "The EcoTaxa concentrations are drawn on depth profiles only."
+              },
+              "include_predicted": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also count the predicted objects (validated objects only by default, as legacy EcoPart)."
+              },
+              "sum_child_taxa": {
+                "type": "boolean",
+                "default": false,
+                "description": "A category also counts the objects of its children among the categories of the selection."
+              }
+            }
+          }
+        ]
+      },
       "ExploreProjectOption": {
         "type": "object",
         "properties": {
@@ -1857,6 +1886,29 @@
             "description": "Why samples drawn have no CTD curve: no CTD imported, unreadable file, no pressure or time column."
           }
         }
+      },
+      "ExploreEcoTaxaGraphs": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Why samples drawn have no curve: not imported in EcoTaxa, objects being read, no particle data, no validated object."
+              },
+              "nb_samples_pending": {
+                "type": "integer",
+                "description": "Samples whose objects are being read from EcoTaxa: ask again later for the complete curves."
+              }
+            }
+          }
+        ]
       },
       "InstrumentModelResponse": {
         "type": "object",
@@ -5224,7 +5276,7 @@
     "/explore/graphs": {
       "post": {
         "summary": "Curves of the Explore selection",
-        "description": "Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by\ndefault, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out,\n`ctd_warnings` which samples have no CTD curve and why (no CTD imported, unreadable file, no\npressure or time column). The EcoTaxa dataset is not computed yet and comes back empty.\nAnonymous callers are served, as a user without any privilege.\n",
+        "description": "Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by\ndefault, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out,\n`ctd_warnings` which samples have no CTD curve and why (no CTD imported, unreadable file, no\npressure or time column). The `ecotaxa` dataset comes back empty: the EcoTaxa concentrations are\nserved by `/explore/graphs/ecotaxa`.\nAnonymous callers are served, as a user without any privilege.\n",
         "tags": [
           "Explore"
         ],
@@ -5277,6 +5329,83 @@
           },
           "422": {
             "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/graphs/ecotaxa": {
+      "post": {
+        "summary": "Concentrations per EcoTaxa category of the Explore selection",
+        "description": "The concentration (# m-3) of every EcoTaxa category of the depth profiles of the selection\nwhose project lets the caller see figures, as legacy EcoPart drew it: the objects are counted\nin the legacy depth bins (0, 25, 50, 75, 100, 125, 150, 200, 250 m... widening with depth),\nthe depth offset added to their EcoTaxa depth, and divided by the water volume the particle\nimages of the same depths imaged. Validated objects only unless `include_predicted`; with\n`sum_child_taxa`, a category also counts the objects of its children among the categories of\nthe selection. The categories come most abundant first. Each curve is a step curve: its\n`positions` are the top of each depth bin, then the bottom of the deepest one, which repeats\nthe last value. The objects are read from EcoTaxa in\nthe background and kept: `nb_samples_pending` samples are still being read, ask again later.\nThe descent filter and the first and last image of the particle settings are not applied to\nthe objects yet. At most 100 samples are drawn; `warnings` tells which samples have no curve\nand why. Anonymous callers are served, as a user without any privilege.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreEcoTaxaGraphsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The concentrations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreEcoTaxaGraphs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (the mode must be depth).",
             "content": {
               "application/json": {
                 "schema": {

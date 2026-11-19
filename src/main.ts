@@ -156,6 +156,7 @@ import { GetExploreSelection } from './domain/use-cases/explore/get-explore-sele
 import { GetExploreEcoTaxa } from './domain/use-cases/explore/get-explore-ecotaxa'
 import { GetExploreImages } from './domain/use-cases/explore/get-explore-images'
 import { GetExploreGraphs } from './domain/use-cases/explore/get-explore-graphs'
+import { GetExploreEcoTaxaGraphs } from './domain/use-cases/explore/get-explore-ecotaxa-graphs'
 
 sqlite3.verbose()
 
@@ -486,8 +487,10 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     // Explore: the selection, its stats and its curves over every project; anonymous callers served,
     // only the exports need a login. The EcoTaxa service and the particle and CTD bins keep caches shared by every request.
     const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
-    // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
+    // Refreshes the EcoTaxa stats and objects kept per sample once a day, in the background.
     explore_ecotaxa.startSweeper()
+    // One cache of particle bins for the particle curves and the water volume of the EcoTaxa concentrations.
+    const explore_particle_bins = new ExploreParticleBins(sample_repo)
     server.use("/explore", ExploreRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExploreValidation(),
@@ -496,7 +499,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetExploreSelection(explore_repositories, explore_ecotaxa),
         new GetExploreEcoTaxa(explore_repositories, explore_ecotaxa),
         new GetExploreImages(explore_repositories, explore_ecotaxa),
-        new GetExploreGraphs(explore_repositories, explore_ecotaxa, new ExploreParticleBins(sample_repo), new ExploreCtdBins(sample_repo)),
+        new GetExploreGraphs(explore_repositories, explore_ecotaxa, explore_particle_bins, new ExploreCtdBins(sample_repo)),
+        new GetExploreEcoTaxaGraphs(explore_repositories, explore_ecotaxa, explore_particle_bins),
     ))
     server.use("/version", VersionRouter(config.APP_VERSION))
 

@@ -18,7 +18,7 @@ import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
 import { parseCtdRows } from "../utils/ctd-rows";
 import { CtdRows } from "../entities/ctd";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../entities/explore";
 import { ProjectStatsSampleRow } from "../entities/project-stats";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
@@ -2490,6 +2490,18 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
         return await this.sampleDataSource.listEcoTaxaImportedSamples();
+    }
+
+    async getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]> {
+        return await this.sampleDataSource.getEcoTaxaHistograms(sample_ids);
+    }
+
+    async saveEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void> {
+        await this.sampleDataSource.upsertEcoTaxaHistogram(histogram);
+    }
+
+    async listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]> {
+        return await this.sampleDataSource.listEcoTaxaHistogramStates();
     }
 
     async updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number> {
