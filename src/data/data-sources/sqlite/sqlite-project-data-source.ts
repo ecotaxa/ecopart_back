@@ -301,5 +301,18 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         })
     }
 
+    async getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<number[]> {
+        const sql = `SELECT DISTINCT ecotaxa_project_id FROM project WHERE ecotaxa_instance_id = ? AND ecotaxa_project_id IS NOT NULL;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [ecotaxa_instance_id], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve((rows as { ecotaxa_project_id: number }[]).map((row) => row.ecotaxa_project_id));
+                }
+            });
+        })
+    }
+
 }
 

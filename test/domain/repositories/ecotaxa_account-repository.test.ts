@@ -339,7 +339,7 @@ describe("EcotaxaAccount Repository", () => {
 
             const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1, "UVP6LP");
 
-            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&instrument_filter=UVP6", expect.objectContaining({ method: "GET" }));
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated&instrument_filter=UVP6", expect.objectContaining({ method: "GET" }));
             expect(result).toStrictEqual([{ projid: 1, title: "p1", instrument: "UVP6", status: "Annotate", objcount: 3, pctvalidated: 1.5 }]);
         });
         test("lists every managed project without an instrument", async () => {
@@ -349,7 +349,7 @@ describe("EcotaxaAccount Repository", () => {
 
             const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1);
 
-            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true", expect.anything());
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated", expect.anything());
             expect(result.map((p) => p.projid)).toEqual([1, 3]);
         });
         test("returns nothing for an instrument EcoTaxa does not know, without asking EcoTaxa", async () => {

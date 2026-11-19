@@ -66,6 +66,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesLogoutEcoTaxaAccount = []
+    rulesListEcotaxaAccountProjects = []
     rulesUserRequestCreationModel = []
     rulesMigrateUsers = []
     rulesUserRequestModel = []

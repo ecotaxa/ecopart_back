@@ -963,7 +963,8 @@ export default function UsersRouter(
      *         required: false
      *         schema:
      *           type: string
-     *         description: EcoPart instrument model the EcoTaxa projects must fit.
+     *           enum: [UVP5HD, UVP5SD, UVP5Z, UVP6LP, UVP6HF, UVP6MHP, UVP6MHF]
+     *         description: EcoPart instrument model the EcoTaxa projects must fit (empty = every instrument).
      *         example: UVP6LP
      *     responses:
      *       200:
@@ -993,7 +994,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error (an ID is not a number, or the instrument model is unknown).
      *         content:
      *           application/json:
      *             schema:
@@ -1005,9 +1006,10 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      */
-    router.get('/:user_id/ecotaxa_account/:ecotaxa_account_id/projects', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
+    router.get('/:user_id/ecotaxa_account/:ecotaxa_account_id/projects', middlewareAuth.auth, middlewareUserValidation.rulesListEcotaxaAccountProjects, async (req: Request, res: Response) => {
         try {
-            const instrument_model = typeof req.query.instrument_model === "string" && req.query.instrument_model !== "" ? req.query.instrument_model : undefined
+            // Validated: absent, empty, or one known instrument model.
+            const instrument_model = (req.query.instrument_model as string | undefined) || undefined
             const projects = await listEcotaxaAccountProjectsUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id), instrument_model)
             res.status(200).send(projects)
         } catch (err) {

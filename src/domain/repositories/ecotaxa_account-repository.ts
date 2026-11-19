@@ -1020,7 +1020,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             if (!ecotaxa_instrument) return [];
         }
         // for_managing: only the projects the account can manage (every project for an EcoTaxa admin).
-        const params = new URLSearchParams({ for_managing: "true" });
+        // fields: only what the picker shows; by default EcoTaxa returns every field (member lists,
+        // free column mappings, classification settings) of every project, heavy for an admin account.
+        const params = new URLSearchParams({ for_managing: "true", fields: "projid,title,status,instrument,objcount,pctvalidated" });
         if (ecotaxa_instrument) params.set("instrument_filter", ecotaxa_instrument);
         const projects = await this.http<EcoTaxaSearchedProject[]>(
             `${base_url}api/projects/search?${params.toString()}`,

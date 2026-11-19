@@ -113,6 +113,9 @@ export class MockProjectDataSource {
     getDistinctShips(): Promise<string[]> {
         throw new Error("Method not implemented : getDistinctShips");
     }
+    getLinkedEcotaxaProjectIds(): Promise<number[]> {
+        throw new Error("Method not implemented : getLinkedEcotaxaProjectIds");
+    }
 }
 
 // PRESENTATION LAYER

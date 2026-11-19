@@ -10732,9 +10732,18 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "UVP5HD",
+                "UVP5SD",
+                "UVP5Z",
+                "UVP6LP",
+                "UVP6HF",
+                "UVP6MHP",
+                "UVP6MHF"
+              ]
             },
-            "description": "EcoPart instrument model the EcoTaxa projects must fit.",
+            "description": "EcoPart instrument model the EcoTaxa projects must fit (empty = every instrument).",
             "example": "UVP6LP"
           }
         ],
@@ -10783,7 +10792,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error (an ID is not a number, or the instrument model is unknown).",
             "content": {
               "application/json": {
                 "schema": {

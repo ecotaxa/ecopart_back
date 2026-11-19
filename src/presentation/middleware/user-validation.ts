@@ -254,4 +254,26 @@ export class MiddlewareUserValidation implements IMiddlewareUserValidation {
             next();
         },
     ]
+
+    rulesListEcotaxaAccountProjects = [
+        param('user_id')
+            .not().isEmpty().withMessage('User id is required.')
+            .isInt().withMessage('Ecopart user id must be a number.'),
+        param('ecotaxa_account_id')
+            .not().isEmpty().withMessage('Ecotaxa account id is required.')
+            .isInt().withMessage('Ecotaxa account id must be a number.'),
+        // Same list as the project validation: an unknown model is refused, not answered with an empty list.
+        query('instrument_model').optional({ values: 'falsy' })
+            .not().isArray().withMessage('Instrument model must be given once.').bail()
+            .isIn(['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF'])
+            .withMessage("Instrument model must be a string included in the following list of instrument models: ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']"),
+        // Error Handling Middleware
+        (req: Request, res: Response, next: NextFunction) => {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                return res.status(422).json({ errors: errors.array() });
+            }
+            next();
+        },
+    ]
 }

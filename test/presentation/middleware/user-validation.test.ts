@@ -44,6 +44,7 @@ describe("User Router", () => {
     let mockLogoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase;
     let mockSearchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase;
     let mockListOrganisationsUseCase: ListOrganisationsUseCase;
+    let mockListEcotaxaAccountProjectsUseCase: MockListEcotaxaAccountProjectsUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -61,8 +62,9 @@ describe("User Router", () => {
         mockLogoutEcotaxaAccountUseCase = new MockLogoutEcotaxaAccountUseCase()
         mockSearchEcotaxaAccountsUseCase = new MockSearchEcotaxaAccountsUseCase()
         mockListOrganisationsUseCase = new MockListOrganisationsUseCase()
+        mockListEcotaxaAccountProjectsUseCase = new MockListEcotaxaAccountProjectsUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, middlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase, new MockListEcotaxaAccountProjectsUseCase()))
+        server.use("/users", UserRouter(mockMiddlewareAuth, middlewareUserValidation, middlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase, mockListEcotaxaAccountProjectsUseCase))
     })
 
     beforeEach(() => {
@@ -425,6 +427,32 @@ describe("User Router", () => {
             expect(response.status).toBe(422)
             expect(mockLogoutEcotaxaAccountUseCase.execute).toBeCalledTimes(0)
             expect(response.body).toStrictEqual(OutputData)
+        });
+    });
+    describe("Test user router list ecotaxa account projects", () => {
+        test("a known instrument model, or none, reaches the use case", async () => {
+            jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.resolve([]))
+
+            expect((await request(server).get("/users/1/ecotaxa_account/3/projects?instrument_model=UVP6LP")).status).toBe(200)
+            expect((await request(server).get("/users/1/ecotaxa_account/3/projects?instrument_model=")).status).toBe(200)
+            expect((await request(server).get("/users/1/ecotaxa_account/3/projects")).status).toBe(200)
+            // The arguments after the token (this file's auth mock sets none).
+            const calls = (mockListEcotaxaAccountProjectsUseCase.execute as jest.Mock).mock.calls.map((call) => call.slice(1))
+            expect(calls).toEqual([[1, 3, "UVP6LP"], [1, 3, undefined], [1, 3, undefined]])
+        });
+        test.each([
+            ["an unknown instrument model", "/users/1/ecotaxa_account/3/projects?instrument_model=UVP7", "instrument_model"],
+            ["an instrument model given twice", "/users/1/ecotaxa_account/3/projects?instrument_model=UVP6LP&instrument_model=UVP5HD", "instrument_model"],
+            ["an ecotaxa account id that is not a number", "/users/1/ecotaxa_account/toto/projects", "ecotaxa_account_id"],
+            ["a user id that is not a number", "/users/tutu/ecotaxa_account/3/projects", "user_id"],
+        ])("%s : ko 422", async (_, url, path) => {
+            jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.resolve([]))
+
+            const response = await request(server).get(url)
+
+            expect(response.status).toBe(422)
+            expect(response.body.errors.map((error: { path: string }) => error.path)).toEqual([path])
+            expect(mockListEcotaxaAccountProjectsUseCase.execute).toBeCalledTimes(0)
         });
     });
     describe("Test auth rulesAuthEcoTaxaAccountCredentialsModel", () => {
