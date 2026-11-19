@@ -231,7 +231,9 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   EcoTaxa figures are kept per sample (`sample_ecotaxa_stats`), refreshed at most once a day by a
   background sweeper, with at most 2 EcoTaxa calls in flight and batches of 50
   (`use-cases/explore/explore-ecotaxa.ts`). Project stats (STATS tab) and the QC state of the
-  project lists reuse the same warnings.
+  project lists reuse the same warnings. The concentrations per category (`/explore/graphs/ecotaxa`)
+  read the objects of each sample once, in the background, into `sample_ecotaxa_histogram` (5 m
+  bins, offset included), read again when the stats counts or the offset change and every week.
 - **EcoTaxa**: every call to EcoTaxa lives in `domain/repositories/ecotaxa_account-repository.ts`
   (`fetchWithAgent`); **the front never calls EcoTaxa itself**, it goes through this API. Users
   link one EcoTaxa account per instance; imports, reads, deletions use the instance's **generic

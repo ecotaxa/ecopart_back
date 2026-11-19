@@ -10,11 +10,14 @@ export interface IMiddlewareExploreValidation {
     rulesExploreRequest: any[];
     rulesExploreGraphs: any[];
     rulesExploreImages: any[];
+    rulesExploreEcoTaxaGraphs: any[];
 }
 
 const MODES = ["depth", "time", "all"];
 // A curve has one axis: the graphs take one sample type.
 const GRAPH_MODES = ["depth", "time"];
+// The EcoTaxa concentrations are drawn on depth profiles only.
+const ECOTAXA_GRAPH_MODES = ["depth"];
 const PRIVACY_STATUSES: ProjectPrivacyLevel[] = ["private", "visible", "public", "open"];
 const CLASSIFICATION_STATES: ExploreClassificationState[] = ["all", "fully_predicted", "fully_validated"];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -135,6 +138,16 @@ export class MiddlewareExploreValidation implements IMiddlewareExploreValidation
         check("size_classes").optional({ nullable: true })
             .isString().withMessage("size_classes must be a string.")
             .isIn(EXPLORE_SIZE_CLASSES).withMessage(`size_classes must be one of ${EXPLORE_SIZE_CLASSES.join(", ")}.`),
+        validate,
+    ];
+
+    rulesExploreEcoTaxaGraphs = [
+        modeRule(ECOTAXA_GRAPH_MODES),
+        filtersRule,
+        check("include_predicted").optional({ nullable: true })
+            .isBoolean({ strict: true }).withMessage("include_predicted must be a boolean."),
+        check("sum_child_taxa").optional({ nullable: true })
+            .isBoolean({ strict: true }).withMessage("sum_child_taxa must be a boolean."),
         validate,
     ];
 

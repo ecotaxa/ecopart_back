@@ -4,7 +4,7 @@ import path from 'path'
 import { MigrationManager } from '../../../../src/data/migrations/migration-manager'
 import { SQLiteSampleDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-sample-data-source'
 import { sampleRequestCreationModel_1 } from '../../../entities/sample'
-import { ExploreSampleQuery, StoredEcoTaxaStats } from '../../../../src/domain/entities/explore'
+import { ExploreSampleQuery, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from '../../../../src/domain/entities/explore'
 import { SampleRequestCreationModel } from '../../../../src/domain/entities/sample'
 
 const DBFILE = 'TEST_DB_SOURCE_SAMPLE'
@@ -492,6 +492,81 @@ describe('SQLiteSampleDataSource', () => {
 
             expect(await rawRows(doomed)).toEqual([])
             await expect(dataSource.getEcoTaxaStats([doomed])).resolves.toEqual([])
+        })
+    })
+    describe('EcoTaxa histograms (table sample_ecotaxa_histogram)', () => {
+        // A project of its own: other describes flag samples as imported in EcoTaxa too.
+        const P_HISTO = 9007
+        let with_offset: number
+        let never_read: number
+        let not_imported: number
+
+        const histogram = (sample_id: number, overrides: Partial<StoredEcoTaxaHistogram> = {}): StoredEcoTaxaHistogram => ({
+            sample_id, ecotaxa_sample_id: 8001, depth_offset_m: 1.2, nb_validated: 12, nb_predicted: 5,
+            bins: [{ classif_id: 45072, depth_bin: 0, nb_validated: 10, nb_predicted: 0 }, { classif_id: 56693, depth_bin: 7, nb_validated: 2, nb_predicted: 5 }],
+            fetched_utc_date_time: '2026-11-19T08:00:00.000Z', ...overrides,
+        })
+        const rawRows = (sample_id: number): Promise<any[]> => new Promise((resolve, reject) =>
+            db.all('SELECT * FROM sample_ecotaxa_histogram WHERE sample_id = ?', [sample_id], (e, rows) => e ? reject(e) : resolve(rows)))
+
+        beforeAll(async () => {
+            const create = async (sample_name: string, columns: Record<string, unknown>): Promise<number> => {
+                const id = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_HISTO })
+                await run(db, `UPDATE sample SET ${Object.keys(columns).map(name => `${name} = ?`).join(', ')} WHERE sample_id = ?`, [...Object.values(columns), id])
+                return id
+            }
+            with_offset = await create('histo_with_offset', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: 8001, instrument_settings_depth_offset_m: 1.2 })
+            never_read = await create('histo_never_read', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: null, instrument_settings_depth_offset_m: null })
+            not_imported = await create('histo_not_imported', { ecotaxa_sample_imported: 0, ecotaxa_sample_id: 8003 })
+        })
+
+        test('upsertEcoTaxaHistogram inserts, then replaces the row of the same sample; the bins read back as written', async () => {
+            await dataSource.upsertEcoTaxaHistogram(histogram(with_offset))
+            expect(await dataSource.getEcoTaxaHistograms([with_offset])).toEqual([histogram(with_offset)])
+            // Tuples in the column: a sample can hold thousands of bins.
+            expect((await rawRows(with_offset))[0].bins).toBe('[[45072,0,10,0],[56693,7,2,5]]')
+
+            const reread = histogram(with_offset, { depth_offset_m: 0, nb_validated: 0, nb_predicted: 0, bins: [], fetched_utc_date_time: '2026-11-20T08:00:00.000Z' })
+            await dataSource.upsertEcoTaxaHistogram(reread)
+
+            expect(await dataSource.getEcoTaxaHistograms([with_offset])).toEqual([reread])
+            expect(await rawRows(with_offset)).toHaveLength(1)
+        })
+
+        test('getEcoTaxaHistograms: nothing for an empty list or samples never read', async () => {
+            await expect(dataSource.getEcoTaxaHistograms([])).resolves.toEqual([])
+            await expect(dataSource.getEcoTaxaHistograms([never_read, 424242])).resolves.toEqual([])
+        })
+
+        test('listEcoTaxaHistogramStates: the samples imported in EcoTaxa, their offset, stats counts and reading, without the bins', async () => {
+            await run(db, 'DELETE FROM sample_ecotaxa_stats WHERE sample_id IN (?, ?, ?)', [with_offset, never_read, not_imported])
+            await dataSource.upsertEcoTaxaStats([{ sample_id: with_offset, ecotaxa_sample_id: 8001, nb_unclassified: 1, nb_validated: 12, nb_dubious: 0, nb_predicted: 5, used_taxa: [45072], fetched_utc_date_time: '2026-11-19T07:00:00.000Z' }])
+            await dataSource.upsertEcoTaxaHistogram(histogram(with_offset))
+            await dataSource.upsertEcoTaxaHistogram(histogram(not_imported))
+
+            const states = (await dataSource.listEcoTaxaHistogramStates()).filter(state => state.project_id === P_HISTO)
+
+            expect(states).toEqual([
+                {
+                    sample_id: with_offset, sample_name: 'histo_with_offset', project_id: P_HISTO, ecotaxa_sample_id: 8001, instrument_settings_depth_offset_m: 1.2,
+                    stats: { nb_validated: 12, nb_predicted: 5 },
+                    histogram: { ecotaxa_sample_id: 8001, depth_offset_m: 1.2, nb_validated: 12, nb_predicted: 5, fetched_utc_date_time: '2026-11-19T08:00:00.000Z' },
+                },
+                { sample_id: never_read, sample_name: 'histo_never_read', project_id: P_HISTO, ecotaxa_sample_id: null, instrument_settings_depth_offset_m: null, stats: null, histogram: null },
+            ])
+        })
+
+        test('deleting a sample deletes its histogram (foreign keys on, as in production)', async () => {
+            const doomed = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name: 'histo_deleted', project_id: P_HISTO })
+            await dataSource.upsertEcoTaxaHistogram(histogram(doomed))
+            await run(db, 'PRAGMA foreign_keys = ON')
+            try {
+                await run(db, 'DELETE FROM sample WHERE sample_id = ?', [doomed])
+            } finally {
+                await run(db, 'PRAGMA foreign_keys = OFF')
+            }
+
+            expect(await rawRows(doomed)).toEqual([])
         })
     })
 })

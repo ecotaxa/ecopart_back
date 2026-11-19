@@ -1,11 +1,12 @@
 import { ECOTAXA_BIOTA_TAXO_ID } from "../../constants/ecotaxa-living-taxo";
 import { EcoTaxaTaxon } from "../../entities/ecotaxa_account";
-import { ClassificationShares, EcoTaxaImportedSample, EcoTaxaObjectCounts, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
+import { ClassificationShares, EcoTaxaHistogramBin, EcoTaxaHistogramReading, EcoTaxaImportedSample, EcoTaxaObjectCounts, ExploreClassificationState, ExploreEcoTaxaSummary, ExploreFilters, ExploreImage, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../entities/explore";
 import { EcotaxaAccountRepository } from "../../interfaces/repositories/ecotaxa_account-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { effectiveDepthOffset } from "../../utils/depth-offset";
 import { EcoTaxaThrottle } from "./ecotaxa-throttle";
+import { ECOTAXA_HISTOGRAM_STEP_M } from "./explore-ecotaxa-graphs";
 import { ExploreProjectContext } from "./explore-selection";
 
 /* What the Explore page asks EcoTaxa: the classification counts of the samples (stats), the names of
@@ -15,7 +16,12 @@ import { ExploreProjectContext } from "./explore-selection";
  * The stats are the costly part (EcoTaxa scans every object of the samples asked), so EcoPart keeps
  * them in its database: a request is served from there, refreshes synchronously only a few missing
  * or stale samples, and hands the rest to a background queue, answering `partial` meanwhile. A daily
- * sweep refreshes every sample older than a day, gently, so that the queue rarely has much to do. */
+ * sweep refreshes every sample older than a day, gently, so that the queue rarely has much to do.
+ *
+ * The concentrations per category need the objects themselves (category, status, depth): they are
+ * read the same way, one sample per EcoTaxa query, counted per category and 5 m depth bin and kept
+ * (sample_ecotaxa_histogram), read again when the stats counts or the depth offset change, and once a
+ * week anyway. */
 
 export interface EcoTaxaSampleStat {
     ecotaxa_sample_id: number;
@@ -38,6 +44,13 @@ interface SampleOnInstance {
     access: InstanceAccess;
 }
 
+// A sample whose objects are to be read, with what the reading depends on.
+interface HistogramJob {
+    entry: SampleOnInstance;
+    depth_offset_m: number;
+    stats: ClassificationCounts | null;
+}
+
 // A project as the service needs it: its EcoTaxa link.
 export type EcoTaxaProjectLink = { project_id: number; ecotaxa_project_id: number | null; ecotaxa_instance_id: number | null };
 
@@ -58,6 +71,16 @@ export const EXPLORE_IMAGES_MAX = 12;
 // EcoTaxa calls a request for images may make, per image asked.
 export const EXPLORE_IMAGES_CALLS_PER_IMAGE = 3;
 const IMAGE_FIELDS = ["img.file_name", "obj.depth_min", "obj.objdate", "obj.objtime", "txo.display_name"];
+// The objects of a sample come by pages, ordered by id so that two pages never overlap.
+export const ECOTAXA_OBJECTS_PAGE = 50_000;
+const HISTOGRAM_FIELDS = ["obj.classif_id", "obj.classif_qual", "obj.depth_min"];
+// Objects read again after a week even if the counts did not move: a validated object moved to
+// another category leaves them as they were.
+export const ECOTAXA_HISTOGRAM_STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+// Samples whose objects a request reads itself; beyond, they are queued and the answer is partial.
+export const ECOTAXA_HISTOGRAM_SYNC_LIMIT = 10;
+// Samples the histogram queue reads side by side (the throttle still bounds the EcoTaxa calls).
+const HISTOGRAM_BATCH = 4;
 
 export const totalOf = (stat: EcoTaxaSampleStat) => stat.nb_unclassified + stat.nb_validated + stat.nb_dubious + stat.nb_predicted;
 
@@ -102,6 +125,24 @@ export function objectCountsOf(stats: EcoTaxaSampleStat[]): EcoTaxaObjectCounts 
     return counts;
 }
 
+type ClassificationCounts = { nb_validated: number; nb_predicted: number };
+
+// A histogram is read again when the sample moved to another EcoTaxa sample, when the depth offset
+// changed, when the stats EcoPart keeps no longer count the same objects, or after a week.
+export function histogramIsFresh(reading: EcoTaxaHistogramReading | null | undefined, ecotaxa_sample_id: number | null, depth_offset_m: number, stats: ClassificationCounts | null | undefined, now: number): boolean {
+    if (!reading || reading.ecotaxa_sample_id !== ecotaxa_sample_id || reading.depth_offset_m !== depth_offset_m) return false;
+    if (stats && (stats.nb_validated !== reading.nb_validated || stats.nb_predicted !== reading.nb_predicted)) return false;
+    return now - Date.parse(reading.fetched_utc_date_time) < ECOTAXA_HISTOGRAM_STALE_AFTER_MS;
+}
+
+// The histograms of the samples asked, with the categories of their objects.
+export interface EcoTaxaHistograms {
+    in_ecotaxa: Set<number>;                  // sample ids imported in EcoTaxa, on a reachable instance
+    histograms: Map<number, StoredEcoTaxaHistogram>;
+    pending: number;                          // samples without a histogram yet, being read in the background
+    taxonOf: (sample_id: number, classif_id: number) => EcoTaxaTaxon | undefined;
+}
+
 export function toSampleStat(stored: StoredEcoTaxaStats): EcoTaxaSampleStat {
     return { ecotaxa_sample_id: stored.ecotaxa_sample_id, used_taxa: stored.used_taxa, nb_unclassified: stored.nb_unclassified, nb_validated: stored.nb_validated, nb_dubious: stored.nb_dubious, nb_predicted: stored.nb_predicted };
 }
@@ -117,6 +158,9 @@ export class ExploreEcoTaxaService {
     // The background refresh: samples waiting, by id, drained by one worker at a time.
     private readonly queue = new Map<number, SampleOnInstance>();
     private draining: Promise<void> | null = null;
+    // The background reading of the objects, by sample id, drained the same way.
+    private readonly histogram_queue = new Map<number, HistogramJob>();
+    private draining_histograms: Promise<void> | null = null;
     private sweep_timer: NodeJS.Timeout | null = null;
 
     constructor(
@@ -258,8 +302,14 @@ export class ExploreEcoTaxaService {
     // The work the background refresh still has to do.
     get queued(): number { return this.queue.size; }
 
-    // Waits for the queue to be drained (tests, shutdown).
-    async idle(): Promise<void> { await this.draining; }
+    // The samples whose objects the background reading still has to read.
+    get queuedHistograms(): number { return this.histogram_queue.size; }
+
+    // Waits for the queues to be drained (tests, shutdown).
+    async idle(): Promise<void> {
+        await this.draining;
+        await this.draining_histograms;
+    }
 
     // Stats of the entries: from the database when read less than a day ago; otherwise read from
     // EcoTaxa now when they are few (`sync_limit`), else queued, with the stale ones served meanwhile.
@@ -343,25 +393,163 @@ export class ExploreEcoTaxaService {
         };
     }
 
+    /* ─── histograms: the objects of each sample per category and depth bin ─── */
+
+    // Reads every object of the sample (category, status, depth) and keeps their counts per category
+    // and 5 m bin; null when EcoTaxa or the database failed (the sample is tried again later).
+    private async fetchHistogram(job: HistogramJob): Promise<StoredEcoTaxaHistogram | null> {
+        const { entry, depth_offset_m } = job;
+        const ecotaxa_sample_id = entry.sample.ecotaxa_sample_id as number;
+        const bins = new Map<string, EcoTaxaHistogramBin>();
+        const read = { nb_validated: 0, nb_predicted: 0 };
+        // Stats without any validated or predicted object: nothing to read.
+        const nothing_to_read = job.stats !== null && job.stats.nb_validated + job.stats.nb_predicted === 0;
+        try {
+            for (let start = 0; !nothing_to_read;) {
+                const page = await this.throttle.run(() => this.ecotaxaAccountRepository.api_ecotaxa_query_object_set(entry.access.base_url, entry.access.token, entry.ecotaxa_project_id, {
+                    filters: { samples: String(ecotaxa_sample_id) }, fields: HISTOGRAM_FIELDS, order_field: "obj.objid", window_start: start, window_size: ECOTAXA_OBJECTS_PAGE,
+                }));
+                for (const [classif_id, qual, depth_min] of page.details) {
+                    if (qual !== "V" && qual !== "P") continue;
+                    if (qual === "V") read.nb_validated++; else read.nb_predicted++;
+                    // Legacy EcoPart skipped the objects without a category or a depth too.
+                    if (typeof classif_id !== "number" || typeof depth_min !== "number") continue;
+                    const depth_bin = Math.floor(Math.max(0, depth_min + depth_offset_m) / ECOTAXA_HISTOGRAM_STEP_M);
+                    const key = `${classif_id}|${depth_bin}`;
+                    const bin = bins.get(key) ?? { classif_id, depth_bin, nb_validated: 0, nb_predicted: 0 };
+                    if (qual === "V") bin.nb_validated++; else bin.nb_predicted++;
+                    bins.set(key, bin);
+                }
+                start += page.details.length;
+                if (page.details.length < ECOTAXA_OBJECTS_PAGE || start >= page.total_ids) break;
+            }
+            // The counts the freshness is judged on are those of the stats, when EcoPart has them.
+            const counts = job.stats ?? read;
+            const histogram: StoredEcoTaxaHistogram = {
+                sample_id: entry.sample.sample_id, ecotaxa_sample_id, depth_offset_m,
+                nb_validated: counts.nb_validated, nb_predicted: counts.nb_predicted,
+                bins: Array.from(bins.values()), fetched_utc_date_time: new Date(this.now()).toISOString(),
+            };
+            await this.sampleRepository.saveEcoTaxaHistogram(histogram);
+            return histogram;
+        } catch (error) {
+            console.log(new Date().toISOString(), `Explore: cannot read the EcoTaxa objects of sample ${entry.sample.sample_name}`, (error as Error).message);
+            return null;
+        }
+    }
+
+    private enqueueHistograms(jobs: HistogramJob[]): void {
+        for (const job of jobs) if (!this.histogram_queue.has(job.entry.sample.sample_id)) this.histogram_queue.set(job.entry.sample.sample_id, job);
+        if (this.draining_histograms === null && this.histogram_queue.size > 0) this.draining_histograms = this.drainHistograms();
+    }
+
+    private async drainHistograms(): Promise<void> {
+        try {
+            while (this.histogram_queue.size > 0) {
+                const batch = Array.from(this.histogram_queue.values()).slice(0, HISTOGRAM_BATCH);
+                for (const job of batch) this.histogram_queue.delete(job.entry.sample.sample_id);
+                await Promise.all(batch.map(job => this.fetchHistogram(job)));
+                if (this.histogram_queue.size > 0) await this.pause(ECOTAXA_QUEUE_PAUSE_MS);
+            }
+        } catch (error) {
+            console.log(new Date().toISOString(), "Explore: EcoTaxa objects reading queue stopped", error);
+        } finally {
+            this.draining_histograms = null;
+        }
+    }
+
+    // The histograms of the samples, from the database when fresh. The missing or stale ones are read
+    // now when they are few, otherwise queued, a stale one served meanwhile when it used the same offset.
+    async histogramsOf(samples: ExploreSampleRow[], projects: Map<number, ExploreProjectContext>): Promise<EcoTaxaHistograms> {
+        const entries = await this.samplesOnInstances(samples, ExploreEcoTaxaService.linksOf(projects));
+        const { stats } = await this.statsOfEntries(entries, ECOTAXA_SYNC_REFRESH_LIMIT);
+        const stored = new Map((await this.sampleRepository.getEcoTaxaHistograms(entries.map(entry => entry.sample.sample_id))).map(row => [row.sample_id, row]));
+        const rows = new Map(samples.map(sample => [sample.sample_id, sample]));
+        const now = this.now();
+        const histograms = new Map<number, StoredEcoTaxaHistogram>();
+        const jobs: HistogramJob[] = [];
+        for (const entry of entries) {
+            const sample_id = entry.sample.sample_id;
+            const depth_offset_m = effectiveDepthOffset(projects.get(entry.sample.project_id)?.project ?? {}, rows.get(sample_id) ?? {}) ?? 0;
+            const stat = stats.get(sample_id);
+            const counts = stat ? { nb_validated: stat.nb_validated, nb_predicted: stat.nb_predicted } : null;
+            const row = stored.get(sample_id);
+            if (histogramIsFresh(row, entry.sample.ecotaxa_sample_id, depth_offset_m, counts, now)) {
+                histograms.set(sample_id, row as StoredEcoTaxaHistogram);
+                continue;
+            }
+            if (row && row.ecotaxa_sample_id === entry.sample.ecotaxa_sample_id && row.depth_offset_m === depth_offset_m) histograms.set(sample_id, row);
+            jobs.push({ entry, depth_offset_m, stats: counts });
+        }
+        let pending = 0;
+        if (jobs.length <= ECOTAXA_HISTOGRAM_SYNC_LIMIT) {
+            const read = await Promise.all(jobs.map(job => this.fetchHistogram(job)));
+            read.forEach((histogram, i) => { if (histogram) histograms.set(jobs[i].entry.sample.sample_id, histogram); });
+        } else {
+            this.enqueueHistograms(jobs);
+            pending = jobs.filter(job => !histograms.has(job.entry.sample.sample_id)).length;
+        }
+
+        // The categories of the objects, asked once per instance.
+        const taxa_by_instance = new Map<number, Map<number, EcoTaxaTaxon>>();
+        const instance_of = new Map<number, number>();
+        const ids_by_instance = new Map<number, { access: InstanceAccess; ids: Set<number> }>();
+        for (const entry of entries) {
+            instance_of.set(entry.sample.sample_id, entry.access.instance_id);
+            const histogram = histograms.get(entry.sample.sample_id);
+            if (!histogram) continue;
+            let bucket = ids_by_instance.get(entry.access.instance_id);
+            if (!bucket) { bucket = { access: entry.access, ids: new Set() }; ids_by_instance.set(entry.access.instance_id, bucket); }
+            for (const bin of histogram.bins) bucket.ids.add(bin.classif_id);
+        }
+        for (const [instance_id, { access, ids }] of ids_by_instance) {
+            taxa_by_instance.set(instance_id, new Map((await this.taxaOf(access, ids)).map(taxon => [taxon.id, taxon])));
+        }
+        return {
+            in_ecotaxa: new Set(entries.map(entry => entry.sample.sample_id)),
+            histograms,
+            pending,
+            taxonOf: (sample_id, classif_id) => taxa_by_instance.get(instance_of.get(sample_id) ?? -1)?.get(classif_id),
+        };
+    }
+
     /* ─── the daily sweep ─── */
 
-    // Queues every sample imported in EcoTaxa whose stats are older than a day, or absent.
+    // Queues every sample imported in EcoTaxa whose stats are older than a day, or absent, and every
+    // sample whose histogram is missing or stale.
     async sweep(): Promise<number> {
         const now = this.now();
-        const samples = (await this.sampleRepository.listEcoTaxaImportedSamples())
+        const stale_stats = (await this.sampleRepository.listEcoTaxaImportedSamples())
             .filter(sample => sample.fetched_utc_date_time === null || now - Date.parse(sample.fetched_utc_date_time) >= ECOTAXA_STATS_STALE_AFTER_MS);
-        if (samples.length === 0) return 0;
-        const links = new Map<number, EcoTaxaProjectLink>((await this.projectRepository.listProjects()).map(project => [project.project_id, project]));
-        const entries = await this.samplesOnInstances(samples, links);
-        this.enqueue(entries);
-        return entries.length;
+        const states = await this.sampleRepository.listEcoTaxaHistogramStates();
+        if (stale_stats.length === 0 && states.length === 0) return 0;
+        const projects = new Map((await this.projectRepository.listProjects()).map(project => [project.project_id, project]));
+        const offsetOf = (sample: { project_id: number; instrument_settings_depth_offset_m: number | null }) =>
+            effectiveDepthOffset(projects.get(sample.project_id) ?? {}, sample) ?? 0;
+        const stale_histograms = states.filter(state => !histogramIsFresh(state.histogram, state.ecotaxa_sample_id, offsetOf(state), state.stats, now));
+        if (stale_stats.length === 0 && stale_histograms.length === 0) return 0;
+
+        // One list of sample objects, so that an EcoTaxa sample id resolved for one queue serves the other.
+        const by_id = new Map<number, EcoTaxaImportedSample>(stale_histograms.map(state => [state.sample_id, state]));
+        for (const sample of stale_stats) if (!by_id.has(sample.sample_id)) by_id.set(sample.sample_id, sample);
+        const links = new Map<number, EcoTaxaProjectLink>(Array.from(projects.values()).map(project => [project.project_id, project]));
+        const entries = new Map((await this.samplesOnInstances(Array.from(by_id.values()), links)).map(entry => [entry.sample.sample_id, entry]));
+
+        const stats_entries = stale_stats.map(sample => entries.get(sample.sample_id)).filter((entry): entry is SampleOnInstance => entry !== undefined);
+        this.enqueue(stats_entries);
+        const jobs = stale_histograms.flatMap(state => {
+            const entry = entries.get(state.sample_id);
+            return entry ? [{ entry, depth_offset_m: offsetOf(state), stats: state.stats }] : [];
+        });
+        this.enqueueHistograms(jobs);
+        return stats_entries.length + jobs.length;
     }
 
     // Starts the sweep: once after a delay, then every day. Timers never keep the process alive.
     startSweeper(): void {
         if (this.sweep_timer) return;
         const run = () => this.sweep()
-            .then(count => { if (count > 0) console.log(new Date().toISOString(), `Explore: EcoTaxa stats of ${count} sample(s) queued for refresh`); })
+            .then(count => { if (count > 0) console.log(new Date().toISOString(), `Explore: EcoTaxa stats or objects of ${count} sample(s) queued for refresh`); })
             .catch(error => console.log(new Date().toISOString(), "Explore: EcoTaxa stats sweep failed", error));
         const first = setTimeout(() => {
             run();

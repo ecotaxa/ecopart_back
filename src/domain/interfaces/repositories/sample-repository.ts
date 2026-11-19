@@ -2,7 +2,7 @@ import { EcoTaxaSampleSummary, ImportableCTDSampleModel, MinimalSampleRequestMod
 import { PerImageColumns, SampleSourceQcMetadata, PerImageReadOptions } from "../../entities/sample-qc-graph";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../../entities/pivot";
 import { PivotImageRecord } from "../../entities/binned-export";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../entities/explore";
 import { ProjectStatsSampleRow } from "../../entities/project-stats";
 import { CtdRows } from "../../entities/ctd";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -104,6 +104,10 @@ export interface SampleRepository {
     getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]>;
     saveEcoTaxaStats(stats: StoredEcoTaxaStats[]): Promise<void>;
     listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]>;
+    // EcoTaxa objects counted per category and depth bin, read in the background for the Explore concentrations.
+    getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]>;
+    saveEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void>;
+    listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]>;
 }
 
 // A sample's pivot read in two passes, so that a mooring of millions of images is never held in
