@@ -57,6 +57,7 @@ import { LoginEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/
 import { LogoutEcotaxaAccount } from '../../src/domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { SearchEcotaxaAccounts } from '../../src/domain/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { ListOrganisations } from '../../src/domain/use-cases/user/list-organisations'
+import { ListEcotaxaAccountProjects } from '../../src/domain/use-cases/ecotaxa_account/list-ecotaxa_account-projects'
 import { CreateProject } from '../../src/domain/use-cases/project/create-project'
 import { DeleteProject } from '../../src/domain/use-cases/project/delete-project'
 import { UpdateProject } from '../../src/domain/use-cases/project/update-project'
@@ -287,7 +288,8 @@ describeE2E("End-to-end: UVP5 import (samples / CTD / EcoTaxa, with and without 
             new LogoutEcotaxaAccount(userRepo, ecotaxaAccountRepo),
             new SearchUsers(userRepo, searchRepo, privilegeRepo),
             new SearchEcotaxaAccounts(userRepo, ecotaxaAccountRepo, searchRepo),
-            new ListOrganisations(userRepo)
+            new ListOrganisations(userRepo),
+            new ListEcotaxaAccountProjects(userRepo, ecotaxaAccountRepo, projectRepo)
         )
 
         const authMiddleware = AuthRouter(

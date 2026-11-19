@@ -1,4 +1,4 @@
-import { EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaTaxon, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
+import { EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaSearchedProject, EcoTaxaTaxon, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
@@ -38,4 +38,7 @@ export interface EcotaxaAccountRepository {
     api_ecotaxa_get_taxa(baseUrl: string, token: string, taxon_ids: number[]): Promise<EcoTaxaTaxon[]>;
     // POST api/object_set/{project_id}/query: a window of the objects matching the filters, with the asked fields.
     api_ecotaxa_query_object_set(baseUrl: string, token: string, ecotaxa_project_id: number, query: EcoTaxaObjectSetQuery): Promise<EcoTaxaObjectSetPage>;
+    // GET api/projects/search?for_managing=true: the EcoTaxa projects the account can manage,
+    // restricted to the ones whose instrument fits the EcoPart instrument when one is given.
+    listManageableEcotaxaProjects(ecotaxa_account: EcotaxaAccountResponseModel, ecopart_instrument_model?: string): Promise<EcoTaxaSearchedProject[]>;
 }

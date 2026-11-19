@@ -1058,6 +1058,39 @@
           }
         }
       },
+      "EcotaxaAccountProject": {
+        "type": "object",
+        "description": "An EcoTaxa project an EcoTaxa account can manage.",
+        "properties": {
+          "ecotaxa_project_id": {
+            "type": "integer",
+            "example": 16188
+          },
+          "ecotaxa_project_title": {
+            "type": "string",
+            "example": "uvp6_sn000110lp_2024_tara"
+          },
+          "ecotaxa_project_instrument": {
+            "type": "string",
+            "nullable": true,
+            "example": "UVP6"
+          },
+          "ecotaxa_project_object_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of objects in the EcoTaxa project."
+          },
+          "ecotaxa_project_validated_pct": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentage of validated objects."
+          },
+          "already_linked": {
+            "type": "boolean",
+            "description": "Already linked to an EcoPart project, cannot be linked again."
+          }
+        }
+      },
       "EcotaxaAccountSearchResponse": {
         "type": "object",
         "description": "Paginated EcoTaxa account search results.",
@@ -10652,6 +10685,115 @@
           },
           "500": {
             "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}/ecotaxa_account/{ecotaxa_account_id}/projects": {
+      "get": {
+        "summary": "List the EcoTaxa projects an EcoTaxa account can manage",
+        "description": "Asks EcoTaxa, with the given EcoTaxa account of the logged user, for the EcoTaxa projects that\naccount can manage (every project for an EcoTaxa administrator). Used to pick the EcoTaxa project\nan EcoPart project is linked to. Only the owner of the EcoTaxa account can list them.\n\nWith `instrument_model` (EcoPart instrument, e.g. UVP6LP), only the EcoTaxa projects of the matching\nEcoTaxa instrument (UVP6) are returned, the same rule as when the link is saved.\n`already_linked` flags the EcoTaxa projects already linked to an EcoPart project: they cannot be linked again.\nSorted by EcoTaxa project ID, most recent first.\n",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The EcoPart user ID (must be the logged user)."
+          },
+          {
+            "name": "ecotaxa_account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The EcoTaxa account ID."
+          },
+          {
+            "name": "instrument_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "EcoPart instrument model the EcoTaxa projects must fit.",
+            "example": "UVP6LP"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EcoTaxa projects the account can manage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EcotaxaAccountProject"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used, or the EcoTaxa account is not theirs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "EcoTaxa account not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The EcoTaxa account session expired, the user must log in to EcoTaxa again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (EcoTaxa could not be reached).",
             "content": {
               "application/json": {
                 "schema": {

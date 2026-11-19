@@ -77,6 +77,24 @@ export interface EcotaxaAccountUser {
 export interface EcoTaxaProject {
     highest_right: "Read" | "Annotate" | "Manage";
 }
+// GET api/projects/search (EcoTaxa ProjectModel, the fields the project picker uses).
+export interface EcoTaxaSearchedProject {
+    projid: number;
+    title: string;
+    instrument: string | null;
+    status: string | null;
+    objcount: number | null;
+    pctvalidated: number | null;
+}
+// One EcoTaxa project an EcoTaxa account can manage, as listed to link an EcoPart project.
+export interface PublicEcotaxaAccountProjectModel {
+    ecotaxa_project_id: number;
+    ecotaxa_project_title: string;
+    ecotaxa_project_instrument: string | null;
+    ecotaxa_project_object_count: number | null;
+    ecotaxa_project_validated_pct: number | null;
+    already_linked: boolean;                 // linked to an EcoPart project already: cannot be linked again
+}
 // GET api/taxon_set/query (EcoTaxa TaxonModel, the fields the Explore page uses).
 export interface EcoTaxaTaxon {
     id: number;

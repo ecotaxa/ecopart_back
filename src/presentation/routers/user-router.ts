@@ -13,6 +13,7 @@ import { SearchUsersUseCase } from '../../domain/interfaces/use-cases/user/searc
 import { SearchEcotaxaAccountsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account'
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
+import { ListEcotaxaAccountProjectsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects'
 import { ListOrganisationsUseCase } from '../../domain/interfaces/use-cases/user/list-organisations'
 import { CustomRequest } from '../../domain/entities/auth'
 import { MiddlewareAuthValidation } from '../middleware/auth-validation'
@@ -31,7 +32,8 @@ export default function UsersRouter(
     logoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase,
     searchUsersUseCase: SearchUsersUseCase,
     searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase,
-    listOrganisationsUseCase: ListOrganisationsUseCase
+    listOrganisationsUseCase: ListOrganisationsUseCase,
+    listEcotaxaAccountProjectsUseCase: ListEcotaxaAccountProjectsUseCase
 ) {
     const router = express.Router()
 
@@ -924,6 +926,97 @@ export default function UsersRouter(
             else if (err.message === "User cannot logout from the requested ecotaxa account") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete logout ecotaxa account"] })
+        }
+    })
+    /**
+     * @openapi
+     * /users/{user_id}/ecotaxa_account/{ecotaxa_account_id}/projects:
+     *   get:
+     *     summary: List the EcoTaxa projects an EcoTaxa account can manage
+     *     description: |
+     *       Asks EcoTaxa, with the given EcoTaxa account of the logged user, for the EcoTaxa projects that
+     *       account can manage (every project for an EcoTaxa administrator). Used to pick the EcoTaxa project
+     *       an EcoPart project is linked to. Only the owner of the EcoTaxa account can list them.
+     *
+     *       With `instrument_model` (EcoPart instrument, e.g. UVP6LP), only the EcoTaxa projects of the matching
+     *       EcoTaxa instrument (UVP6) are returned, the same rule as when the link is saved.
+     *       `already_linked` flags the EcoTaxa projects already linked to an EcoPart project: they cannot be linked again.
+     *       Sorted by EcoTaxa project ID, most recent first.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart user ID (must be the logged user).
+     *       - name: ecotaxa_account_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoTaxa account ID.
+     *       - name: instrument_model
+     *         in: query
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: EcoPart instrument model the EcoTaxa projects must fit.
+     *         example: UVP6LP
+     *     responses:
+     *       200:
+     *         description: EcoTaxa projects the account can manage.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 $ref: '#/components/schemas/EcotaxaAccountProject'
+     *       403:
+     *         description: The logged user cannot be used, or the EcoTaxa account is not theirs.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: EcoTaxa account not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The EcoTaxa account session expired, the user must log in to EcoTaxa again.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error (EcoTaxa could not be reached).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.get('/:user_id/ecotaxa_account/:ecotaxa_account_id/projects', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
+        try {
+            const instrument_model = typeof req.query.instrument_model === "string" && req.query.instrument_model !== "" ? req.query.instrument_model : undefined
+            const projects = await listEcotaxaAccountProjectsUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id), instrument_model)
+            res.status(200).send(projects)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot list the projects of this ecotaxa account") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account session expired") res.status(409).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot list EcoTaxa projects"] })
         }
     })
     /**
