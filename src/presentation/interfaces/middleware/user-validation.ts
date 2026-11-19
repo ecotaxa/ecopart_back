@@ -9,6 +9,7 @@ export interface IMiddlewareUserValidation {
     rulesMigrateUsers: (ValidationChain | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesUserUpdateModel: ((Middleware & ContextRunner) | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
     rulesLogoutEcoTaxaAccount: ((Middleware & ContextRunner) | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
+    rulesListEcotaxaAccountProjects: ((Middleware & ContextRunner) | ((req: Request, res: Response, next: NextFunction) => Response | undefined))[]
 }
 
 

@@ -18,7 +18,8 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { MockCreateUserUseCase, MockMigrateUsersUseCase, MockResendMigrationEmailsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase, MockListOrganisationsUseCase } from "../../mocks/user-mock";
+import { MockCreateUserUseCase, MockMigrateUsersUseCase, MockResendMigrationEmailsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase, MockListOrganisationsUseCase, MockListEcotaxaAccountProjectsUseCase } from "../../mocks/user-mock";
+import { ListEcotaxaAccountProjectsUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects";
 import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 import { LoginEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
@@ -65,6 +66,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesLogoutEcoTaxaAccount = []
+    rulesListEcotaxaAccountProjects = []
     rulesUserRequestCreationModel = []
     rulesMigrateUsers = []
     rulesUserRequestModel = []
@@ -89,6 +91,7 @@ describe("User Router", () => {
     let mockLogoutEcotaxaAccountUseCase: LogoutEcotaxaAccountUseCase;
     let mockSearchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase;
     let mockListOrganisationsUseCase: ListOrganisationsUseCase;
+    let mockListEcotaxaAccountProjectsUseCase: ListEcotaxaAccountProjectsUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -105,8 +108,9 @@ describe("User Router", () => {
         mockSearchUsersUseCase = new MockSearchUsersUseCase()
         mockSearchEcotaxaAccountsUseCase = new MockSearchEcotaxaAccountsUseCase()
         mockListOrganisationsUseCase = new MockListOrganisationsUseCase()
+        mockListEcotaxaAccountProjectsUseCase = new MockListEcotaxaAccountProjectsUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockMiddlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockMiddlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase, mockListEcotaxaAccountProjectsUseCase))
     })
 
     beforeEach(() => {
@@ -855,6 +859,40 @@ describe("User Router", () => {
         });
     });
 
+    describe("GET /users/:user_id/ecotaxa_account/:ecotaxa_account_id/projects", () => {
+        test("returns 200 with the projects and passes the instrument model", async () => {
+            const projects = [{
+                ecotaxa_project_id: 12, ecotaxa_project_title: "uvp6 project", ecotaxa_project_instrument: "UVP6",
+                ecotaxa_project_object_count: 10, ecotaxa_project_validated_pct: 50, already_linked: false,
+            }]
+            jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.resolve(projects))
+            const response = await request(server).get("/users/1/ecotaxa_account/3/projects?instrument_model=UVP6LP")
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(projects)
+            expect(mockListEcotaxaAccountProjectsUseCase.execute).toHaveBeenCalledWith(expect.objectContaining({ user_id: 1 }), 1, 3, "UVP6LP")
+        });
+        test("passes no instrument model when the query has none", async () => {
+            jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.resolve([]))
+            const response = await request(server).get("/users/1/ecotaxa_account/3/projects")
+
+            expect(response.status).toBe(200)
+            expect(mockListEcotaxaAccountProjectsUseCase.execute).toHaveBeenCalledWith(expect.anything(), 1, 3, undefined)
+        });
+        test.each([
+            ["User cannot be used", 403, "User cannot be used"],
+            ["User cannot list the projects of this ecotaxa account", 403, "User cannot list the projects of this ecotaxa account"],
+            ["Ecotaxa account not found", 404, "Ecotaxa account not found"],
+            ["Ecotaxa account session expired", 409, "Ecotaxa account session expired"],
+            ["HTTP 500 Internal Server Error for https://ecotaxa/api/projects/search", 500, "Cannot list EcoTaxa projects"],
+        ])("maps %s to %i", async (message, status, expected) => {
+            jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).get("/users/1/ecotaxa_account/3/projects")
+
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [expected] })
+        });
+    });
     describe("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id", () => {
         test("DELETE /users/:user_id/ecotaxa_account/:ecotaxa_account_id should return 200", async () => {
             const OutputMessage = { message: "You have been logged out from ecotaxa account" }

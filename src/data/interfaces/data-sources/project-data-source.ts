@@ -8,4 +8,6 @@ export interface ProjectDataSource {
     getOne(project: ProjectRequestModel): Promise<ProjectResponseModel | null>;
     deleteOne(project: ProjectRequestModel): Promise<number>;
     getDistinctShips(): Promise<string[]>;
+    // IDs of the EcoTaxa projects of this instance linked to an EcoPart project.
+    getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<number[]>;
 }

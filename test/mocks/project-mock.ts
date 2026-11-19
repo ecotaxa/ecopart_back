@@ -79,6 +79,9 @@ export class MockProjectRepository implements ProjectRepository {
     ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(): Promise<void> {
         throw new Error("Method not implemented : ensureEcotaxaProjectNotLinkedToAnotherEcopartProject");
     }
+    getLinkedEcotaxaProjectIds(): Promise<Set<number>> {
+        throw new Error("Method not implemented : getLinkedEcotaxaProjectIds");
+    }
     getDistinctShips(): Promise<string[]> {
         throw new Error("Method not implemented : getDistinctShips");
     }
@@ -109,6 +112,9 @@ export class MockProjectDataSource {
     }
     getDistinctShips(): Promise<string[]> {
         throw new Error("Method not implemented : getDistinctShips");
+    }
+    getLinkedEcotaxaProjectIds(): Promise<number[]> {
+        throw new Error("Method not implemented : getLinkedEcotaxaProjectIds");
     }
 }
 

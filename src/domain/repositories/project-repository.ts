@@ -594,6 +594,10 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         }
     }
 
+    async getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<Set<number>> {
+        return new Set(await this.projectDataSource.getLinkedEcotaxaProjectIds(ecotaxa_instance_id));
+    }
+
     async getDistinctShips(): Promise<string[]> {
         return await this.projectDataSource.getDistinctShips();
     }

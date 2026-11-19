@@ -3,7 +3,7 @@ import { UserResponseModel } from "../../src/domain/entities/user";
 import { EcotaxaAccountModel, EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, PublicEcotaxaAccountResponseModel } from "../../src/domain/entities/ecotaxa_account";
 
 import { UserRepository } from "../../src/domain/interfaces/repositories/user-repository";
-import { EcoTaxaObjectSetPage, EcoTaxaTaxon } from "../../src/domain/entities/ecotaxa_account";
+import { EcoTaxaObjectSetPage, EcoTaxaSearchedProject, EcoTaxaTaxon, PublicEcotaxaAccountProjectModel } from "../../src/domain/entities/ecotaxa_account";
 import { EcotaxaAccountRepository } from "../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 
 import { CreateUserUseCase } from "../../src/domain/interfaces/use-cases/user/create-user";
@@ -15,6 +15,7 @@ import { DeleteUserUseCase } from "../../src/domain/interfaces/use-cases/user/de
 import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/search-user";
 import { LoginEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
+import { ListEcotaxaAccountProjectsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects";
 import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
 import { GetAllEcoTaxaInstancesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/get-all-ecotaxa-instances";
 import { CreateEcoTaxaInstanceUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/create-ecotaxa-instance";
@@ -114,6 +115,9 @@ export class MockUserRepository implements UserRepository {
 }
 
 export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
+    listManageableEcotaxaProjects(): Promise<EcoTaxaSearchedProject[]> {
+        throw new Error("Method not implemented for listManageableEcotaxaProjects.");
+    }
     deleteEcotaxaAccountsOfUser(): Promise<number> {
         throw new Error("Method not implemented for deleteEcotaxaAccountsOfUser.");
     }
@@ -287,6 +291,11 @@ export class MockLoginEcotaxaAccountUseCase implements LoginEcotaxaAccountUseCas
 export class MockLogoutEcotaxaAccountUseCase implements LogoutEcotaxaAccountUseCase {
     execute(): Promise<void> {
         throw new Error("Method not implemented for LogoutEcotaxaAccountUseCase");
+    }
+}
+export class MockListEcotaxaAccountProjectsUseCase implements ListEcotaxaAccountProjectsUseCase {
+    execute(): Promise<PublicEcotaxaAccountProjectModel[]> {
+        throw new Error("Method not implemented for ListEcotaxaAccountProjectsUseCase");
     }
 }
 export class MockSearchEcotaxaAccountsUseCase implements SearchEcotaxaAccountsUseCase {

@@ -244,6 +244,17 @@ describe("Project Repository", () => {
 
     })
 
+    describe("getLinkedEcotaxaProjectIds", () => {
+        test("returns the EcoTaxa project ids linked on the instance", async () => {
+            jest.spyOn(mockProjectDataSource, 'getLinkedEcotaxaProjectIds').mockResolvedValue([4, 9])
+
+            const result = await projectRepository.getLinkedEcotaxaProjectIds(1)
+
+            expect(mockProjectDataSource.getLinkedEcotaxaProjectIds).toBeCalledWith(1)
+            expect(result).toEqual(new Set([4, 9]))
+        })
+    })
+
     describe("formatProjectRequestCreationModel", () => {
         test("Should format project request creation model", () => {
             const result = projectRepository.formatProjectRequestCreationModel(projectRequestCreationModel, instrument_model_response)

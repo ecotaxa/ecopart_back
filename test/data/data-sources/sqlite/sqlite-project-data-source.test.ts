@@ -359,5 +359,17 @@ describe('SQLiteProjectDataSource', () => {
             expect(deleted).toEqual(1);
         });
     })
+    describe("getLinkedEcotaxaProjectIds", () => {
+        test("lists the EcoTaxa projects linked on the instance only", async () => {
+            // Instance 1 is the one migration 000 seeds; the projects created above are not linked.
+            await dataSource.create({ ...data_source_projectRequestCreationModel_4, ecotaxa_project_id: 4242, ecotaxa_project_name: "a", ecotaxa_instance_id: 1 });
+            await dataSource.create({ ...data_source_projectRequestCreationModel_5, ecotaxa_project_id: 16188, ecotaxa_project_name: "b", ecotaxa_instance_id: 1 });
+
+            const linked = await dataSource.getLinkedEcotaxaProjectIds(1);
+
+            expect([...linked].sort((a, b) => a - b)).toEqual([4242, 16188]);
+            expect(await dataSource.getLinkedEcotaxaProjectIds(99)).toEqual([]);
+        });
+    })
 
 });

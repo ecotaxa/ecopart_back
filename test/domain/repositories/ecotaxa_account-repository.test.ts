@@ -329,6 +329,39 @@ describe("EcotaxaAccount Repository", () => {
         });
     });
 
+    describe("listManageableEcotaxaProjects", () => {
+        const project = (projid: number, instrument: string | null) => ({ projid, title: "p" + projid, instrument, status: "Annotate", objcount: 3, pctvalidated: 1.5, highest_right: "Manage" });
+
+        test("asks EcoTaxa for the managed projects of the EcoTaxa instrument and keeps the exact instrument", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            jest.spyOn(repositoryImpl, "getInstanceURL").mockResolvedValue("https://ecotaxa.test/");
+            const http = jest.spyOn(repositoryImpl as any, "http").mockResolvedValue([project(1, "UVP6"), project(2, "UVP6_old"), project(3, null)]);
+
+            const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1, "UVP6LP");
+
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated&instrument_filter=UVP6", expect.objectContaining({ method: "GET" }));
+            expect(result).toStrictEqual([{ projid: 1, title: "p1", instrument: "UVP6", status: "Annotate", objcount: 3, pctvalidated: 1.5 }]);
+        });
+        test("lists every managed project without an instrument", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            jest.spyOn(repositoryImpl, "getInstanceURL").mockResolvedValue("https://ecotaxa.test/");
+            const http = jest.spyOn(repositoryImpl as any, "http").mockResolvedValue([project(1, "UVP6"), project(3, null)]);
+
+            const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1);
+
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated", expect.anything());
+            expect(result.map((p) => p.projid)).toEqual([1, 3]);
+        });
+        test("returns nothing for an instrument EcoTaxa does not know, without asking EcoTaxa", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            jest.spyOn(repositoryImpl, "getInstanceURL").mockResolvedValue("https://ecotaxa.test/");
+            const http = jest.spyOn(repositoryImpl as any, "http");
+
+            await expect(repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1, "UNKNOWN")).resolves.toEqual([]);
+            expect(http).not.toBeCalled();
+        });
+    });
+
     describe("exportObjectSetGeneral", () => {
         let tmp_dir: string;
         beforeEach(() => { tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-ecotaxa-export-")); });

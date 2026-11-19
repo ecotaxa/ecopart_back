@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject, EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaTaxon } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject, EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaSearchedProject, EcoTaxaTaxon } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -1008,6 +1008,37 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             { method: "GET", headers: this.JSON_HEADERS(token) }
         );
         return taxa ?? [];
+    }
+
+    async listManageableEcotaxaProjects(ecotaxa_account: EcotaxaAccountResponseModel, ecopart_instrument_model?: string): Promise<EcoTaxaSearchedProject[]> {
+        const base_url = await this.getInstanceURL(ecotaxa_account.ecotaxa_account_instance_id);
+        // EcoTaxa instrument of the EcoPart one (UVP6LP -> UVP6): an unknown instrument fits no project,
+        // the same rule as ensureInstrumentsMatch when the link is saved.
+        let ecotaxa_instrument: string | undefined;
+        if (ecopart_instrument_model) {
+            ecotaxa_instrument = Object.keys(this.instrument_mapping).find((key) => this.instrument_mapping[key].includes(ecopart_instrument_model));
+            if (!ecotaxa_instrument) return [];
+        }
+        // for_managing: only the projects the account can manage (every project for an EcoTaxa admin).
+        // fields: only what the picker shows; by default EcoTaxa returns every field (member lists,
+        // free column mappings, classification settings) of every project, heavy for an admin account.
+        const params = new URLSearchParams({ for_managing: "true", fields: "projid,title,status,instrument,objcount,pctvalidated" });
+        if (ecotaxa_instrument) params.set("instrument_filter", ecotaxa_instrument);
+        const projects = await this.http<EcoTaxaSearchedProject[]>(
+            `${base_url}api/projects/search?${params.toString()}`,
+            { method: "GET", headers: this.JSON_HEADERS(ecotaxa_account.ecotaxa_account_token) }
+        );
+        // instrument_filter matches a substring: keep the exact instrument only.
+        return (projects ?? [])
+            .filter((project) => !ecotaxa_instrument || project.instrument === ecotaxa_instrument)
+            .map((project) => ({
+                projid: project.projid,
+                title: project.title,
+                instrument: project.instrument ?? null,
+                status: project.status ?? null,
+                objcount: project.objcount ?? null,
+                pctvalidated: project.pctvalidated ?? null,
+            }));
     }
 
     async api_ecotaxa_query_object_set(baseUrl: string, token: string, ecotaxa_project_id: number, query: EcoTaxaObjectSetQuery): Promise<EcoTaxaObjectSetPage> {

@@ -25,6 +25,8 @@ export interface ProjectRepository {
     exportBackupedProjectToFtp(project: ProjectResponseModel, task_id: number): Promise<string>;
     exportBackupedProjectToFs(project: ProjectResponseModel, task_id: number): Promise<string>;
     ensureEcotaxaProjectNotLinkedToAnotherEcopartProject(ecotaxa_project_id: number, ecotaxa_instance_id: number): Promise<void>;
+    // IDs of the EcoTaxa projects of this instance already linked to an EcoPart project.
+    getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<Set<number>>;
     getDistinctShips(): Promise<string[]>;
     // Every project's privacy inputs, to tell which ones a user outside them may look into.
     listProjectsPrivacy(): Promise<ProjectPrivacyInputs[]>;

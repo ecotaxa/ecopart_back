@@ -91,6 +91,32 @@ components:
           type: string
           description: Name of the EcoTaxa instance.
 
+    EcotaxaAccountProject:
+      type: object
+      description: An EcoTaxa project an EcoTaxa account can manage.
+      properties:
+        ecotaxa_project_id:
+          type: integer
+          example: 16188
+        ecotaxa_project_title:
+          type: string
+          example: "uvp6_sn000110lp_2024_tara"
+        ecotaxa_project_instrument:
+          type: string
+          nullable: true
+          example: "UVP6"
+        ecotaxa_project_object_count:
+          type: integer
+          nullable: true
+          description: Number of objects in the EcoTaxa project.
+        ecotaxa_project_validated_pct:
+          type: number
+          nullable: true
+          description: Percentage of validated objects.
+        already_linked:
+          type: boolean
+          description: Already linked to an EcoPart project, cannot be linked again.
+
     EcotaxaAccountSearchResponse:
       type: object
       description: Paginated EcoTaxa account search results.

@@ -75,6 +75,7 @@ import { DeleteImportedCTDSamples } from './domain/use-cases/ctd_sample/delete-i
 
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
+import { ListEcotaxaAccountProjects } from './domain/use-cases/ecotaxa_account/list-ecotaxa_account-projects'
 
 import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
 import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
@@ -365,7 +366,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
             new LogoutEcotaxaAccount(user_repo, ecotaxa_account_repo),
             new SearchUsers(user_repo, search_repo, privilege_repo),
             new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
-            new ListOrganisations(user_repo)
+            new ListOrganisations(user_repo),
+            new ListEcotaxaAccountProjects(user_repo, ecotaxa_account_repo, project_repo)
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
