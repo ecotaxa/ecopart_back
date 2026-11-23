@@ -167,6 +167,27 @@ describe("Import pre-checks in the source folder", () => {
 
                 expect(qc(await list("uvp5_m1", "UVP5HD", []))).toEqual(failingEverySample("config/cruise_info.txt not found, config/process_install_config.txt not found"));
             });
+
+            test("fails the samples whose position cannot be degrees.minutes, and only them", async () => {
+                writeUvp5Project();
+                const line = (name: string, latitude: string, longitude: string) => `m1;ship;file;${name};2000;ctd;${latitude};${longitude}`;
+                fs.writeFileSync(path.join(tmp, "uvp5_m1", "meta", "uvp5_header_m1.txt"),
+                    ["cruise;ship;filename;profileid;bottomdepth;ctdrosettefilename;latitude;longitude", line("s1", "32.9", "-64.6"), line("s2", "43.4111", "7.1901"), line("absent", "17.6", "-16.2406")].join("\n") + "\n");
+
+                expect(qc(await list("uvp5_m1", "UVP5HD"))).toEqual([
+                    ["s1", false, "latitude 32.9 is not in degrees.minutes (the decimal part holds the minutes and must be below 0.60) and longitude -64.6 is not in degrees.minutes (the decimal part holds the minutes and must be below 0.60): correct the position in the meta header"],
+                    ["s2", true, ""],
+                    ["absent", false, "Sample not found in work folder"],
+                ]);
+            });
+        });
+
+        test("UVP6 positions are decimal degrees: a decimal part of 0.60 or more is fine", async () => {
+            fs.mkdirSync(path.join(tmp, "uvp6_pos", "meta"), { recursive: true });
+            fs.mkdirSync(path.join(tmp, "uvp6_pos", "ecodata"), { recursive: true });
+            fs.writeFileSync(path.join(tmp, "uvp6_pos", "meta", "uvp6_header_pos.txt"), "cruise;ship;filename;profileid;bottomdepth;ctdrosettefilename;latitude;longitude\nm1;ship;file;s1;2000;ctd;43.6798;7.9\n");
+
+            expect(qc(await list("uvp6_pos", "UVP6LP"))).toEqual([["s1", false, "Sample not found in ecodata folder"]]);
         });
 
         describe("UVP6: HW_CONF.Operator_email of each sample's metadata.ini", () => {
