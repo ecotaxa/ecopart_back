@@ -160,13 +160,8 @@ function mapRowToProjectStatsSample(row: any): ProjectStatsSampleRow {
 // The sample's reference position: the CTD one when chosen and present, the particle file's otherwise.
 const EXPLORE_LATITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_latitude ELSE sample.latitude END";
 const EXPLORE_LONGITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_longitude ELSE sample.longitude END";
-// Samples imported before the ISO conversion keep their UVP date formats, "20120520080213" (UVP5) and
-// "20230406-144332-820" (UVP6): read as ISO date-times, like the ones written since.
-const DIGITS = (n: number) => "[0-9]".repeat(n);
-const EXPLORE_SAMPLING_TIME = `CASE
-    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(14)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 9, 2) || ':' || substr(sample.sampling_utc_date_time, 11, 2) || ':' || substr(sample.sampling_utc_date_time, 13, 2) || 'Z'
-    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(8)}-${DIGITS(6)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 10, 2) || ':' || substr(sample.sampling_utc_date_time, 12, 2) || ':' || substr(sample.sampling_utc_date_time, 14, 2) || 'Z'
-    ELSE sample.sampling_utc_date_time END`;
+// ISO UTC date-time. The UVP formats of the first imports were rewritten by migration 043.
+const EXPLORE_SAMPLING_TIME = "sample.sampling_utc_date_time";
 // The particle statistics the project's descent filter selects (see SampleParticleStats). Expects the
 // query to join `project`.
 const PARTICLE_STATS_OF_PROJECT = ["nb_particles", "particle_min_area_px", "particle_max_area_px"]
@@ -383,7 +378,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                // An empty IN matches nothing
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
+                    filtering_sql += `0 = 1`;
+                }
+                else if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
@@ -597,8 +596,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     async getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]> {
         if (sample_ids.length === 0) return [];
-        const sql = `SELECT * FROM sample_ecotaxa_stats WHERE sample_id IN (${sample_ids.map(() => "(?)").join(",")});`;
-        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, sample_ids, (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        // The ids go as one JSON parameter: one bound variable per id fails beyond SQLite's limit
+        // (32 766), which a worldwide Explore selection can exceed.
+        const sql = `SELECT * FROM sample_ecotaxa_stats WHERE sample_id IN (SELECT value FROM json_each(?));`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [JSON.stringify(sample_ids)], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
         return rows.map(row => ({
             sample_id: row.sample_id,
             ecotaxa_sample_id: row.ecotaxa_sample_id,
@@ -695,7 +696,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         if (options.filter.length > 0) {
             filtering_sql += ` WHERE `;
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                // An empty IN matches nothing
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
+                    filtering_sql += `0 = 1`;
+                }
+                else if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         filtering_sql += `sample.` + filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `;
                         params_filtering.push(...filter.value);

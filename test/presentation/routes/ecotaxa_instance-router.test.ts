@@ -119,8 +119,8 @@ describe("EcoTaxaInstanceRouter", () => {
             expect(response.body.ecotaxa_instance_name).toBe("NEW")
         });
 
-        test("Should return 403 with error message : User is deleted", async () => {
-            jest.spyOn(mockCreateEcoTaxaInstanceUseCase, "execute").mockImplementation(() => { throw new Error("User is deleted") })
+        test("Should return 403 with error message : User cannot be used", async () => {
+            jest.spyOn(mockCreateEcoTaxaInstanceUseCase, "execute").mockImplementation(() => { throw new Error("User cannot be used") })
             const response = await request(server).post("/ecotaxa_instances").send({
                 ecotaxa_instance_name: "NEW",
                 ecotaxa_instance_description: "New instance",
@@ -129,7 +129,7 @@ describe("EcoTaxaInstanceRouter", () => {
 
             expect(response.status).toBe(403)
             expect(mockCreateEcoTaxaInstanceUseCase.execute).toBeCalledTimes(1)
-            expect(response.body).toStrictEqual({ errors: ["User is deleted"] })
+            expect(response.body).toStrictEqual({ errors: ["User cannot be used"] })
         });
 
         test("Should return 403 with error message : Logged user cannot create an EcoTaxa instance", async () => {

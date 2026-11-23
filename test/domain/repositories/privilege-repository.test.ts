@@ -95,6 +95,16 @@ describe("Privilege Repository", () => {
             expect(result).toStrictEqual(projects_ids)
         });
     });
+    describe("GetPrivilegesByFilter", () => {
+        test("asks for every matching privilege, without a row cap : ok", async () => {
+            jest.spyOn(mockPrivilegeDataSource, 'getAll').mockResolvedValue({ items: [], total: 0 })
+
+            await privilegeRepository.getProjectsByUser({ user_id: 1 })
+
+            expect(mockPrivilegeDataSource.getAll).toBeCalledWith(expect.objectContaining({ page: 1, limit: Number.MAX_SAFE_INTEGER }))
+        })
+    })
+
     describe("GetProjectsByUsers", () => {
         test("Should return projects by users", async () => {
             const projects_ids: number[] = [1]

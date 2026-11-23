@@ -173,7 +173,9 @@ export default function ExportRouter(
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated")) res.status(409).send({ errors: [msg] })
             else if (msg.startsWith("format must")) res.status(422).send({ errors: [msg] })
-            else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            else if (msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            // The seeded lookup row is missing: a server problem, nothing the caller can fix
+            else if (msg === "Task type not found" || msg === "Task status not found") res.status(500).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export raw data"] })
         }
@@ -310,7 +312,9 @@ export default function ExportRouter(
             else if (msg === "Cannot find project" || msg === "No samples found" || msg.startsWith("Sample(s) not found")) res.status(404).send({ errors: [msg] })
             else if (msg.startsWith("Sample(s) not validated") || msg.startsWith("Sample(s) without calibration") || msg.startsWith("Sample(s) without pivot") || msg.startsWith("Instrument not supported by the binned export")) res.status(409).send({ errors: [msg] })
             else if (msg.startsWith("sample_ids must") || msg.startsWith("bin_mode must") || msg.startsWith("bin_size_m must") || msg.startsWith("bin_size_h must") || msg.startsWith("format must")) res.status(422).send({ errors: [msg] })
-            else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            else if (msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            // The seeded lookup row is missing: a server problem, nothing the caller can fix
+            else if (msg === "Task type not found" || msg === "Task status not found") res.status(500).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot export binned data"] })
         }

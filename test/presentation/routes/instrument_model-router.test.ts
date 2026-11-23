@@ -100,20 +100,20 @@ describe('InstrumentModelsRouter', () => {
         });
 
         // Test for GET /instrument_models failed because of Unauthorized or unexisting parameters, Invalid sorting statement, Cannot search instrument models, Cannot get instrument_models
-        test("Should return 401 with error message : Unauthorized or unexisting parameters", async () => {
+        test("Should return 422 with error message : Unauthorized or unexisting parameters", async () => {
             jest.spyOn(searchInstrumentModelsUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters") })
             const response = await request(server).get("/instrument_models")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(searchInstrumentModelsUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual({ errors: ["Unauthorized or unexisting parameters"] })
 
         });
-        test("Should return 401 with error message : Invalid sorting statement", async () => {
+        test("Should return 422 with error message : Invalid sorting statement", async () => {
             jest.spyOn(searchInstrumentModelsUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement") })
             const response = await request(server).get("/instrument_models")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(searchInstrumentModelsUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual({ errors: ["Invalid sorting statement"] })
 

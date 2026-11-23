@@ -195,6 +195,12 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   exposed through an interface so router tests can replace them with empty rules.
 - **Errors**: always `{ errors: [string] }`. Unknown route = 404, malformed JSON = 400, anything a
   router did not catch = 500 without a stack trace.
+- **Statuses**: 401 only when the caller is not authenticated (missing, invalid or expired token,
+  wrong credentials): the front answers every 401 by refreshing the session and replaying the
+  request. Refused for this user = 403, resource not found = 404, invalid input (body, filter, sort,
+  inconsistent values) = 422, state that forbids the action = 409, server-side inconsistency (a
+  seeded lookup row missing, a row just written that cannot be read back) = 500. The same message
+  gets the same status on every route.
 - **Body size**: 100 KB default, 5 MB on `/exports` (sample id lists). Responses are gzipped.
 - **Rate limits** (`presentation/middleware/rate-limit.ts`): in-memory fixed windows, counted per
   target e-mail (behind the reverse proxy every request may share one IP), on `POST /auth/login`,

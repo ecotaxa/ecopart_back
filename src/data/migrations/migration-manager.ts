@@ -55,6 +55,8 @@ interface MigrationRecord {
  * await manager.runAllMigrations();
  * ```
  */
+const MIGRATION_FILE = /^\d{3}_.+\.(ts|js)$/;
+
 export class MigrationManager {
     private db: SQLiteDatabaseWrapper;
     private logger: MigrationLogger;
@@ -165,22 +167,29 @@ export class MigrationManager {
             return [];
         }
 
+        // Only the numbered migration files (NNN_description): the runner and its logger live in the same folder.
         const files = fs
             .readdirSync(migrationsDir)
-            .filter((f) => (f.endsWith(".ts") || f.endsWith(".js")) && !f.includes("migration-manager"))
+            .filter((f) => MIGRATION_FILE.test(f) && !f.endsWith(".d.ts"))
             .sort();
 
+        // A migration that cannot be loaded stops everything: skipping it would run the following ones
+        // out of order, on a schema they do not expect.
         const migrations: Migration[] = [];
         for (const file of files) {
+            let mod;
             try {
                 // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const mod = require(path.resolve(migrationsDir, file));
-                if (mod.migration && mod.migration.id && mod.migration.up && mod.migration.down) {
-                    migrations.push(mod.migration);
-                }
+                mod = require(path.resolve(migrationsDir, file));
             } catch (err) {
                 this.logger.error(`Failed to load migration file ${file}`, err);
+                throw new Error(`Cannot load migration file ${file}: ${(err as Error).message}`);
             }
+            if (!(mod.migration && mod.migration.id && mod.migration.up && mod.migration.down)) {
+                this.logger.error(`Migration file ${file} does not export a migration with an id, up and down`);
+                throw new Error(`Migration file ${file} does not export a migration with an id, up and down`);
+            }
+            migrations.push(mod.migration);
         }
 
         return migrations;
@@ -210,22 +219,7 @@ export class MigrationManager {
             return [];
         }
 
-        const justApplied: string[] = [];
-
-        for (const migration of pending) {
-            try {
-                this.logger.logMigrationApplying(migration.id);
-                await this.inTransaction(migration, async () => {
-                    await migration.up(this.db);
-                    await this.markAsApplied(migration.id);
-                });
-                justApplied.push(migration.id);
-                this.logger.logMigrationApplied(migration.id);
-            } catch (err) {
-                this.logger.logMigrationFailed(migration.id, err);
-                throw err; // stop on first failure
-            }
-        }
+        const justApplied = await this.applyPending(pending);
 
         this.logger.logRunComplete(justApplied);
         return justApplied;
@@ -239,18 +233,26 @@ export class MigrationManager {
         await this.ensureMigrationTable();
         const applied = await this.getAppliedMigrations();
         const pending = migrations.filter((m) => !applied.includes(m.id));
+        return this.applyPending(pending);
+    }
+
+    // Applies the migrations in order, each in its transaction, and stops at the first failure.
+    private async applyPending(pending: Migration[]): Promise<string[]> {
         const justApplied: string[] = [];
-
         for (const migration of pending) {
-            this.logger.logMigrationApplying(migration.id);
-            await this.inTransaction(migration, async () => {
-                await migration.up(this.db);
-                await this.markAsApplied(migration.id);
-            });
-            justApplied.push(migration.id);
-            this.logger.logMigrationApplied(migration.id);
+            try {
+                this.logger.logMigrationApplying(migration.id);
+                await this.inTransaction(migration, async () => {
+                    await migration.up(this.db);
+                    await this.markAsApplied(migration.id);
+                });
+                justApplied.push(migration.id);
+                this.logger.logMigrationApplied(migration.id);
+            } catch (err) {
+                this.logger.logMigrationFailed(migration.id, err);
+                throw err;
+            }
         }
-
         return justApplied;
     }
 
