@@ -144,11 +144,12 @@ describe("Stream zip file Use Case", () => {
             jest.spyOn(mockTaskRepository, "getZipFilePath").mockResolvedValue(zip)
             const res = new Writable({ write(_chunk, _encoding, callback) { callback(new Error("client went away")); } }) as any;
             res.setHeader = jest.fn();
-            const logged = jest.spyOn(console, "log").mockImplementation(() => undefined);
+            const logged = jest.spyOn(console, "log");
+            // The log is written once the pipeline has closed both ends: when exactly depends on the Node version
+            const interrupted = new Promise<void>(resolve => logged.mockImplementation(() => resolve()));
 
             await streamZipFileTaskUseCase.execute(current_user, 1, res);
-            await new Promise(resolve => res.on("close", resolve));
-            await new Promise(resolve => setImmediate(resolve));
+            await interrupted;
 
             expect(logged).toBeCalledWith(expect.any(String), "Download of the file of task 1 interrupted", "client went away");
             logged.mockRestore();
