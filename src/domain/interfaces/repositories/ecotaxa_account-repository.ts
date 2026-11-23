@@ -20,6 +20,8 @@ export interface EcotaxaAccountRepository {
     ecotaxa_account_belongs(user_id: number, ecotaxa_account_id: number): Promise<boolean>;
     createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number>;
     connectToEcotaxaInstance(ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcotaxaAccountModel>;
+    // POST api/token/refresh with the stored refresh token, saves the new pair. "Ecotaxa account session expired" when refused.
+    refreshEcotaxaAccountSession(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel>;
     accountExists(ecotaxa_account: PublicEcotaxaAccountRequestCreationModel): Promise<boolean>;
     getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number): Promise<EcotaxaAccountResponseModel | null>;
     formatEcotaxaAccountResponse(ecotaxa_account: EcotaxaAccountResponseModel): PublicEcotaxaAccountResponseModel;

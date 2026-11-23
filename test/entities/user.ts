@@ -87,6 +87,7 @@ export const ecotaxaAccountRequestCreationModel: EcotaxaAccountRequestCreationMo
     ecotaxa_account_ecotaxa_id: 1,
     ecotaxa_account_ecopart_user_id: 1,
     ecotaxa_account_token: "ecotaxa_token",
+    ecotaxa_account_refresh_token: "ecotaxa_refresh_token",
     ecotaxa_account_user_name: "ecotaxa_user_name",
     ecotaxa_account_user_email: "lena@gmail.com",
     ecotaxa_account_instance_id: 1,
@@ -179,6 +180,7 @@ export const ecotaxa_instance_test_ecotaxa: EcotaxaInstanceModel = {
 
 export const ecotaxa_account_1: EcotaxaAccountModel = {
     ecotaxa_token: "ecotaxa_token",
+    ecotaxa_refresh_token: "ecotaxa_refresh_token",
     ecotaxa_user_name: "ecotaxa_user_name",
     ecotaxa_account_ecotaxa_id: 1,
     ecotaxa_expiration_date: "2025-03-19T16:49:24.892Z"

@@ -48,15 +48,10 @@ describe("EcotaxaAccount Repository", () => {
             expect(result).toHaveProperty('ecotaxa_token');
             expect(result).toHaveProperty('ecotaxa_user_name');
 
-            // expected expiration date is 30 days from now
-            const expectedExpirationDate = new Date();
-            expectedExpirationDate.setDate(expectedExpirationDate.getDate() + 30);
-            const formattedExpectedExpirationDate = expectedExpirationDate.toISOString().split('T')[0];
-            // given expiration date
-            const actualExpirationDate = new Date(result.ecotaxa_expiration_date).toISOString().split('T')[0];
-
-            expect(actualExpirationDate).toBe(formattedExpectedExpirationDate);
+            // api/token: the session lasts as long as the refresh token, set by the EcoTaxa instance
+            expect(new Date(result.ecotaxa_expiration_date).getTime()).toBeGreaterThan(Date.now());
             expect(typeof result.ecotaxa_token).toBe('string');
+            expect(typeof result.ecotaxa_refresh_token).toBe('string');
             expect(result.ecotaxa_user_name).toBe('Test API user');
         });
         test("Should throw an error if cannot connect to ecotaxa account", async () => {
@@ -178,6 +173,7 @@ describe("EcotaxaAccount Repository", () => {
         test("Should delete ecotaxa account", async () => {
             const ecotaxa_account = ecotaxaAccountResponseModel_1
 
+            jest.spyOn(mockEcotaxaAccountDataSource, 'getAll').mockResolvedValue({ items: [], total: 0 })
             jest.spyOn(mockEcotaxaAccountDataSource, 'deleteOne').mockResolvedValue(1)
 
             const result = await ecotaxa_accountRepository.deleteEcotaxaAccount(ecotaxa_account)
@@ -188,6 +184,7 @@ describe("EcotaxaAccount Repository", () => {
         test("Should throw an error if cannot delete ecotaxa account", async () => {
             const ecotaxa_account = ecotaxaAccountResponseModel_1
 
+            jest.spyOn(mockEcotaxaAccountDataSource, 'getAll').mockResolvedValue({ items: [], total: 0 })
             jest.spyOn(mockEcotaxaAccountDataSource, 'deleteOne').mockResolvedValue(0)
 
             try { await ecotaxa_accountRepository.deleteEcotaxaAccount(ecotaxa_account) }
