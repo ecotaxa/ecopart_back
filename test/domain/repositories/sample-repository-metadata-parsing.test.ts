@@ -300,3 +300,21 @@ describe("max pressure of a UVP6 particules.csv", () => {
         expect(repo.getMaxPressure(repo.extractPressures(content))).toBeNull();
     });
 });
+
+describe("computeLatitudeAndLongitude (position of the sample header)", () => {
+    test("UVP5 header, degrees.minutes : ok, converted to decimal degrees", () => {
+        expect(repo.computeLatitudeAndLongitude("43.4111", "7.1901", "degrees.minutes")).toEqual({ latitude: 43.68517, longitude: 7.31683 });
+    });
+
+    test("UVP5 header with a decimal part that cannot be minutes : ko", () => {
+        expect(() => repo.computeLatitudeAndLongitude("32.9", "-28.3", "degrees.minutes")).toThrow("Position 32.9 is not in degrees.minutes");
+    });
+
+    test("UVP6 metadata, decimal degrees : ok, left as written", () => {
+        expect(repo.computeLatitudeAndLongitude("43.67861", "7.94152", "decimal degrees")).toEqual({ latitude: 43.67861, longitude: 7.94152 });
+    });
+
+    test("a position is missing : ko", () => {
+        expect(() => repo.computeLatitudeAndLongitude(undefined, "7.1901", "degrees.minutes")).toThrow("Latitude or longitude not found");
+    });
+});

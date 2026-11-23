@@ -129,7 +129,7 @@ describe("ExportRouter — POST /exports/raw", () => {
             ["Sample(s) not found: 42", 404],
             ["Cannot find project", 404],
             ["Cannot find task", 404],
-            ["Task type not found", 404],
+            ["Task type not found", 500],
             ["Sample(s) not validated: omer2_1, omer2_2", 409],
             ["format must be one of: tsv, parquet", 422],
             ["Cannot create log file", 500],

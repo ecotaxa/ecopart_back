@@ -462,7 +462,7 @@ describe("User Router", () => {
                 .set("Cookie", `access_token=${valid_token}; Path=/; HttpOnly;`)
                 .send(credentials);
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse);
         });
     })

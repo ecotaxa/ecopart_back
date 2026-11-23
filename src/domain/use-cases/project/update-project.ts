@@ -259,17 +259,14 @@ export class UpdateProject implements UpdateProjectUseCase {
     }
 
     private async updateProjectProperties(project_to_update: ProjectUpdateModel, privilegeUpdated: boolean): Promise<void> {
-        try {
-            const updated_count = await this.projectRepository.standardUpdateProject(project_to_update);
-            // TODO not sure about this
-            if (updated_count === 0) {
-                throw new Error("Cannot update project");
-            }
-        } catch (e) {
-            if (e.message === "Please provide at least one property to update" && !privilegeUpdated) {
-                throw new Error("Please provide at least one property to update");
-            }
-            throw e;
+        // Privileges alone were sent and are already replaced: no project property is left to write,
+        // and the repository refuses an update without any.
+        if (privilegeUpdated && Object.keys(project_to_update).length <= 1) return;
+
+        const updated_count = await this.projectRepository.standardUpdateProject(project_to_update);
+        // TODO not sure about this
+        if (updated_count === 0) {
+            throw new Error("Cannot update project");
         }
     }
 

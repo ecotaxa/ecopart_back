@@ -258,7 +258,7 @@ export default function AuthRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: New password must be different from old password.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -270,7 +270,7 @@ export default function AuthRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error, or the new password is the same as the old one.
      *         content:
      *           application/json:
      *             schema:
@@ -293,7 +293,7 @@ export default function AuthRouter(
                 .json({ message: "Password sucessfully changed" });
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "New password must be different from old password") res.status(401).send({ errors: ["New password must be different from old password"] })
+            if (err.message === "New password must be different from old password") res.status(422).send({ errors: ["New password must be different from old password"] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot change password"] })
         }

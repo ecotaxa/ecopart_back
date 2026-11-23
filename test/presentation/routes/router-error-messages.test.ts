@@ -13,7 +13,6 @@ const KNOWN_UNREACHABLE = new Set([
     "Cannot create ecotaxa account",
     "Cannot create privileges for project",
     "Cannot find deleted user",
-    "Cannot find task file",
     "Contact user cannot be use",
     "Ecotaxa instance id should be a number",
     "HTTP Error: 403",

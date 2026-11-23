@@ -204,7 +204,7 @@ describe("Project Router", () => {
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
             const response = await request(server).get("/projects")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -214,7 +214,7 @@ describe("Project Router", () => {
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
             const response = await request(server).get("/projects")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
 
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
@@ -266,7 +266,7 @@ describe("Project Router", () => {
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
             const response = await request(server).post("/projects/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -276,7 +276,7 @@ describe("Project Router", () => {
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
             const response = await request(server).post("/projects/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
 
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
@@ -287,7 +287,7 @@ describe("Project Router", () => {
             jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => { throw new Error("Invalid filter statement Value for operator 'IN' must be an array in filter: {field: user_id, operator: IN, value:1 } ") })
             const response = await request(server).post("/projects/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -300,6 +300,52 @@ describe("Project Router", () => {
             expect(response.status).toBe(500)
             expect(mockSearchProjectsUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
+        });
+    })
+
+    describe("Messages the use cases really throw", () => {
+        test.each([
+            "members should be a number",
+            "members should be an array of numbers",
+            "members should be an array of numbers or a number",
+            "managers should be an array of numbers or a number",
+            "granted_users should be a number",
+        ])("POST /projects/searches with a bad user filter (%s) : ko, 422", async (message) => {
+            jest.spyOn(mockSearchProjectsUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).post("/projects/searches")
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+
+        test.each([
+            ["Cannot find project", 404],
+            ["Ecotaxa instance not found", 404],
+        ])("GET /projects/:project_id/ecotaxa_samples fail for %s : ko, %i", async (message, status) => {
+            jest.spyOn(mockSearchEcoTaxaSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message as string)))
+            const response = await request(server).get("/projects/1/ecotaxa_samples")
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+
+        test.each([
+            ["Project not found", 404],
+            ["Some samples to delete were not found: s1, s2", 404],
+            ["Ecotaxa instance not found", 404],
+            ["The sample to delete does not have an associated EcoTaxa sample", 409],
+            ["No linked EcoTaxa project", 409],
+            ["Logged user cannot delete this sample", 403],
+        ])("DELETE /projects/:project_id/ecotaxa_samples fail for %s : ko, %i", async (message, status) => {
+            jest.spyOn(mockDeleteEcoTaxaSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message as string)))
+            const response = await request(server).delete("/projects/1/ecotaxa_samples").send({ samples: ["s1"] })
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [message] })
+        });
+
+        test("POST /projects fail for Ecotaxa instance not found (as the repository throws it) : ko, 404", async () => {
+            jest.spyOn(mockCreateProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Ecotaxa instance not found")))
+            const response = await request(server).post("/projects").send(projectRequestCreationModel)
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual({ errors: ["Ecotaxa instance not found"] })
         });
     })
 
@@ -387,13 +433,13 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
 
-        test("PATCH /projects fail for User is deleted", async () => {
+        test("PATCH /projects fail for User cannot be used", async () => {
             const project_to_update = partial_projectUpdateModel
 
-            const expectedResponse = { errors: ["User is deleted"] }
+            const expectedResponse = { errors: ["User cannot be used"] }
 
 
-            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("User is deleted")))
+            jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("User cannot be used")))
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
             expect(response.status).toBe(403)
@@ -425,7 +471,7 @@ describe("Project Router", () => {
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find updated project")))
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -437,7 +483,7 @@ describe("Project Router", () => {
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters") })
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse))
         });
@@ -449,7 +495,7 @@ describe("Project Router", () => {
             jest.spyOn(mockUpdateProjectUseCase, "execute").mockImplementation(() => { throw new Error("Please provide at least one valid parameter to update") })
             const response = await request(server).patch("/projects/2").send(project_to_update)
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockUpdateProjectUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -556,19 +602,19 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task type not found
-        test("POST /projects/:project_id/backup fail for Task type not found should return 404", async () => {
+        test("POST /projects/:project_id/backup fail for Task type not found should return 500", async () => {
             const expectedResponse = { errors: ["Task type not found"] }
             jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task type not found")))
             const response = await request(server).post("/projects/1/backup")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task status not found
-        test("POST /projects/:project_id/backup fail for Task status not found should return 404", async () => {
+        test("POST /projects/:project_id/backup fail for Task status not found should return 500", async () => {
             const expectedResponse = { errors: ["Task status not found"] }
             jest.spyOn(mockBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task status not found")))
             const response = await request(server).post("/projects/1/backup")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot create log file
@@ -664,19 +710,19 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task type not found
-        test("POST /projects/:project_id/export fail for Task type not found should return 404", async () => {
+        test("POST /projects/:project_id/export fail for Task type not found should return 500", async () => {
             const expectedResponse = { errors: ["Task type not found"] }
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task type not found")))
             const response = await request(server).post("/projects/1/backup/export")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task status not found
-        test("POST /projects/:project_id/export fail for Task status not found should return 404", async () => {
+        test("POST /projects/:project_id/export fail for Task status not found should return 500", async () => {
             const expectedResponse = { errors: ["Task status not found"] }
             jest.spyOn(mockExportBackupProjectUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task status not found")))
             const response = await request(server).post("/projects/1/backup/export")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot create log file
@@ -833,7 +879,7 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task type not found 404
-        test("POST /projects/:project_id/samples/import fail for Task type not found and should return error 404", async () => {
+        test("POST /projects/:project_id/samples/import fail for Task type not found and should return error 500", async () => {
             const expectedResponse = {
                 success: false,
                 errors: {
@@ -842,11 +888,11 @@ describe("Project Router", () => {
             }
             jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task type not found")))
             const response = await request(server).post("/projects/1/samples/import")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Task status not found 404
-        test("POST /projects/:project_id/samples/import fail for Task status not found and should return error 404", async () => {
+        test("POST /projects/:project_id/samples/import fail for Task status not found and should return error 500", async () => {
             const expectedResponse = {
                 success: false,
                 errors: {
@@ -855,7 +901,7 @@ describe("Project Router", () => {
             }
             jest.spyOn(mockImportSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Task status not found")))
             const response = await request(server).post("/projects/1/samples/import")
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot create log file 500
@@ -1018,7 +1064,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Missing field, operator, or value in filter"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Missing field, operator, or value in filter")))
             const response = await request(server).get("/projects/1/samples")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Invalid sorting statement
@@ -1026,7 +1072,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Invalid sorting statement"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Invalid sorting statement")))
             const response = await request(server).get("/projects/1/samples")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Sample type not found
@@ -1050,7 +1096,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized sort_by:"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized sort_by:")))
             const response = await request(server).get("/projects/1/samples")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Unauthorized order_by:
@@ -1058,7 +1104,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized order_by:"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized order_by:")))
             const response = await request(server).get("/projects/1/samples")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Unauthorized or unexisting parameters :
@@ -1066,7 +1112,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized or unexisting parameters :"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized or unexisting parameters :")))
             const response = await request(server).get("/projects/1/samples")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot get samples
@@ -1106,7 +1152,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Missing field, operator, or value in filter"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Missing field, operator, or value in filter")))
             const response = await request(server).post("/projects/1/samples/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Invalid sorting statement
@@ -1114,7 +1160,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Invalid sorting statement"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Invalid sorting statement")))
             const response = await request(server).post("/projects/1/samples/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Sample type not found
@@ -1138,7 +1184,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized sort_by:"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized sort_by:")))
             const response = await request(server).post("/projects/1/samples/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Unauthorized order_by:
@@ -1146,7 +1192,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized order_by:"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized order_by:")))
             const response = await request(server).post("/projects/1/samples/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Unauthorized or unexisting parameters :
@@ -1154,7 +1200,7 @@ describe("Project Router", () => {
             const expectedResponse = { errors: ["Unauthorized or unexisting parameters :"] }
             jest.spyOn(mockSearchSamplesUseCase, "execute").mockImplementation(() => Promise.reject(new Error("Unauthorized or unexisting parameters :")))
             const response = await request(server).post("/projects/1/samples/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Cannot search samples
@@ -1295,11 +1341,11 @@ describe("Project Router", () => {
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // The given project_id does not match the sample's project_id
-        test("DELETE /projects/:project_id/samples/:sample_id fail for The given project_id does not match the sample's project_id should return 401", async () => {
+        test("DELETE /projects/:project_id/samples/:sample_id fail for The given project_id does not match the sample's project_id should return 404", async () => {
             const expectedResponse = { errors: ["The given project_id does not match the sample's project_id"] }
             jest.spyOn(mockDeleteSampleUseCase, "execute").mockImplementation(() => Promise.reject(new Error("The given project_id does not match the sample's project_id")))
             const response = await request(server).delete("/projects/1/samples/1")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(404)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         // Logged user cannot delete samples in this project

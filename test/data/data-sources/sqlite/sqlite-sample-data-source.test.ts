@@ -286,7 +286,7 @@ describe('SQLiteSampleDataSource', () => {
             }
             await create('rows_b', { station_id: 'st_2', latitude: 10, longitude: 20, sampling_utc_date_time: '2024-02-01T00:00:00Z' },
                 { use_ctd_coordinates: 1, ctd_latitude: 11, ctd_longitude: 21, ctd_imported: 1, ctd_file_extension: 'ctd' })
-            await create('rows_a', { station_id: 'st_1', latitude: 43.4, longitude: 7.87, sampling_utc_date_time: '20240101120000', instrument_serial_number: 'sn_42' },
+            await create('rows_a', { station_id: 'st_1', latitude: 43.4, longitude: 7.87, sampling_utc_date_time: '2024-01-01T12:00:00Z', instrument_serial_number: 'sn_42' },
                 { instrument_settings_acq_exposure: null })
         })
 
@@ -301,7 +301,6 @@ describe('SQLiteSampleDataSource', () => {
             })
             expect(rows[1]).toMatchObject({
                 station_id: 'st_1', latitude: 43.4, longitude: 7.87, sample_latitude: 43.4, sample_longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false,
-                // Legacy UVP5 date format read as an ISO date-time, like the Explore rows.
                 sampling_utc_date_time: '2024-01-01T12:00:00Z',
                 instrument_serial_number: 'sn_42', instrument_settings_acq_exposure: null,
                 instrument_settings_pixel_size_mm: sampleRequestCreationModel_1.instrument_settings_pixel_size_mm,
@@ -370,9 +369,8 @@ describe('SQLiteSampleDataSource', () => {
         })
     })
 
-    describe('Explore queries on legacy sampling dates', () => {
-        // Samples imported before the ISO conversion keep the UVP formats: "20120520080213" (UVP5),
-        // "20230406-144332-820" (UVP6). The Explore query reads them as ISO date-times.
+    describe('Explore queries on sampling dates', () => {
+        // Sampling dates are ISO UTC date-times (the UVP formats of the first imports were rewritten by migration 043)
         const P_LEGACY = 9005
         const query = (overrides: Partial<ExploreSampleQuery> = {}): ExploreSampleQuery => ({
             sample_type_label: 'Depth', project_ids: [P_LEGACY], bounds: null, date_from: null, date_to: null, months: [], sample_names: [],
@@ -383,21 +381,21 @@ describe('SQLiteSampleDataSource', () => {
         beforeAll(async () => {
             const depth_type_id = await new Promise<number>((resolve, reject) =>
                 db.get("SELECT sample_type_id AS id FROM sample_type WHERE sample_type_label = 'Depth'", [], (e, row: any) => e ? reject(e) : resolve(row.id)))
-            for (const [sample_name, sampling_utc_date_time] of [['legacy_uvp5', '20120520080213'], ['legacy_uvp6', '20230406-144332-820'], ['iso_sample', '2024-06-12T10:20:00Z']]) {
+            for (const [sample_name, sampling_utc_date_time] of [['sample_2012', '2012-05-20T08:02:13Z'], ['sample_2023', '2023-04-06T14:43:32Z'], ['sample_2024', '2024-06-12T10:20:00Z']]) {
                 await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_LEGACY, sample_type_id: depth_type_id, sampling_utc_date_time })
             }
         })
 
-        test('the dates come back as ISO date-times', async () => {
+        test('the dates come back as stored', async () => {
             const rows = await dataSource.getExploreSamples(query())
             const dates = Object.fromEntries(rows.map(row => [row.sample_name, row.sampling_utc_date_time]))
-            expect(dates).toEqual({ legacy_uvp5: '2012-05-20T08:02:13Z', legacy_uvp6: '2023-04-06T14:43:32Z', iso_sample: '2024-06-12T10:20:00Z' })
+            expect(dates).toEqual({ sample_2012: '2012-05-20T08:02:13Z', sample_2023: '2023-04-06T14:43:32Z', sample_2024: '2024-06-12T10:20:00Z' })
         })
 
-        test('date, month and hour criteria apply to the legacy formats', async () => {
-            expect(await names({ date_from: '2012-05-20', date_to: '2012-05-20' })).toEqual(['legacy_uvp5'])
-            expect(await names({ months: [4, 6] })).toEqual(['iso_sample', 'legacy_uvp6'])
-            expect(await names({ hour_range: [14, 15] })).toEqual(['legacy_uvp6'])
+        test('date, month and hour criteria : ok', async () => {
+            expect(await names({ date_from: '2012-05-20', date_to: '2012-05-20' })).toEqual(['sample_2012'])
+            expect(await names({ months: [4, 6] })).toEqual(['sample_2023', 'sample_2024'])
+            expect(await names({ hour_range: [14, 15] })).toEqual(['sample_2023'])
         })
     })
 
@@ -453,6 +451,12 @@ describe('SQLiteSampleDataSource', () => {
             const rows = await dataSource.getEcoTaxaStats([with_id, without_id])
             expect(rows.find(row => row.sample_id === with_id)?.used_taxa).toEqual([1, 2, 3])
             expect(rows.find(row => row.sample_id === without_id)?.used_taxa).toEqual([])
+        })
+
+        test('getEcoTaxaStats: more ids than SQLite accepts bound variables : ok', async () => {
+            const ids = Array.from({ length: 40000 }, (_, index) => 1000000 + index)
+            const rows = await dataSource.getEcoTaxaStats([...ids, with_id])
+            expect(rows.map(row => row.sample_id)).toEqual([with_id])
         })
 
         test('getEcoTaxaStats: nothing for an empty list or samples without stats', async () => {

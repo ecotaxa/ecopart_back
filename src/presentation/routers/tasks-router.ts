@@ -59,6 +59,12 @@ export default function TaskRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
      *       500:
      *         description: Internal server error.
      *         content:
@@ -77,6 +83,9 @@ export default function TaskRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
     })
@@ -150,7 +159,7 @@ export default function TaskRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskSearchResponse'
      *       401:
-     *         description: Invalid filter value.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -163,6 +172,12 @@ export default function TaskRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Task type or status label not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -184,7 +199,10 @@ export default function TaskRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Task type label not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task status label not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task managing filter value is not valid") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement")) res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Task managing filter value is not valid") res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search tasks"] })
         }
     })
@@ -551,7 +569,9 @@ export default function TaskRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] });
             else if (err.message === "ZIP file not found") res.status(404).send({ errors: [err.message] });
-            else if (err.message === "Cannot find task file") res.status(404).send({ errors: [err.message] });
+            else if (err.message.startsWith("No file found for task ")) res.status(404).send({ errors: [err.message] });
+            // The task folder itself is gone (task results removed)
+            else if (err.code === "ENOENT") res.status(404).send({ errors: ["ZIP file not found"] });
             else if (err.message === "User does not have the necessary permissions to access this task.") res.status(403).send({ errors: ["Cannot get task file"] });
             else res.status(500).send({ errors: ["Cannot get task file"] });
         }

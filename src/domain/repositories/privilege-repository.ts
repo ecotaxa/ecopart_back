@@ -109,12 +109,14 @@ export class PrivilegeRepositoryImpl implements PrivilegeRepository {
         }
         return publicPrivilege;
     }
-    // Get projects by filter
+    // Every privilege matching the filters: an internal lookup, never a page shown to a user. A row left
+    // out would silently take a right away (a project missing from "my projects", a member read as a
+    // plain user), hence no cap.
     async getPrivilegesByFilter(filters: FilterSearchOptions[]): Promise<SearchResult<PrivilegeResponseModel>> {
         const prepare_options: PreparedSearchOptions = {
             filter: filters,
             sort_by: [{ sort_by: "privilege_creation_utc_date_time", order_by: "desc" }],
-            limit: 1000,
+            limit: Number.MAX_SAFE_INTEGER,
             page: 1
         };
         const privileges = await this.privilegeDataSource.getAll(prepare_options);

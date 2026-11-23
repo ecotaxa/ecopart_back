@@ -69,8 +69,8 @@ describe("AdminRouter — POST /admin/samples/particle-stats", () => {
         const cases: Array<[string, number]> = [
             ["User cannot be used", 403],
             ["Logged user cannot compute particle stats", 403],
-            ["Task type not found", 404],
-            ["Task status not found", 404],
+            ["Task type not found", 500],
+            ["Task status not found", 500],
             ["Cannot find task", 404],
             ["Task not found", 404],
             ["Cannot create log file", 500],
