@@ -63,6 +63,7 @@ export class LoginEcotaxaAccount implements LoginEcotaxaAccountUseCase {
             ecotaxa_account_ecotaxa_id: ecotaxa_data.ecotaxa_account_ecotaxa_id,
             ecotaxa_account_ecopart_user_id: ecotaxa_account_to_create.ecopart_user_id,
             ecotaxa_account_token: ecotaxa_data.ecotaxa_token,
+            ecotaxa_account_refresh_token: ecotaxa_data.ecotaxa_refresh_token,
             ecotaxa_account_user_name: ecotaxa_data.ecotaxa_user_name,
             ecotaxa_account_user_email: ecotaxa_account_to_create.ecotaxa_user_login,
             ecotaxa_account_instance_id: ecotaxa_account_to_create.ecotaxa_instance_id,

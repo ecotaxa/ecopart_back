@@ -1,5 +1,5 @@
 import { EcotaxaAccountDataSource } from "../../data/interfaces/data-sources/ecotaxa_account-data-source";
-import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject, EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaSearchedProject, EcoTaxaTaxon } from "../entities/ecotaxa_account";
+import { PublicEcotaxaAccountRequestCreationModel, EcotaxaAccountModel, EcotaxaAccountRequestCreationModel, EcotaxaAccountUser, EcotaxaInstanceModel, EcotaxaInstanceRequestCreationModel, EcotaxaAccountRequestModel, EcotaxaAccountResponseModel, PublicEcotaxaAccountResponseModel, EcoTaxaProject, EcoTaxaObjectSetPage, EcoTaxaObjectSetQuery, EcoTaxaSearchedProject, EcoTaxaTaxon, EcoTaxaTokenPair } from "../entities/ecotaxa_account";
 import { ProjectResponseModel, PublicProjectRequestCreationModel, PublicProjectUpdateModel } from "../entities/project";
 import { PublicImportableEcoTaxaSampleResponseModel } from "../entities/sample";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
@@ -7,7 +7,7 @@ import { UserUpdateModel } from "../entities/user";
 
 import path from 'path';
 import * as fsPromises from 'fs/promises';
-import fetch, { FormData, fileFromSync, RequestInfo, RequestInit } from "node-fetch";
+import fetch, { FormData, fileFromSync, Headers, RequestInfo, RequestInit, Response } from "node-fetch";
 import https from "https";
 
 import { ECOTAXA_BIOTA_TAXO_ID } from "../constants/ecotaxa-living-taxo";
@@ -21,6 +21,19 @@ import { Agent } from "http";
 import { TokenCipherWrapper } from "../../infra/cryptography/token-cipher-wrapper";
 import { AesGcmTokenCipher } from "../../infra/cryptography/aes-gcm-token-cipher";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Lifetime of a former api/login token (EcoTaxa MAX_TOKEN_AGE is 31 days).
+const LEGACY_TOKEN_DAYS = 30;
+// An access token replaced by a refresh is still mapped to its account this long, for the callers that kept it.
+const REPLACED_TOKEN_KEPT_MS = 7 * DAY_MS;
+
+// A login or a refresh: the access token, the refresh token (null for a former api/login token) and the end of the session.
+interface EcoTaxaSession {
+    access_token: string;
+    refresh_token: string | null;
+    expiration_utc_date_time: string;
+}
+
 export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     ecotaxa_accountDataSource: EcotaxaAccountDataSource
 
@@ -32,6 +45,12 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     insecureHttpsAgent: Agent | undefined
     tokenCipher: TokenCipherWrapper
     private unreadable_token_reported = new Set<number>()
+    // Access token -> its stored account, to refresh the session behind a token EcoTaxa refuses (see fetchWithAgent).
+    private token_accounts = new Map<string, { ecotaxa_account_id: number; replaced_at?: number }>()
+    // Latest access token of each account refreshed by this process.
+    private latest_tokens = new Map<number, string>()
+    // One refresh at a time per account: a refresh token is single-use, presenting it twice revokes the session.
+    private refreshing = new Map<number, Promise<string>>()
 
     // TODO Define the mapping between EcoTaxa and EcoPart instruments in a .env or conf file 
     // ecopart ['UVP5HD', 'UVP5SD', 'UVP5Z', 'UVP6LP', 'UVP6HF', 'UVP6MHP', 'UVP6MHF']
@@ -97,13 +116,90 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         // }
         return ecotaxa_account_data
     }
-    async api_ecotaxa_login(base_url: string, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<string> {
+    // POST api/token (OAuth2 password flow): an access token and a refresh token. An EcoTaxa older than these
+    // routes (404 or 405, as the EcoTaxa front checks) gets the former api/login, whose single token lasts
+    // LEGACY_TOKEN_DAYS and cannot be refreshed.
+    async api_ecotaxa_login(base_url: string, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcoTaxaSession> {
+        const response = await this.rawFetch(base_url + "api/token", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json"
+            },
+            body: new URLSearchParams({
+                grant_type: "password",
+                username: ecotaxa_account_to_create.ecotaxa_user_login,
+                password: ecotaxa_account_to_create.ecotaxa_user_password,
+            }).toString()
+        });
+        if (response.status === 404 || response.status === 405) {
+            return {
+                access_token: await this.api_ecotaxa_legacy_login(base_url, ecotaxa_account_to_create),
+                refresh_token: null,
+                expiration_utc_date_time: new Date(Date.now() + LEGACY_TOKEN_DAYS * DAY_MS).toISOString(),
+            };
+        }
+        if (!response.ok) {
+            throw new Error(`Cannot login into EcoTaxa, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${await this.errorDetails(response)}`);
+        }
+        return this.toSession(await response.json() as EcoTaxaTokenPair);
+    }
+
+    // POST api/token/refresh: the new pair, or null when EcoTaxa refuses the refresh token (expired, revoked,
+    // or already used): the session is over and the user must log in again.
+    async api_ecotaxa_refresh_token(base_url: string, refresh_token: string): Promise<EcoTaxaSession | null> {
+        const response = await this.rawFetch(base_url + "api/token/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ refresh_token }),
+        });
+        if (response.status === 401) return null;
+        if (!response.ok) {
+            throw new Error(`Cannot refresh the EcoTaxa session, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${await this.errorDetails(response)}`);
+        }
+        return this.toSession(await response.json() as EcoTaxaTokenPair);
+    }
+
+    // POST api/token/revoke: ends the session on EcoTaxa (always succeeds there, whatever the token).
+    async api_ecotaxa_revoke_token(base_url: string, refresh_token: string): Promise<void> {
+        const response = await this.rawFetch(base_url + "api/token/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ refresh_token }),
+        });
+        if (!response.ok) {
+            throw new Error(`Cannot revoke the EcoTaxa session, EcoTaxa HTTP Error: ${response.status} - ${response.statusText} - msg: ${await this.errorDetails(response)}`);
+        }
+    }
+
+    // The session ends with its refresh token: the access token is renewed on the way until then.
+    private toSession(pair: EcoTaxaTokenPair): EcoTaxaSession {
+        return {
+            access_token: pair.access_token,
+            refresh_token: pair.refresh_token,
+            expiration_utc_date_time: new Date(Date.now() + pair.refresh_expires_in * 1000).toISOString(),
+        };
+    }
+
+    private async errorDetails(response: Response): Promise<string> {
+        try {
+            return JSON.stringify(await response.clone().json(), null, 2);
+        } catch {
+            try {
+                return await response.text();
+            } catch {
+                return "Unknown error (response body could not be read)";
+            }
+        }
+    }
+
+    private async api_ecotaxa_legacy_login(base_url: string, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<string> {
         const credentials = {
             username: ecotaxa_account_to_create.ecotaxa_user_login,
             password: ecotaxa_account_to_create.ecotaxa_user_password
         };
 
-        const response = await this.fetchWithAgent(base_url + "api/login", {
+        const response = await this.rawFetch(base_url + "api/login", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -372,29 +468,39 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return ecotaxa_account?.ecotaxa_account_ecopart_user_id == user_id || false;
     }
     async createEcotaxaAccount(private_ecotaxa_account_to_create: EcotaxaAccountRequestCreationModel): Promise<number> {
+        const refresh_token = private_ecotaxa_account_to_create.ecotaxa_account_refresh_token;
         return await this.ecotaxa_accountDataSource.create({
             ...private_ecotaxa_account_to_create,
             ecotaxa_account_token: this.tokenCipher.encrypt(private_ecotaxa_account_to_create.ecotaxa_account_token),
+            ecotaxa_account_refresh_token: refresh_token ? this.tokenCipher.encrypt(refresh_token) : null,
         });
     }
 
-    // Every account read from the data source goes through here, so callers always get a usable token. A token
+    // Every account read from the data source goes through here, so callers always get usable tokens. A token
     // that cannot be decrypted (key changed or removed) becomes empty: EcoTaxa then refuses it like an expired one,
-    // and the user logs in to EcoTaxa again, instead of every listing of accounts failing.
+    // and the user logs in to EcoTaxa again, instead of every listing of accounts failing. The access token is
+    // mapped to its account, so a call EcoTaxa refuses with it refreshes the session (see fetchWithAgent).
     private withReadableToken(ecotaxa_account: EcotaxaAccountResponseModel): EcotaxaAccountResponseModel {
         try {
-            return { ...ecotaxa_account, ecotaxa_account_token: this.tokenCipher.decrypt(ecotaxa_account.ecotaxa_account_token) };
+            const token = this.tokenCipher.decrypt(ecotaxa_account.ecotaxa_account_token);
+            const stored_refresh_token = ecotaxa_account.ecotaxa_account_refresh_token;
+            const readable: EcotaxaAccountResponseModel = { ...ecotaxa_account, ecotaxa_account_token: token };
+            if (stored_refresh_token) readable.ecotaxa_account_refresh_token = this.tokenCipher.decrypt(stored_refresh_token);
+            if (token && !this.token_accounts.has(token)) {
+                this.token_accounts.set(token, { ecotaxa_account_id: ecotaxa_account.ecotaxa_account_id });
+            }
+            return readable;
         } catch (error) {
             if (!this.unreadable_token_reported.has(ecotaxa_account.ecotaxa_account_id)) {
                 this.unreadable_token_reported.add(ecotaxa_account.ecotaxa_account_id);
                 console.log(new Date().toISOString(), `EcoTaxa account ${ecotaxa_account.ecotaxa_account_id}: token cannot be decrypted (${(error as Error).message}), the user must log in to EcoTaxa again`);
             }
-            return { ...ecotaxa_account, ecotaxa_account_token: "" };
+            return { ...ecotaxa_account, ecotaxa_account_token: "", ecotaxa_account_refresh_token: null };
         }
     }
 
-    // Run at startup: encrypts the tokens saved in clear (before a key was configured) and counts those the
-    // current key cannot read. Without a key it only counts.
+    // Run at startup: encrypts the tokens saved in clear (before a key was configured) and counts the accounts
+    // whose tokens the current key cannot read. Without a key it only counts.
     async encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }> {
         let encrypted = 0;
         let unreadable = 0;
@@ -402,15 +508,17 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         for (let page = 1; ; page++) {
             const result = await this.ecotaxa_accountDataSource.getAll({ filter: [], sort_by: [], page, limit });
             for (const ecotaxa_account of result.items) {
-                const stored = ecotaxa_account.ecotaxa_account_token;
-                if (this.tokenCipher.isEncrypted(stored)) {
-                    try {
-                        this.tokenCipher.decrypt(stored);
-                    } catch {
-                        unreadable++;
-                    }
-                } else if (this.tokenCipher.enabled) {
-                    await this.ecotaxa_accountDataSource.updateToken(ecotaxa_account.ecotaxa_account_id, this.tokenCipher.encrypt(stored));
+                const stored = [ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_refresh_token ?? null];
+                const in_clear = stored.some((token) => token !== null && !this.tokenCipher.isEncrypted(token));
+                try {
+                    stored.forEach((token) => { if (token !== null && this.tokenCipher.isEncrypted(token)) this.tokenCipher.decrypt(token) });
+                } catch {
+                    unreadable++;
+                    continue;
+                }
+                if (in_clear && this.tokenCipher.enabled) {
+                    const [token, refresh_token] = stored.map((value) => value === null || this.tokenCipher.isEncrypted(value) ? value : this.tokenCipher.encrypt(value));
+                    await this.ecotaxa_accountDataSource.updateTokens(ecotaxa_account.ecotaxa_account_id, token as string, refresh_token, ecotaxa_account.ecotaxa_account_expiration_utc_date_time);
                     encrypted++;
                 }
             }
@@ -442,20 +550,134 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const instance_url = await this.getInstanceURL(ecotaxa_account_to_create.ecotaxa_instance_id)
 
         // Connect to the ecotaxa instance login api
-        const ecotaxa_token = await this.api_ecotaxa_login(instance_url, ecotaxa_account_to_create)
+        const session = await this.api_ecotaxa_login(instance_url, ecotaxa_account_to_create)
 
-
-        const expiration_date = new Date();
-        expiration_date.setDate(expiration_date.getDate() + 30);
-
-        const me = await this.api_ecotaxa_me(instance_url, ecotaxa_token)
+        const me = await this.api_ecotaxa_me(instance_url, session.access_token)
 
         // Return the ecotaxa account model
         return {
             ecotaxa_account_ecotaxa_id: me.id,
-            ecotaxa_token: ecotaxa_token,
+            ecotaxa_token: session.access_token,
+            ecotaxa_refresh_token: session.refresh_token,
             ecotaxa_user_name: me.name,
-            ecotaxa_expiration_date: expiration_date.toISOString()
+            ecotaxa_expiration_date: session.expiration_utc_date_time
+        }
+    }
+
+    // ---- EcoTaxa sessions ---------------------------------------------------------
+    // An access token from api/token lasts one hour (EcoTaxa default), its refresh token ten days. Every call
+    // to EcoTaxa with a token goes through fetchWithAgent: when EcoTaxa refuses (401) the access token of a stored
+    // account, the session is refreshed, both tokens are saved, and the call is sent again with the new token.
+    // A caller holding the former token (a job polled for hours, a cached Explore access) gets the new one.
+    // Every session is also renewed once a day (refreshEcotaxaAccountSessions), so it does not end unused.
+
+    // Refreshes the session of an account now, e.g. from the "Reconnect" button of an expired account.
+    // Fails with "Ecotaxa account session expired" when EcoTaxa refuses the refresh token, or there is none
+    // (account logged in with the former api/login): the user must log in again.
+    async refreshEcotaxaAccountSession(ecotaxa_account_id: number): Promise<EcotaxaAccountResponseModel> {
+        await this.refreshAccessToken(ecotaxa_account_id, null);
+        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
+        if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
+        return ecotaxa_account;
+    }
+
+    // Run at startup then once a day: renews every session that has a refresh token and has not ended, so that a
+    // refresh token (10 days on EcoTaxa) never expires while an account is not used, the generic account first.
+    // One account at a time, through the same per-account lock as the calls refused by EcoTaxa.
+    async refreshEcotaxaAccountSessions(): Promise<{ refreshed: number; ended: number; failed: number }> {
+        const now = Date.now();
+        const to_refresh: number[] = [];
+        const limit = 1000;
+        for (let page = 1; ; page++) {
+            const result = await this.ecotaxa_accountDataSource.getAll({ filter: [], sort_by: [], page, limit });
+            for (const ecotaxa_account of result.items) {
+                if (ecotaxa_account.ecotaxa_account_refresh_token && new Date(ecotaxa_account.ecotaxa_account_expiration_utc_date_time).getTime() > now) {
+                    to_refresh.push(ecotaxa_account.ecotaxa_account_id);
+                }
+            }
+            if (page * limit >= result.total) break;
+        }
+        let refreshed = 0;
+        let ended = 0;
+        let failed = 0;
+        for (const ecotaxa_account_id of to_refresh) {
+            try {
+                await this.refreshAccessToken(ecotaxa_account_id, null);
+                refreshed++;
+            } catch (error) {
+                const message = (error as Error).message;
+                // Removed since the listing: nothing to renew
+                if (message === "Ecotaxa account not found") continue;
+                if (message === "Ecotaxa account session expired") ended++;
+                else failed++;
+                console.log(new Date().toISOString(), `EcoTaxa account ${ecotaxa_account_id}: the daily renewal of the EcoTaxa session failed (${message})`);
+            }
+        }
+        return { refreshed, ended, failed };
+    }
+
+    // The new access token of the account. One refresh at a time per account: the callers refused at the same
+    // time all wait for it. refused_token null forces a refresh; otherwise a token already replaced (by a refresh
+    // of this process that ended meanwhile, or of another one) is not refreshed again.
+    private refreshAccessToken(ecotaxa_account_id: number, refused_token: string | null): Promise<string> {
+        const pending = this.refreshing.get(ecotaxa_account_id);
+        if (pending) return pending;
+        const refresh = this.refreshSession(ecotaxa_account_id, refused_token)
+            .finally(() => this.refreshing.delete(ecotaxa_account_id));
+        this.refreshing.set(ecotaxa_account_id, refresh);
+        return refresh;
+    }
+
+    private async refreshSession(ecotaxa_account_id: number, refused_token: string | null): Promise<string> {
+        const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
+        if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
+        if (refused_token !== null && ecotaxa_account.ecotaxa_account_token && ecotaxa_account.ecotaxa_account_token !== refused_token) {
+            this.rememberRefreshedToken(ecotaxa_account_id, refused_token, ecotaxa_account.ecotaxa_account_token);
+            return ecotaxa_account.ecotaxa_account_token;
+        }
+        if (!ecotaxa_account.ecotaxa_account_refresh_token) throw new Error("Ecotaxa account session expired");
+
+        const base_url = await this.getInstanceURL(ecotaxa_account.ecotaxa_account_instance_id);
+        const session = await this.api_ecotaxa_refresh_token(base_url, ecotaxa_account.ecotaxa_account_refresh_token);
+        if (!session) {
+            // Refused: the session is over. Shown as expired until the user logs in again.
+            await this.ecotaxa_accountDataSource.updateExpiration(ecotaxa_account_id, new Date().toISOString());
+            throw new Error("Ecotaxa account session expired");
+        }
+        await this.ecotaxa_accountDataSource.updateTokens(
+            ecotaxa_account_id,
+            this.tokenCipher.encrypt(session.access_token),
+            session.refresh_token ? this.tokenCipher.encrypt(session.refresh_token) : null,
+            session.expiration_utc_date_time,
+        );
+        this.rememberRefreshedToken(ecotaxa_account_id, ecotaxa_account.ecotaxa_account_token, session.access_token);
+        return session.access_token;
+    }
+
+    private rememberRefreshedToken(ecotaxa_account_id: number, replaced_token: string, new_token: string): void {
+        const now = Date.now();
+        for (const [token, owner] of this.token_accounts) {
+            if (owner.replaced_at !== undefined && now - owner.replaced_at > REPLACED_TOKEN_KEPT_MS) this.token_accounts.delete(token);
+        }
+        if (replaced_token) this.token_accounts.set(replaced_token, { ecotaxa_account_id, replaced_at: now });
+        this.token_accounts.set(new_token, { ecotaxa_account_id });
+        this.latest_tokens.set(ecotaxa_account_id, new_token);
+    }
+
+    // The latest access token of the account a token belongs to (the token itself when it was never replaced).
+    private currentToken(token: string): string {
+        const owner = this.token_accounts.get(token);
+        return (owner && this.latest_tokens.get(owner.ecotaxa_account_id)) || token;
+    }
+
+    // Ends the EcoTaxa session of an account that is removed from EcoPart. Best effort: the account is removed anyway.
+    private async revokeSession(ecotaxa_account: EcotaxaAccountResponseModel): Promise<void> {
+        if (!ecotaxa_account.ecotaxa_account_refresh_token) return;
+        try {
+            const base_url = await this.getInstanceURL(ecotaxa_account.ecotaxa_account_instance_id);
+            await this.api_ecotaxa_revoke_token(base_url, ecotaxa_account.ecotaxa_account_refresh_token);
+        } catch (error) {
+            console.log(new Date().toISOString(), `EcoTaxa account ${ecotaxa_account.ecotaxa_account_id}: the EcoTaxa session could not be revoked (${(error as Error).message})`);
         }
     }
     async getOneEcotaxaAccount(ecotaxa_account_id: number, ecopart_user_id?: number, ecotaxa_instance_id?: number): Promise<EcotaxaAccountResponseModel | null> {
@@ -522,11 +744,14 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             .then(result => result.total > 0);
     }
     async deleteEcotaxaAccount(ecotaxa_account: EcotaxaAccountRequestModel): Promise<number> {
+        // Logging out of EcoPart's link also ends the session on EcoTaxa
+        const stored = await this.getOneEcotaxaAccount(ecotaxa_account.ecotaxa_account_id, ecotaxa_account.ecotaxa_account_ecopart_user_id);
         // Return the number of deleted rows
         const nb_of_deleted_rows = await this.ecotaxa_accountDataSource.deleteOne(ecotaxa_account);
         if (nb_of_deleted_rows === 0) {
             throw new Error("Ecotaxa account not found");
         }
+        if (stored) await this.revokeSession(stored);
         return nb_of_deleted_rows;
     }
 
@@ -692,7 +917,34 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         }
     }
 
-    private fetchWithAgent(input: RequestInfo, init: RequestInit = {}) {
+    // Every authenticated call to EcoTaxa. The token sent is the latest one of its account, and a 401 on the
+    // token of a stored account refreshes its session then sends the call again, once (see refreshAccessToken).
+    // When the session cannot be refreshed, the caller gets EcoTaxa's 401 as before.
+    private async fetchWithAgent(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
+        const headers = init.headers;
+        const authorization = headers && typeof headers === "object" && !Array.isArray(headers) && !(headers instanceof Headers)
+            ? (headers as Record<string, string>).Authorization
+            : undefined;
+        const sent_token = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : undefined;
+        if (!sent_token) return this.rawFetch(input, init);
+
+        const withToken = (token: string): RequestInit => ({ ...init, headers: { ...(headers as Record<string, string>), Authorization: `Bearer ${token}` } });
+        const token = this.currentToken(sent_token);
+        const response = await this.rawFetch(input, withToken(token));
+        const owner = this.token_accounts.get(token);
+        if (response.status !== 401 || !owner) return response;
+
+        let new_token: string;
+        try {
+            new_token = await this.refreshAccessToken(owner.ecotaxa_account_id, token);
+        } catch (error) {
+            console.log(new Date().toISOString(), `EcoTaxa account ${owner.ecotaxa_account_id}: the EcoTaxa session cannot be refreshed (${(error as Error).message})`);
+            return response;
+        }
+        return this.rawFetch(input, withToken(new_token));
+    }
+
+    private rawFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
         return fetch(input, {
             ...init,
             agent: this.insecureHttpsAgent,
@@ -952,13 +1204,31 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             throw new Error("Ecotaxa instance not found");
         }
 
-        // 2. Login transiently — token is never persisted
-        const token = await this.api_ecotaxa_login(ecotaxa_instance.ecotaxa_instance_url, {
+        // 2. Login transiently — tokens are never persisted, and the EcoTaxa session is revoked once done
+        const session = await this.api_ecotaxa_login(ecotaxa_instance.ecotaxa_instance_url, {
             ecopart_user_id: 0,
             ecotaxa_user_login,
             ecotaxa_user_password,
             ecotaxa_instance_id
         });
+        try {
+            return await this.linkEcotaxaProjectWithToken(ecotaxa_instance, session.access_token, ecotaxa_user_login, ecotaxa_project_id, instrument_model);
+        } finally {
+            if (session.refresh_token) {
+                await this.api_ecotaxa_revoke_token(ecotaxa_instance.ecotaxa_instance_url, session.refresh_token).catch((error: Error) =>
+                    console.log(new Date().toISOString(), `[linkEcotaxaProjectWithTransientCredentials] the transient EcoTaxa session could not be revoked (${error.message})`));
+            }
+        }
+    }
+
+    private async linkEcotaxaProjectWithToken(
+        ecotaxa_instance: EcotaxaInstanceModel,
+        token: string,
+        ecotaxa_user_login: string,
+        ecotaxa_project_id: number,
+        instrument_model: string
+    ): Promise<{ ecotaxa_project_id: number; ecotaxa_project_name: string }> {
+        const ecotaxa_instance_id = ecotaxa_instance.ecotaxa_instance_id;
 
         // 3. Verify the EcoTaxa project exists and fetch it
         const ecotaxa_project = await this.api_get_ecotaxa_project(ecotaxa_instance.ecotaxa_instance_url, token, ecotaxa_project_id);

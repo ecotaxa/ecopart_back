@@ -18,8 +18,9 @@ import { MiddlewareAuth } from "../../../src/presentation/interfaces/middleware/
 import { IMiddlewareUserValidation } from "../../../src/presentation/interfaces/middleware/user-validation";
 
 import { Request, Response, NextFunction } from "express";
-import { MockCreateUserUseCase, MockMigrateUsersUseCase, MockResendMigrationEmailsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase, MockListOrganisationsUseCase, MockListEcotaxaAccountProjectsUseCase } from "../../mocks/user-mock";
+import { MockCreateUserUseCase, MockMigrateUsersUseCase, MockResendMigrationEmailsUseCase, MockLoginEcotaxaAccountUseCase, MockLogoutEcotaxaAccountUseCase, MockSearchEcotaxaAccountsUseCase, MockSearchUsersUseCase, MockUpdateUserUseCase, MockValidUserUseCase, MockListOrganisationsUseCase, MockListEcotaxaAccountProjectsUseCase, MockRefreshEcotaxaAccountUseCase } from "../../mocks/user-mock";
 import { ListEcotaxaAccountProjectsUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects";
+import { RefreshEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/refresh-ecotaxa_account";
 import { MiddlewareAuthValidation } from "../../../src/presentation/middleware/auth-validation";
 import { LoginEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
@@ -92,6 +93,7 @@ describe("User Router", () => {
     let mockSearchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase;
     let mockListOrganisationsUseCase: ListOrganisationsUseCase;
     let mockListEcotaxaAccountProjectsUseCase: ListEcotaxaAccountProjectsUseCase;
+    let mockRefreshEcotaxaAccountUseCase: RefreshEcotaxaAccountUseCase;
 
     beforeAll(() => {
         mockMiddlewareAuth = new MockMiddlewareAuth()
@@ -109,8 +111,9 @@ describe("User Router", () => {
         mockSearchEcotaxaAccountsUseCase = new MockSearchEcotaxaAccountsUseCase()
         mockListOrganisationsUseCase = new MockListOrganisationsUseCase()
         mockListEcotaxaAccountProjectsUseCase = new MockListEcotaxaAccountProjectsUseCase()
+        mockRefreshEcotaxaAccountUseCase = new MockRefreshEcotaxaAccountUseCase()
 
-        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockMiddlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase, mockListEcotaxaAccountProjectsUseCase))
+        server.use("/users", UserRouter(mockMiddlewareAuth, mockMiddlewareUserValidation, mockMiddlewareAuthValidation, mockCreateUserUseCase, mockMigrateUsersUseCase, mockResendMigrationEmailsUseCase, mockUpdateUserUseCase, mockValidUserUseCase, mockDeleteUserUseCase, mockLoginEcotaxaAccountUseCase, mockLogoutEcotaxaAccountUseCase, mockSearchUsersUseCase, mockSearchEcotaxaAccountsUseCase, mockListOrganisationsUseCase, mockListEcotaxaAccountProjectsUseCase, mockRefreshEcotaxaAccountUseCase))
     })
 
     beforeEach(() => {
@@ -888,6 +891,33 @@ describe("User Router", () => {
         ])("maps %s to %i", async (message, status, expected) => {
             jest.spyOn(mockListEcotaxaAccountProjectsUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
             const response = await request(server).get("/users/1/ecotaxa_account/3/projects")
+
+            expect(response.status).toBe(status)
+            expect(response.body).toStrictEqual({ errors: [expected] })
+        });
+    });
+    describe("POST /users/:user_id/ecotaxa_account/:ecotaxa_account_id/refresh", () => {
+        test("returns 200 with the refreshed account", async () => {
+            const account = {
+                ecotaxa_account_id: 3, ecotaxa_account_ecotaxa_id: 7, ecotaxa_user_name: "name", ecotaxa_user_email: "a@example.org",
+                ecotaxa_expiration_date: "2030-01-01T00:00:00.000Z", ecotaxa_account_instance_id: 1, ecotaxa_account_instance_name: "instance",
+            }
+            jest.spyOn(mockRefreshEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.resolve(account))
+            const response = await request(server).post("/users/1/ecotaxa_account/3/refresh")
+
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual(account)
+            expect(mockRefreshEcotaxaAccountUseCase.execute).toHaveBeenCalledWith(expect.objectContaining({ user_id: 1 }), 1, 3)
+        });
+        test.each([
+            ["User cannot be used", 403, "User cannot be used"],
+            ["User cannot refresh this ecotaxa account", 403, "User cannot refresh this ecotaxa account"],
+            ["Ecotaxa account not found", 404, "Ecotaxa account not found"],
+            ["Ecotaxa account session expired", 409, "Ecotaxa account session expired"],
+            ["Cannot refresh the EcoTaxa session, EcoTaxa HTTP Error: 502", 500, "Cannot refresh the EcoTaxa account session"],
+        ])("maps %s to %i", async (message, status, expected) => {
+            jest.spyOn(mockRefreshEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(new Error(message)))
+            const response = await request(server).post("/users/1/ecotaxa_account/3/refresh")
 
             expect(response.status).toBe(status)
             expect(response.body).toStrictEqual({ errors: [expected] })

@@ -14,6 +14,7 @@ import { SearchEcotaxaAccountsUseCase } from '../../domain/interfaces/use-cases/
 import { LoginEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { ListEcotaxaAccountProjectsUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects'
+import { RefreshEcotaxaAccountUseCase } from '../../domain/interfaces/use-cases/ecotaxa_account/refresh-ecotaxa_account'
 import { ListOrganisationsUseCase } from '../../domain/interfaces/use-cases/user/list-organisations'
 import { CustomRequest } from '../../domain/entities/auth'
 import { MiddlewareAuthValidation } from '../middleware/auth-validation'
@@ -33,7 +34,8 @@ export default function UsersRouter(
     searchUsersUseCase: SearchUsersUseCase,
     searchEcotaxaAccountsUseCase: SearchEcotaxaAccountsUseCase,
     listOrganisationsUseCase: ListOrganisationsUseCase,
-    listEcotaxaAccountProjectsUseCase: ListEcotaxaAccountProjectsUseCase
+    listEcotaxaAccountProjectsUseCase: ListEcotaxaAccountProjectsUseCase,
+    refreshEcotaxaAccountUseCase: RefreshEcotaxaAccountUseCase
 ) {
     const router = express.Router()
 
@@ -1031,6 +1033,86 @@ export default function UsersRouter(
             else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa account session expired") res.status(409).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot list EcoTaxa projects"] })
+        }
+    })
+    /**
+     * @openapi
+     * /users/{user_id}/ecotaxa_account/{ecotaxa_account_id}/refresh:
+     *   post:
+     *     summary: Refresh the EcoTaxa session of an EcoTaxa account
+     *     description: |
+     *       Renews the EcoTaxa session of the account with its stored refresh token (EcoTaxa `api/token/refresh`),
+     *       without the EcoTaxa password, and returns the account with its new expiration date. EcoPart also
+     *       renews it on its own once a day, and whenever EcoTaxa refuses the access token of a call.
+     *
+     *       409 when EcoTaxa refuses the refresh token (expired, revoked or already used) or the account was
+     *       logged in with the former `api/login` and has none: the user must log in to EcoTaxa again.
+     *       Allowed to the owner of the EcoTaxa account and to admins.
+     *     tags: [Users]
+     *     security:
+     *       - cookieAccessToken: []
+     *     parameters:
+     *       - name: user_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoPart user ID owning the EcoTaxa account.
+     *       - name: ecotaxa_account_id
+     *         in: path
+     *         required: true
+     *         schema:
+     *           type: integer
+     *         description: The EcoTaxa account ID.
+     *     responses:
+     *       200:
+     *         description: The EcoTaxa account, with its new expiration date.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/PublicEcotaxaAccountResponse'
+     *       403:
+     *         description: The logged user cannot be used, or cannot refresh this EcoTaxa account.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       404:
+     *         description: EcoTaxa account not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The EcoTaxa session cannot be refreshed, the user must log in to EcoTaxa again.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ValidationErrorResponse'
+     *       500:
+     *         description: Internal server error (EcoTaxa could not be reached).
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     */
+    router.post('/:user_id/ecotaxa_account/:ecotaxa_account_id/refresh', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
+        try {
+            const ecotaxa_account = await refreshEcotaxaAccountUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id))
+            res.status(200).send(ecotaxa_account)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "User cannot refresh this ecotaxa account") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account session expired") res.status(409).send({ errors: [err.message] })
+            else res.status(500).send({ errors: ["Cannot refresh the EcoTaxa account session"] })
         }
     })
     /**

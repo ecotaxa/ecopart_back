@@ -13,7 +13,8 @@ export interface EcotaxaInstanceRequestCreationModel {
 export interface EcotaxaAccountRequestCreationModel {
     ecotaxa_account_ecotaxa_id: number;
     ecotaxa_account_ecopart_user_id: number;
-    ecotaxa_account_token: string;
+    ecotaxa_account_token: string;                      // EcoTaxa access token (short-lived when it comes from api/token)
+    ecotaxa_account_refresh_token?: string | null;      // single-use, rotated by api/token/refresh; null for a former api/login token
     ecotaxa_account_user_name: string;
     ecotaxa_account_user_email: string;
     ecotaxa_account_instance_id: number;
@@ -40,6 +41,7 @@ export interface PublicEcotaxaAccountRequestCreationModel {
 
 export interface EcotaxaAccountModel {
     ecotaxa_token: string;
+    ecotaxa_refresh_token: string | null;
     ecotaxa_user_name: string;
     ecotaxa_account_ecotaxa_id: number;
     ecotaxa_expiration_date: string;
@@ -53,6 +55,14 @@ export interface PublicEcotaxaAccountResponseModel {
     ecotaxa_user_email: string;
     ecotaxa_expiration_date: string;
     ecotaxa_account_instance_name: string;
+}
+
+// POST api/token and api/token/refresh (EcoTaxa TokenRsp). Lifetimes in seconds.
+export interface EcoTaxaTokenPair {
+    access_token: string;
+    expires_in: number;
+    refresh_token: string;
+    refresh_expires_in: number;
 }
 
 export interface EcotaxaAccountUser {

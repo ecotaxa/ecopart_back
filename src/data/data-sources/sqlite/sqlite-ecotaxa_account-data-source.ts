@@ -13,9 +13,9 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
 
     async create(ecotaxa_account: EcotaxaAccountRequestCreationModel): Promise<number> {
         // Explicit ISO 8601 UTC timestamp for the creation date (see sqlite-task-data-source).
-        const params = [ecotaxa_account.ecotaxa_account_ecotaxa_id, ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_utc_date_time, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id, new Date().toISOString()]
+        const params = [ecotaxa_account.ecotaxa_account_ecotaxa_id, ecotaxa_account.ecotaxa_account_token, ecotaxa_account.ecotaxa_account_user_name, ecotaxa_account.ecotaxa_account_user_email, ecotaxa_account.ecotaxa_account_expiration_utc_date_time, ecotaxa_account.ecotaxa_account_ecopart_user_id, ecotaxa_account.ecotaxa_account_instance_id, new Date().toISOString(), ecotaxa_account.ecotaxa_account_refresh_token ?? null]
         const placeholders = params.map(() => '(?)').join(','); // TODO create tool funct
-        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_utc_date_time, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id, ecotaxa_account_creation_utc_date_time) VALUES (` + placeholders + `);`;
+        const sql = `INSERT INTO ecotaxa_account (ecotaxa_account_ecotaxa_id, ecotaxa_account_token, ecotaxa_account_user_name, ecotaxa_account_user_email, ecotaxa_account_expiration_utc_date_time, ecotaxa_account_ecopart_user_id, ecotaxa_account_instance_id, ecotaxa_account_creation_utc_date_time, ecotaxa_account_refresh_token) VALUES (` + placeholders + `);`;
 
         return await new Promise((resolve, reject) => {
             this.db.run(sql, params, function (err) {
@@ -47,6 +47,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                         ecotaxa_account_creation_utc_date_time: row.ecotaxa_account_creation_utc_date_time,
                         ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                         ecotaxa_account_token: row.ecotaxa_account_token,
+                        ecotaxa_account_refresh_token: row.ecotaxa_account_refresh_token ?? null,
                         ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                         ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                         ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
@@ -151,6 +152,7 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
                             ecotaxa_account_creation_utc_date_time: row.ecotaxa_account_creation_utc_date_time,
                             ecotaxa_account_ecopart_user_id: row.ecotaxa_account_ecopart_user_id,
                             ecotaxa_account_token: row.ecotaxa_account_token,
+                            ecotaxa_account_refresh_token: row.ecotaxa_account_refresh_token ?? null,
                             ecotaxa_account_user_name: row.ecotaxa_account_user_name,
                             ecotaxa_account_user_email: row.ecotaxa_account_user_email,
                             ecotaxa_account_instance_id: row.ecotaxa_account_instance_id,
@@ -185,6 +187,28 @@ export class SQLiteEcotaxaAccountDataSource implements EcotaxaAccountDataSource 
         const sql = "UPDATE ecotaxa_account SET ecotaxa_account_token = (?) WHERE ecotaxa_account_id = (?)";
         return await new Promise((resolve, reject) => {
             this.db.run(sql, [ecotaxa_account_token, ecotaxa_account_id], function (err) {
+                if (err) reject(err);
+                else resolve(this.changes);
+            });
+        })
+    }
+
+    // Stores the pair a login or a refresh returned (both already encrypted by the repository) and the end of the session.
+    async updateTokens(ecotaxa_account_id: number, ecotaxa_account_token: string, ecotaxa_account_refresh_token: string | null, ecotaxa_account_expiration_utc_date_time: string): Promise<number> {
+        const sql = "UPDATE ecotaxa_account SET ecotaxa_account_token = (?), ecotaxa_account_refresh_token = (?), ecotaxa_account_expiration_utc_date_time = (?) WHERE ecotaxa_account_id = (?)";
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, [ecotaxa_account_token, ecotaxa_account_refresh_token, ecotaxa_account_expiration_utc_date_time, ecotaxa_account_id], function (err) {
+                if (err) reject(err);
+                else resolve(this.changes);
+            });
+        })
+    }
+
+    // Ends the session in EcoPart once EcoTaxa refused its refresh token: the account shows as expired.
+    async updateExpiration(ecotaxa_account_id: number, ecotaxa_account_expiration_utc_date_time: string): Promise<number> {
+        const sql = "UPDATE ecotaxa_account SET ecotaxa_account_expiration_utc_date_time = (?) WHERE ecotaxa_account_id = (?)";
+        return await new Promise((resolve, reject) => {
+            this.db.run(sql, [ecotaxa_account_expiration_utc_date_time, ecotaxa_account_id], function (err) {
                 if (err) reject(err);
                 else resolve(this.changes);
             });

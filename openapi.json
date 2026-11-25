@@ -11181,6 +11181,102 @@
         }
       }
     },
+    "/users/{user_id}/ecotaxa_account/{ecotaxa_account_id}/refresh": {
+      "post": {
+        "summary": "Refresh the EcoTaxa session of an EcoTaxa account",
+        "description": "Renews the EcoTaxa session of the account with its stored refresh token (EcoTaxa `api/token/refresh`),\nwithout the EcoTaxa password, and returns the account with its new expiration date. EcoPart also\nrenews it on its own once a day, and whenever EcoTaxa refuses the access token of a call.\n\n409 when EcoTaxa refuses the refresh token (expired, revoked or already used) or the account was\nlogged in with the former `api/login` and has none: the user must log in to EcoTaxa again.\nAllowed to the owner of the EcoTaxa account and to admins.\n",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The EcoPart user ID owning the EcoTaxa account."
+          },
+          {
+            "name": "ecotaxa_account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The EcoTaxa account ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The EcoTaxa account, with its new expiration date.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEcotaxaAccountResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used, or cannot refresh this EcoTaxa account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "EcoTaxa account not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The EcoTaxa session cannot be refreshed, the user must log in to EcoTaxa again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (EcoTaxa could not be reached).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "summary": "Running version",

@@ -76,6 +76,7 @@ import { DeleteImportedCTDSamples } from './domain/use-cases/ctd_sample/delete-i
 import { LoginEcotaxaAccount } from './domain/use-cases/ecotaxa_account/login-ecotaxa_account'
 import { LogoutEcotaxaAccount } from './domain/use-cases/ecotaxa_account/logout-ecotaxa_account'
 import { ListEcotaxaAccountProjects } from './domain/use-cases/ecotaxa_account/list-ecotaxa_account-projects'
+import { RefreshEcotaxaAccount } from './domain/use-cases/ecotaxa_account/refresh-ecotaxa_account'
 
 import { GetAllEcoTaxaInstances } from './domain/use-cases/ecotaxa_instance/get-all-ecotaxa-instances'
 import { CreateEcoTaxaInstance } from './domain/use-cases/ecotaxa_instance/create-ecotaxa-instance'
@@ -346,6 +347,18 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     } catch (error) {
         console.log(new Date().toISOString(), 'Cannot encrypt the stored EcoTaxa tokens:', error)
     }
+    // At startup then once a day, the EcoTaxa sessions are renewed before their refresh token (10 days) expires,
+    // so that an account left unused, the generic one first, stays logged in. Not awaited: it calls EcoTaxa.
+    const refreshEcotaxaSessions = async () => {
+        try {
+            const sessions = await ecotaxa_account_repo.refreshEcotaxaAccountSessions()
+            if (sessions.refreshed + sessions.ended + sessions.failed > 0) console.log(new Date().toISOString(), `EcoTaxa sessions renewed: ${sessions.refreshed}, ended (log in again): ${sessions.ended}, failed (retried tomorrow): ${sessions.failed}`)
+        } catch (error) {
+            console.log(new Date().toISOString(), 'Cannot renew the EcoTaxa sessions:', error)
+        }
+    }
+    void refreshEcotaxaSessions()
+    setInterval(refreshEcotaxaSessions, 24 * 60 * 60 * 1000).unref()
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     // The EcoTaxa statistics kept per sample, shared by the Explore page and the project STATS tab.
     const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)
@@ -368,7 +381,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
             new SearchUsers(user_repo, search_repo, privilege_repo),
             new SearchEcotaxaAccounts(user_repo, ecotaxa_account_repo, search_repo),
             new ListOrganisations(user_repo),
-            new ListEcotaxaAccountProjects(user_repo, ecotaxa_account_repo, project_repo)
+            new ListEcotaxaAccountProjects(user_repo, ecotaxa_account_repo, project_repo),
+            new RefreshEcotaxaAccount(user_repo, ecotaxa_account_repo)
         )
     const authMiddleWare = AuthRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),

@@ -16,6 +16,7 @@ import { SearchUsersUseCase } from "../../src/domain/interfaces/use-cases/user/s
 import { LoginEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/login-ecotaxa_account";
 import { LogoutEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/logout-ecotaxa_account";
 import { ListEcotaxaAccountProjectsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/list-ecotaxa_account-projects";
+import { RefreshEcotaxaAccountUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/refresh-ecotaxa_account";
 import { SearchEcotaxaAccountsUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_account/search-ecotaxa_account";
 import { GetAllEcoTaxaInstancesUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/get-all-ecotaxa-instances";
 import { CreateEcoTaxaInstanceUseCase } from "../../src/domain/interfaces/use-cases/ecotaxa_instance/create-ecotaxa-instance";
@@ -121,6 +122,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     deleteEcotaxaAccountsOfUser(): Promise<number> {
         throw new Error("Method not implemented for deleteEcotaxaAccountsOfUser.");
     }
+    refreshEcotaxaAccountSessions(): Promise<{ refreshed: number; ended: number; failed: number }> {
+        throw new Error("Method not implemented for refreshEcotaxaAccountSessions.");
+    }
     encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }> {
         throw new Error("Method not implemented for encryptStoredTokens.");
     }
@@ -165,6 +169,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     }
     connectToEcotaxaInstance(): Promise<EcotaxaAccountModel> {
         throw new Error("Method not implemented for connectToEcotaxaInstance.");
+    }
+    refreshEcotaxaAccountSession(): Promise<EcotaxaAccountResponseModel> {
+        throw new Error("Method not implemented for refreshEcotaxaAccountSession.");
     }
     createEcotaxaAccount(): Promise<number> {
         throw new Error("Method not implemented for createEcotaxaAccount.");
@@ -221,6 +228,12 @@ export class MockEcotaxaAccountDataSource implements EcotaxaAccountDataSource {
     }
     updateToken(): Promise<number> {
         throw new Error("Method not implemented for updateToken.");
+    }
+    updateTokens(): Promise<number> {
+        throw new Error("Method not implemented for updateTokens.");
+    }
+    updateExpiration(): Promise<number> {
+        throw new Error("Method not implemented for updateExpiration.");
     }
     getOneEcoTaxaInstance(): Promise<EcotaxaInstanceModel | null> {
         throw new Error("Method not implemented for getOneEcoTaxaInstance.");
@@ -291,6 +304,11 @@ export class MockLoginEcotaxaAccountUseCase implements LoginEcotaxaAccountUseCas
 export class MockLogoutEcotaxaAccountUseCase implements LogoutEcotaxaAccountUseCase {
     execute(): Promise<void> {
         throw new Error("Method not implemented for LogoutEcotaxaAccountUseCase");
+    }
+}
+export class MockRefreshEcotaxaAccountUseCase implements RefreshEcotaxaAccountUseCase {
+    execute(): Promise<PublicEcotaxaAccountResponseModel> {
+        throw new Error("Method not implemented for RefreshEcotaxaAccountUseCase");
     }
 }
 export class MockListEcotaxaAccountProjectsUseCase implements ListEcotaxaAccountProjectsUseCase {
