@@ -1,5 +1,5 @@
 import { EcotaxaAccountResponseModel, EcotaxaInstanceModel, EcoTaxaObjectSetQuery, EcoTaxaTaxon } from "../../../../src/domain/entities/ecotaxa_account";
-import { EcoTaxaImportedSample, ExploreSampleRow, StoredEcoTaxaStats } from "../../../../src/domain/entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../../../src/domain/entities/explore";
 import { EcotaxaAccountRepository } from "../../../../src/domain/interfaces/repositories/ecotaxa_account-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { SampleRepository } from "../../../../src/domain/interfaces/repositories/sample-repository";
@@ -7,7 +7,10 @@ import { EcoTaxaThrottle } from "../../../../src/domain/use-cases/explore/ecotax
 import {
     classificationSharesOf,
     ECOTAXA_CACHE_TTL_MS,
+    ECOTAXA_HISTOGRAM_STALE_AFTER_MS,
+    ECOTAXA_HISTOGRAM_SYNC_LIMIT,
     ECOTAXA_MAX_IN_FLIGHT,
+    ECOTAXA_OBJECTS_PAGE,
     ECOTAXA_QUEUE_PAUSE_MS,
     ECOTAXA_STATS_BATCH,
     ECOTAXA_STATS_STALE_AFTER_MS,
@@ -15,6 +18,7 @@ import {
     EcoTaxaSampleStat,
     EXPLORE_IMAGES_CALLS_PER_IMAGE,
     ExploreEcoTaxaService,
+    histogramIsFresh,
     matchesClassificationState,
     objectDate,
     toSampleStat,
@@ -84,6 +88,29 @@ describe("objectDate", () => {
         expect(objectDate("", "10:20:30")).toBeNull();
         expect(objectDate(20240612, "10:20:30")).toBeNull();
         expect(objectDate("12/06/2024", "10:20:30")).toBeNull();
+    });
+});
+
+describe("histogramIsFresh", () => {
+    const NOW = Date.UTC(2026, 10, 19, 8, 0, 0);
+    const reading = { ecotaxa_sample_id: 9001, depth_offset_m: 1.2, nb_validated: 4, nb_predicted: 1, fetched_utc_date_time: new Date(NOW - 60_000).toISOString() };
+    const counts = { nb_validated: 4, nb_predicted: 1 };
+
+    test("fresh: same EcoTaxa sample, offset and counts, read less than a week ago", () => {
+        expect(histogramIsFresh(reading, 9001, 1.2, counts, NOW)).toBe(true);
+        // Without stats to compare with, the reading stands.
+        expect(histogramIsFresh(reading, 9001, 1.2, null, NOW)).toBe(true);
+        expect(histogramIsFresh({ ...reading, fetched_utc_date_time: new Date(NOW - ECOTAXA_HISTOGRAM_STALE_AFTER_MS + 1).toISOString() }, 9001, 1.2, counts, NOW)).toBe(true);
+    });
+
+    test("stale: never read, another EcoTaxa sample, another offset, other counts, or a week old", () => {
+        expect(histogramIsFresh(null, 9001, 1.2, counts, NOW)).toBe(false);
+        expect(histogramIsFresh(undefined, 9001, 1.2, counts, NOW)).toBe(false);
+        expect(histogramIsFresh(reading, 9002, 1.2, counts, NOW)).toBe(false);
+        expect(histogramIsFresh(reading, 9001, 0, counts, NOW)).toBe(false);
+        expect(histogramIsFresh(reading, 9001, 1.2, { nb_validated: 5, nb_predicted: 0 }, NOW)).toBe(false);
+        expect(histogramIsFresh(reading, 9001, 1.2, { nb_validated: 4, nb_predicted: 2 }, NOW)).toBe(false);
+        expect(histogramIsFresh({ ...reading, fetched_utc_date_time: new Date(NOW - ECOTAXA_HISTOGRAM_STALE_AFTER_MS).toISOString() }, 9001, 1.2, counts, NOW)).toBe(false);
     });
 });
 
@@ -174,6 +201,10 @@ describe("ExploreEcoTaxaService", () => {
     let stored: Map<number, StoredEcoTaxaStats>;
     // The samples imported in EcoTaxa, as the sweep lists them.
     let importedSamples: EcoTaxaImportedSample[];
+    // What EcoPart keeps of the objects (table sample_ecotaxa_histogram), by sample id.
+    let histograms: Map<number, StoredEcoTaxaHistogram>;
+    // The histogram states the sweep lists.
+    let histogramStates: EcoTaxaHistogramState[];
 
     const makeService = (options: { pause?: (ms: number) => Promise<void> } = {}) => new ExploreEcoTaxaService(
         ecotaxaAccountRepository, sampleRepository, projectRepository,
@@ -199,6 +230,8 @@ describe("ExploreEcoTaxaService", () => {
         statRows = new Map();
         stored = new Map();
         importedSamples = [];
+        histograms = new Map();
+        histogramStates = [];
 
         jest.spyOn(ecotaxaAccountRepository, "getOneEcoTaxaInstance").mockImplementation(async (id) => INSTANCES[id] ?? null);
         jest.spyOn(ecotaxaAccountRepository, "getEcotaxaGenericAccountForInstance").mockImplementation(async (id) => genericAccount(id));
@@ -214,6 +247,10 @@ describe("ExploreEcoTaxaService", () => {
         jest.spyOn(sampleRepository, "listEcoTaxaImportedSamples").mockImplementation(async () =>
             importedSamples.map(sample => ({ ...sample, fetched_utc_date_time: stored.get(sample.sample_id)?.fetched_utc_date_time ?? null })));
         jest.spyOn(projectRepository, "listProjects").mockResolvedValue([ON_FR, ON_DEV, WITHOUT_ECOTAXA]);
+        jest.spyOn(sampleRepository, "getEcoTaxaHistograms").mockImplementation(async (sample_ids) =>
+            sample_ids.flatMap(id => { const row = histograms.get(id); return row ? [{ ...row, bins: [...row.bins] }] : []; }));
+        jest.spyOn(sampleRepository, "saveEcoTaxaHistogram").mockImplementation(async (row) => { histograms.set(row.sample_id, { ...row }); });
+        jest.spyOn(sampleRepository, "listEcoTaxaHistogramStates").mockImplementation(async () => histogramStates);
     });
 
     afterEach(async () => {
@@ -736,6 +773,178 @@ describe("ExploreEcoTaxaService", () => {
             const asked = statsCalls().flatMap(call => call[2]);
             expect(batchSizes()).toEqual([50, 50, 20]);
             expect(new Set(asked).size).toBe(120);
+        });
+    });
+
+    describe("histograms: the objects per category and depth bin", () => {
+        // The objects EcoTaxa holds, by EcoTaxa sample id: [classif_id, classif_qual, depth_min].
+        let objects: Map<number, (string | number | null)[][]>;
+        const objectQueries = () => (ecotaxaAccountRepository.api_ecotaxa_query_object_set as jest.Mock).mock.calls as [string, string, number, EcoTaxaObjectSetQuery][];
+        const reading = (sample_id: number, ecotaxa_sample_id: number, overrides: Partial<StoredEcoTaxaHistogram> = {}): StoredEcoTaxaHistogram => ({
+            sample_id, ecotaxa_sample_id, depth_offset_m: 1.2, nb_validated: 10, nb_predicted: 0, bins: [{ classif_id: 10, depth_bin: 0, nb_validated: 10, nb_predicted: 0 }],
+            fetched_utc_date_time: new Date(clock - 60_000).toISOString(), ...overrides,
+        });
+
+        beforeEach(() => {
+            objects = new Map();
+            jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockImplementation(async (_url, _token, _project, query: EcoTaxaObjectSetQuery) => {
+                const rows = objects.get(Number(query.filters.samples)) ?? [];
+                const start = query.window_start ?? 0;
+                const page = rows.slice(start, start + (query.window_size ?? rows.length));
+                return { total_ids: rows.length, object_ids: page.map((_, i) => start + i), details: page };
+            });
+        });
+
+        test("a few samples are read now: every object, counted per category and 5 m bin with the depth offset, kept, categories named", async () => {
+            statRows.set(9001, statRow(9001, { nb_validated: 4, nb_predicted: 1, used_taxa: [10, 11] }));
+            statRows.set(501, statRow(501, { nb_validated: 0, nb_predicted: 0 }));
+            objects.set(9001, [
+                [10, "V", 3.0], [10, "V", 3.5],   // Copepoda, 4.2 and 4.7 m with the offset: bin 0
+                [11, "P", 30.0],                  // predicted, 31.2 m: bin 6
+                [11, "V", null], [null, "V", 2],  // no depth, no category: counted in the reading, in no bin
+                [20, "D", 4.0], [30, null, 4.0],  // dubious, unclassified: left out
+            ]);
+            const samples = [imported(1, 1, 9001), imported(2, 2, 501), imported(4, 3, 9004)];
+
+            const result = await service.histogramsOf(samples, PROJECTS);
+
+            expect(Array.from(result.in_ecotaxa).sort()).toEqual([1, 2]);
+            expect(result.pending).toBe(0);
+            const now = new Date(clock).toISOString();
+            expect(result.histograms.get(1)).toEqual({
+                sample_id: 1, ecotaxa_sample_id: 9001, depth_offset_m: 1.2, nb_validated: 4, nb_predicted: 1, fetched_utc_date_time: now,
+                bins: [{ classif_id: 10, depth_bin: 0, nb_validated: 2, nb_predicted: 0 }, { classif_id: 11, depth_bin: 6, nb_validated: 0, nb_predicted: 1 }],
+            });
+            // Stats without validated nor predicted object: nothing asked, an empty histogram kept.
+            expect(result.histograms.get(2)).toEqual({ sample_id: 2, ecotaxa_sample_id: 501, depth_offset_m: 1.2, nb_validated: 0, nb_predicted: 0, bins: [], fetched_utc_date_time: now });
+            expect(objectQueries()).toEqual([["https://ecotaxa.obs-vlfr.fr/", "generic-token-fr", 1450, {
+                filters: { samples: "9001" }, fields: ["obj.classif_id", "obj.classif_qual", "obj.depth_min"], order_field: "obj.objid", window_start: 0, window_size: ECOTAXA_OBJECTS_PAGE,
+            }]]);
+            expect(Array.from(histograms.keys()).sort()).toEqual([1, 2]);
+            expect(result.taxonOf(1, 10)?.display_name).toBe("Copepoda");
+            expect(result.taxonOf(1, 999)).toBeUndefined();
+            expect(result.taxonOf(4, 10)).toBeUndefined();
+        });
+
+        test("the project override of the depth offset is the one used", async () => {
+            const projects = contextsOf(exploreContext({ ...ON_FR, override_depth_offset: 3 }), exploreContext(ON_DEV));
+            objects.set(9001, [[10, "V", 1.5]]);
+
+            const result = await service.histogramsOf([imported(1, 1, 9001)], projects);
+
+            expect(result.histograms.get(1)?.depth_offset_m).toBe(3);
+            expect(result.histograms.get(1)?.bins).toEqual([{ classif_id: 10, depth_bin: 0, nb_validated: 1, nb_predicted: 0 }]);
+        });
+
+        test("a sample of more objects than a page is read page by page, by object id", async () => {
+            statRows.set(9001, statRow(9001, { nb_validated: ECOTAXA_OBJECTS_PAGE + 2 }));
+            objects.set(9001, Array.from({ length: ECOTAXA_OBJECTS_PAGE + 2 }, () => [10, "V", 0]));
+
+            const result = await service.histogramsOf([imported(1, 1, 9001)], PROJECTS);
+
+            expect(objectQueries().map(call => [call[3].window_start, call[3].order_field])).toEqual([[0, "obj.objid"], [ECOTAXA_OBJECTS_PAGE, "obj.objid"]]);
+            expect(result.histograms.get(1)?.bins).toEqual([{ classif_id: 10, depth_bin: 0, nb_validated: ECOTAXA_OBJECTS_PAGE + 2, nb_predicted: 0 }]);
+        });
+
+        test("fresh histograms are served from the database without asking EcoTaxa for objects", async () => {
+            stored.set(1, storedRow(1, 9001, clock - 60_000, { nb_validated: 10 }));
+            histograms.set(1, reading(1, 9001));
+
+            const result = await service.histogramsOf([imported(1, 1, 9001)], PROJECTS);
+
+            expect(result.histograms.get(1)).toEqual(reading(1, 9001));
+            expect(objectQueries()).toEqual([]);
+            expect(sampleRepository.saveEcoTaxaHistogram).toBeCalledTimes(0);
+        });
+
+        test.each([
+            ["the stats count other objects", { nb_validated: 9 }],
+            ["another depth offset", { depth_offset_m: 0 }],
+            ["another EcoTaxa sample", { ecotaxa_sample_id: 9999 }],
+            ["read a week ago", { fetched_utc_date_time: new Date(Date.UTC(2026, 9, 22, 8, 0, 0) - ECOTAXA_HISTOGRAM_STALE_AFTER_MS).toISOString() }],
+        ])("a stale histogram is read again: %s", async (_label, overrides) => {
+            stored.set(1, storedRow(1, 9001, clock - 60_000, { nb_validated: 10 }));
+            histograms.set(1, reading(1, 9001, overrides));
+            objects.set(9001, [[10, "V", 40]]);
+
+            const result = await service.histogramsOf([imported(1, 1, 9001)], PROJECTS);
+
+            expect(objectQueries()).toHaveLength(1);
+            expect(result.histograms.get(1)?.bins).toEqual([{ classif_id: 10, depth_bin: 8, nb_validated: 1, nb_predicted: 0 }]);
+            expect(result.histograms.get(1)?.fetched_utc_date_time).toBe(new Date(clock).toISOString());
+        });
+
+        test(`more than ${ECOTAXA_HISTOGRAM_SYNC_LIMIT} samples to read: queued, a stale histogram of the same offset served meanwhile`, async () => {
+            const { pause: held, open, reached } = gate();
+            service = makeService({ pause: held });
+            const samples = manySamples(ECOTAXA_HISTOGRAM_SYNC_LIMIT + 2, 1, 1, 20001);
+            for (const sample of samples) {
+                stored.set(sample.sample_id, storedRow(sample.sample_id, sample.ecotaxa_sample_id as number, clock - 60_000, { nb_validated: 10 }));
+                objects.set(sample.ecotaxa_sample_id as number, [[10, "V", 12]]);
+            }
+            // Sample 1 was read before with the same offset, sample 2 with another one.
+            histograms.set(1, reading(1, 20001, { nb_validated: 9 }));
+            histograms.set(2, reading(2, 20002, { depth_offset_m: 0, nb_validated: 9 }));
+
+            const result = await service.histogramsOf(samples, PROJECTS);
+
+            expect(result.pending).toBe(ECOTAXA_HISTOGRAM_SYNC_LIMIT + 1);
+            expect(Array.from(result.histograms.keys())).toEqual([1]);
+            await reached;
+            open();
+            await service.idle();
+            expect(service.queuedHistograms).toBe(0);
+            expect(histograms.size).toBe(ECOTAXA_HISTOGRAM_SYNC_LIMIT + 2);
+            expect(histograms.get(1)?.bins).toEqual([{ classif_id: 10, depth_bin: 2, nb_validated: 1, nb_predicted: 0 }]);
+        });
+
+        test("EcoTaxa failing on a sample: logged, nothing kept for it, the other samples read", async () => {
+            objects.set(501, [[10, "V", 4]]);
+            jest.spyOn(ecotaxaAccountRepository, "api_ecotaxa_query_object_set").mockImplementation(async (_url, _token, project, query: EcoTaxaObjectSetQuery) => {
+                if (project === 1450) throw new Error("EcoTaxa answered 500");
+                const rows = objects.get(Number(query.filters.samples)) ?? [];
+                return { total_ids: rows.length, object_ids: rows.map((_, i) => i), details: rows };
+            });
+
+            const result = await service.histogramsOf([imported(1, 1, 9001), imported(2, 2, 501)], PROJECTS);
+
+            expect(Array.from(result.histograms.keys())).toEqual([2]);
+            expect(histograms.has(1)).toBe(false);
+            expect(console.log).toBeCalledWith(expect.any(String), "Explore: cannot read the EcoTaxa objects of sample moose_ge_2024_001", "EcoTaxa answered 500");
+        });
+
+        test("the sweep queues the histograms never read or stale, with the offset of each sample", async () => {
+            const state = (sample_id: number, project_id: number, ecotaxa_sample_id: number | null, overrides: Partial<EcoTaxaHistogramState> = {}): EcoTaxaHistogramState => ({
+                ...importedRow(sample_id, project_id, ecotaxa_sample_id), instrument_settings_depth_offset_m: 1.2,
+                stats: { nb_validated: 10, nb_predicted: 0 }, histogram: reading(sample_id, ecotaxa_sample_id ?? 0), ...overrides,
+            });
+            histogramStates = [
+                state(1, 1, 9001),                                                       // fresh
+                state(2, 1, 9002, { histogram: null }),                                  // never read
+                state(3, 2, 501, { stats: { nb_validated: 11, nb_predicted: 0 } }),      // classified since
+                state(4, 3, 9004, { histogram: null }),                                  // project without EcoTaxa
+                state(5, 1, 9005, { instrument_settings_depth_offset_m: 2.5 }),           // offset changed
+            ];
+            for (const id of [9002, 501, 9005]) objects.set(id, [[10, "V", 0]]);
+
+            const count = await service.sweep();
+            await service.idle();
+
+            expect(count).toBe(3);
+            expect(objectQueries().map(call => call[3].filters.samples).sort()).toEqual(["501", "9002", "9005"]);
+            expect(histograms.get(5)?.depth_offset_m).toBe(2.5);
+            expect(histograms.get(3)?.nb_validated).toBe(11);
+            // The stats themselves were fresh: none asked.
+            expect(ecotaxaAccountRepository.api_ecotaxa_get_sample_stats).toBeCalledTimes(0);
+        });
+
+        test("the sweep with every histogram fresh asks nothing", async () => {
+            histogramStates = [{ ...importedRow(1, 1, 9001), instrument_settings_depth_offset_m: 1.2, stats: { nb_validated: 10, nb_predicted: 0 }, histogram: reading(1, 9001) }];
+
+            await expect(service.sweep()).resolves.toBe(0);
+
+            expect(ecotaxaCalls()).toBe(0);
+            expect(service.queuedHistograms).toBe(0);
         });
     });
 

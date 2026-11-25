@@ -336,7 +336,7 @@ describe("EcotaxaAccount Repository", () => {
 
             const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1, "UVP6LP");
 
-            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&instrument_filter=UVP6", expect.objectContaining({ method: "GET" }));
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated&instrument_filter=UVP6", expect.objectContaining({ method: "GET" }));
             expect(result).toStrictEqual([{ projid: 1, title: "p1", instrument: "UVP6", status: "Annotate", objcount: 3, pctvalidated: 1.5 }]);
         });
         test("lists every managed project without an instrument", async () => {
@@ -346,7 +346,7 @@ describe("EcotaxaAccount Repository", () => {
 
             const result = await repositoryImpl.listManageableEcotaxaProjects(ecotaxaAccountResponseModel_1);
 
-            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true", expect.anything());
+            expect(http).toBeCalledWith("https://ecotaxa.test/api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated", expect.anything());
             expect(result.map((p) => p.projid)).toEqual([1, 3]);
         });
         test("returns nothing for an instrument EcoTaxa does not know, without asking EcoTaxa", async () => {
@@ -386,6 +386,32 @@ describe("EcotaxaAccount Repository", () => {
                 "EcoTaxa export job 99 done, downloading its file",
             ]);
             expect(fs.readFileSync(dest, "utf8")).toBe("zip");
+        });
+    });
+
+    describe("api_ecotaxa_query_objects_by_sample", () => {
+        test("keeps only the samples named exactly as asked : ok", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            const http = jest.spyOn(repositoryImpl as any, "http").mockImplementation((async (url: string) => {
+                // EcoTaxa answers every sample whose name contains the pattern
+                if (url.includes("id_pattern=omer2_1")) return [{ sampleid: 1, orig_id: "omer2_1" }, { sampleid: 10, orig_id: "omer2_10" }, { sampleid: 11, orig_id: "omer2_11" }];
+                return { object_ids: [501, 502] };
+            }) as any);
+
+            const result = await repositoryImpl.api_ecotaxa_query_objects_by_sample("https://ecotaxa/", "token", 55, ["omer2_1"]);
+
+            expect(result).toEqual([501, 502]);
+            expect(http).toHaveBeenLastCalledWith("https://ecotaxa/api/object_set/55/query", expect.objectContaining({ body: JSON.stringify({ samples: "1" }) }));
+        });
+
+        test("no sample named exactly as asked, no object query : ok", async () => {
+            const repositoryImpl = ecotaxa_accountRepository as EcotaxaAccountRepositoryImpl;
+            const http = jest.spyOn(repositoryImpl as any, "http").mockResolvedValue([{ sampleid: 10, orig_id: "omer2_10" }] as never);
+
+            const result = await repositoryImpl.api_ecotaxa_query_objects_by_sample("https://ecotaxa/", "token", 55, ["omer2_1"]);
+
+            expect(result).toEqual([]);
+            expect(http).toBeCalledTimes(1);
         });
     });
 

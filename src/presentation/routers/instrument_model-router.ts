@@ -30,8 +30,8 @@ export default function InstrumentModelsRouter(
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/InstrumentModelSearchResponse'
-     *       401:
-     *         description: Unauthorized or invalid parameters.
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -50,8 +50,8 @@ export default function InstrumentModelsRouter(
             res.status(200).send(instrument_models)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("Cannot search instrument models")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get instrument_models"] })
         }

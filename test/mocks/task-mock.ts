@@ -66,6 +66,9 @@ export class MockTaskRepository implements TaskRepository {
     getLogFileTask(): Promise<string> {
         throw new Error("Method not implemented for getLogFileTask");
     }
+    purgeExpiredLogs(): Promise<number> {
+        throw new Error("Method not implemented for purgeExpiredLogs");
+    }
     getZipFilePath(): Promise<string> {
         throw new Error("Method not implemented for getZipFilePath");
     }

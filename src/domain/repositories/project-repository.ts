@@ -595,18 +595,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     async getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<Set<number>> {
-        const options: PreparedSearchOptions = {
-            filter: [
-                { field: "ecotaxa_instance_id", operator: "=", value: ecotaxa_instance_id },
-                { field: "ecotaxa_project_id", operator: "<>", value: null }
-            ],
-            sort_by: [],
-            page: 1,
-            // Every linked project: at most one per EcoPart project.
-            limit: 1000000
-        }
-        const linked_projects = await this.projectDataSource.getAll(options);
-        return new Set(linked_projects.items.map((project) => project.ecotaxa_project_id as number));
+        return new Set(await this.projectDataSource.getLinkedEcotaxaProjectIds(ecotaxa_instance_id));
     }
 
     async getDistinctShips(): Promise<string[]> {

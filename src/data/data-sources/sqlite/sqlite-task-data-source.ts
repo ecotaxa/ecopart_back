@@ -145,12 +145,11 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 if (filter.operator == "IN" && Array.isArray(filter.value)) {
                     filtering_sql += inClause(column, filter.value, params_filtering)
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += column + ` = 1`;
-                }
-                else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += column + ` = 0`;
+                // A boolean (or its string form) is bound as 1/0 and keeps its operator. Strictly booleans: a loose
+                // test also caught the numbers 0 and 1, whose filter then lost its operator (`> 1` read as `= 1`).
+                else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    filtering_sql += column + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push((filter.value === true || filter.value === "true") ? 1 : 0);
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
@@ -229,6 +228,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
+                            task_log_purged_utc_date_time: row.task_log_purged_utc_date_time,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
@@ -293,6 +293,7 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                             task_owner: row.first_name != null ? row.first_name + " " + row.last_name + " (" + row.email + ")" : "", // Doe John (john.doe@mail.com)
                             task_project_id: row.task_project_id,
                             task_log_file_path: row.task_log_file_path,
+                            task_log_purged_utc_date_time: row.task_log_purged_utc_date_time,
                             task_progress_pct: row.task_progress_pct,
                             task_progress_msg: row.task_progress_msg,
                             task_params: row.task_params,
@@ -319,12 +320,11 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 if (filter.operator == "IN" && Array.isArray(filter.value)) {
                     filtering_sql += inClause(filter.field, filter.value, params_filtering)
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += filter.field + ` = 1`;
-                }
-                else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += filter.field + ` = 0`;
+                // A boolean (or its string form) is bound as 1/0 and keeps its operator. Strictly booleans: a loose
+                // test also caught the numbers 0 and 1, whose filter then lost its operator (`> 1` read as `= 1`).
+                else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push((filter.value === true || filter.value === "true") ? 1 : 0);
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
@@ -408,12 +408,11 @@ export class SQLiteTaskDataSource implements TaskDataSource {
                 if (filter.operator == "IN" && Array.isArray(filter.value)) {
                     filtering_sql += inClause(filter.field, filter.value, params_filtering)
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += filter.field + ` = 1`;
-                }
-                else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += filter.field + ` = 0`;
+                // A boolean (or its string form) is bound as 1/0 and keeps its operator. Strictly booleans: a loose
+                // test also caught the numbers 0 and 1, whose filter then lost its operator (`> 1` read as `= 1`).
+                else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    filtering_sql += filter.field + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push((filter.value === true || filter.value === "true") ? 1 : 0);
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {

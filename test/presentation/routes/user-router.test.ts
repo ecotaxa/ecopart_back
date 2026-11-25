@@ -67,6 +67,7 @@ class MockDeleteUserUseCase implements DeleteUserUseCase {
 }
 class MockMiddlewareUserValidation implements IMiddlewareUserValidation {
     rulesLogoutEcoTaxaAccount = []
+    rulesListEcotaxaAccountProjects = []
     rulesUserRequestCreationModel = []
     rulesMigrateUsers = []
     rulesUserRequestModel = []
@@ -178,7 +179,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
             const response = await request(server).get("/users")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -188,7 +189,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
             const response = await request(server).get("/users")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
 
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
@@ -262,7 +263,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters : Unauthorized sort_by: validemail") })
             const response = await request(server).post("/users/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -272,7 +273,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid sorting statement : 'des'") })
             const response = await request(server).post("/users/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
 
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
@@ -283,7 +284,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchUsersUseCase, "execute").mockImplementation(() => { throw new Error("Invalid filter statement Value for operator 'IN' must be an array in filter: {field: user_id, operator: IN, value:1 } ") })
             const response = await request(server).post("/users/searches")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockSearchUsersUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse));
         });
@@ -535,7 +536,7 @@ describe("User Router", () => {
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => { throw new Error("Unauthorized or unexisting parameters") })
             const response = await request(server).patch("/users/2").send(user_to_update)
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body.errors[0]).toEqual(expect.stringContaining(expectedResponse))
         });
@@ -551,7 +552,7 @@ describe("User Router", () => {
             jest.spyOn(mockUpdateUserUseCase, "execute").mockImplementation(() => Promise.reject(Error("Cannot find updated user")))
             const response = await request(server).patch("/users/2").send(user_to_update)
 
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(mockUpdateUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -671,7 +672,7 @@ describe("User Router", () => {
 
             const response = await request(server).get("/users/1/welcome/123456789")
 
-            expect(response.status).toBe(404)
+            expect(response.status).toBe(500)
             expect(mockValidUserUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -816,7 +817,7 @@ describe("User Router", () => {
 
             jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /user/:user_id/ecotaxa_account fail for Cannot create ecotaxa account", async () => {
@@ -836,7 +837,7 @@ describe("User Router", () => {
 
             jest.spyOn(mockLoginEcotaxaAccountUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).post("/users/1/ecotaxa_account").send(InputData)
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(409)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("POST /user/:user_id/ecotaxa_account fail for HTTP Error: 403", async () => {
@@ -1023,7 +1024,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).get("/users/1/ecotaxa_account")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("GET /users/:user_id/ecotaxa_account fail for Invalid sorting statement", async () => {
@@ -1033,7 +1034,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).get("/users/1/ecotaxa_account")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("GET /users/:user_id/ecotaxa_account fail for User cannot get requested ecotaxa account", async () => {
@@ -1053,7 +1054,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).get("/users/1/ecotaxa_account")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("GET /users/:user_id/ecotaxa_account fail for Unauthorized order_by", async () => {
@@ -1063,7 +1064,7 @@ describe("User Router", () => {
             jest.spyOn(mockSearchEcotaxaAccountsUseCase, "execute").mockImplementation(() => Promise.reject(OutputError))
             const response = await request(server).get("/users/1/ecotaxa_account")
 
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(response.body).toStrictEqual(expectedResponse)
         });
         test("GET /users/:user_id/ecotaxa_account fail for any other error", async () => {

@@ -13,12 +13,13 @@ import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { PivotImages, SampleRepository } from "../interfaces/repositories/sample-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
 import { formatBytes } from "../utils/format-bytes";
+import { degreesMinutesProblem, parseUvpCoordinate, UvpCoordinateNotation } from "../utils/uvp-coordinates";
 import { decodeUvpText } from "../utils/decode-uvp-text";
 import { selectMetaHeaderFile } from "../utils/meta-header-file";
 import { readUvpTextLines } from "../utils/text-lines";
 import { parseCtdRows } from "../utils/ctd-rows";
 import { CtdRows } from "../entities/ctd";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../entities/explore";
 import { ProjectStatsSampleRow } from "../entities/project-stats";
 import { addBruLine, BruBlocksByFrame, convertUvp5ToPivot, parseUvp5HeaderRow, Uvp5PivotFiles } from "../utils/uvp5-pivot-converter";
 import { Uvp5PivotReport, Uvp5PivotSampleMetadata } from "../entities/pivot";
@@ -301,7 +302,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         // Process sample_type_id
         const sample_type_id = await this.computeSampleTypeId(sample_header.sampleType);
         // Process latitude and longitude
-        const coords = this.computeLatitudeAndLongitude(sample_header.latitude_raw, sample_header.longitude_raw);
+        const coords = this.computeLatitudeAndLongitude(sample_header.latitude_raw, sample_header.longitude_raw, "degrees.minutes");
 
         // Construct the sample object
         delete (sample_header as any).sampleType;
@@ -445,7 +446,7 @@ export class SampleRepositoryImpl implements SampleRepository {
         const sample_metadata_ini = await this.getSampleFromMetadataIni(file_system_storage_project_folder, sample_name);
         const sample_type_id = await this.computeSampleTypeId(sample_metadata_ini.sampleType);
         // Process latitude and longitude
-        const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw);
+        const coords = this.computeLatitudeAndLongitude(sample_metadata_ini.latitude_raw, sample_metadata_ini.longitude_raw, "decimal degrees");
         // Compute max_pressure
         const max_pressure = await this.computeMaxPressure(file_system_storage_project_folder, sample_name);
         // Get the vignette-processing settings (gamma + resize factor) from compute_vignette.txt
@@ -584,47 +585,13 @@ export class SampleRepositoryImpl implements SampleRepository {
     }
 
 
-    computeLatitudeAndLongitude(latitude_raw: string | undefined, longitude_raw: string | undefined): { latitude: number, longitude: number } {
+    // Positions of the sample header as decimal degrees (see parseUvpCoordinate).
+    computeLatitudeAndLongitude(latitude_raw: string | undefined, longitude_raw: string | undefined, notation: UvpCoordinateNotation): { latitude: number, longitude: number } {
         if (latitude_raw === undefined || longitude_raw === undefined) {
             throw new Error("Latitude or longitude not found");
         }  // #TODO what to do if not found????
 
-        // Compute latitude and longitude
-        const latitude = this.convTextDegreeDotMinuteToDecimalDegree(latitude_raw, 'uvp6');
-        const longitude = this.convTextDegreeDotMinuteToDecimalDegree(longitude_raw, 'uvp6');
-
-        return { latitude, longitude };
-    }
-
-
-    // Convert a latitude or longitude string to a decimal degree float.
-    // Possible formats:
-    // DD°MM SS
-    // DD.MMMMM: MMMMM = Minutes /100, between 0.0 and 0.6 (historical UVP format)
-    // DD.FFFFF: FFFFF = Fraction of degrees
-    convTextDegreeDotMinuteToDecimalDegree(v: string, instrumtype: string): number {
-
-        const degreeMinuteSecondRegex = /(-?\d+)°(\d+) (\d+)/;
-        const match = degreeMinuteSecondRegex.exec(v);
-
-        if (match) { // Format DDD°MM SSS
-            const degrees = parseFloat(match[1]);
-            const minutes = parseFloat(match[2]);
-            const seconds = parseFloat(match[3]);
-
-            const minuteFraction = minutes + seconds / 60;
-            const decimalDegrees = degrees + Math.sign(degrees) * (minuteFraction / 60);
-            return parseFloat(decimalDegrees.toFixed(5));
-        } else {
-            if (instrumtype === 'uvp5') {
-                const floatValue = parseFloat(v);
-                const integerPart = Math.floor(floatValue);
-                const fractionPart = floatValue - integerPart;
-                return parseFloat((integerPart + fractionPart / 0.6).toFixed(5));
-            } else {
-                return parseFloat(parseFloat(v).toFixed(5));
-            }
-        }
+        return { latitude: parseUvpCoordinate(latitude_raw, notation), longitude: parseUvpCoordinate(longitude_raw, notation) };
     }
 
     async computeSampleTypeId(sampleType: string | undefined): Promise<number> {
@@ -1109,7 +1076,18 @@ export class SampleRepositoryImpl implements SampleRepository {
             not_imported_samples.map(sample => sample.profileId),
             to_inspect.map(sample => sample.profileId).filter(name => source_samples.includes(name)),
         );
-        for (const [sample_name, problem] of ambiguous) {
+        const header_problems = new Map(ambiguous);
+        if (instrument_model.startsWith('UVP5')) {
+            // UVP5 positions are converted from degrees.minutes: one that cannot be read so is refused
+            for (const sample of not_imported_samples) {
+                const position_problems = [degreesMinutesProblem("latitude", sample.latitude), degreesMinutesProblem("longitude", sample.longitude)].filter(problem => problem !== null);
+                if (position_problems.length === 0) continue;
+                const problem = `${position_problems.join(" and ")}: correct the position in the meta header`;
+                const other_problem = header_problems.get(sample.profileId);
+                header_problems.set(sample.profileId, other_problem ? `${other_problem}, ${problem}` : problem);
+            }
+        }
+        for (const [sample_name, problem] of header_problems) {
             const other_problem = source_problems.get(sample_name);
             source_problems.set(sample_name, other_problem ? `${problem}, ${other_problem}` : problem);
         }
@@ -2490,6 +2468,18 @@ export class SampleRepositoryImpl implements SampleRepository {
 
     async listEcoTaxaImportedSamples(): Promise<(EcoTaxaImportedSample & { fetched_utc_date_time: string | null })[]> {
         return await this.sampleDataSource.listEcoTaxaImportedSamples();
+    }
+
+    async getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]> {
+        return await this.sampleDataSource.getEcoTaxaHistograms(sample_ids);
+    }
+
+    async saveEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void> {
+        await this.sampleDataSource.upsertEcoTaxaHistogram(histogram);
+    }
+
+    async listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]> {
+        return await this.sampleDataSource.listEcoTaxaHistogramStates();
     }
 
     async updateParticleStats(sample_id: number, stats: SampleParticleStats): Promise<number> {

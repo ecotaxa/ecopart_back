@@ -1253,7 +1253,9 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
             if (!ecotaxa_instrument) return [];
         }
         // for_managing: only the projects the account can manage (every project for an EcoTaxa admin).
-        const params = new URLSearchParams({ for_managing: "true" });
+        // fields: only what the picker shows; by default EcoTaxa returns every field (member lists,
+        // free column mappings, classification settings) of every project, heavy for an admin account.
+        const params = new URLSearchParams({ for_managing: "true", fields: "projid,title,status,instrument,objcount,pctvalidated" });
         if (ecotaxa_instrument) params.set("instrument_filter", ecotaxa_instrument);
         const projects = await this.http<EcoTaxaSearchedProject[]>(
             `${base_url}api/projects/search?${params.toString()}`,
@@ -1299,24 +1301,30 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return stats ?? [];
     }
 
+    // EcoTaxa reads id_pattern as a case-insensitive "contains" (`ilike '%name%'`): searching "omer2_1"
+    // also answers "omer2_10". Only the samples named exactly as asked are kept, otherwise a deletion
+    // or an export would reach the objects of other samples.
+    private async resolveEcoTaxaSampleIds(baseUrl: string, token: string, ecotaxa_project_id: number, sample_names: string[]): Promise<{ sample_ids: number[], not_found: string[] }> {
+        const sample_ids: number[] = [];
+        const not_found: string[] = [];
+        for (const name of sample_names) {
+            const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
+                `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
+                { method: "GET", headers: this.JSON_HEADERS(token) }
+            );
+            const matching = (samples ?? []).filter(s => s.orig_id === name);
+            for (const s of matching) sample_ids.push(s.sampleid);
+            if (matching.length === 0) not_found.push(name);
+        }
+        return { sample_ids, not_found };
+    }
+
     // Query EcoTaxa objects by sample name in a project
     // GET /api/samples/search to resolve names → numeric IDs
     // POST /api/object_set/{project_id}/query with ProjectFilters.samples
     async api_ecotaxa_query_objects_by_sample(baseUrl: string, token: string, ecotaxa_project_id: number, sample_names: string[]): Promise<number[]> {
         // Step 1: resolve sample names to EcoTaxa numeric sample IDs
-        const sampleIds: number[] = [];
-        for (const name of sample_names) {
-            const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
-                `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
-                {
-                    method: "GET",
-                    headers: this.JSON_HEADERS(token),
-                }
-            );
-            for (const s of samples) {
-                sampleIds.push(s.sampleid);
-            }
-        }
+        const { sample_ids: sampleIds } = await this.resolveEcoTaxaSampleIds(baseUrl, token, ecotaxa_project_id, sample_names);
         if (sampleIds.length === 0) return [];
 
         // Step 2: query objects filtered by those sample IDs
@@ -1377,17 +1385,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const token = ecotaxa_account.ecotaxa_account_token;
 
         // Resolve sample names → EcoTaxa numeric sample ids
-        const sampleIds: number[] = [];
-        const not_found: string[] = [];
-        for (const name of sample_names) {
-            const samples = await this.http<Array<{ sampleid: number; orig_id: string }>>(
-                `${baseUrl}api/samples/search?project_ids=${ecotaxa_project_id}&id_pattern=${encodeURIComponent(name)}`,
-                { method: "GET", headers: this.JSON_HEADERS(token) }
-            );
-            const matching = samples.filter(s => s.orig_id === name);
-            for (const s of matching) sampleIds.push(s.sampleid);
-            if (matching.length === 0) not_found.push(name);
-        }
+        const { sample_ids: sampleIds, not_found } = await this.resolveEcoTaxaSampleIds(baseUrl, token, ecotaxa_project_id, sample_names);
         if (sampleIds.length === 0) {
             throw new Error(`No EcoTaxa samples found in project ${ecotaxa_project_id} matching: ${sample_names.join(", ")}`);
         }

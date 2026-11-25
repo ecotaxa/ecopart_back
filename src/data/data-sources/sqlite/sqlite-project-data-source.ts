@@ -172,8 +172,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
                 const physicalField = toPhysicalColumn(filter.field);
-                // An empty IN matches no project (e.g. a privacy_status no project is at). Explicit: otherwise
-                // [] would fall through to the `== false` branch below and only work as `project_id = 0`.
+                // An empty IN matches no project (e.g. a privacy_status no project is at)
                 if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
                     filtering_sql += `0 = 1`;
                 }
@@ -185,12 +184,11 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                         params_filtering.push(...filter.value)
                     }
                 }
-                // If value is true or false, set to 1 or 0
-                else if (filter.value == true || filter.value == "true") {
-                    filtering_sql += physicalField + ` = 1`;
-                }
-                else if (filter.value == false || filter.value == "false") {
-                    filtering_sql += physicalField + ` = 0`;
+                // A boolean (or its string form) is bound as 1/0 and keeps its operator. Strictly booleans: a loose
+                // test also caught the numbers 0 and 1, whose filter then lost its operator (`> 1` read as `= 1`).
+                else if (typeof filter.value === "boolean" || filter.value === "true" || filter.value === "false") {
+                    filtering_sql += physicalField + ` ` + filter.operator + ` (?)`;
+                    params_filtering.push((filter.value === true || filter.value === "true") ? 1 : 0);
                 }
                 // If value is undefined, null or empty, and operator =, set to is null
                 else if (filter.value === null || filter.value === undefined || filter.value == "null") {
@@ -296,6 +294,19 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                     reject(err);
                 } else {
                     resolve(rows.map((row: any) => row.ship_floatref));
+                }
+            });
+        })
+    }
+
+    async getLinkedEcotaxaProjectIds(ecotaxa_instance_id: number): Promise<number[]> {
+        const sql = `SELECT DISTINCT ecotaxa_project_id FROM project WHERE ecotaxa_instance_id = ? AND ecotaxa_project_id IS NOT NULL;`;
+        return await new Promise((resolve, reject) => {
+            this.db.all(sql, [ecotaxa_instance_id], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve((rows as { ecotaxa_project_id: number }[]).map((row) => row.ecotaxa_project_id));
                 }
             });
         })

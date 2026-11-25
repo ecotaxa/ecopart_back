@@ -82,9 +82,9 @@ describe('DELETE /tasks/:task_id (integration)', () => {
         }
         app = express()
         app.use(express.json())
-        app.use('/tasks', TaskRouter(auth, { rulesGetTasks: [] },
+        app.use('/tasks', TaskRouter(auth, { rulesGetTasks: [], rulesGetTaskLog: [] },
             new DeleteTask(userRepo, taskRepo, new MockPrivilegeRepository()),
-            new MockGetOneTaskUseCase(), new MockGetLogFileTask(), new MockStreamZipFileUseCase(), new MockSearchTasksUseCase(), new MockCancelTaskUseCase()))
+            new MockGetOneTaskUseCase(), new MockGetLogFileTask(), new MockStreamZipFileUseCase(), new MockSearchTasksUseCase(), new MockCancelTaskUseCase(), 30))
     })
 
     afterEach(async () => {

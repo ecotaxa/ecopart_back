@@ -94,7 +94,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/UserSearchResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -106,7 +106,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error, or invalid sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -126,8 +126,8 @@ export default function UsersRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get users"] })
         }
     })
@@ -203,13 +203,19 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/UserSearchResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters/filters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
      *         description: User cannot be used.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -229,9 +235,9 @@ export default function UsersRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement ")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search users"] })
         }
     })
@@ -630,8 +636,8 @@ export default function UsersRouter(
             if (err.message === "Logged user cannot update this property or user") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Cannot find updated user") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated user") res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot update user"] })
         }
     })
@@ -701,7 +707,7 @@ export default function UsersRouter(
             else if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find user with confirmation code") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot update user") res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Cannot find updated user") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated user") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot validate user") res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot welcome user"] })
         }
@@ -808,7 +814,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/PublicEcotaxaAccountResponse'
      *       401:
-     *         description: Unauthorized or account already exists.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -821,6 +827,12 @@ export default function UsersRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: EcoTaxa instance not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: An EcoTaxa account is already linked for this instance.
      *         content:
      *           application/json:
      *             schema:
@@ -849,9 +861,9 @@ export default function UsersRouter(
             else if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "User cannot add account to the desired ecopart user") res.status(403).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa instance not found ")) res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Ecotaxa instance id should be a number") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance id should be a number") res.status(422).send({ errors: [err.message] })
             else if (err.message === "Cannot create ecotaxa account") res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Account already exists") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Account already exists") res.status(409).send({ errors: [err.message] })
             else if (err.message === "HTTP Error: 403") res.status(403).send({ errors: ["Cannot login ecotaxa account"] })
             else res.status(500).send({ errors: ["Cannot login ecotaxa account"] })
         }
@@ -965,7 +977,8 @@ export default function UsersRouter(
      *         required: false
      *         schema:
      *           type: string
-     *         description: EcoPart instrument model the EcoTaxa projects must fit.
+     *           enum: [UVP5HD, UVP5SD, UVP5Z, UVP6LP, UVP6HF, UVP6MHP, UVP6MHF]
+     *         description: EcoPart instrument model the EcoTaxa projects must fit (empty = every instrument).
      *         example: UVP6LP
      *     responses:
      *       200:
@@ -995,7 +1008,7 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error (an ID is not a number, or the instrument model is unknown).
      *         content:
      *           application/json:
      *             schema:
@@ -1007,9 +1020,10 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      */
-    router.get('/:user_id/ecotaxa_account/:ecotaxa_account_id/projects', middlewareAuth.auth, middlewareUserValidation.rulesLogoutEcoTaxaAccount, async (req: Request, res: Response) => {
+    router.get('/:user_id/ecotaxa_account/:ecotaxa_account_id/projects', middlewareAuth.auth, middlewareUserValidation.rulesListEcotaxaAccountProjects, async (req: Request, res: Response) => {
         try {
-            const instrument_model = typeof req.query.instrument_model === "string" && req.query.instrument_model !== "" ? req.query.instrument_model : undefined
+            // Validated: absent, empty, or one known instrument model.
+            const instrument_model = (req.query.instrument_model as string | undefined) || undefined
             const projects = await listEcotaxaAccountProjectsUseCase.execute((req as CustomRequest).token, Number(req.params.user_id), Number(req.params.ecotaxa_account_id), instrument_model)
             res.status(200).send(projects)
         } catch (err) {
@@ -1134,13 +1148,19 @@ export default function UsersRouter(
      *             schema:
      *               $ref: '#/components/schemas/EcotaxaAccountSearchResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
      *         description: User cannot be used. The logged user is not allowed to perform this action.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -1160,11 +1180,11 @@ export default function UsersRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("User cannot get requested ecotaxa accounts")) res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized sort_by")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized order_by")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get ecotaxa accounts for user : " + req.params.user_id] })
         }
     })

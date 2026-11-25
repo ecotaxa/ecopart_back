@@ -23,6 +23,7 @@ import { SearchTasksResult } from "../../entities/task";
 class MockMiddlewareTaskValidation implements IMiddlewareTaskValidation {
     rulesGetInstrumentModels = []
     rulesGetTasks = []
+    rulesGetTaskLog = []
 }
 class MockMiddlewareAuth implements MiddlewareAuth {
     auth(req: Request, __: Response, next: NextFunction): void {
@@ -73,12 +74,22 @@ describe('TaskRouter', () => {
         searchTaskUseCase = new MockSearchTasksUseCase()
         cancelTaskUseCase = new MockCancelTaskUseCase()
 
-        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase, cancelTaskUseCase))
+        server.use("/tasks", TaskRouter(mockMiddlewareAuth, middlewareTaskValidation, deleteTaskUseCase, getOneTaskUseCase, getLogFileTaskUseCase, streamZipFileUseCase, searchTaskUseCase, cancelTaskUseCase, 30))
     })
 
     beforeEach(() => {
         jest.clearAllMocks();
     })
+
+    describe("Tests for GET /log_retention", () => {
+        test("gives the retention of the logs of successful tasks set on the server, not a task", async () => {
+            jest.spyOn(getOneTaskUseCase, "execute")
+            const response = await request(server).get("/tasks/log_retention")
+            expect(response.status).toBe(200)
+            expect(response.body).toStrictEqual({ task_log_retention_days: 30 })
+            expect(getOneTaskUseCase.execute).toBeCalledTimes(0)
+        });
+    });
 
     describe("Tests for GET /", () => {
         // Test for GET /tasks runs well
@@ -117,6 +128,16 @@ describe('TaskRouter', () => {
             expect(response.status).toBe(404)
             expect(searchTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test.each([
+            "Unauthorized or unexisting parameters : task_log_file_path",
+            "Invalid sorting statement : 'desc(task_id'",
+            "Invalid filter statement : 'Missing field, operator, or value in filter: {}'",
+        ])("search error %s : ko, 422", async (message) => {
+            jest.spyOn(searchTaskUseCase, "execute").mockImplementation(() => { throw new Error(message) })
+            const response = await request(server).get("/tasks")
+            expect(response.status).toBe(422)
+            expect(response.body).toStrictEqual({ errors: [message] })
         });
         test("failed if cannot search tasks", async () => {
             const expectedResponse = { errors: ["Cannot search tasks"] }
@@ -170,7 +191,7 @@ describe('TaskRouter', () => {
             const expectedResponse = { errors: ["Task managing filter value is not valid"] }
             jest.spyOn(searchTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task managing filter value is not valid") })
             const response = await request(server).post("/tasks/searches")
-            expect(response.status).toBe(401)
+            expect(response.status).toBe(422)
             expect(searchTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
@@ -373,6 +394,20 @@ describe('TaskRouter', () => {
             expect(getLogFileTaskUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
+        test("passes the from offset", async () => {
+            jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => Promise.resolve("next lines\n"))
+            const response = await request(server).get("/tasks/1/log?from=120")
+            expect(response.status).toBe(200)
+            expect(response.text).toBe("next lines\n")
+            // Validation rules are empty here: rulesGetTaskLog turns it into a number (task-validation.test.ts)
+            expect(getLogFileTaskUseCase.execute).toHaveBeenCalledWith(expect.anything(), 1, "120")
+        });
+        test("410 once the log of a successful task has expired with no warning to keep", async () => {
+            jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => { throw new Error("Task log expired") })
+            const response = await request(server).get("/tasks/1/log")
+            expect(response.status).toBe(410)
+            expect(response.body).toStrictEqual({ errors: ["The log of this successful task has expired and had no warning to keep: it has been removed"] })
+        });
         test("failed if cannot get task log", async () => {
             const expectedResponse = { errors: ["Cannot get task log"] }
             jest.spyOn(getLogFileTaskUseCase, "execute").mockImplementation(() => { throw new Error("xyz") })
@@ -418,13 +453,19 @@ describe('TaskRouter', () => {
             expect(streamZipFileUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
         });
-        test("failed if cannot find task file", async () => {
-            const expectedResponse = { errors: ["Cannot find task file"] }
-            jest.spyOn(streamZipFileUseCase, "execute").mockImplementation(() => { throw new Error("Cannot find task file") })
+        test("the task folder holds no zip : ko, 404", async () => {
+            const expectedResponse = { errors: ["No file found for task 1"] }
+            jest.spyOn(streamZipFileUseCase, "execute").mockImplementation(() => { throw new Error("No file found for task 1") })
             const response = await request(server).get("/tasks/1/file")
             expect(response.status).toBe(404)
             expect(streamZipFileUseCase.execute).toBeCalledTimes(1)
             expect(response.body).toStrictEqual(expectedResponse)
+        });
+        test("the task folder is gone : ko, 404 without the server path", async () => {
+            jest.spyOn(streamZipFileUseCase, "execute").mockImplementation(() => { throw Object.assign(new Error("ENOENT: no such file or directory, scandir '/srv/data/tasks/1'"), { code: "ENOENT" }) })
+            const response = await request(server).get("/tasks/1/file")
+            expect(response.status).toBe(404)
+            expect(response.body).toStrictEqual({ errors: ["ZIP file not found"] })
         });
         test("failed if user does not have the necessary permissions to access this task", async () => {
             const expectedResponse = { errors: ["Cannot get task file"] }

@@ -57,6 +57,7 @@ import { GetLogFileTask } from './domain/use-cases/task/get-log-file-task'
 import { StreamZipFile } from './domain/use-cases/task/stream-zip-file'
 import { CancelTask } from './domain/use-cases/task/cancel-task'
 import { RecoverInterruptedTasks } from './domain/use-cases/task/recover-interrupted-tasks'
+import { DEFAULT_TASK_LOG_RETENTION_DAYS } from './domain/constants/task'
 
 import { ListImportableSamples } from './domain/use-cases/sample/list-importable-samples'
 import { ImportSamples } from './domain/use-cases/sample/import-samples'
@@ -156,6 +157,7 @@ import { GetExploreSelection } from './domain/use-cases/explore/get-explore-sele
 import { GetExploreEcoTaxa } from './domain/use-cases/explore/get-explore-ecotaxa'
 import { GetExploreImages } from './domain/use-cases/explore/get-explore-images'
 import { GetExploreGraphs } from './domain/use-cases/explore/get-explore-graphs'
+import { GetExploreEcoTaxaGraphs } from './domain/use-cases/explore/get-explore-ecotaxa-graphs'
 
 sqlite3.verbose()
 
@@ -177,6 +179,9 @@ const config = {
     DATA_STORAGE_FS_STORAGE: process.env.DATA_STORAGE_FS_STORAGE || '',
     DATA_STORAGE_EXPORT: process.env.DATA_STORAGE_EXPORT || '',
     DATA_STORAGE_IMPORT: process.env.DATA_STORAGE_IMPORT || '',
+    // Days the log of a successful task is kept whole before only its warnings are kept. A wrong value stops
+    // the server at startup (TaskRepositoryImpl).
+    TASK_LOG_RETENTION_DAYS: process.env.TASK_LOG_RETENTION_DAYS ? Number(process.env.TASK_LOG_RETENTION_DAYS) : DEFAULT_TASK_LOG_RETENTION_DAYS,
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || '',
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || '',
@@ -311,11 +316,24 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     const sample_repo = new SampleRepositoryImpl(sample_dataSource, config.DATA_STORAGE_FS_STORAGE)
     // Notifies the owner of a task when it ends
     const notification_repo = new NotificationRepositoryImpl(notification_dataSource, project_dataSource)
-    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER, notification_repo)
+    const task_repo = new TaskRepositoryImpl(task_datasource, fsAdapter, config.DATA_STORAGE_FOLDER, notification_repo, config.DATA_STORAGE_EXPORT, config.TASK_LOG_RETENTION_DAYS)
+    console.log(new Date().toISOString(), `Logs of successful tasks kept whole ${config.TASK_LOG_RETENTION_DAYS} days, then only their warnings (TASK_LOG_RETENTION_DAYS)`)
 
     // Before any route exists: a task still active now lost its work when the server stopped
     const recovered_tasks = await new RecoverInterruptedTasks(task_repo, project_repo, sample_repo, config.DATA_STORAGE_FS_STORAGE).execute()
     if (recovered_tasks > 0) console.log(new Date().toISOString(), `${recovered_tasks} task(s) interrupted by the previous shutdown moved to a final status`)
+    // Housekeeping, at startup then once a day: the log of a task that succeeded is only kept whole for a while.
+    // A failure is logged and does not stop the server.
+    const purgeExpiredTaskLogs = async () => {
+        try {
+            const purged_logs = await task_repo.purgeExpiredLogs()
+            if (purged_logs > 0) console.log(new Date().toISOString(), `${purged_logs} expired task log(s) reduced to their warnings or removed`)
+        } catch (error) {
+            console.log(new Date().toISOString(), 'Cannot purge the expired task logs:', error)
+        }
+    }
+    await purgeExpiredTaskLogs()
+    setInterval(purgeExpiredTaskLogs, 24 * 60 * 60 * 1000).unref()
     // Throws at startup when the key is set but malformed
     const ecotaxa_token_cipher = new AesGcmTokenCipher(config.ECOTAXA_TOKEN_ENCRYPTION_KEY)
     const ecotaxa_account_repo = new EcotaxaAccountRepositoryImpl(ecotaxa_account_dataSource, config.GENERIC_ECOTAXA_ACCOUNT_EMAIL, config.NODE_ENV, config.ECOTAXA_ALLOW_SELF_SIGNED_CERT, ecotaxa_token_cipher)
@@ -413,7 +431,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetLogFileTask(task_repo, user_repo, privilege_repo),
         new StreamZipFile(task_repo, user_repo, privilege_repo),
         new SearchTask(user_repo, task_repo, search_repo, project_repo, privilege_repo),
-        new CancelTask(task_repo, user_repo)
+        new CancelTask(task_repo, user_repo),
+        config.TASK_LOG_RETENTION_DAYS
     )
 
     // Registered before the routers. Password guessing on login, and e-mail flooding through registration and
@@ -470,8 +489,10 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     // Explore: the selection, its stats and its curves over every project; anonymous callers served,
     // only the exports need a login. The EcoTaxa service and the particle and CTD bins keep caches shared by every request.
     const explore_repositories = { userRepository: user_repo, projectRepository: project_repo, privilegeRepository: privilege_repo, sampleRepository: sample_repo }
-    // Refreshes the EcoTaxa stats kept per sample once a day, in the background.
+    // Refreshes the EcoTaxa stats and objects kept per sample once a day, in the background.
     explore_ecotaxa.startSweeper()
+    // One cache of particle bins for the particle curves and the water volume of the EcoTaxa concentrations.
+    const explore_particle_bins = new ExploreParticleBins(sample_repo)
     server.use("/explore", ExploreRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareExploreValidation(),
@@ -480,7 +501,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new GetExploreSelection(explore_repositories, explore_ecotaxa),
         new GetExploreEcoTaxa(explore_repositories, explore_ecotaxa),
         new GetExploreImages(explore_repositories, explore_ecotaxa),
-        new GetExploreGraphs(explore_repositories, explore_ecotaxa, new ExploreParticleBins(sample_repo), new ExploreCtdBins(sample_repo)),
+        new GetExploreGraphs(explore_repositories, explore_ecotaxa, explore_particle_bins, new ExploreCtdBins(sample_repo)),
+        new GetExploreEcoTaxaGraphs(explore_repositories, explore_ecotaxa, explore_particle_bins),
     ))
     server.use("/version", VersionRouter(config.APP_VERSION))
 

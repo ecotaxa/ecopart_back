@@ -14,7 +14,7 @@ import { SearchRepositoryImpl } from '../../../src/domain/repositories/search-re
 import { SearchTask } from '../../../src/domain/use-cases/task/search-tasks'
 import { FsAdapter } from '../../../src/infra/files/fs'
 import { TasksStatus, TaskType } from '../../../src/domain/entities/task'
-import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE } from '../../../src/domain/constants/task'
+import { TASK_CANCELLED_MESSAGE, TASK_INTERRUPTED_MESSAGE, TASK_LOG_EXPIRED_MESSAGE } from '../../../src/domain/constants/task'
 import { migration as migration028 } from '../../../src/data/migrations/028_task_cancellation_and_unused_cleanup'
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..')
@@ -291,6 +291,25 @@ describe('task repository (integration)', () => {
             expect(fs.existsSync(task_folder)).toBe(false)
         })
 
+        test('the copy of an export in the FTP export folder goes with its task, the other copies stay', async () => {
+            const export_dir = path.join(tmp_dir, 'ftp_export')
+            const repo = new TaskRepositoryImpl(taskDs, new FsAdapter(), path.relative(PROJECT_ROOT, tmp_dir), undefined, path.relative(PROJECT_ROOT, export_dir))
+            const task_id = await newTask(TaskType.Export_Backup)
+            const other_id = await newTask(TaskType.Export_Backup)
+            for (const id of [task_id, other_id]) {
+                await repo.startTask({ task_id: id })
+                await repo.finishTask({ task_id: id })
+                fs.mkdirSync(path.join(export_dir, `${id}`), { recursive: true })
+                fs.writeFileSync(path.join(export_dir, `${id}`, `ecopart_export_backup_${id}.zip`), 'zip')
+            }
+
+            expect(await repo.deleteTask({ task_id })).toBe(1)
+
+            expect(fs.existsSync(path.join(export_dir, `${task_id}`))).toBe(false)
+            expect(fs.existsSync(path.join(export_dir, `${other_id}`, `ecopart_export_backup_${other_id}.zip`))).toBe(true)
+            expect(fs.existsSync(export_dir)).toBe(true)
+        })
+
         test('a log stored in a former storage folder goes with its folder, a log elsewhere goes alone', async () => {
             const moved_id = await newTask()
             await taskRepo.failedTask(moved_id, new Error('boom'))
@@ -469,6 +488,152 @@ describe('task repository (integration)', () => {
 
         test('an unknown task is refused', async () => {
             await expect(taskRepo.detachTaskFromProject(999)).rejects.toThrow('Task not found')
+        })
+    })
+
+    describe('log read from an offset', () => {
+        test('returns the complete lines written from the offset, whatever their characters', async () => {
+            const task_id = await newTask()
+            const full = await logOf(task_id)
+            const offset = Buffer.byteLength(full)
+            expect(await taskRepo.getLogFileTask(task_id, offset)).toBe('')
+
+            await taskRepo.updateTaskProgress({ task_id }, 10, 'échantillon été')
+            const next = await taskRepo.getLogFileTask(task_id, offset)
+            expect(next).toMatch(/^\S+ Task progress: 10% - échantillon été\n$/)
+            expect(full + next).toBe(await logOf(task_id))
+
+            expect(await taskRepo.getLogFileTask(task_id, offset + Buffer.byteLength(next) + 50)).toBe('')
+        })
+
+        test('a line still being written is left for the next read', async () => {
+            const task_id = await newTask()
+            const log_path = (await taskRepo.getOneTask({ task_id }))!.task_log_file_path!
+            const offset = fs.statSync(log_path).size
+            fs.appendFileSync(log_path, 'complete line\npartial')
+            expect(await taskRepo.getLogFileTask(task_id, offset)).toBe('complete line\n')
+        })
+    })
+
+    describe('log retention', () => {
+        const DAY_MS = 24 * 60 * 60 * 1000
+        const WARNING_LINE = 'Step 3/4 particle statistics : s1 : WARNING particle statistics not computed, left empty (boom)'
+        async function doneTask(warning?: string): Promise<number> {
+            const task_id = await newTask()
+            await taskRepo.startTask({ task_id })
+            await taskRepo.updateTaskProgress({ task_id }, 50, 'Step 3/4 particle statistics : s1')
+            if (warning) await taskRepo.logMessage(await logPathOf(task_id), warning)
+            await taskRepo.finishTask({ task_id })
+            return task_id
+        }
+        async function failedTask(): Promise<number> {
+            const task_id = await newTask()
+            await taskRepo.failedTask(task_id, new Error('boom'))
+            return task_id
+        }
+        async function endedDaysAgo(task_id: number, days: number): Promise<void> {
+            await run(db, 'UPDATE task SET task_end_utc_date_time = ? WHERE task_id = ?', [new Date(Date.now() - days * DAY_MS).toISOString(), task_id])
+        }
+        async function logPathOf(task_id: number): Promise<string> {
+            return (await taskRepo.getOneTask({ task_id }))!.task_log_file_path!
+        }
+        async function purgedOn(task_id: number): Promise<string | null | undefined> {
+            return (await taskRepo.getOneTask({ task_id }))!.task_log_purged_utc_date_time
+        }
+
+        test('only a successful task has a log expiration, 30 days after its end by default', async () => {
+            const done = await taskRepo.getOneTask({ task_id: await doneTask() })
+            const public_done = taskRepo.toPublicTask(done!)
+            expect(Date.parse(public_done.task_log_expiration_utc_date_time!) - Date.parse(done!.task_end_utc_date_time!)).toBe(30 * DAY_MS)
+            expect(public_done).not.toHaveProperty('task_log_purged_utc_date_time')
+
+            const failed = await taskRepo.getOneTask({ task_id: await failedTask() })
+            expect(taskRepo.toPublicTask(failed!).task_log_expiration_utc_date_time).toBeNull()
+            const pending = await taskRepo.getOneTask({ task_id: await newTask() })
+            expect(taskRepo.toPublicTask(pending!).task_log_expiration_utc_date_time).toBeNull()
+        })
+
+        test('the retention is the one set on the server, a whole number of days of at least 1', async () => {
+            const repo = new TaskRepositoryImpl(taskDs, new FsAdapter(), path.relative(PROJECT_ROOT, tmp_dir), undefined, '', 7)
+            const done = await repo.getOneTask({ task_id: await doneTask() })
+            expect(Date.parse(repo.toPublicTask(done!).task_log_expiration_utc_date_time!) - Date.parse(done!.task_end_utc_date_time!)).toBe(7 * DAY_MS)
+
+            for (const days of [0, -3, 1.5, Number.NaN]) {
+                expect(() => new TaskRepositoryImpl(taskDs, new FsAdapter(), 'folder', undefined, '', days))
+                    .toThrow(`TASK_LOG_RETENTION_DAYS must be a whole number of days, at least 1 (got ${days})`)
+            }
+        })
+
+        test('once expired, only the warnings of the log are served, even before the purge', async () => {
+            const recent = await doneTask(WARNING_LINE)
+            await endedDaysAgo(recent, 29)
+            expect(await logOf(recent)).toContain('Task is done')
+
+            const old = await doneTask(WARNING_LINE)
+            await endedDaysAgo(old, 31)
+            const warnings = await logOf(old)
+            expect(warnings).toMatch(new RegExp(`^\\S+ ${WARNING_LINE.replace(/[()]/g, '\\$&')}\n$`))
+            // Read from an offset like the whole log
+            expect(await taskRepo.getLogFileTask(old, Buffer.byteLength(warnings))).toBe('')
+            expect(fs.readFileSync(await logPathOf(old), 'utf8')).toContain('Task is done')
+
+            const old_without_warning = await doneTask()
+            await endedDaysAgo(old_without_warning, 31)
+            await expect(logOf(old_without_warning)).rejects.toThrow(TASK_LOG_EXPIRED_MESSAGE)
+
+            const old_failure = await failedTask()
+            await endedDaysAgo(old_failure, 365)
+            expect(await logOf(old_failure)).toContain('Task failed with error: boom')
+        })
+
+        test('the purge reduces the expired logs to their warnings, removes the ones without, once per task', async () => {
+            const old = await doneTask()
+            await endedDaysAgo(old, 31)
+            const old_with_warning = await doneTask(WARNING_LINE)
+            await endedDaysAgo(old_with_warning, 31)
+            const old_export = await doneTask()
+            await endedDaysAgo(old_export, 31)
+            const archive = path.join(path.dirname(await logPathOf(old_export)), 'export.zip')
+            fs.writeFileSync(archive, 'zip')
+            const recent = await doneTask()
+            await endedDaysAgo(recent, 29)
+            const old_failure = await failedTask()
+            await endedDaysAgo(old_failure, 365)
+
+            expect(await taskRepo.purgeExpiredLogs()).toBe(3)
+
+            expect(fs.existsSync(path.dirname(await logPathOf(old)))).toBe(false)
+            const reduced = fs.readFileSync(await logPathOf(old_with_warning), 'utf8')
+            expect(reduced).toMatch(/^\S+ Step 3\/4 particle statistics : s1 : WARNING particle statistics not computed, left empty \(boom\)\n$/)
+            expect(fs.readdirSync(path.dirname(await logPathOf(old_with_warning)))).toEqual([`task_log_${old_with_warning}.log`])
+            expect(await logOf(old_with_warning)).toBe(reduced)
+            expect(fs.existsSync(await logPathOf(old_export))).toBe(false)
+            expect(fs.existsSync(archive)).toBe(true)
+            expect(fs.readFileSync(await logPathOf(recent), 'utf8')).toContain('Task is done')
+            expect(fs.readFileSync(await logPathOf(old_failure), 'utf8')).toContain('Task failed with error: boom')
+            // The tasks themselves stay listed, the purged ones marked
+            expect(await statusOf(old)).toBe(TasksStatus.Done)
+            for (const task_id of [old, old_with_warning, old_export]) expect(await purgedOn(task_id)).toEqual(expect.any(String))
+            for (const task_id of [recent, old_failure]) expect(await purgedOn(task_id)).toBeNull()
+
+            // Marked: the next runs leave them alone
+            fs.appendFileSync(await logPathOf(old_with_warning), 'not read again\n')
+            expect(await taskRepo.purgeExpiredLogs()).toBe(0)
+            expect(fs.readFileSync(await logPathOf(old_with_warning), 'utf8')).toContain('not read again')
+        })
+
+        test('a log that cannot be purged is left unmarked for the next run, the others are done', async () => {
+            const blocked = await doneTask(WARNING_LINE)
+            await endedDaysAgo(blocked, 31)
+            const other = await doneTask()
+            await endedDaysAgo(other, 31)
+            // A folder where the reduced log is written: the rename over it fails
+            fs.mkdirSync((await logPathOf(blocked)) + '.partial')
+
+            expect(await taskRepo.purgeExpiredLogs()).toBe(1)
+            expect(await purgedOn(blocked)).toBeNull()
+            expect(await purgedOn(other)).toEqual(expect.any(String))
+            expect(fs.readFileSync(await logPathOf(blocked), 'utf8')).toContain('Task is done')
         })
     })
 

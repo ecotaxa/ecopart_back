@@ -164,7 +164,9 @@ export default function AdminRouter(
             const msg: string = err?.message || "";
             if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
             else if (msg === "Logged user cannot compute particle stats") res.status(403).send({ errors: [msg] })
-            else if (msg === "Task type not found" || msg === "Task status not found" || msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            else if (msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            // The seeded lookup row is missing: a server problem, nothing the caller can fix
+            else if (msg === "Task type not found" || msg === "Task status not found") res.status(500).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot compute particle stats"] })
         }

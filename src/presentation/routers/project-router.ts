@@ -40,6 +40,9 @@ import { CustomRequest } from '../../domain/entities/auth'
 import { TOO_MANY_IMAGES_ERROR } from '../../domain/utils/per-image-columns'
 import { IMiddlewareSampleValidation } from '../interfaces/middleware/sample-validation'
 
+// What SearchProjects throws for a managers, members or granted_users filter that is not a user id or a list of them
+const USER_FILTER_ERROR = /^(managers|members|granted_users) should be (a number|an array of numbers|an array of numbers or a number)$/;
+
 export default function ProjectRouter(
     middlewareAuth: MiddlewareAuth,
     middlewareProjectValidation: IMiddlewareProjectValidation,
@@ -131,7 +134,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ProjectSearchResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -144,6 +147,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Instrument model or privileges not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -164,8 +173,8 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get projects"] })
         }
@@ -265,7 +274,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ProjectSearchResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters/filters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -278,6 +287,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Instrument model or privileges not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -298,20 +313,11 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument model not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid filter statement ")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("contact should be a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("member should be a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("granted_users should be a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("member should be an array of numbers")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("managers should be a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("managers should be an array of numbers")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("granted_users should be an array of numbers")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("members should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("managers should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("granted_users should be an array of number or a number")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.startsWith("privacy_status should be one of")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid filter statement ")) res.status(422).send({ errors: [err.message] })
+            else if (USER_FILTER_ERROR.test(err.message)) res.status(422).send({ errors: [err.message] })
+            else if (err.message.startsWith("privacy_status should be one of")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find privileges")) res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search projects"] })
         }
@@ -410,7 +416,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/PublicProjectResponse'
      *       401:
-     *         description: Unauthorized or EcoTaxa configuration error.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -422,13 +428,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Instrument or user not found.
+     *         description: Instrument, user, EcoTaxa instance, EcoTaxa account or EcoTaxa project not found.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error, inconsistent privileges (managers, members, contact), or inconsistent EcoTaxa link (instance required, instance and account mismatch, instruments do not match).
      *         content:
      *           application/json:
      *             schema:
@@ -449,20 +455,21 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes(" cannot be used: ")) res.status(403).send({ errors: [err.message] })
-            else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "At least one user must be a manager") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "A user cannot be both a member and a manager") res.status(422).send({ errors: [err.message] })
             else if (err.message === "Cannot find the created project.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot create privileges for project") res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find created privileges")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("User cannot use the provided ecotaxa account current user id: ")) res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Ecotaxa instance not found.") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Ecotaxa instance ID is required for a new Ecotaxa project.") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Ecotaxa instance ID is required for an existing Ecotaxa project.") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Ecotaxa account not found.") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "EcoTaxa project not found") res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Mismatch: Ecotaxa instance ID does not match the Ecotaxa account's instance ID.") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found.") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance ID is required for a new Ecotaxa project.") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance ID is required for an existing Ecotaxa project.") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa account not found.") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "EcoTaxa project not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Mismatch: Ecotaxa instance ID does not match the Ecotaxa account's instance ID.") res.status(422).send({ errors: [err.message] })
             else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Instruments do not match")) res.status(500).send({ errors: [err.message] })
+            else if (err.message.includes("Instruments do not match")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Ecotaxa generic account not found for instance : ")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create project"] })
@@ -612,19 +619,25 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/PublicProjectResponse'
      *       401:
-     *         description: Unauthorized or invalid parameters.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       403:
-     *         description: User is deleted. The logged user is not allowed to perform this action.
+     *         description: User cannot be used. The logged user is not allowed to perform this action.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project, instrument, or user not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid parameters, nothing to update, or inconsistent privileges (managers, members and contact must be sent together and be coherent).
      *         content:
      *           application/json:
      *             schema:
@@ -642,24 +655,23 @@ export default function ProjectRouter(
             res.status(200).send(updated_project)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot update this property or project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project to update") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Instrument not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Member user cannot be use") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Manager user cannot be use") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Contact user cannot be use") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Contact user must be either in members or managers") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "At least one user must be a manager") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "A user cannot be both a member and a manager") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "To update privilege part you must provide members, managers and contact, if you want to manage privileges more granuraly please use privilege endpoints") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Please provide at least one property to update") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Contact user must be either in members or managers") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "At least one user must be a manager") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "A user cannot be both a member and a manager") res.status(422).send({ errors: [err.message] })
+            else if (err.message === "To update privilege part you must provide members, managers and contact, if you want to manage privileges more granuraly please use privilege endpoints") res.status(422).send({ errors: [err.message] })
             else if (err.message === "Privileges partially created, please check members, managers and contact") res.status(500).send({ errors: [err.message] })
-            else if (err.message === "Cannot find updated project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Cannot find updated project") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find privileges") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find updated privileges")) res.status(500).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(401).send({ errors: [err.message] })
-            else if (err.message === "Please provide at least one valid parameter to update") res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters")) res.status(422).send({ errors: [err.message] })
+            else if (err.message === "Please provide at least one valid parameter to update") res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot update project"] })
         }
@@ -740,7 +752,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find project to delete") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "A task is still running on this project") res.status(409).send({ errors: [err.message] })
-            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete project"] })
         }
@@ -925,8 +937,8 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Task status not found") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Task not found") res.status(404).send({ errors: [err.message] })
@@ -1093,8 +1105,8 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot list importable samples in this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "Task status not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(500).send({ errors: [err.message] })
+            else if (err.message === "Task status not found") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot create log file") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else if (err.message.includes("Backup folder does not exist at path")) res.status(404).send({ errors: [err.message] })
@@ -1183,19 +1195,19 @@ export default function ProjectRouter(
             "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
             "Logged user cannot list importable EcoTaxa samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
-            "Task type not found": { status: 404, message: err.message },
-            "Task status not found": { status: 404, message: err.message },
+            "Task type not found": { status: 500, message: err.message },
+            "Task status not found": { status: 500, message: err.message },
             "Cannot create log file": { status: 500, message: err.message },
             "Task not found": { status: 404, message: err.message },
             "Task is already in this status": { status: 500, message: err.message },
             "Cannot change status from": { status: 500, message: err.message },
             "Cannot find task": { status: 404, message: err.message },
             "Folder does not exist at path": { status: 404, message: err.message },
-            "No samples to import": { status: 404, message: err.message },
-            "Samples not importable:": { status: 401, message: err.message },
+            "No samples to import": { status: 422, message: err.message },
+            "Samples not importable:": { status: 422, message: err.message },
             "Invalid validated_samples:": { status: 422, message: err.message },
             "Samples listed more than once:": { status: 422, message: err.message },
-            "Unknown instrument model": { status: 404, message: err.message },
+            "Unknown instrument model": { status: 422, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
 
@@ -1277,7 +1289,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleImportResponse'
      *       401:
-     *         description: Missing or invalid access token, or samples not importable.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -1295,7 +1307,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: A sample listed twice in `samples`, or `validated_samples` not a subset of `samples`.
+     *         description: A sample listed twice in `samples`, `validated_samples` not a subset of `samples`, samples not importable, no samples to import, or unknown instrument model.
      *         content:
      *           application/json:
      *             schema:
@@ -1486,7 +1498,7 @@ export default function ProjectRouter(
             else if (err.message === 'Logged user cannot list importable CTD samples in this project') res.status(403).send({ errors: [err.message] });
             else if (err.message === 'Cannot find project') res.status(404).send({ errors: [err.message] });
             else if (err.message === 'No CTD folder found in project folder') res.status(404).send({ errors: [err.message] });
-            else if (err.message === 'Unknown instrument model') res.status(404).send({ errors: [err.message] });
+            else if (err.message === 'Unknown instrument model') res.status(422).send({ errors: [err.message] });
             else res.status(500).send({ errors: ['Cannot list importable CTD samples'] });
         }
     });
@@ -1501,8 +1513,8 @@ export default function ProjectRouter(
             'Cannot create log file': { status: 500, message: err.message },
             'Task not found': { status: 404, message: err.message },
             'Cannot find task': { status: 404, message: err.message },
-            'Unknown instrument model': { status: 404, message: err.message },
-            'CTD samples not importable:': { status: 401, message: err.message },
+            'Unknown instrument model': { status: 422, message: err.message },
+            'CTD samples not importable:': { status: 422, message: err.message },
             'No CTD folder found in project folder': { status: 404, message: err.message },
         };
 
@@ -1578,7 +1590,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: Missing or invalid access token, or provided non-importable samples.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -1596,7 +1608,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       422:
-     *         description: Validation error.
+     *         description: Validation error, CTD samples not importable, or unknown instrument model.
      *         content:
      *           application/json:
      *             schema:
@@ -1741,7 +1753,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: User is not allowed or sample is not currently CTD-imported.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -1754,6 +1766,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project or CTD sample not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: A sample has no imported CTD file.
      *         content:
      *           application/json:
      *             schema:
@@ -1780,7 +1798,7 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find project") return res.status(404).send({ errors: [err.message] })
             else if (err.message === "Cannot find CTD samples to delete") return res.status(404).send({ errors: [err.message] })
             else if (err.message.startsWith("Some CTD samples to delete were not found:")) return res.status(404).send({ errors: [err.message] })
-            else if (err.message.startsWith("Some samples do not have an imported CTD file:")) return res.status(401).send({ errors: [err.message] })
+            else if (err.message.startsWith("Some samples do not have an imported CTD file:")) return res.status(409).send({ errors: [err.message] })
             else return res.status(500).send({ errors: ["Cannot delete CTD samples"] })
         }
     });
@@ -1812,7 +1830,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleSearchResponse'
      *       401:
-     *         description: Invalid parameters or unauthorized.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -1825,6 +1843,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -1846,13 +1870,13 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
             else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get samples"] })
         }
     })
@@ -2032,13 +2056,13 @@ export default function ProjectRouter(
      *       200:
      *         description: The updated sample.
      *       401:
-     *         description: Invalid visual QC status.
+     *         description: Missing or invalid access token.
      *       403:
      *         description: User cannot be used or cannot validate in this project.
      *       404:
      *         description: Sample, project, or QC status not found.
      *       422:
-     *         description: Validation error.
+     *         description: Validation error, or invalid visual QC status.
      *       500:
      *         description: Internal server error.
      */
@@ -2050,7 +2074,7 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot validate samples in this project") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Invalid visual QC status") res.status(401).send({ errors: [err.message] })
+            else if (err.message === "Invalid visual QC status") res.status(422).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample" || err.message === "Cannot find updated sample") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Sample does not belong to project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Visual QC status not found") res.status(404).send({ errors: [err.message] })
@@ -2258,7 +2282,7 @@ export default function ProjectRouter(
             else if (err.message === "No samples in this project") res.status(404).send({ errors: [err.message] })
             else if (err.message.startsWith("Samples not found in this project")) res.status(404).send({ errors: [err.message] })
             else if (err.message === "Pivots only exist for UVP5 projects") res.status(422).send({ errors: [err.message] })
-            else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Task type not found") res.status(500).send({ errors: [err.message] })
             else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot regenerate pivots"] })
         }
@@ -2358,7 +2382,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleSearchResponse'
      *       401:
-     *         description: Invalid parameters/filters or unauthorized.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -2371,6 +2395,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -2392,13 +2422,13 @@ export default function ProjectRouter(
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot access this project") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
             else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot search samples"] })
         }
     })
@@ -2440,7 +2470,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: Missing or invalid access token, or the sample does not belong to the project.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -2452,7 +2482,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Project or sample not found.
+     *         description: Project or sample not found, or the sample does not belong to the project.
      *         content:
      *           application/json:
      *             schema:
@@ -2526,11 +2556,11 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/TaskResponse'
      *       401:
-     *         description: Missing or invalid access token, or a sample does not belong to the project.
+     *         description: Missing or invalid access token.
      *       403:
      *         description: User cannot be used. Logged user cannot delete samples in this project.
      *       404:
-     *         description: Project or sample not found.
+     *         description: Project or sample not found, or a sample does not belong to the project.
      *       409:
      *         description: The project is being deleted.
      *       422:
@@ -2553,10 +2583,10 @@ export default function ProjectRouter(
         else if (err.message === "Logged user cannot delete samples in this project") res.status(403).send({ errors: [err.message] })
         else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
         else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
-        else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
+        else if (err.message === "The given project_id does not match the sample's project_id") res.status(404).send({ errors: [err.message] })
         else if (err.message === "No samples to delete") res.status(422).send({ errors: [err.message] })
         else if (err.message === "The project is being deleted") res.status(409).send({ errors: [err.message] })
-        else if (err.message === "Task type not found") res.status(404).send({ errors: [err.message] })
+        else if (err.message === "Task type not found") res.status(500).send({ errors: [err.message] })
         else if (err.message === "Cannot find task") res.status(404).send({ errors: [err.message] })
         else res.status(500).send({ errors: ["Cannot delete samples"] })
     }
@@ -2633,18 +2663,18 @@ export default function ProjectRouter(
             "Logged user cannot list importable samples in this project": { status: 403, message: err.message },
             "Logged user cannot list importable EcoTaxa samples in this project": { status: 403, message: err.message },
             "Cannot find project": { status: 404, message: err.message },
-            "Task type not found": { status: 404, message: err.message },
-            "Task status not found": { status: 404, message: err.message },
+            "Task type not found": { status: 500, message: err.message },
+            "Task status not found": { status: 500, message: err.message },
             "Cannot create log file": { status: 500, message: err.message },
             "Task not found": { status: 404, message: err.message },
             "Task is already in this status": { status: 500, message: err.message },
             "Cannot change status from": { status: 500, message: err.message },
             "Cannot find task": { status: 404, message: err.message },
             "Folder does not exist at path": { status: 404, message: err.message },
-            "No samples to import": { status: 404, message: err.message },
-            "Samples not importable:": { status: 401, message: err.message },
+            "No samples to import": { status: 422, message: err.message },
+            "Samples not importable:": { status: 422, message: err.message },
             "Invalid validated_samples:": { status: 422, message: err.message },
-            "Unknown instrument model": { status: 404, message: err.message },
+            "Unknown instrument model": { status: 422, message: err.message },
             "Backup aborted": { status: 500, message: err.message },
         };
 
@@ -2713,7 +2743,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/SampleImportResponse'
      *       401:
-     *         description: Missing or invalid access token, or samples not importable.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -2726,6 +2756,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project or samples not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Samples not importable, no samples to import, or unknown instrument model.
      *         content:
      *           application/json:
      *             schema:
@@ -2841,7 +2877,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/EcoTaxaSampleListResponse'
      *       401:
-     *         description: Invalid parameters or unauthorized.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -2853,7 +2889,19 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Sample type or visual QC status not found.
+     *         description: Project, EcoTaxa instance, sample type or visual QC status not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: The project is not linked to an EcoTaxa instance.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Invalid filter, sort or search parameters.
      *         content:
      *           application/json:
      *             schema:
@@ -2874,14 +2922,16 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot get EcoTaxa samples for this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Project is not linked to an EcoTaxa instance") res.status(409).send({ errors: [err.message] })
-            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Invalid sorting statement")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Missing field, operator, or value in filter")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Invalid sorting statement")) res.status(422).send({ errors: [err.message] })
             else if (err.message === ("Sample type not found")) res.status(404).send({ errors: [err.message] })
             else if (err.message === ("Visual QC status not found")) res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized sort_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized order_by:")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized sort_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized order_by:")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Unauthorized or unexisting parameters :")) res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot get samples"] })
         }
     })
@@ -2924,7 +2974,7 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/MessageResponse'
      *       401:
-     *         description: User cannot delete sample or project mismatch.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -2936,7 +2986,13 @@ export default function ProjectRouter(
      *             schema:
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
-     *         description: Sample not found.
+     *         description: Project, sample or EcoTaxa instance not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       409:
+     *         description: A sample has no EcoTaxa sample, or the project has no linked EcoTaxa project.
      *         content:
      *           application/json:
      *             schema:
@@ -2957,7 +3013,11 @@ export default function ProjectRouter(
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find sample to delete") res.status(404).send({ errors: [err.message] })
-            else if (err.message === "The given project_id does not match the sample's project_id") res.status(401).send({ errors: [err.message] })
+            else if (err.message.startsWith("Some samples to delete were not found: ")) res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Project not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
+            else if (err.message === "The sample to delete does not have an associated EcoTaxa sample") res.status(409).send({ errors: [err.message] })
+            else if (err.message === "No linked EcoTaxa project") res.status(409).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot delete this sample") res.status(403).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot delete sample"] })
         }
@@ -3031,7 +3091,7 @@ export default function ProjectRouter(
          *                     type: string
          *                   description: Names of EcoTaxa samples in the EcoTaxa project that have no matching EcoPart sample.
      *       401:
-     *         description: Not admin, or EcoTaxa account/instance/project validation failed.
+     *         description: Missing or invalid access token.
      *         content:
      *           application/json:
      *             schema:
@@ -3044,6 +3104,12 @@ export default function ProjectRouter(
      *               $ref: '#/components/schemas/ErrorResponse'
      *       404:
      *         description: Project, EcoTaxa account, or EcoTaxa project not found.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ErrorResponse'
+     *       422:
+     *         description: Validation error, EcoTaxa instance required, instance and account mismatch, or instruments do not match.
      *         content:
      *           application/json:
      *             schema:
@@ -3084,12 +3150,12 @@ export default function ProjectRouter(
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found.") res.status(404).send({ errors: [err.message] })
             else if (err.message === "Ecotaxa instance not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Ecotaxa generic account not found for instance")) res.status(404).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa generic account not found for instance")) res.status(500).send({ errors: [err.message] })
             else if (err.message === "EcoTaxa project not found") res.status(404).send({ errors: [err.message] })
-            else if (err.message.includes("Ecotaxa instance ID is required")) res.status(401).send({ errors: [err.message] })
-            else if (err.message.includes("Mismatch: Ecotaxa instance ID does not match")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Ecotaxa instance ID is required")) res.status(422).send({ errors: [err.message] })
+            else if (err.message.includes("Mismatch: Ecotaxa instance ID does not match")) res.status(422).send({ errors: [err.message] })
             else if (err.message === "EcoTaxa account is not manager in the ecotaxa project") res.status(403).send({ errors: [err.message] })
-            else if (err.message.includes("Instruments do not match")) res.status(401).send({ errors: [err.message] })
+            else if (err.message.includes("Instruments do not match")) res.status(422).send({ errors: [err.message] })
             else if (err.message.includes("already linked")) res.status(409).send({ errors: [err.message] })
             else if (err.message.includes("EcoTaxa HTTP Error")) res.status(500).send({ errors: [err.message] })
             else if (err.message.includes("Cannot find updated project")) res.status(500).send({ errors: [err.message] })

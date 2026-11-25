@@ -1,5 +1,7 @@
 import sqlite3 from "sqlite3";
 import fs from "fs";
+import os from "os";
+import path from "path";
 import { MigrationManager, Migration } from "../../../src/data/migrations/migration-manager";
 import { SQLiteDatabaseWrapper } from "../../../src/data/interfaces/data-sources/database-wrapper";
 
@@ -331,6 +333,44 @@ describe("MigrationManager", () => {
         test("should return empty array for nonexistent directory", () => {
             const migrations = manager.loadMigrationsFromDirectory("/tmp/nonexistent_dir_12345");
             expect(migrations).toEqual([]);
+        });
+
+        describe("files of a folder", () => {
+            let dir: string;
+            const valid = (id: string) => `exports.migration = { id: "${id}", up: async () => undefined, down: async () => undefined };`;
+            beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "ecopart-migrations-")); });
+            afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+
+            test("numbered files are loaded in order, the other files of the folder are left out : ok", () => {
+                fs.writeFileSync(path.join(dir, "001_second.js"), valid("001_second"));
+                fs.writeFileSync(path.join(dir, "000_first.js"), valid("000_first"));
+                fs.writeFileSync(path.join(dir, "migration-logger.js"), "exports.anything = 1;");
+                fs.writeFileSync(path.join(dir, "notes.js"), "throw new Error('never loaded');");
+
+                expect(manager.loadMigrationsFromDirectory(dir).map(m => m.id)).toEqual(["000_first", "001_second"]);
+            });
+
+            test("a migration file that cannot be loaded : ko, nothing is returned to run", () => {
+                fs.writeFileSync(path.join(dir, "000_first.js"), valid("000_first"));
+                fs.writeFileSync(path.join(dir, "001_broken.js"), "throw new Error('syntax or import problem');");
+                fs.writeFileSync(path.join(dir, "002_third.js"), valid("002_third"));
+
+                expect(() => manager.loadMigrationsFromDirectory(dir)).toThrow("Cannot load migration file 001_broken.js: syntax or import problem");
+            });
+
+            test("a migration file without a migration export : ko", () => {
+                fs.writeFileSync(path.join(dir, "000_first.js"), "exports.migration = { id: '000_first', up: async () => undefined };");
+
+                expect(() => manager.loadMigrationsFromDirectory(dir)).toThrow("Migration file 000_first.js does not export a migration with an id, up and down");
+            });
+
+            test("runAllMigrations stops before running anything when a file cannot be loaded : ko", async () => {
+                fs.writeFileSync(path.join(dir, "000_first.js"), valid("000_first"));
+                fs.writeFileSync(path.join(dir, "001_broken.js"), "throw new Error('broken');");
+
+                await expect(manager.runAllMigrations(dir)).rejects.toThrow("Cannot load migration file 001_broken.js");
+                expect(await manager.getAppliedMigrations()).toEqual([]);
+            });
         });
     });
 });

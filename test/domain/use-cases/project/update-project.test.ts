@@ -250,6 +250,35 @@ test("Admin can update privilege part", async () => {
     expect(mockProjectRepository.getProject).toHaveBeenCalledTimes(2)
     expect(data).toStrictEqual(OutputData);
 })
+test("Privileges alone are sent : ok, no project property is written", async () => {
+    const current_user: UserUpdateModel = { user_id: 1 }
+    const project_to_update: PublicProjectUpdateModel = {
+        project_id: 1,
+        managers: [{ user_id: 2 }],
+        members: [{ user_id: 3 }],
+        contact: { user_id: 2 },
+    } as PublicProjectUpdateModel
+    jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
+    jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
+    jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
+    jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())
+    jest.spyOn(mockPrivilegeRepository, "ensurePrivilegeCoherence").mockImplementation(() => undefined)
+    jest.spyOn(mockPrivilegeRepository, "deletePrivileges").mockImplementation(() => Promise.resolve(2))
+    jest.spyOn(mockPrivilegeRepository, "createPrivileges").mockImplementation(() => Promise.resolve(2))
+    // What the real repository answers to an update carrying only project_id
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementation(() => Promise.reject(new Error("Please provide at least one valid parameter to update")))
+    jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(publicPrivileges))
+    jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => projectResponseModel)
+
+    const updateProjectUseCase = new UpdateProject(mockUserRepository, mockProjectRepository, mockInstrumentModelRepository, mockPrivilegeRepository, mockEcotaxaAccountRepository, mockSampleRepository, "data_storage/ecopart_data_to_import/")
+
+    const data = await updateProjectUseCase.execute(current_user, project_to_update);
+
+    expect(data).toStrictEqual(projectResponseModel);
+    expect(mockPrivilegeRepository.deletePrivileges).toHaveBeenCalledTimes(1)
+    expect(mockPrivilegeRepository.createPrivileges).toHaveBeenCalledTimes(1)
+    expect(mockProjectRepository.standardUpdateProject).toHaveBeenCalledTimes(0)
+})
 // test manager can update privilege part
 test("Manager can update privilege part", async () => {
     const current_user: UserUpdateModel = {
@@ -412,8 +441,8 @@ test("Update project with privileges partially created", async () => {
     }
 });
 
-// please provide at least one property to update
-test("Please provide at least one property to update", async () => {
+// nothing to update: the repository error reaches the router as is
+test("Please provide at least one valid parameter to update", async () => {
     const current_user: UserUpdateModel = {
         user_id: 1
     }
@@ -422,14 +451,14 @@ test("Please provide at least one property to update", async () => {
     }
     const privileges: PublicPrivilege = publicPrivileges
     const updated_public_project: PublicProjectResponseModel = projectResponseModel
-    const expected_error = new Error("Please provide at least one property to update")
+    const expected_error = new Error("Please provide at least one valid parameter to update")
 
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockImplementationOnce(() => Promise.resolve())
     jest.spyOn(mockProjectRepository, "getProject").mockImplementation(() => Promise.resolve(projectResponseModel))
     jest.spyOn(mockPrivilegeRepository, "isGranted").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockPrivilegeRepository, "isManager").mockImplementationOnce(() => Promise.resolve(true))
     jest.spyOn(mockUserRepository, "isAdmin").mockImplementationOnce(() => Promise.resolve(true))
-    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.reject(new Error("Please provide at least one property to update")))
+    jest.spyOn(mockProjectRepository, "standardUpdateProject").mockImplementationOnce(() => Promise.reject(new Error("Please provide at least one valid parameter to update")))
     jest.spyOn(mockPrivilegeRepository, "getPublicPrivileges").mockImplementationOnce(() => Promise.resolve(privileges))
     jest.spyOn(mockProjectRepository, "toPublicProject").mockImplementationOnce(() => updated_public_project)
     jest.spyOn(mockUserRepository, "ensureTypedUserCanBeUsed").mockImplementation(() => Promise.resolve())

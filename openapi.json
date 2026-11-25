@@ -1393,6 +1393,35 @@
           }
         ]
       },
+      "ExploreEcoTaxaGraphsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExploreRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "depth"
+                ],
+                "description": "The EcoTaxa concentrations are drawn on depth profiles only."
+              },
+              "include_predicted": {
+                "type": "boolean",
+                "default": false,
+                "description": "Also count the predicted objects (validated objects only by default, as legacy EcoPart)."
+              },
+              "sum_child_taxa": {
+                "type": "boolean",
+                "default": false,
+                "description": "A category also counts the objects of its children among the categories of the selection."
+              }
+            }
+          }
+        ]
+      },
       "ExploreProjectOption": {
         "type": "object",
         "properties": {
@@ -1848,8 +1877,38 @@
             "items": {
               "type": "string"
             }
+          },
+          "ctd_warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why samples drawn have no CTD curve: no CTD imported, unreadable file, no pressure or time column."
           }
         }
+      },
+      "ExploreEcoTaxaGraphs": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GraphDataset"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Why samples drawn have no curve: not imported in EcoTaxa, objects being read, no particle data, no validated object."
+              },
+              "nb_samples_pending": {
+                "type": "integer",
+                "description": "Samples whose objects are being read from EcoTaxa: ask again later for the complete curves."
+              }
+            }
+          }
+        ]
       },
       "InstrumentModelResponse": {
         "type": "object",
@@ -3631,6 +3690,11 @@
             "type": "string",
             "description": "Date the task reached DONE, ERROR or CANCELLED (ISO 8601 UTC)."
           },
+          "task_log_expiration_utc_date_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date from which only the WARNING lines of the log are kept and served (GET /tasks/{task_id}/log, 410 when the log has none): GET /tasks/log_retention days (TASK_LOG_RETENTION_DAYS) after the end of a task that succeeded (DONE). Null for any other status, whose log is kept whole."
+          },
           "task_progress_pct": {
             "type": "number",
             "description": "Task progress percentage (0-100).",
@@ -4343,7 +4407,7 @@
             }
           },
           "401": {
-            "description": "New password must be different from old password.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4363,7 +4427,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error, or the new password is the same as the old one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5212,7 +5276,7 @@
     "/explore/graphs": {
       "post": {
         "summary": "Curves of the Explore selection",
-        "description": "Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by\ndefault, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out.\nAnonymous callers are served, as a user without any privilege.\n",
+        "description": "Particle abundance and biovolume per size class (`size_classes`: the 15 reduced classes by\ndefault, or the 45 detailed classes of legacy EcoPart), and the CTD variables, of every\nsample of the selection whose project lets the caller see figures (members and managers\nalways, anyone once the project is visible), binned on the depth axis (`mode: depth`,\n`pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned\nexport computation, the descent filter of the project applied to depth profiles. At most\n100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out,\n`ctd_warnings` which samples have no CTD curve and why (no CTD imported, unreadable file, no\npressure or time column). The `ecotaxa` dataset comes back empty: the EcoTaxa concentrations are\nserved by `/explore/graphs/ecotaxa`.\nAnonymous callers are served, as a user without any privilege.\n",
         "tags": [
           "Explore"
         ],
@@ -5265,6 +5329,83 @@
           },
           "422": {
             "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explore/graphs/ecotaxa": {
+      "post": {
+        "summary": "Concentrations per EcoTaxa category of the Explore selection",
+        "description": "The concentration (# m-3) of every EcoTaxa category of the depth profiles of the selection\nwhose project lets the caller see figures, as legacy EcoPart drew it: the objects are counted\nin the legacy depth bins (0, 25, 50, 75, 100, 125, 150, 200, 250 m... widening with depth),\nthe depth offset added to their EcoTaxa depth, and divided by the water volume the particle\nimages of the same depths imaged. Validated objects only unless `include_predicted`; with\n`sum_child_taxa`, a category also counts the objects of its children among the categories of\nthe selection. The categories come most abundant first. Each curve is a step curve: its\n`positions` are the top of each depth bin, then the bottom of the deepest one, which repeats\nthe last value. The objects are read from EcoTaxa in\nthe background and kept: `nb_samples_pending` samples are still being read, ask again later.\nThe descent filter and the first and last image of the particle settings are not applied to\nthe objects yet. At most 100 samples are drawn; `warnings` tells which samples have no curve\nand why. Anonymous callers are served, as a user without any privilege.\n",
+        "tags": [
+          "Explore"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploreEcoTaxaGraphsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The concentrations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExploreEcoTaxaGraphs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access cookie is invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The logged user cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (the mode must be depth).",
             "content": {
               "application/json": {
                 "schema": {
@@ -5656,8 +5797,8 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized or invalid parameters.",
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6197,7 +6338,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6218,6 +6359,16 @@
           },
           "404": {
             "description": "Instrument model or privileges not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6271,7 +6422,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or EcoTaxa configuration error.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6291,7 +6442,7 @@
             }
           },
           "404": {
-            "description": "Instrument or user not found.",
+            "description": "Instrument, user, EcoTaxa instance, EcoTaxa account or EcoTaxa project not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6301,7 +6452,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error, inconsistent privileges (managers, members, contact), or inconsistent EcoTaxa link (instance required, instance and account mismatch, instruments do not match).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6407,7 +6558,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters/filters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6428,6 +6579,16 @@
           },
           "404": {
             "description": "Instrument model or privileges not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6680,7 +6841,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6690,7 +6851,7 @@
             }
           },
           "403": {
-            "description": "User is deleted. The logged user is not allowed to perform this action.",
+            "description": "User cannot be used. The logged user is not allowed to perform this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6701,6 +6862,16 @@
           },
           "404": {
             "description": "Project, instrument, or user not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters, nothing to update, or inconsistent privileges (managers, members and contact must be sent together and be coherent).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7287,7 +7458,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token, or samples not importable.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7317,7 +7488,7 @@
             }
           },
           "422": {
-            "description": "A sample listed twice in `samples`, or `validated_samples` not a subset of `samples`.",
+            "description": "A sample listed twice in `samples`, `validated_samples` not a subset of `samples`, samples not importable, no samples to import, or unknown instrument model.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7486,7 +7657,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token, or provided non-importable samples.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7516,7 +7687,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error, CTD samples not importable, or unknown instrument model.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7687,7 +7858,7 @@
             }
           },
           "401": {
-            "description": "User is not allowed or sample is not currently CTD-imported.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7708,6 +7879,16 @@
           },
           "404": {
             "description": "Project or CTD sample not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A sample has no imported CTD file.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7773,7 +7954,7 @@
             }
           },
           "401": {
-            "description": "Invalid parameters or unauthorized.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7794,6 +7975,16 @@
           },
           "404": {
             "description": "Sample type or visual QC status not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7871,13 +8062,13 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token, or a sample does not belong to the project."
+            "description": "Missing or invalid access token."
           },
           "403": {
             "description": "User cannot be used. Logged user cannot delete samples in this project."
           },
           "404": {
-            "description": "Project or sample not found."
+            "description": "Project or sample not found, or a sample does not belong to the project."
           },
           "409": {
             "description": "The project is being deleted."
@@ -8009,7 +8200,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token, or the sample does not belong to the project.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8029,7 +8220,7 @@
             }
           },
           "404": {
-            "description": "Project or sample not found.",
+            "description": "Project or sample not found, or the sample does not belong to the project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8171,7 +8362,7 @@
             "description": "The updated sample."
           },
           "401": {
-            "description": "Invalid visual QC status."
+            "description": "Missing or invalid access token."
           },
           "403": {
             "description": "User cannot be used or cannot validate in this project."
@@ -8180,7 +8371,7 @@
             "description": "Sample, project, or QC status not found."
           },
           "422": {
-            "description": "Validation error."
+            "description": "Validation error, or invalid visual QC status."
           },
           "500": {
             "description": "Internal server error."
@@ -8481,7 +8672,7 @@
             }
           },
           "401": {
-            "description": "Invalid parameters/filters or unauthorized.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8502,6 +8693,16 @@
           },
           "404": {
             "description": "Sample type or visual QC status not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8648,7 +8849,7 @@
             }
           },
           "401": {
-            "description": "Missing or invalid access token, or samples not importable.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8669,6 +8870,16 @@
           },
           "404": {
             "description": "Project or samples not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Samples not importable, no samples to import, or unknown instrument model.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8734,7 +8945,7 @@
             }
           },
           "401": {
-            "description": "Invalid parameters or unauthorized.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8754,7 +8965,27 @@
             }
           },
           "404": {
-            "description": "Sample type or visual QC status not found.",
+            "description": "Project, EcoTaxa instance, sample type or visual QC status not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project is not linked to an EcoTaxa instance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8831,7 +9062,7 @@
             }
           },
           "401": {
-            "description": "User cannot delete sample or project mismatch.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8851,7 +9082,17 @@
             }
           },
           "404": {
-            "description": "Sample not found.",
+            "description": "Project, sample or EcoTaxa instance not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A sample has no EcoTaxa sample, or the project has no linked EcoTaxa project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8966,7 +9207,7 @@
             }
           },
           "401": {
-            "description": "Not admin, or EcoTaxa account/instance/project validation failed.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8987,6 +9228,16 @@
           },
           "404": {
             "description": "Project, EcoTaxa account, or EcoTaxa project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error, EcoTaxa instance required, instance and account mismatch, or instruments do not match.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9054,6 +9305,16 @@
           },
           "404": {
             "description": "Task type or status label not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9130,7 +9391,7 @@
             }
           },
           "401": {
-            "description": "Invalid filter value.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9159,12 +9420,58 @@
               }
             }
           },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/log_retention": {
+      "get": {
+        "summary": "Retention of task logs",
+        "description": "How many days after its end the log of a task that succeeded (DONE) is kept whole, before it is reduced to its WARNING lines (removed when it has none). Set on the server by TASK_LOG_RETENTION_DAYS. The log of a failed or cancelled task is kept whole.",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "cookieAccessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The retention in days.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "task_log_retention_days"
+                  ],
+                  "properties": {
+                    "task_log_retention_days": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "example": 30
+                    }
+                  }
                 }
               }
             }
@@ -9399,7 +9706,7 @@
     "/tasks/{task_id}/log": {
       "get": {
         "summary": "Get task log",
-        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers.",
+        "description": "Fetch the log file content for a specific task. Available to admins, task owners, and project members/managers. The log of a task that succeeded (DONE) is kept whole until task_log_expiration_utc_date_time (GET /tasks/log_retention days after its end), then only its WARNING lines are given, and 410 when it has none. The log of a failed or cancelled task is kept whole.",
         "tags": [
           "Tasks"
         ],
@@ -9417,6 +9724,16 @@
               "type": "integer"
             },
             "description": "The task ID."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Byte offset in the log. Only the complete lines written from this offset on are returned, so the byte length of a response added to its offset is the next offset to ask for. Without it, the whole log."
           }
         ],
         "responses": {
@@ -9446,6 +9763,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The log of this successful task has expired and had no warning to keep, it was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (from is not a non-negative integer).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
                 }
               }
             }
@@ -9600,7 +9937,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9620,7 +9957,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error, or invalid sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9771,7 +10108,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters/filters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9782,6 +10119,16 @@
           },
           "403": {
             "description": "User cannot be used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10467,7 +10814,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or account already exists.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10488,6 +10835,16 @@
           },
           "404": {
             "description": "EcoTaxa instance not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An EcoTaxa account is already linked for this instance.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10568,7 +10925,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized or invalid parameters.",
+            "description": "Missing or invalid access token.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10579,6 +10936,16 @@
           },
           "403": {
             "description": "User cannot be used. The logged user is not allowed to perform this action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid filter, sort or search parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10732,9 +11099,18 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "UVP5HD",
+                "UVP5SD",
+                "UVP5Z",
+                "UVP6LP",
+                "UVP6HF",
+                "UVP6MHP",
+                "UVP6MHF"
+              ]
             },
-            "description": "EcoPart instrument model the EcoTaxa projects must fit.",
+            "description": "EcoPart instrument model the EcoTaxa projects must fit (empty = every instrument).",
             "example": "UVP6LP"
           }
         ],
@@ -10783,7 +11159,7 @@
             }
           },
           "422": {
-            "description": "Validation error.",
+            "description": "Validation error (an ID is not a number, or the instrument model is unknown).",
             "content": {
               "application/json": {
                 "schema": {

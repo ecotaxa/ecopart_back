@@ -4,7 +4,8 @@ import { PrivilegeRepository } from "../../interfaces/repositories/privilege-rep
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
 import { UserRepository } from "../../interfaces/repositories/user-repository";
 import { StreamZipFileUseCase } from "../../interfaces/use-cases/task/stream-zip-file";
-import * as fs from 'fs'; // For createWriteStream
+import { promises as fsPromises } from 'fs';
+import { pipeline } from 'stream';
 import path from 'path';
 
 export class StreamZipFile implements StreamZipFileUseCase {
@@ -33,9 +34,8 @@ export class StreamZipFile implements StreamZipFileUseCase {
         // Get the file path
         const zipFilePath = await this.taskRepository.getZipFilePath(task_id);
 
-        if (!fs.existsSync(zipFilePath)) {
-            throw new Error("ZIP file not found");
-        }
+        // Opened before any header is set: a file that is gone is still answered as a not found.
+        const file = await fsPromises.open(zipFilePath, "r").catch(() => { throw new Error("ZIP file not found"); });
 
         res.setHeader("Content-Type", "application/zip");
         res.setHeader(
@@ -44,8 +44,11 @@ export class StreamZipFile implements StreamZipFileUseCase {
             `attachment; filename="${path.basename(zipFilePath)}"`
         );
 
-        const fileStream = fs.createReadStream(zipFilePath);
-        fileStream.pipe(res);
+        // pipeline, not pipe: a read error or a client that goes away closes both ends instead of
+        // raising an uncaught 'error' event, which would stop the whole server and its running tasks.
+        pipeline(file.createReadStream(), res, (error) => {
+            if (error) console.log(new Date().toISOString(), `Download of the file of task ${task_id} interrupted`, error.message);
+        });
     }
 
     //TODO factoriser les fonctions de vérification de permission

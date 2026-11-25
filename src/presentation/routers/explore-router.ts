@@ -10,6 +10,7 @@ import { GetExploreSelectionUseCase } from '../../domain/interfaces/use-cases/ex
 import { GetExploreEcoTaxaUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-ecotaxa'
 import { GetExploreImagesUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-images'
 import { GetExploreGraphsUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-graphs'
+import { GetExploreEcoTaxaGraphsUseCase } from '../../domain/interfaces/use-cases/explore/get-explore-ecotaxa-graphs'
 
 // The user behind an optionally authenticated request: null when anonymous.
 const userOf = (req: Request) => (req as CustomRequest).token ?? null;
@@ -23,6 +24,7 @@ export default function ExploreRouter(
     getExploreEcoTaxaUseCase: GetExploreEcoTaxaUseCase,
     getExploreImagesUseCase: GetExploreImagesUseCase,
     getExploreGraphsUseCase: GetExploreGraphsUseCase,
+    getExploreEcoTaxaGraphsUseCase: GetExploreEcoTaxaGraphsUseCase,
 ) {
     const router = express.Router()
 
@@ -283,7 +285,10 @@ export default function ExploreRouter(
      *       always, anyone once the project is visible), binned on the depth axis (`mode: depth`,
      *       `pressure_bin` metres) or on the time axis (`mode: time`, `time_bin` hours) with the binned
      *       export computation, the descent filter of the project applied to depth profiles. At most
-     *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out.
+     *       100 samples are drawn (33 with the detailed histogram); `warnings` tells what was left out,
+     *       `ctd_warnings` which samples have no CTD curve and why (no CTD imported, unreadable file, no
+     *       pressure or time column). The `ecotaxa` dataset comes back empty: the EcoTaxa concentrations are
+     *       served by `/explore/graphs/ecotaxa`.
      *       Anonymous callers are served, as a user without any privilege.
      *     tags: [Explore]
      *     security:
@@ -322,6 +327,64 @@ export default function ExploreRouter(
             }))
         } catch (err) {
             sendError(res, err, "Cannot get the explore graphs")
+        }
+    })
+
+    /**
+     * @openapi
+     * /explore/graphs/ecotaxa:
+     *   post:
+     *     summary: Concentrations per EcoTaxa category of the Explore selection
+     *     description: |
+     *       The concentration (# m-3) of every EcoTaxa category of the depth profiles of the selection
+     *       whose project lets the caller see figures, as legacy EcoPart drew it: the objects are counted
+     *       in the legacy depth bins (0, 25, 50, 75, 100, 125, 150, 200, 250 m... widening with depth),
+     *       the depth offset added to their EcoTaxa depth, and divided by the water volume the particle
+     *       images of the same depths imaged. Validated objects only unless `include_predicted`; with
+     *       `sum_child_taxa`, a category also counts the objects of its children among the categories of
+     *       the selection. The categories come most abundant first. Each curve is a step curve: its
+     *       `positions` are the top of each depth bin, then the bottom of the deepest one, which repeats
+     *       the last value. The objects are read from EcoTaxa in
+     *       the background and kept: `nb_samples_pending` samples are still being read, ask again later.
+     *       The descent filter and the first and last image of the particle settings are not applied to
+     *       the objects yet. At most 100 samples are drawn; `warnings` tells which samples have no curve
+     *       and why. Anonymous callers are served, as a user without any privilege.
+     *     tags: [Explore]
+     *     security:
+     *       - cookieAccessToken: []
+     *       - {}
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema: { $ref: '#/components/schemas/ExploreEcoTaxaGraphsRequest' }
+     *     responses:
+     *       200:
+     *         description: The concentrations.
+     *         content:
+     *           application/json:
+     *             schema: { $ref: '#/components/schemas/ExploreEcoTaxaGraphs' }
+     *       401:
+     *         description: The access cookie is invalid or expired.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       403:
+     *         description: The logged user cannot be used.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       422:
+     *         description: Validation error (the mode must be depth).
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ValidationErrorResponse' } } }
+     *       500:
+     *         description: Internal server error.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     */
+    router.post('/graphs/ecotaxa', middlewareAuth.auth_optional, middlewareExploreValidation.rulesExploreEcoTaxaGraphs, async (req: Request, res: Response) => {
+        try {
+            res.status(200).send(await getExploreEcoTaxaGraphsUseCase.execute(userOf(req), {
+                mode: "depth", filters: req.body.filters ?? null,
+                include_predicted: req.body.include_predicted ?? undefined, sum_child_taxa: req.body.sum_child_taxa ?? undefined,
+            }))
+        } catch (err) {
+            sendError(res, err, "Cannot get the explore EcoTaxa graphs")
         }
     })
 

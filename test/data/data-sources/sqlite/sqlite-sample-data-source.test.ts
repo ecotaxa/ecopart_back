@@ -4,7 +4,7 @@ import path from 'path'
 import { MigrationManager } from '../../../../src/data/migrations/migration-manager'
 import { SQLiteSampleDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-sample-data-source'
 import { sampleRequestCreationModel_1 } from '../../../entities/sample'
-import { ExploreSampleQuery, StoredEcoTaxaStats } from '../../../../src/domain/entities/explore'
+import { ExploreSampleQuery, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from '../../../../src/domain/entities/explore'
 import { SampleRequestCreationModel } from '../../../../src/domain/entities/sample'
 
 const DBFILE = 'TEST_DB_SOURCE_SAMPLE'
@@ -286,7 +286,7 @@ describe('SQLiteSampleDataSource', () => {
             }
             await create('rows_b', { station_id: 'st_2', latitude: 10, longitude: 20, sampling_utc_date_time: '2024-02-01T00:00:00Z' },
                 { use_ctd_coordinates: 1, ctd_latitude: 11, ctd_longitude: 21, ctd_imported: 1, ctd_file_extension: 'ctd' })
-            await create('rows_a', { station_id: 'st_1', latitude: 43.4, longitude: 7.87, sampling_utc_date_time: '20240101120000', instrument_serial_number: 'sn_42' },
+            await create('rows_a', { station_id: 'st_1', latitude: 43.4, longitude: 7.87, sampling_utc_date_time: '2024-01-01T12:00:00Z', instrument_serial_number: 'sn_42' },
                 { instrument_settings_acq_exposure: null })
         })
 
@@ -301,7 +301,6 @@ describe('SQLiteSampleDataSource', () => {
             })
             expect(rows[1]).toMatchObject({
                 station_id: 'st_1', latitude: 43.4, longitude: 7.87, sample_latitude: 43.4, sample_longitude: 7.87, ctd_latitude: null, ctd_longitude: null, use_ctd_coordinates: false,
-                // Legacy UVP5 date format read as an ISO date-time, like the Explore rows.
                 sampling_utc_date_time: '2024-01-01T12:00:00Z',
                 instrument_serial_number: 'sn_42', instrument_settings_acq_exposure: null,
                 instrument_settings_pixel_size_mm: sampleRequestCreationModel_1.instrument_settings_pixel_size_mm,
@@ -370,9 +369,8 @@ describe('SQLiteSampleDataSource', () => {
         })
     })
 
-    describe('Explore queries on legacy sampling dates', () => {
-        // Samples imported before the ISO conversion keep the UVP formats: "20120520080213" (UVP5),
-        // "20230406-144332-820" (UVP6). The Explore query reads them as ISO date-times.
+    describe('Explore queries on sampling dates', () => {
+        // Sampling dates are ISO UTC date-times (the UVP formats of the first imports were rewritten by migration 043)
         const P_LEGACY = 9005
         const query = (overrides: Partial<ExploreSampleQuery> = {}): ExploreSampleQuery => ({
             sample_type_label: 'Depth', project_ids: [P_LEGACY], bounds: null, date_from: null, date_to: null, months: [], sample_names: [],
@@ -383,21 +381,21 @@ describe('SQLiteSampleDataSource', () => {
         beforeAll(async () => {
             const depth_type_id = await new Promise<number>((resolve, reject) =>
                 db.get("SELECT sample_type_id AS id FROM sample_type WHERE sample_type_label = 'Depth'", [], (e, row: any) => e ? reject(e) : resolve(row.id)))
-            for (const [sample_name, sampling_utc_date_time] of [['legacy_uvp5', '20120520080213'], ['legacy_uvp6', '20230406-144332-820'], ['iso_sample', '2024-06-12T10:20:00Z']]) {
+            for (const [sample_name, sampling_utc_date_time] of [['sample_2012', '2012-05-20T08:02:13Z'], ['sample_2023', '2023-04-06T14:43:32Z'], ['sample_2024', '2024-06-12T10:20:00Z']]) {
                 await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_LEGACY, sample_type_id: depth_type_id, sampling_utc_date_time })
             }
         })
 
-        test('the dates come back as ISO date-times', async () => {
+        test('the dates come back as stored', async () => {
             const rows = await dataSource.getExploreSamples(query())
             const dates = Object.fromEntries(rows.map(row => [row.sample_name, row.sampling_utc_date_time]))
-            expect(dates).toEqual({ legacy_uvp5: '2012-05-20T08:02:13Z', legacy_uvp6: '2023-04-06T14:43:32Z', iso_sample: '2024-06-12T10:20:00Z' })
+            expect(dates).toEqual({ sample_2012: '2012-05-20T08:02:13Z', sample_2023: '2023-04-06T14:43:32Z', sample_2024: '2024-06-12T10:20:00Z' })
         })
 
-        test('date, month and hour criteria apply to the legacy formats', async () => {
-            expect(await names({ date_from: '2012-05-20', date_to: '2012-05-20' })).toEqual(['legacy_uvp5'])
-            expect(await names({ months: [4, 6] })).toEqual(['iso_sample', 'legacy_uvp6'])
-            expect(await names({ hour_range: [14, 15] })).toEqual(['legacy_uvp6'])
+        test('date, month and hour criteria : ok', async () => {
+            expect(await names({ date_from: '2012-05-20', date_to: '2012-05-20' })).toEqual(['sample_2012'])
+            expect(await names({ months: [4, 6] })).toEqual(['sample_2023', 'sample_2024'])
+            expect(await names({ hour_range: [14, 15] })).toEqual(['sample_2023'])
         })
     })
 
@@ -455,6 +453,12 @@ describe('SQLiteSampleDataSource', () => {
             expect(rows.find(row => row.sample_id === without_id)?.used_taxa).toEqual([])
         })
 
+        test('getEcoTaxaStats: more ids than SQLite accepts bound variables : ok', async () => {
+            const ids = Array.from({ length: 40000 }, (_, index) => 1000000 + index)
+            const rows = await dataSource.getEcoTaxaStats([...ids, with_id])
+            expect(rows.map(row => row.sample_id)).toEqual([with_id])
+        })
+
         test('getEcoTaxaStats: nothing for an empty list or samples without stats', async () => {
             await expect(dataSource.getEcoTaxaStats([])).resolves.toEqual([])
             await expect(dataSource.getEcoTaxaStats([424242])).resolves.toEqual([])
@@ -492,6 +496,81 @@ describe('SQLiteSampleDataSource', () => {
 
             expect(await rawRows(doomed)).toEqual([])
             await expect(dataSource.getEcoTaxaStats([doomed])).resolves.toEqual([])
+        })
+    })
+    describe('EcoTaxa histograms (table sample_ecotaxa_histogram)', () => {
+        // A project of its own: other describes flag samples as imported in EcoTaxa too.
+        const P_HISTO = 9007
+        let with_offset: number
+        let never_read: number
+        let not_imported: number
+
+        const histogram = (sample_id: number, overrides: Partial<StoredEcoTaxaHistogram> = {}): StoredEcoTaxaHistogram => ({
+            sample_id, ecotaxa_sample_id: 8001, depth_offset_m: 1.2, nb_validated: 12, nb_predicted: 5,
+            bins: [{ classif_id: 45072, depth_bin: 0, nb_validated: 10, nb_predicted: 0 }, { classif_id: 56693, depth_bin: 7, nb_validated: 2, nb_predicted: 5 }],
+            fetched_utc_date_time: '2026-11-19T08:00:00.000Z', ...overrides,
+        })
+        const rawRows = (sample_id: number): Promise<any[]> => new Promise((resolve, reject) =>
+            db.all('SELECT * FROM sample_ecotaxa_histogram WHERE sample_id = ?', [sample_id], (e, rows) => e ? reject(e) : resolve(rows)))
+
+        beforeAll(async () => {
+            const create = async (sample_name: string, columns: Record<string, unknown>): Promise<number> => {
+                const id = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name, project_id: P_HISTO })
+                await run(db, `UPDATE sample SET ${Object.keys(columns).map(name => `${name} = ?`).join(', ')} WHERE sample_id = ?`, [...Object.values(columns), id])
+                return id
+            }
+            with_offset = await create('histo_with_offset', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: 8001, instrument_settings_depth_offset_m: 1.2 })
+            never_read = await create('histo_never_read', { ecotaxa_sample_imported: 1, ecotaxa_sample_id: null, instrument_settings_depth_offset_m: null })
+            not_imported = await create('histo_not_imported', { ecotaxa_sample_imported: 0, ecotaxa_sample_id: 8003 })
+        })
+
+        test('upsertEcoTaxaHistogram inserts, then replaces the row of the same sample; the bins read back as written', async () => {
+            await dataSource.upsertEcoTaxaHistogram(histogram(with_offset))
+            expect(await dataSource.getEcoTaxaHistograms([with_offset])).toEqual([histogram(with_offset)])
+            // Tuples in the column: a sample can hold thousands of bins.
+            expect((await rawRows(with_offset))[0].bins).toBe('[[45072,0,10,0],[56693,7,2,5]]')
+
+            const reread = histogram(with_offset, { depth_offset_m: 0, nb_validated: 0, nb_predicted: 0, bins: [], fetched_utc_date_time: '2026-11-20T08:00:00.000Z' })
+            await dataSource.upsertEcoTaxaHistogram(reread)
+
+            expect(await dataSource.getEcoTaxaHistograms([with_offset])).toEqual([reread])
+            expect(await rawRows(with_offset)).toHaveLength(1)
+        })
+
+        test('getEcoTaxaHistograms: nothing for an empty list or samples never read', async () => {
+            await expect(dataSource.getEcoTaxaHistograms([])).resolves.toEqual([])
+            await expect(dataSource.getEcoTaxaHistograms([never_read, 424242])).resolves.toEqual([])
+        })
+
+        test('listEcoTaxaHistogramStates: the samples imported in EcoTaxa, their offset, stats counts and reading, without the bins', async () => {
+            await run(db, 'DELETE FROM sample_ecotaxa_stats WHERE sample_id IN (?, ?, ?)', [with_offset, never_read, not_imported])
+            await dataSource.upsertEcoTaxaStats([{ sample_id: with_offset, ecotaxa_sample_id: 8001, nb_unclassified: 1, nb_validated: 12, nb_dubious: 0, nb_predicted: 5, used_taxa: [45072], fetched_utc_date_time: '2026-11-19T07:00:00.000Z' }])
+            await dataSource.upsertEcoTaxaHistogram(histogram(with_offset))
+            await dataSource.upsertEcoTaxaHistogram(histogram(not_imported))
+
+            const states = (await dataSource.listEcoTaxaHistogramStates()).filter(state => state.project_id === P_HISTO)
+
+            expect(states).toEqual([
+                {
+                    sample_id: with_offset, sample_name: 'histo_with_offset', project_id: P_HISTO, ecotaxa_sample_id: 8001, instrument_settings_depth_offset_m: 1.2,
+                    stats: { nb_validated: 12, nb_predicted: 5 },
+                    histogram: { ecotaxa_sample_id: 8001, depth_offset_m: 1.2, nb_validated: 12, nb_predicted: 5, fetched_utc_date_time: '2026-11-19T08:00:00.000Z' },
+                },
+                { sample_id: never_read, sample_name: 'histo_never_read', project_id: P_HISTO, ecotaxa_sample_id: null, instrument_settings_depth_offset_m: null, stats: null, histogram: null },
+            ])
+        })
+
+        test('deleting a sample deletes its histogram (foreign keys on, as in production)', async () => {
+            const doomed = await dataSource.createOne({ ...sampleRequestCreationModel_1, sample_name: 'histo_deleted', project_id: P_HISTO })
+            await dataSource.upsertEcoTaxaHistogram(histogram(doomed))
+            await run(db, 'PRAGMA foreign_keys = ON')
+            try {
+                await run(db, 'DELETE FROM sample WHERE sample_id = ?', [doomed])
+            } finally {
+                await run(db, 'PRAGMA foreign_keys = OFF')
+            }
+
+            expect(await rawRows(doomed)).toEqual([])
         })
     })
 })

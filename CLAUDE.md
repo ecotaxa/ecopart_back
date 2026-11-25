@@ -71,7 +71,8 @@ transient hints.
 | `DATA_STORAGE_FOLDER` | Root of everything persistent: `tasks/<task_id>/`, `migrations.log`. |
 | `DATA_STORAGE_FS_STORAGE` | Imported sample files: `<project_id>/<sample_name>/` (raw files, `pivot/<sample>_Particule.zip`), `<project_id>/l0b_backup/`. |
 | `DATA_STORAGE_IMPORT` | Import sources; the import browser lists `remote/` (symlinks allowed, README). |
-| `DATA_STORAGE_EXPORT` | Export working folder. |
+| `DATA_STORAGE_EXPORT` | FTP export folder: `<task_id>/` per export copied there, removed with its task. |
+| `TASK_LOG_RETENTION_DAYS` | Days the log of a DONE task is kept whole before only its `WARNING` lines are kept (README, Task logs). Empty = 30, invalid = startup failure. |
 | `GENERIC_ECOTAXA_ACCOUNT_EMAIL`, `ECOPART_USER_*` | The EcoPart application user, seeded at boot, that owns the generic EcoTaxa accounts. |
 | `ECOTAXA_TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for EcoTaxa tokens at rest. Empty locally. Malformed = startup failure. |
 | `ECOTAXA_ALLOW_SELF_SIGNED_CERT` | Only for a local EcoTaxa. Implied by `NODE_ENV=DEV`. |
@@ -194,6 +195,12 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   exposed through an interface so router tests can replace them with empty rules.
 - **Errors**: always `{ errors: [string] }`. Unknown route = 404, malformed JSON = 400, anything a
   router did not catch = 500 without a stack trace.
+- **Statuses**: 401 only when the caller is not authenticated (missing, invalid or expired token,
+  wrong credentials): the front answers every 401 by refreshing the session and replaying the
+  request. Refused for this user = 403, resource not found = 404, invalid input (body, filter, sort,
+  inconsistent values) = 422, state that forbids the action = 409, server-side inconsistency (a
+  seeded lookup row missing, a row just written that cannot be read back) = 500. The same message
+  gets the same status on every route.
 - **Body size**: 100 KB default, 5 MB on `/exports` (sample id lists). Responses are gzipped.
 - **Rate limits** (`presentation/middleware/rate-limit.ts`): in-memory fixed windows, counted per
   target e-mail (behind the reverse proxy every request may share one IP), on `POST /auth/login`,
@@ -230,7 +237,9 @@ Unhandled promise rejections are logged, never fatal: a crash would interrupt ev
   EcoTaxa figures are kept per sample (`sample_ecotaxa_stats`), refreshed at most once a day by a
   background sweeper, with at most 2 EcoTaxa calls in flight and batches of 50
   (`use-cases/explore/explore-ecotaxa.ts`). Project stats (STATS tab) and the QC state of the
-  project lists reuse the same warnings.
+  project lists reuse the same warnings. The concentrations per category (`/explore/graphs/ecotaxa`)
+  read the objects of each sample once, in the background, into `sample_ecotaxa_histogram` (5 m
+  bins, offset included), read again when the stats counts or the offset change and every week.
 - **EcoTaxa**: every call to EcoTaxa lives in `domain/repositories/ecotaxa_account-repository.ts`
   (`fetchWithAgent`); **the front never calls EcoTaxa itself**, it goes through this API. Users
   link one EcoTaxa account per instance; imports, reads, deletions use the instance's **generic

@@ -3,7 +3,7 @@ import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wr
 import { EcoTaxaImportStatusModel, EcoTaxaImportStatusRequestModel, EcoTaxaSampleSummary, MinimalSampleRequestModel, PrivateSampleUpdateModel, PublicSampleModel, SampleIdModel, SampleRequestCreationModel, SampleTypeModel, SampleTypeRequestModel, SampleUpdateModel, VisualQualityCheckStatusModel, VisualQualityCheckStatusRequestModel, } from "../../../domain/entities/sample";
 import { SampleDataSource } from "../../interfaces/data-sources/sample-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
-import { EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaStats } from "../../../domain/entities/explore";
+import { EcoTaxaHistogramState, EcoTaxaImportedSample, ExploreSampleQuery, ExploreSampleRow, StoredEcoTaxaHistogram, StoredEcoTaxaStats } from "../../../domain/entities/explore";
 import { ProjectStatsSampleRow } from "../../../domain/entities/project-stats";
 import { sqlIdentifier } from "./sql-identifier"
 //import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
@@ -160,13 +160,8 @@ function mapRowToProjectStatsSample(row: any): ProjectStatsSampleRow {
 // The sample's reference position: the CTD one when chosen and present, the particle file's otherwise.
 const EXPLORE_LATITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_latitude ELSE sample.latitude END";
 const EXPLORE_LONGITUDE = "CASE WHEN sample.use_ctd_coordinates = 1 AND sample.ctd_latitude IS NOT NULL AND sample.ctd_longitude IS NOT NULL THEN sample.ctd_longitude ELSE sample.longitude END";
-// Samples imported before the ISO conversion keep their UVP date formats, "20120520080213" (UVP5) and
-// "20230406-144332-820" (UVP6): read as ISO date-times, like the ones written since.
-const DIGITS = (n: number) => "[0-9]".repeat(n);
-const EXPLORE_SAMPLING_TIME = `CASE
-    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(14)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 9, 2) || ':' || substr(sample.sampling_utc_date_time, 11, 2) || ':' || substr(sample.sampling_utc_date_time, 13, 2) || 'Z'
-    WHEN sample.sampling_utc_date_time GLOB '${DIGITS(8)}-${DIGITS(6)}*' THEN substr(sample.sampling_utc_date_time, 1, 4) || '-' || substr(sample.sampling_utc_date_time, 5, 2) || '-' || substr(sample.sampling_utc_date_time, 7, 2) || 'T' || substr(sample.sampling_utc_date_time, 10, 2) || ':' || substr(sample.sampling_utc_date_time, 12, 2) || ':' || substr(sample.sampling_utc_date_time, 14, 2) || 'Z'
-    ELSE sample.sampling_utc_date_time END`;
+// ISO UTC date-time. The UVP formats of the first imports were rewritten by migration 043.
+const EXPLORE_SAMPLING_TIME = "sample.sampling_utc_date_time";
 // The particle statistics the project's descent filter selects (see SampleParticleStats). Expects the
 // query to join `project`.
 const PARTICLE_STATS_OF_PROJECT = ["nb_particles", "particle_min_area_px", "particle_max_area_px"]
@@ -383,7 +378,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                // An empty IN matches nothing
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
+                    filtering_sql += `0 = 1`;
+                }
+                else if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     // if array do not contains null or undefined
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         // for eatch value in filter.value, add to filtering_sql and params_filtering
@@ -597,8 +596,10 @@ export class SQLiteSampleDataSource implements SampleDataSource {
 
     async getEcoTaxaStats(sample_ids: number[]): Promise<StoredEcoTaxaStats[]> {
         if (sample_ids.length === 0) return [];
-        const sql = `SELECT * FROM sample_ecotaxa_stats WHERE sample_id IN (${sample_ids.map(() => "(?)").join(",")});`;
-        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, sample_ids, (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        // The ids go as one JSON parameter: one bound variable per id fails beyond SQLite's limit
+        // (32 766), which a worldwide Explore selection can exceed.
+        const sql = `SELECT * FROM sample_ecotaxa_stats WHERE sample_id IN (SELECT value FROM json_each(?));`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [JSON.stringify(sample_ids)], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
         return rows.map(row => ({
             sample_id: row.sample_id,
             ecotaxa_sample_id: row.ecotaxa_sample_id,
@@ -631,6 +632,59 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         return rows.map(row => ({ sample_id: row.sample_id, sample_name: row.sample_name, project_id: row.project_id, ecotaxa_sample_id: row.ecotaxa_sample_id ?? null, fetched_utc_date_time: row.fetched_utc_date_time ?? null }));
     }
 
+    async getEcoTaxaHistograms(sample_ids: number[]): Promise<StoredEcoTaxaHistogram[]> {
+        if (sample_ids.length === 0) return [];
+        const sql = `SELECT * FROM sample_ecotaxa_histogram WHERE sample_id IN (${sample_ids.map(() => "(?)").join(",")});`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, sample_ids, (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({
+            sample_id: row.sample_id,
+            ecotaxa_sample_id: row.ecotaxa_sample_id,
+            depth_offset_m: row.depth_offset_m,
+            nb_validated: row.nb_validated,
+            nb_predicted: row.nb_predicted,
+            // Stored as [classif_id, depth_bin, nb_validated, nb_predicted] tuples: a sample can hold thousands.
+            bins: (JSON.parse(row.bins) as number[][]).map(([classif_id, depth_bin, nb_validated, nb_predicted]) => ({ classif_id, depth_bin, nb_validated, nb_predicted })),
+            fetched_utc_date_time: row.fetched_utc_date_time,
+        }));
+    }
+
+    async upsertEcoTaxaHistogram(histogram: StoredEcoTaxaHistogram): Promise<void> {
+        const sql = `INSERT OR REPLACE INTO sample_ecotaxa_histogram
+            (sample_id, ecotaxa_sample_id, depth_offset_m, nb_validated, nb_predicted, bins, fetched_utc_date_time)
+            VALUES ((?), (?), (?), (?), (?), (?), (?));`;
+        const bins = JSON.stringify(histogram.bins.map(bin => [bin.classif_id, bin.depth_bin, bin.nb_validated, bin.nb_predicted]));
+        await new Promise<void>((resolve, reject) => this.db.run(sql, [
+            histogram.sample_id, histogram.ecotaxa_sample_id, histogram.depth_offset_m, histogram.nb_validated, histogram.nb_predicted,
+            bins, histogram.fetched_utc_date_time,
+        ], (err) => err ? reject(err) : resolve()));
+    }
+
+    async listEcoTaxaHistogramStates(): Promise<EcoTaxaHistogramState[]> {
+        const sql = `SELECT sample.sample_id, sample.sample_name, sample.project_id, sample.ecotaxa_sample_id, sample.instrument_settings_depth_offset_m,
+                stats.nb_validated AS stats_nb_validated, stats.nb_predicted AS stats_nb_predicted,
+                histogram.ecotaxa_sample_id AS histogram_ecotaxa_sample_id, histogram.depth_offset_m, histogram.nb_validated, histogram.nb_predicted, histogram.fetched_utc_date_time
+            FROM sample
+            LEFT JOIN sample_ecotaxa_stats stats ON stats.sample_id = sample.sample_id
+            LEFT JOIN sample_ecotaxa_histogram histogram ON histogram.sample_id = sample.sample_id
+            WHERE sample.ecotaxa_sample_imported = 1 ORDER BY sample.sample_id;`;
+        const rows = await new Promise<any[]>((resolve, reject) => this.db.all(sql, [], (err, rows) => err ? reject(err) : resolve(rows ?? [])));
+        return rows.map(row => ({
+            sample_id: row.sample_id,
+            sample_name: row.sample_name,
+            project_id: row.project_id,
+            ecotaxa_sample_id: row.ecotaxa_sample_id ?? null,
+            instrument_settings_depth_offset_m: row.instrument_settings_depth_offset_m ?? null,
+            stats: row.stats_nb_validated === null ? null : { nb_validated: row.stats_nb_validated, nb_predicted: row.stats_nb_predicted },
+            histogram: row.histogram_ecotaxa_sample_id === null ? null : {
+                ecotaxa_sample_id: row.histogram_ecotaxa_sample_id,
+                depth_offset_m: row.depth_offset_m,
+                nb_validated: row.nb_validated,
+                nb_predicted: row.nb_predicted,
+                fetched_utc_date_time: row.fetched_utc_date_time,
+            },
+        }));
+    }
+
     async getEcoTaxaSampleSummaries(options: PreparedSearchOptions): Promise<SearchResult<EcoTaxaSampleSummary>> {
         // Focused query: only the three columns the EcoTaxa listing endpoint needs.
         // Builds the same WHERE / ORDER BY / LIMIT-OFFSET as getAll but without joins.
@@ -642,7 +696,11 @@ export class SQLiteSampleDataSource implements SampleDataSource {
         if (options.filter.length > 0) {
             filtering_sql += ` WHERE `;
             for (const filter of options.filter) {
-                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
+                // An empty IN matches nothing
+                if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
+                    filtering_sql += `0 = 1`;
+                }
+                else if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length > 0) {
                     if (!filter.value.includes(null) && !filter.value.includes(undefined) && filter.value.length > 0) {
                         filtering_sql += `sample.` + filter.field + ` IN (` + filter.value.map(() => '(?)').join(',') + `) `;
                         params_filtering.push(...filter.value);

@@ -55,6 +55,13 @@ export interface ExploreImagesRequest extends ExploreRequest {
     count?: number;
 }
 
+// The EcoTaxa concentrations are drawn on depth profiles only.
+export interface ExploreEcoTaxaGraphsRequest extends ExploreRequest {
+    mode: "depth";
+    include_predicted?: boolean;              // validated objects only by default, as legacy EcoPart
+    sum_child_taxa?: boolean;                 // a category also counts the objects of its children
+}
+
 /* ─── what the data source can filter ─── */
 
 export interface ExploreSampleQuery {
@@ -224,6 +231,36 @@ export interface EcoTaxaImportedSample {
     ecotaxa_sample_id: number | null;
 }
 
+// The objects of one EcoTaxa category in one depth bin of a sample.
+export interface EcoTaxaHistogramBin {
+    classif_id: number;
+    depth_bin: number;                        // floor(depth / ECOTAXA_HISTOGRAM_STEP_M), depth = depth_min + offset
+    nb_validated: number;
+    nb_predicted: number;
+}
+
+// What a reading of the objects of a sample depended on: a change asks for a new reading.
+export interface EcoTaxaHistogramReading {
+    ecotaxa_sample_id: number;
+    depth_offset_m: number;                   // added to the EcoTaxa depths, which have none
+    nb_validated: number;                     // the counts of the stats when the objects were read
+    nb_predicted: number;
+    fetched_utc_date_time: string;
+}
+
+// The EcoTaxa objects of a sample counted per category and depth bin (table sample_ecotaxa_histogram).
+export interface StoredEcoTaxaHistogram extends EcoTaxaHistogramReading {
+    sample_id: number;
+    bins: EcoTaxaHistogramBin[];
+}
+
+// A sample imported in EcoTaxa with what the daily sweep needs to tell whether its histogram is stale.
+export interface EcoTaxaHistogramState extends EcoTaxaImportedSample {
+    instrument_settings_depth_offset_m: number | null;
+    stats: { nb_validated: number; nb_predicted: number } | null;
+    histogram: EcoTaxaHistogramReading | null;
+}
+
 export interface ExploreEcoTaxaResponse {
     all: ExploreEcoTaxaSummary;
     exportable: ExploreEcoTaxaSummary;
@@ -258,4 +295,11 @@ export interface ExploreGraphs {
     ctd: GraphDataset;
     ecotaxa: GraphDataset;
     warnings: string[];
+    ctd_warnings: string[];                   // why CTD curves are missing, shown with the CTD graph
+}
+
+// The concentrations per EcoTaxa category, one curve per sample and category (#/m3, legacy depth bins).
+export interface ExploreEcoTaxaGraphs extends GraphDataset {
+    warnings: string[];                       // samples without a curve and why
+    nb_samples_pending: number;               // samples whose objects are being read from EcoTaxa: ask again later
 }

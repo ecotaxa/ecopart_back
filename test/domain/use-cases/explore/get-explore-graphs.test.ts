@@ -226,8 +226,58 @@ describe("GetExploreGraphs", () => {
 
         const graphs = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
 
-        expect(graphs.warnings).toEqual(["1 CTD file could not be read: moose_002"]);
+        expect(graphs.warnings).toEqual([]);
+        expect(graphs.ctd_warnings).toEqual(["1 CTD file could not be read: moose_002"]);
         expect(graphs.ctd.series.temperature.map(series => series.sample_id)).toEqual([1]);
+    });
+
+    test("no drawn sample with CTD data : the CTD warnings say so and where CTD files are imported", async () => {
+        samples = [sample(1, 1), sample(3, 3)];
+        const many = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(many.ctd_warnings).toEqual(["None of the 2 samples drawn has CTD data imported: CTD files are imported from the Import tab of the project"]);
+        expect(many.warnings).toEqual([]);
+
+        samples = [sample(1, 1)];
+        const one = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(one.ctd_warnings).toEqual(["The sample drawn has no CTD data imported: CTD files are imported from the Import tab of the project"]);
+        expect(sampleRepository.getCtdRows).toBeCalledTimes(0);
+    });
+
+    test("some drawn samples without CTD data : counted, the samples of private projects left out of the count", async () => {
+        samples = [sample(1, 1, { ctd_imported: true, ctd_file_extension: "ctd" }), sample(2, 2), sample(3, 3), sample(5, 3)];
+        const graphs = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(graphs.ctd_warnings).toEqual(["2 of the 3 samples drawn have no CTD data imported"]);
+
+        samples = [sample(1, 1, { ctd_imported: true, ctd_file_extension: "ctd" }), sample(3, 3)];
+        const single = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(single.ctd_warnings).toEqual(["1 of the 2 samples drawn has no CTD data imported"]);
+    });
+
+    test("every drawn sample with readable CTD data : no CTD warning", async () => {
+        samples = [sample(1, 1, { ctd_imported: true, ctd_file_extension: "ctd" })];
+        const graphs = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+        expect(graphs.ctd_warnings).toEqual([]);
+    });
+
+    test("a CTD file without time column gives no curve over time : named in the CTD warnings", async () => {
+        samples = [sample(1, 1, { ctd_imported: true, ctd_file_extension: "ctd" }), sample(3, 3, { ctd_imported: true, ctd_file_extension: "ctd" })];
+        const timed: CtdRows = { columns: ["time [yyyymmddhhmmssmmm]", "temperature [degc]"], values: [[null, 12]], time_ms: [Date.UTC(2024, 5, 12, 10)] };
+        jest.spyOn(sampleRepository, "getCtdRows").mockImplementation(async (...args: unknown[]) => args[1] === "moose_003" ? timed : YOYO);
+
+        const time = await useCase.execute({ user_id: CAROL.user_id }, { mode: "time", filters: null });
+
+        expect(time.ctd_warnings).toEqual(["1 CTD file has no \"time [yyyymmddhhmmssmmm]\" value, so it cannot be drawn over time: moose_001"]);
+        expect(time.ctd.series.temperature.map(series => series.sample_id)).toEqual([3]);
+    });
+
+    test("CTD files without pressure column give no depth profile : named in the CTD warnings", async () => {
+        samples = [sample(1, 1, { ctd_imported: true, ctd_file_extension: "ctd" }), sample(3, 3, { ctd_imported: true, ctd_file_extension: "ctd" })];
+        jest.spyOn(sampleRepository, "getCtdRows").mockResolvedValue({ columns: ["temperature [degc]"], values: [[12]], time_ms: [null] });
+
+        const depth = await useCase.execute({ user_id: CAROL.user_id }, { mode: "depth", filters: null });
+
+        expect(depth.ctd_warnings).toEqual(["2 CTD files have no \"pressure [db]\" value, so they cannot be drawn on depth: moose_001, moose_003"]);
+        expect(depth.ctd.keys).toEqual([]);
     });
 
     test("the classification state is decided with EcoTaxa before drawing", async () => {

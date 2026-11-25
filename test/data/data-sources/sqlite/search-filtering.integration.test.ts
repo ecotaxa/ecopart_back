@@ -16,6 +16,8 @@ import { MigrationManager } from '../../../../src/data/migrations/migration-mana
 import { SQLiteProjectDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-project-data-source'
 import { SQLiteTaskDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-task-data-source'
 import { SQLiteSampleDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-sample-data-source'
+import { SQLiteUserDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-user-data-source'
+import { SQLitePrivilegeDataSource } from '../../../../src/data/data-sources/sqlite/sqlite-privilege-data-source'
 import { sampleRequestCreationModel_1 } from '../../../entities/sample'
 import { ProjectRepositoryImpl } from '../../../../src/domain/repositories/project-repository'
 import { TaskRepositoryImpl } from '../../../../src/domain/repositories/task-repository'
@@ -112,6 +114,47 @@ describe('search filtering (integration)', () => {
             const r = await searchProject.execute(cur, opts('asc(project_id)'),
                 [{ field: 'project_title', operator: 'LIKE', value: '%alpha%' }])
             expect(r.search_info.total).toEqual(2)
+        })
+
+        test('a numeric filter on 0 or 1 keeps its operator : ok', async () => {
+            // project ids are 1 to 4
+            const above = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'project_id', operator: '>', value: 1 }])
+            const other = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'project_id', operator: '<>', value: 1 }])
+            const above_zero = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'project_id', operator: '>', value: 0 }])
+            expect(above.projects.map(p => p.project_id)).toEqual([2, 3, 4])
+            expect(other.projects.map(p => p.project_id)).toEqual([2, 3, 4])
+            expect(above_zero.search_info.total).toEqual(4)
+        })
+
+        test('a boolean filter is read as 1/0 and keeps its operator : ok', async () => {
+            // every seeded project has enable_descent_filter false
+            const off = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'enable_descent_filter', operator: '=', value: false }])
+            const not_off = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'enable_descent_filter', operator: '<>', value: false }])
+            const on = await searchProject.execute(cur, opts('asc(project_id)'), [{ field: 'enable_descent_filter', operator: '=', value: 'true' }])
+            expect(off.search_info.total).toEqual(4)
+            expect(not_off.search_info.total).toEqual(0)
+            expect(on.search_info.total).toEqual(0)
+        })
+
+        test('an empty IN matches nothing, on every data source : ok', async () => {
+            const page = { page: 1, limit: 100, sort_by: [] }
+            const empty_in = (field: string) => ({ ...page, filter: [{ field, operator: 'IN', value: [] }] })
+            expect((await new SQLiteProjectDataSource(db).getAll(empty_in('project_id'))).total).toEqual(0)
+            expect((await new SQLiteUserDataSource(db).getAll(empty_in('user_id'))).total).toEqual(0)
+            expect((await new SQLitePrivilegeDataSource(db).getAll(empty_in('project_id'))).total).toEqual(0)
+            expect((await new SQLiteSampleDataSource(db).getAll(empty_in('sample_id'))).total).toEqual(0)
+            expect((await new SQLiteTaskDataSource(db).getAll(empty_in('task_id'))).total).toEqual(0)
+        })
+
+        test('user filter on id 1 keeps its operator : ok', async () => {
+            const users = new SQLiteUserDataSource(db)
+            const page = { page: 1, limit: 100, sort_by: [] }
+            const all = await users.getAll({ ...page, filter: [] })
+            const not_first = await users.getAll({ ...page, filter: [{ field: 'user_id', operator: '<>', value: 1 }] })
+            const first = await users.getAll({ ...page, filter: [{ field: 'user_id', operator: '=', value: 1 }] })
+            expect(first.total).toEqual(1)
+            expect(not_first.total).toEqual(all.total - 1)
+            expect(not_first.items.map(user => user.user_id)).not.toContain(1)
         })
 
         test('privacy_status is computed per project from its oldest sample: 3 private, 1 open, none public', async () => {

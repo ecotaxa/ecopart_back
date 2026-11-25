@@ -100,7 +100,7 @@ export default function EcoTaxaInstanceRouter(
             res.status(201).send(instance)
         } catch (err) {
             console.log(new Date().toISOString(), err)
-            if (err.message === "User is deleted") res.status(403).send({ errors: [err.message] })
+            if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Logged user cannot create an EcoTaxa instance") res.status(403).send({ errors: [err.message] })
             else if (err.message === "ecotaxa_instance_url must be an http or https URL") res.status(422).send({ errors: [err.message] })
             else res.status(500).send({ errors: ["Cannot create EcoTaxa instance"] })

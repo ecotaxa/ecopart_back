@@ -33,6 +33,7 @@ import EcoTaxaInstanceRouter from '../../src/presentation/routers/ecotaxa_instan
 import ExportRouter from '../../src/presentation/routers/export-router'
 import { MiddlewareProjectValidation } from '../../src/presentation/middleware/project-validation'
 import { MiddlewareSampleValidation } from '../../src/presentation/middleware/sample-validation'
+import { DEFAULT_TASK_LOG_RETENTION_DAYS } from '../../src/domain/constants/task'
 import { MiddlewareTaskValidation } from '../../src/presentation/middleware/task-validation'
 import { MiddlewareExportValidation } from '../../src/presentation/middleware/export-validation'
 
@@ -337,7 +338,8 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new GetLogFileTask(taskRepo, userRepo, privilegeRepo),
             new StreamZipFile(taskRepo, userRepo, privilegeRepo),
             new SearchTask(userRepo, taskRepo, searchRepo, projectRepo, privilegeRepo),
-            new CancelTask(taskRepo, userRepo)
+            new CancelTask(taskRepo, userRepo),
+            DEFAULT_TASK_LOG_RETENTION_DAYS
         )
 
         const ecotaxaInstanceMiddleware = EcoTaxaInstanceRouter(
