@@ -347,6 +347,18 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
     } catch (error) {
         console.log(new Date().toISOString(), 'Cannot encrypt the stored EcoTaxa tokens:', error)
     }
+    // At startup then once a day, the EcoTaxa sessions are renewed before their refresh token (10 days) expires,
+    // so that an account left unused, the generic one first, stays logged in. Not awaited: it calls EcoTaxa.
+    const refreshEcotaxaSessions = async () => {
+        try {
+            const sessions = await ecotaxa_account_repo.refreshEcotaxaAccountSessions()
+            if (sessions.refreshed + sessions.ended + sessions.failed > 0) console.log(new Date().toISOString(), `EcoTaxa sessions renewed: ${sessions.refreshed}, ended (log in again): ${sessions.ended}, failed (retried tomorrow): ${sessions.failed}`)
+        } catch (error) {
+            console.log(new Date().toISOString(), 'Cannot renew the EcoTaxa sessions:', error)
+        }
+    }
+    void refreshEcotaxaSessions()
+    setInterval(refreshEcotaxaSessions, 24 * 60 * 60 * 1000).unref()
     const stats_repo = new StatsRepositoryImpl(stats_dataSource)
     // The EcoTaxa statistics kept per sample, shared by the Explore page and the project STATS tab.
     const explore_ecotaxa = new ExploreEcoTaxaService(ecotaxa_account_repo, sample_repo, project_repo)

@@ -11184,7 +11184,7 @@
     "/users/{user_id}/ecotaxa_account/{ecotaxa_account_id}/refresh": {
       "post": {
         "summary": "Refresh the EcoTaxa session of an EcoTaxa account",
-        "description": "Renews the EcoTaxa session of the account with its stored refresh token (EcoTaxa `api/token/refresh`),\nwithout the EcoTaxa password, and returns the account with its new expiration date. EcoPart also\nrenews it on its own whenever EcoTaxa refuses the access token of a call.\n\n409 when EcoTaxa refuses the refresh token (expired, revoked or already used) or the account was\nlogged in with the former `api/login` and has none: the user must log in to EcoTaxa again.\nAllowed to the owner of the EcoTaxa account and to admins.\n",
+        "description": "Renews the EcoTaxa session of the account with its stored refresh token (EcoTaxa `api/token/refresh`),\nwithout the EcoTaxa password, and returns the account with its new expiration date. EcoPart also\nrenews it on its own once a day, and whenever EcoTaxa refuses the access token of a call.\n\n409 when EcoTaxa refuses the refresh token (expired, revoked or already used) or the account was\nlogged in with the former `api/login` and has none: the user must log in to EcoTaxa again.\nAllowed to the owner of the EcoTaxa account and to admins.\n",
         "tags": [
           "Users"
         ],

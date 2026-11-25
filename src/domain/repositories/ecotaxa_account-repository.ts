@@ -117,7 +117,8 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         return ecotaxa_account_data
     }
     // POST api/token (OAuth2 password flow): an access token and a refresh token. An EcoTaxa older than these
-    // routes (404) gets the former api/login, whose single token lasts LEGACY_TOKEN_DAYS and cannot be refreshed.
+    // routes (404 or 405, as the EcoTaxa front checks) gets the former api/login, whose single token lasts
+    // LEGACY_TOKEN_DAYS and cannot be refreshed.
     async api_ecotaxa_login(base_url: string, ecotaxa_account_to_create: PublicEcotaxaAccountRequestCreationModel): Promise<EcoTaxaSession> {
         const response = await this.rawFetch(base_url + "api/token", {
             method: "POST",
@@ -131,7 +132,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
                 password: ecotaxa_account_to_create.ecotaxa_user_password,
             }).toString()
         });
-        if (response.status === 404) {
+        if (response.status === 404 || response.status === 405) {
             return {
                 access_token: await this.api_ecotaxa_legacy_login(base_url, ecotaxa_account_to_create),
                 refresh_token: null,
@@ -568,6 +569,7 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
     // to EcoTaxa with a token goes through fetchWithAgent: when EcoTaxa refuses (401) the access token of a stored
     // account, the session is refreshed, both tokens are saved, and the call is sent again with the new token.
     // A caller holding the former token (a job polled for hours, a cached Explore access) gets the new one.
+    // Every session is also renewed once a day (refreshEcotaxaAccountSessions), so it does not end unused.
 
     // Refreshes the session of an account now, e.g. from the "Reconnect" button of an expired account.
     // Fails with "Ecotaxa account session expired" when EcoTaxa refuses the refresh token, or there is none
@@ -577,6 +579,41 @@ export class EcotaxaAccountRepositoryImpl implements EcotaxaAccountRepository {
         const ecotaxa_account = await this.getOneEcotaxaAccount(ecotaxa_account_id);
         if (!ecotaxa_account) throw new Error("Ecotaxa account not found");
         return ecotaxa_account;
+    }
+
+    // Run at startup then once a day: renews every session that has a refresh token and has not ended, so that a
+    // refresh token (10 days on EcoTaxa) never expires while an account is not used, the generic account first.
+    // One account at a time, through the same per-account lock as the calls refused by EcoTaxa.
+    async refreshEcotaxaAccountSessions(): Promise<{ refreshed: number; ended: number; failed: number }> {
+        const now = Date.now();
+        const to_refresh: number[] = [];
+        const limit = 1000;
+        for (let page = 1; ; page++) {
+            const result = await this.ecotaxa_accountDataSource.getAll({ filter: [], sort_by: [], page, limit });
+            for (const ecotaxa_account of result.items) {
+                if (ecotaxa_account.ecotaxa_account_refresh_token && new Date(ecotaxa_account.ecotaxa_account_expiration_utc_date_time).getTime() > now) {
+                    to_refresh.push(ecotaxa_account.ecotaxa_account_id);
+                }
+            }
+            if (page * limit >= result.total) break;
+        }
+        let refreshed = 0;
+        let ended = 0;
+        let failed = 0;
+        for (const ecotaxa_account_id of to_refresh) {
+            try {
+                await this.refreshAccessToken(ecotaxa_account_id, null);
+                refreshed++;
+            } catch (error) {
+                const message = (error as Error).message;
+                // Removed since the listing: nothing to renew
+                if (message === "Ecotaxa account not found") continue;
+                if (message === "Ecotaxa account session expired") ended++;
+                else failed++;
+                console.log(new Date().toISOString(), `EcoTaxa account ${ecotaxa_account_id}: the daily renewal of the EcoTaxa session failed (${message})`);
+            }
+        }
+        return { refreshed, ended, failed };
     }
 
     // The new access token of the account. One refresh at a time per account: the callers refused at the same

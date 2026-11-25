@@ -1043,7 +1043,7 @@ export default function UsersRouter(
      *     description: |
      *       Renews the EcoTaxa session of the account with its stored refresh token (EcoTaxa `api/token/refresh`),
      *       without the EcoTaxa password, and returns the account with its new expiration date. EcoPart also
-     *       renews it on its own whenever EcoTaxa refuses the access token of a call.
+     *       renews it on its own once a day, and whenever EcoTaxa refuses the access token of a call.
      *
      *       409 when EcoTaxa refuses the refresh token (expired, revoked or already used) or the account was
      *       logged in with the former `api/login` and has none: the user must log in to EcoTaxa again.

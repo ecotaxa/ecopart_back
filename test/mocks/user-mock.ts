@@ -122,6 +122,9 @@ export class MockEcotaxaAccountRepository implements EcotaxaAccountRepository {
     deleteEcotaxaAccountsOfUser(): Promise<number> {
         throw new Error("Method not implemented for deleteEcotaxaAccountsOfUser.");
     }
+    refreshEcotaxaAccountSessions(): Promise<{ refreshed: number; ended: number; failed: number }> {
+        throw new Error("Method not implemented for refreshEcotaxaAccountSessions.");
+    }
     encryptStoredTokens(): Promise<{ encrypted: number; unreadable: number }> {
         throw new Error("Method not implemented for encryptStoredTokens.");
     }

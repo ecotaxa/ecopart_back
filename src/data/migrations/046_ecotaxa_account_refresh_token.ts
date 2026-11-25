@@ -5,7 +5,7 @@ import { SQLiteDatabaseWrapper } from "../interfaces/data-sources/database-wrapp
 // refresh token, rotated by `/api/token/refresh`. NULL for the accounts logged in with the former `/api/login`
 // token: they keep working until that token expires, then their owner logs in again.
 export const migration: Migration = {
-    id: "043_ecotaxa_account_refresh_token",
+    id: "046_ecotaxa_account_refresh_token",
 
     async up(db: SQLiteDatabaseWrapper): Promise<void> {
         await runSQL(db, `ALTER TABLE ecotaxa_account ADD COLUMN ecotaxa_account_refresh_token TEXT NULL;`);

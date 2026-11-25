@@ -42,14 +42,14 @@ describe("EcoTaxa account sessions", () => {
     let accepted_tokens: Set<string>;
     let refresh_answers: Array<() => FakeResponse>;
 
-    async function createAccount(token: string, refresh_token: string | null, expiration = new Date(Date.now() + 5 * DAY_MS).toISOString()): Promise<number> {
+    async function createAccount(token: string, refresh_token: string | null, expiration = new Date(Date.now() + 5 * DAY_MS).toISOString(), email = "a@example.org"): Promise<number> {
         return repo.createEcotaxaAccount({
             ecotaxa_account_ecotaxa_id: 7,
             ecotaxa_account_ecopart_user_id: 101,
             ecotaxa_account_token: token,
             ecotaxa_account_refresh_token: refresh_token,
             ecotaxa_account_user_name: "name",
-            ecotaxa_account_user_email: "a@example.org",
+            ecotaxa_account_user_email: email,
             ecotaxa_account_instance_id: 1,
             ecotaxa_account_expiration_utc_date_time: expiration,
         });
@@ -105,9 +105,9 @@ describe("EcoTaxa account sessions", () => {
         expect(expiration).toBeLessThan(before + 864000 * 1000 + 60_000);
     });
 
-    test("an EcoTaxa without api/token gets the former api/login, without refresh token", async () => {
+    test.each([404, 405])("an EcoTaxa without api/token (%i) gets the former api/login, without refresh token", async (status) => {
         (repo as any).rawFetch.mockImplementation(async (url: string) => {
-            if (url === BASE_URL + "api/token") return reply(404, { detail: "Not Found" });
+            if (url === BASE_URL + "api/token") return reply(status, { detail: "Not Found" });
             if (url === BASE_URL + "api/login") return reply(200, "legacy-token");
             return reply(200, { id: 7, name: "name" });
         });
@@ -135,7 +135,8 @@ describe("EcoTaxa account sessions", () => {
         const projects = await repo.listManageableEcotaxaProjects(account!);
 
         expect(projects).toHaveLength(1);
-        expect(calls.map((call) => call.url.replace(BASE_URL, ""))).toEqual(["api/projects/search?for_managing=true", "api/token/refresh", "api/projects/search?for_managing=true"]);
+        const search = "api/projects/search?for_managing=true&fields=projid%2Ctitle%2Cstatus%2Cinstrument%2Cobjcount%2Cpctvalidated";
+        expect(calls.map((call) => call.url.replace(BASE_URL, ""))).toEqual([search, "api/token/refresh", search]);
         expect(JSON.parse(calls[1].body as string)).toEqual({ refresh_token: "refresh-0" });
         expect(calls[2].authorization).toBe("Bearer access-2");
 
@@ -203,6 +204,40 @@ describe("EcoTaxa account sessions", () => {
         expect(refreshed.ecotaxa_account_token).toBe("access-3");
         expect(refreshed.ecotaxa_account_refresh_token).toBe("refresh-3");
         expect(new Date(refreshed.ecotaxa_account_expiration_utc_date_time).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    test("the daily renewal renews every session not ended, and skips those it cannot renew : ok", async () => {
+        const valid = await createAccount("access-0", "refresh-0");
+        const legacy = await createAccount("legacy-token", null, undefined, "b@example.org");
+        const ended = await createAccount("access-9", "refresh-9", new Date(Date.now() - DAY_MS).toISOString(), "c@example.org");
+        const refused = await createAccount("access-5", "refresh-5", new Date(Date.now() + DAY_MS).toISOString(), "d@example.org");
+        // Accounts are renewed in id order: valid first, then refused
+        refresh_answers.push(() => reply(200, pair(2)), () => reply(401, { detail: "Could not validate credentials" }));
+
+        expect(await repo.refreshEcotaxaAccountSessions()).toEqual({ refreshed: 1, ended: 1, failed: 0 });
+
+        expect(calls.map((call) => JSON.parse(call.body as string))).toEqual([{ refresh_token: "refresh-0" }, { refresh_token: "refresh-5" }]);
+        const renewed = await repo.getOneEcotaxaAccount(valid);
+        expect(renewed?.ecotaxa_account_token).toBe("access-2");
+        expect(renewed?.ecotaxa_account_refresh_token).toBe("refresh-2");
+        expect(new Date(renewed!.ecotaxa_account_expiration_utc_date_time).getTime()).toBeGreaterThan(Date.now() + 9 * DAY_MS);
+        expect((await repo.getOneEcotaxaAccount(legacy))?.ecotaxa_account_token).toBe("legacy-token");
+        expect((await repo.getOneEcotaxaAccount(ended))?.ecotaxa_account_refresh_token).toBe("refresh-9");
+        expect(new Date((await repo.getOneEcotaxaAccount(refused))!.ecotaxa_account_expiration_utc_date_time).getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    test("the daily renewal goes on after an EcoTaxa error, the account kept as it was : ok", async () => {
+        const expiration = new Date(Date.now() + DAY_MS).toISOString();
+        const failing = await createAccount("access-0", "refresh-0", expiration);
+        const next = await createAccount("access-1", "refresh-1", undefined, "b@example.org");
+        refresh_answers.push(() => reply(502, "Bad gateway"), () => reply(200, pair(3)));
+
+        expect(await repo.refreshEcotaxaAccountSessions()).toEqual({ refreshed: 1, ended: 0, failed: 1 });
+
+        const kept = await repo.getOneEcotaxaAccount(failing);
+        expect(kept?.ecotaxa_account_refresh_token).toBe("refresh-0");
+        expect(kept?.ecotaxa_account_expiration_utc_date_time).toBe(expiration);
+        expect((await repo.getOneEcotaxaAccount(next))?.ecotaxa_account_token).toBe("access-3");
     });
 
     test("an EcoTaxa error other than a refused refresh token leaves the account as it was", async () => {
