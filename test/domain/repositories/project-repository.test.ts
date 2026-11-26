@@ -173,6 +173,24 @@ describe("Project Repository", () => {
             expect(mockProjectDataSource.getAll).toBeCalledWith(options)
             expect(response).toBe(result)
         })
+        test("Should filter and sort on the linked EcoTaxa project name", async () => {
+            const result: SearchResult<ProjectResponseModel> = {
+                items: projectResponseModelArray,
+                total: 2
+            }
+            const options = {
+                page: 1,
+                limit: 10,
+                sort_by: [{ sort_by: "ecotaxa_project_name", order_by: "asc" }],
+                filter: [{ field: "ecotaxa_project_name", operator: "LIKE", value: "%uvp6%" }]
+            }
+            jest.spyOn(mockProjectDataSource, 'getAll').mockResolvedValue(result)
+
+            const response = await projectRepository.standardGetProjects(options)
+
+            expect(mockProjectDataSource.getAll).toBeCalledWith(options)
+            expect(response).toBe(result)
+        })
         test("Should return error for unauthorized sort_by", async () => {
             const options = {
                 page: 1,

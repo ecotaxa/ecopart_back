@@ -222,6 +222,7 @@ export default function ProjectRouter(
      *       | `visible_duration` | number | |
      *       | `public_duration` | number | |
      *       | `serial_number` | string | |
+     *       | `ecotaxa_project_name` | string | Name of the linked EcoTaxa project |
      *       | `root_folder_path` | string | |
      *       | `project_creation_utc_date_time` | string (ISO timestamp) | |
      *       | `instrument_model` | string | Computed — resolved to instrument model IDs |
