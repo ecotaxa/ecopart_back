@@ -96,10 +96,10 @@ export class ProjectRepositoryImpl implements ProjectRepository {
 
     async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_name", "project_creation_utc_date_time"]
 
         // Can be sort_by
-        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_name", "project_creation_utc_date_time"]
 
         return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
     }
