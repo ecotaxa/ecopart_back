@@ -2216,7 +2216,7 @@ export default function ProjectRouter(
      * @openapi
      * /projects/{project_id}/samples/pivots/regenerate:
      *   post:
-     *     summary: Regenerate the UVP6 pivot of UVP5 samples
+     *     summary: Regenerate the UVP6 pivot of UVP5 samples (admin only)
      *     description: |
      *       Starts an asynchronous task (returns a Task immediately; poll the task for progress) that
      *       converts the stored `work.zip` of UVP5 samples into their UVP6 pivot,
@@ -2262,7 +2262,7 @@ export default function ProjectRouter(
      *       401:
      *         description: Missing or invalid access token.
      *       403:
-     *         description: User cannot be used. User not authorized for this project. The logged user is not allowed to perform this action.
+     *         description: User cannot be used, or the logged user is not an administrator (reserved to administrators).
      *       404:
      *         description: Project, samples or task not found.
      *       422:
@@ -2277,7 +2277,7 @@ export default function ProjectRouter(
         } catch (err) {
             console.log(new Date().toISOString(), err)
             if (err.message === "User cannot be used") res.status(403).send({ errors: [err.message] })
-            else if (err.message === "Logged user cannot regenerate pivots in this project") res.status(403).send({ errors: [err.message] })
+            else if (err.message === "Logged user cannot regenerate pivots") res.status(403).send({ errors: [err.message] })
             else if (err.message === "Cannot find project") res.status(404).send({ errors: [err.message] })
             else if (err.message === "No samples in this project") res.status(404).send({ errors: [err.message] })
             else if (err.message.startsWith("Samples not found in this project")) res.status(404).send({ errors: [err.message] })

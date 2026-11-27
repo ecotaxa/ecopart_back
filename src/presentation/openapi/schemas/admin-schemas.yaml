@@ -418,3 +418,20 @@ components:
           type: boolean
           default: false
           description: Also recompute the samples that already have their particle statistics.
+
+    # ────────────────────────── pivot regeneration ──────────────────────────
+    RegenerateAllPivotsRequest:
+      type: object
+      description: Projects whose pivots the task regenerates (POST /admin/samples/pivots/regenerate).
+      properties:
+        project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          description: Projects whose samples are regenerated. Empty or absent = every UVP5 project; an unknown or non-UVP5 project is skipped.
+          example: [12, 14]
+        force:
+          type: boolean
+          default: false
+          description: Also rebuild the pivots already at the current converter version.

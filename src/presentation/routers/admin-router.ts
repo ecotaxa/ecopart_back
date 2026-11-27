@@ -6,6 +6,7 @@ import { IMiddlewareAdminValidation } from '../middleware/admin-validation'
 
 import { GetStatsUseCase } from '../../domain/interfaces/use-cases/admin/get-stats'
 import { ComputeParticleStatsUseCase } from '../../domain/interfaces/use-cases/sample/compute-particle-stats'
+import { RegenerateAllPivotsUseCase } from '../../domain/interfaces/use-cases/sample/regenerate-all-pivots'
 import { CustomRequest } from '../../domain/entities/auth'
 import { StatsGranularity } from '../../domain/entities/stats'
 
@@ -14,6 +15,7 @@ export default function AdminRouter(
     middlewareAdminValidation: IMiddlewareAdminValidation,
     getStatsUseCase: GetStatsUseCase,
     computeParticleStatsUseCase: ComputeParticleStatsUseCase,
+    regenerateAllPivotsUseCase: RegenerateAllPivotsUseCase,
 ) {
     const router = express.Router()
 
@@ -169,6 +171,70 @@ export default function AdminRouter(
             else if (msg === "Task type not found" || msg === "Task status not found") res.status(500).send({ errors: [msg] })
             else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
             else res.status(500).send({ errors: ["Cannot compute particle stats"] })
+        }
+    })
+
+    /**
+     * @openapi
+     * /admin/samples/pivots/regenerate:
+     *   post:
+     *     summary: Regenerate the UVP6 pivot of the samples of every UVP5 project (admin only)
+     *     description: |
+     *       Starts an asynchronous task (returns a Task immediately; poll the task for progress) that
+     *       does the pivot regeneration of `POST /projects/{project_id}/samples/pivots/regenerate` for
+     *       every sample of every UVP5 project, and recomputes the particle statistics of each rebuilt pivot.
+     *
+     *       Without `project_ids`, every UVP5 project is considered; an unknown project id, and a project
+     *       of another instrument, are skipped. A pivot already at the current converter version is kept,
+     *       unless `force` is true. A failing sample does not stop the others; the task then fails with the
+     *       number of samples rebuilt, kept and failed, each failure named in the task log.
+     *       Reserved to administrators; the task belongs to no project.
+     *     tags: [Admin]
+     *     security:
+     *       - cookieAccessToken: []
+     *     requestBody:
+     *       required: false
+     *       content:
+     *         application/json:
+     *           schema:
+     *             $ref: '#/components/schemas/RegenerateAllPivotsRequest'
+     *     responses:
+     *       200:
+     *         description: Pivot regeneration task created.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/TaskResponse'
+     *       401:
+     *         description: Not authenticated.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       403:
+     *         description: Authenticated user is not allowed (not an admin, or account cannot be used).
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       404:
+     *         description: The task could not be created (task not found).
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     *       422:
+     *         description: Validation error.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ValidationErrorResponse' } } }
+     *       500:
+     *         description: Internal server error.
+     *         content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+     */
+    router.post('/samples/pivots/regenerate', middlewareAuth.auth, middlewareAdminValidation.rulesRegenerateAllPivots, async (req: Request, res: Response) => {
+        try {
+            const task = await regenerateAllPivotsUseCase.execute((req as CustomRequest).token, { project_ids: req.body.project_ids, force: req.body.force });
+            res.status(200).send(task)
+        } catch (err) {
+            console.log(new Date().toISOString(), err)
+            const msg: string = err?.message || "";
+            if (msg === "User cannot be used") res.status(403).send({ errors: [msg] })
+            else if (msg === "Logged user cannot regenerate pivots") res.status(403).send({ errors: [msg] })
+            else if (msg === "Cannot find task" || msg === "Task not found") res.status(404).send({ errors: [msg] })
+            // The seeded lookup row is missing: a server problem, nothing the caller can fix
+            else if (msg === "Task type not found" || msg === "Task status not found") res.status(500).send({ errors: [msg] })
+            else if (msg === "Cannot create log file") res.status(500).send({ errors: [msg] })
+            else res.status(500).send({ errors: ["Cannot regenerate pivots"] })
         }
     })
 

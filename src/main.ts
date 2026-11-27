@@ -110,6 +110,7 @@ import { GetStats } from './domain/use-cases/admin/get-stats'
 import { GetProjectStats } from './domain/use-cases/project/get-project-stats'
 import { GetProjectsQcStates } from './domain/use-cases/project/get-projects-qc-states'
 import { ComputeParticleStats } from './domain/use-cases/sample/compute-particle-stats'
+import { RegenerateAllPivots } from './domain/use-cases/sample/regenerate-all-pivots'
 import { BroadcastMessageRepositoryImpl } from './domain/repositories/broadcast_message-repository'
 import { GetBroadcastMessage } from './domain/use-cases/broadcast_message/get-broadcast-message'
 import { SetBroadcastMessage } from './domain/use-cases/broadcast_message/set-broadcast-message'
@@ -430,7 +431,7 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new PreviewSamplesQcGraphs(user_repo, sample_repo, project_repo, privilege_repo, config.DATA_STORAGE_FS_STORAGE),
         new SelectSampleCoordinates(user_repo, sample_repo, privilege_repo),
         new GetSample(user_repo, sample_repo, privilege_repo, project_repo),
-        new RegeneratePivots(user_repo, privilege_repo, project_repo, sample_repo, task_repo),
+        new RegeneratePivots(user_repo, project_repo, sample_repo, task_repo),
         new GetProjectStats(user_repo, project_repo, privilege_repo, sample_repo, task_repo, explore_ecotaxa, land_mask),
         new GetProjectsQcStates(user_repo, project_repo, privilege_repo, sample_repo, land_mask),
     )
@@ -478,7 +479,8 @@ async function getSQLiteDS(): Promise<sqlite3.Database> {
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
         new MiddlewareAdminValidation(),
         new GetStats(user_repo, stats_repo),
-        new ComputeParticleStats(user_repo, project_repo, sample_repo, task_repo)
+        new ComputeParticleStats(user_repo, project_repo, sample_repo, task_repo),
+        new RegenerateAllPivots(user_repo, project_repo, sample_repo, task_repo)
     ))
     server.use("/broadcast_messages", BroadcastMessageRouter(
         new MiddlewareAuthCookie(jwtAdapter, config.ACCESS_TOKEN_SECRET, config.REFRESH_TOKEN_SECRET),
