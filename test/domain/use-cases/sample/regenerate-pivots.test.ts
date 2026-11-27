@@ -3,7 +3,6 @@ import { PivotImageRecord } from "../../../../src/domain/entities/binned-export"
 import { PivotImages } from "../../../../src/domain/interfaces/repositories/sample-repository";
 import { toPerImageColumns } from "../../../../src/domain/utils/per-image-columns";
 import { TaskType } from "../../../../src/domain/entities/task";
-import { PrivilegeRepository } from "../../../../src/domain/interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../../../src/domain/interfaces/repositories/project-repository";
 import { SampleRepository } from "../../../../src/domain/interfaces/repositories/sample-repository";
 import { TaskRepository } from "../../../../src/domain/interfaces/repositories/task-repository";
@@ -14,14 +13,12 @@ import { projectResponseModel } from "../../../entities/project";
 import { sampleModel_1, sampleModel_2 } from "../../../entities/sample";
 import { TaskResponseModel_1, toPublicTask } from "../../../entities/task";
 import { TASK_CANCELLED_MESSAGE } from "../../../../src/domain/constants/task";
-import { MockPrivilegeRepository } from "../../../mocks/privilege-mock";
 import { MockProjectRepository } from "../../../mocks/project-mock";
 import { MockSampleRepository } from "../../../mocks/sample-mock";
 import { MockTaskRepository } from "../../../mocks/task-mock";
 import { MockUserRepository } from "../../../mocks/user-mock";
 
 let mockUserRepository: UserRepository;
-let mockPrivilegeRepository: PrivilegeRepository;
 let mockProjectRepository: ProjectRepository;
 let mockSampleRepository: SampleRepository;
 let mockTaskRepository: TaskRepository;
@@ -44,18 +41,16 @@ function pivot(): PivotImages {
 
 function allowUser(): void {
     jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
-    jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false);
-    jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(true);
+    jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true);
 }
 
 beforeEach(() => {
     jest.clearAllMocks();
     mockUserRepository = new MockUserRepository();
-    mockPrivilegeRepository = new MockPrivilegeRepository();
     mockProjectRepository = new MockProjectRepository();
     mockSampleRepository = new MockSampleRepository();
     mockTaskRepository = new MockTaskRepository();
-    regeneratePivots = new RegeneratePivots(mockUserRepository, mockPrivilegeRepository, mockProjectRepository, mockSampleRepository, mockTaskRepository);
+    regeneratePivots = new RegeneratePivots(mockUserRepository, mockProjectRepository, mockSampleRepository, mockTaskRepository);
     // Defaults: a task that is never cancelled, returned without its log file path
     jest.spyOn(mockTaskRepository, "throwIfCancelled").mockResolvedValue();
     jest.spyOn(mockTaskRepository, "toPublicTask").mockImplementation(toPublicTask);
@@ -63,13 +58,12 @@ beforeEach(() => {
 
 describe("RegeneratePivots", () => {
     describe("before the task", () => {
-        test("rejects a user who is neither admin nor member of the project", async () => {
+        test("rejects a user who is not an administrator, even a manager of the project", async () => {
             jest.spyOn(mockUserRepository, "ensureUserCanBeUsed").mockResolvedValue();
             jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false);
-            jest.spyOn(mockPrivilegeRepository, "isGranted").mockResolvedValue(false);
             jest.spyOn(mockProjectRepository, "getProject");
 
-            await expect(regeneratePivots.execute(current_user, 1, {})).rejects.toThrow("Logged user cannot regenerate pivots in this project");
+            await expect(regeneratePivots.execute(current_user, 1, {})).rejects.toThrow("Logged user cannot regenerate pivots");
             expect(mockProjectRepository.getProject).toBeCalledTimes(0);
         });
 

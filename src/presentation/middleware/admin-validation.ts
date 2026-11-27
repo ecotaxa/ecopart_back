@@ -4,6 +4,7 @@ import { body, query, validationResult } from 'express-validator';
 export interface IMiddlewareAdminValidation {
     rulesGetStats: any[];
     rulesComputeParticleStats: any[];
+    rulesRegenerateAllPivots: any[];
 }
 
 export class MiddlewareAdminValidation implements IMiddlewareAdminValidation {
@@ -56,4 +57,7 @@ export class MiddlewareAdminValidation implements IMiddlewareAdminValidation {
             next();
         },
     ];
+
+    // Same body as the particle statistics: the projects to look at (none = all), and force.
+    rulesRegenerateAllPivots = this.rulesComputeParticleStats;
 }

@@ -325,7 +325,7 @@ describeE2E("End-to-end: UVP6 import (samples / CTD / EcoTaxa, with and without 
             new PreviewSamplesQcGraphs(userRepo, sampleRepo, projectRepo, privilegeRepo, fsStorage),
             new SelectSampleCoordinates(userRepo, sampleRepo, privilegeRepo),
             new GetSample(userRepo, sampleRepo, privilegeRepo, projectRepo),
-            new RegeneratePivots(userRepo, privilegeRepo, projectRepo, sampleRepo, taskRepo),
+            new RegeneratePivots(userRepo, projectRepo, sampleRepo, taskRepo),
             new GetProjectStats(userRepo, projectRepo, privilegeRepo, sampleRepo, taskRepo, new ExploreEcoTaxaService(ecotaxaAccountRepo, sampleRepo, projectRepo), new NaturalEarthLandMask()),
             new GetProjectsQcStates(userRepo, projectRepo, privilegeRepo, sampleRepo, new NaturalEarthLandMask()),
         )

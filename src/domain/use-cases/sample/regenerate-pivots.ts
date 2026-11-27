@@ -4,7 +4,6 @@ import { PublicSampleModel, SampleParticleStats } from "../../entities/sample";
 import { PreparedSearchOptions } from "../../entities/search";
 import { PublicTaskRequestCreationModel, PublicTaskResponseModel, TaskResponseModel, TasksStatus, TaskType } from "../../entities/task";
 import { UserUpdateModel } from "../../entities/user";
-import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { ProjectRepository } from "../../interfaces/repositories/project-repository";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { TaskRepository } from "../../interfaces/repositories/task-repository";
@@ -14,18 +13,59 @@ import { describeUvp5PivotReport, UVP5_PIVOT_CONVERTER_VERSION } from "../../uti
 import { binnedSampleSettingsOf } from "../export/binned-settings";
 import { computeParticleStats, describeParticleStats } from "./particle-stats";
 
+export type PivotOutcome = "rebuilt" | "kept" | "failed";
+
+// Builds (or rebuilds) the pivot of one UVP5 sample, then its particle statistics. A pivot already at
+// the current converter version is kept unless `force`. `report` receives the outcome line (the task
+// progress), before the particle statistics are logged. Shared by the regeneration of one project
+// (RegeneratePivots) and the one of every project (RegenerateAllPivots).
+export async function regenerateSamplePivot(
+    sampleRepository: SampleRepository, taskRepository: TaskRepository,
+    task: TaskResponseModel, project: ProjectResponseModel, sample: PublicSampleModel, force: boolean,
+    report: (message: string) => Promise<void>,
+): Promise<PivotOutcome> {
+    const version = await sampleRepository.getPivotConverterVersion(project.project_id, sample.sample_name);
+    if (!force && version === UVP5_PIVOT_CONVERTER_VERSION) {
+        await report(`${sample.sample_name}: pivot already at converter version ${version}, kept`);
+        return "kept";
+    }
+    let message: string;
+    try {
+        message = describeUvp5PivotReport(await sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model, project.root_folder_path));
+    } catch (error) {
+        await report((error as Error).message);
+        return "failed";
+    }
+    await report(message);
+    await updateParticleStats(sampleRepository, taskRepository, task, project, sample);
+    return "rebuilt";
+}
+
+// The particle statistics are read from the pivot just written. A failure keeps the previous
+// ones and does not fail the regeneration: the COMPUTE_PARTICLE_STATS task can redo them.
+async function updateParticleStats(sampleRepository: SampleRepository, taskRepository: TaskRepository, task: TaskResponseModel, project: ProjectResponseModel, sample: PublicSampleModel): Promise<void> {
+    let stats: SampleParticleStats;
+    try {
+        const pivot = await sampleRepository.getPivotImages(project.project_id, sample.sample_name, project.instrument_model);
+        stats = await computeParticleStats(binnedSampleSettingsOf(sample, project), pivot);
+        await sampleRepository.updateParticleStats(sample.sample_id, stats);
+    } catch (error) {
+        await taskRepository.logMessage(task.task_log_file_path, `Particle statistics : ${sample.sample_name} : WARNING particle statistics not updated, the previous ones are kept (${(error as Error).message})`);
+        return;
+    }
+    await taskRepository.logMessage(task.task_log_file_path, "Particle statistics : " + describeParticleStats(sample.sample_name, stats));
+}
+
 // Builds the UVP6 pivot of UVP5 samples imported before the pivot existed, and rebuilds the ones
-// written by an older converter version.
+// written by an older converter version. Administrators only.
 export class RegeneratePivots implements RegeneratePivotsUseCase {
     userRepository: UserRepository
-    privilegeRepository: PrivilegeRepository
     projectRepository: ProjectRepository
     sampleRepository: SampleRepository
     taskRepository: TaskRepository
 
-    constructor(userRepository: UserRepository, privilegeRepository: PrivilegeRepository, projectRepository: ProjectRepository, sampleRepository: SampleRepository, taskRepository: TaskRepository) {
+    constructor(userRepository: UserRepository, projectRepository: ProjectRepository, sampleRepository: SampleRepository, taskRepository: TaskRepository) {
         this.userRepository = userRepository
-        this.privilegeRepository = privilegeRepository
         this.projectRepository = projectRepository
         this.sampleRepository = sampleRepository
         this.taskRepository = taskRepository
@@ -33,7 +73,9 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
 
     async execute(current_user: UserUpdateModel, project_id: number, options: RegeneratePivotsOptions): Promise<PublicTaskResponseModel> {
         await this.userRepository.ensureUserCanBeUsed(current_user.user_id);
-        await this.ensureUserCanRegenerate(current_user, project_id);
+        if (!await this.userRepository.isAdmin(current_user.user_id)) {
+            throw new Error("Logged user cannot regenerate pivots");
+        }
 
         const project = await this.getProjectIfExist(project_id);
         if (!project.instrument_model.startsWith("UVP5")) {
@@ -53,17 +95,6 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
             .catch((error) => console.log(new Date().toISOString(), `Pivot regeneration task ${task.task_id} could not record its outcome`, error));
 
         return this.taskRepository.toPublicTask(task);
-    }
-
-    private async ensureUserCanRegenerate(current_user: UserUpdateModel, project_id: number): Promise<void> {
-        const userIsAdmin = await this.userRepository.isAdmin(current_user.user_id);
-        const userHasPrivilege = await this.privilegeRepository.isGranted({
-            user_id: current_user.user_id,
-            project_id: project_id
-        });
-        if (!userIsAdmin && !userHasPrivilege) {
-            throw new Error("Logged user cannot regenerate pivots in this project");
-        }
     }
 
     private async getProjectIfExist(project_id: number): Promise<ProjectResponseModel> {
@@ -116,20 +147,12 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
             for (const [i, sample] of samples.entries()) {
                 await this.taskRepository.throwIfCancelled(task_id);
                 const progress = Math.round(((i + 1) / samples.length) * 99);
-                const version = await this.sampleRepository.getPivotConverterVersion(project.project_id, sample.sample_name);
-                if (!force && version === UVP5_PIVOT_CONVERTER_VERSION) {
-                    await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, `${sample.sample_name}: pivot already at converter version ${version}, kept`);
-                    continue;
-                }
-                try {
-                    const report = await this.sampleRepository.generateUvp5Pivot(project.project_id, sample, project.instrument_model, project.root_folder_path);
-                    await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, describeUvp5PivotReport(report));
-                } catch (error) {
-                    failures.push((error as Error).message);
-                    await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, (error as Error).message);
-                    continue;
-                }
-                await this.updateParticleStats(task, project, sample);
+                let line = "";
+                const outcome = await regenerateSamplePivot(this.sampleRepository, this.taskRepository, task, project, sample, force, async (message) => {
+                    line = message;
+                    await this.taskRepository.updateTaskProgress({ task_id: task_id }, progress, message);
+                });
+                if (outcome === "failed") failures.push(line);
             }
             if (failures.length > 0) {
                 throw new Error(`Pivot regeneration failed for ${failures.length} of ${samples.length} sample(s). ${failures.join(" | ")}`);
@@ -138,20 +161,5 @@ export class RegeneratePivots implements RegeneratePivotsUseCase {
         } catch (error) {
             await this.taskRepository.failedTask(task_id, error as Error);
         }
-    }
-
-    // The particle statistics are read from the pivot just written. A failure keeps the previous
-    // ones and does not fail the regeneration: the COMPUTE_PARTICLE_STATS task can redo them.
-    private async updateParticleStats(task: TaskResponseModel, project: ProjectResponseModel, sample: PublicSampleModel): Promise<void> {
-        let stats: SampleParticleStats;
-        try {
-            const pivot = await this.sampleRepository.getPivotImages(project.project_id, sample.sample_name, project.instrument_model);
-            stats = await computeParticleStats(binnedSampleSettingsOf(sample, project), pivot);
-            await this.sampleRepository.updateParticleStats(sample.sample_id, stats);
-        } catch (error) {
-            await this.taskRepository.logMessage(task.task_log_file_path, `Particle statistics : ${sample.sample_name} : WARNING particle statistics not updated, the previous ones are kept (${(error as Error).message})`);
-            return;
-        }
-        await this.taskRepository.logMessage(task.task_log_file_path, "Particle statistics : " + describeParticleStats(sample.sample_name, stats));
     }
 }
