@@ -273,6 +273,14 @@ components:
           type: integer
           description: Unique project identifier.
           example: 1
+        nbr_sample:
+          type: integer
+          description: Number of samples (project search only). Left out for a project whose samples the user may not look into.
+          example: 42
+        nbr_ctd_sample:
+          type: integer
+          description: Samples with an imported CTD file (project search only), same rule as `nbr_sample`.
+          example: 10
         project_creation_date:
           type: string
           description: Project creation date.

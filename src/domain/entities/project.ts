@@ -59,6 +59,15 @@ export interface ProjectResponseModel {
     instrument_model: string;
     serial_number: string;
     last_backup_utc_date_time?: string | null;
+    // Computed from the samples, only when the search asks for them (see ProjectSampleCountsOptions).
+    // Null for a project whose samples the user may not look into.
+    nbr_sample?: number | null;
+    nbr_ctd_sample?: number | null;      // samples with an imported CTD file
+}
+// Asks a project search for the sample totals of each project.
+export interface ProjectSampleCountsOptions {
+    // Projects whose totals stay NULL: they are neither returned nor used to sort or filter them.
+    hidden_project_ids: number[];
 }
 export interface ProjectRequestModel {
     project_id: number;
@@ -172,6 +181,9 @@ export interface PublicProjectResponseModel extends Omit<PublicProjectRequestCre
     // Only served to admins and to the project's members and managers (see project-access.ts).
     root_folder_path?: string;
     last_backup_utc_date_time?: string | null;
+    // Returned by the project search, except for a project whose samples the user may not look into.
+    nbr_sample?: number;
+    nbr_ctd_sample?: number;
 }
 
 export interface ProjectMetadataPersonModel {

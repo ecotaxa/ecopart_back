@@ -40,6 +40,8 @@ beforeEach(() => {
     // The user has a privilege on both fixture projects, so the full projects come back
     jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(false)
     jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1, 2])
+    // No project to hide the sample totals of, unless a test says otherwise
+    jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue([])
 })
 
 test("deleted or invalid user should not be able to search for projects", async () => {
@@ -105,7 +107,7 @@ test("Should return data for user without filter and sort_by", async () => {
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).not.toBeCalled()
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [] })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [] }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -146,7 +148,7 @@ test("Should return data for user with filter and sort", async () => {
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).toBeCalledWith([{ field: "pasword_hash", operator: "SELECT", value: "%" }])
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([{ sort_by: "field1", order_by: "asc" }])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "pasword_hash", operator: "SELECT", value: "%" }], limit: 10, page: 1, sort_by: [{ sort_by: "field1", order_by: "asc" }], })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "pasword_hash", operator: "SELECT", value: "%" }], limit: 10, page: 1, sort_by: [{ sort_by: "field1", order_by: "asc" }], }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 
@@ -185,7 +187,7 @@ test("No data to return", async () => {
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).not.toBeCalled()
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [] })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [] }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -227,7 +229,7 @@ test("Should return data for user with filter on instrument model", async () => 
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).toBeCalledWith([filters_IN])
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [filters_IN], limit: 10, page: 1, sort_by: [], })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [filters_IN], limit: 10, page: 1, sort_by: [], }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -300,7 +302,7 @@ test("Should return data for user with filter on managing = true", async () => {
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).toBeCalledWith(filters)
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: filters_IN, limit: 10, page: 1, sort_by: [], })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: filters_IN, limit: 10, page: 1, sort_by: [], }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -340,7 +342,7 @@ test("Should return data for user with filter on managing = false", async () => 
     expect(mockUserRepository.ensureUserCanBeUsed).toBeCalledWith(1)
     expect(mockSearchRepository.formatFilters).toBeCalledWith(filters)
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
-    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [], })
+    expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [], limit: 10, page: 1, sort_by: [], }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -384,7 +386,7 @@ test("Should return data for user with filter on contact", async () => {
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
     expect(mockProjectRepository.standardGetProjects).toBeCalledWith({
         filter: filters_IN, limit: 10, page: 1, sort_by: [],
-    })
+    }, { hidden_project_ids: [] })
     expect(result).toStrictEqual(expectedResponse)
 
 });
@@ -427,7 +429,7 @@ test("Should return data for user with filter on user-based filters such as gran
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
     expect(mockProjectRepository.standardGetProjects).toBeCalledWith({
         filter: filters_IN, limit: 10, page: 1, sort_by: [],
-    })
+    }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -472,7 +474,7 @@ test("Should return data for user with filter on user-based filters such as mana
     expect(mockSearchRepository.formatSortBy).toBeCalledWith([])
     expect(mockProjectRepository.standardGetProjects).toBeCalledWith({
         filter: filters_IN, limit: 10, page: 1, sort_by: [],
-    })
+    }, { hidden_project_ids: [] })
 
     expect(result).toStrictEqual(expectedResponse)
 });
@@ -663,14 +665,39 @@ describe("what the list shows depends on the user's role on each project", () =>
         expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
     })
 
-    test("an empty page asks for no privilege at all", async () => {
+    test("an empty page reads no project's privileges", async () => {
         jest.spyOn(mockProjectRepository, "standardGetProjects").mockResolvedValue({ items: [], total: 0 })
-        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser")
 
         const result = await searchProjectUseCase.execute({ user_id: 1 }, options, [])
 
         expect(result.projects).toStrictEqual([])
-        expect(mockPrivilegeRepository.getProjectsByUser).toBeCalledTimes(0)
+        expect(mockPrivilegeRepository.getPublicPrivileges).toBeCalledTimes(0)
+    })
+
+    test("the sample totals of a project closed to the user are hidden, those of a granted or visible one are not", async () => {
+        jest.spyOn(mockPrivilegeRepository, "getProjectsByUser").mockResolvedValue([1])
+        const now = Date.now()
+        const day = 24 * 3600 * 1000
+        // 1: granted, private; 2: private, not granted; 3: visible, not granted
+        jest.spyOn(mockProjectRepository, "listProjectsPrivacy").mockResolvedValue([
+            { project_id: 1, oldest_sample_utc_date_time: new Date(now).toISOString(), privacy_duration: 2, visible_duration: 24, public_duration: 36 },
+            { project_id: 2, oldest_sample_utc_date_time: new Date(now).toISOString(), privacy_duration: 2, visible_duration: 24, public_duration: 36 },
+            { project_id: 3, oldest_sample_utc_date_time: new Date(now - 100 * day).toISOString(), privacy_duration: 2, visible_duration: 24, public_duration: 36 },
+        ])
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, [])
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.anything(), { hidden_project_ids: [2] })
+    })
+
+    test("an admin sees the sample totals of every project", async () => {
+        jest.spyOn(mockUserRepository, "isAdmin").mockResolvedValue(true)
+        jest.spyOn(mockProjectRepository, "listProjectsPrivacy")
+
+        await searchProjectUseCase.execute({ user_id: 1 }, options, [])
+
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.anything(), { hidden_project_ids: [] })
+        expect(mockProjectRepository.listProjectsPrivacy).toBeCalledTimes(0)
     })
 
     test.each([
@@ -693,7 +720,7 @@ describe("what the list shows depends on the user's role on each project", () =>
         const result = await searchProjectUseCase.execute({ user_id: 1 }, options, filter)
 
         expect(result.projects).toStrictEqual([full_1, full_2])
-        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter }))
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter }), { hidden_project_ids: [] })
     })
 })
 
@@ -734,7 +761,7 @@ describe("qc_state is resolved to the projects in that state, as the QC state co
 
         await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
 
-        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] })
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] }, { hidden_project_ids: [] })
         expect(mockSampleRepository.getProjectStatsSamples).toBeCalledTimes(3)
     })
 
@@ -746,7 +773,7 @@ describe("qc_state is resolved to the projects in that state, as the QC state co
 
         await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
 
-        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [1] }] }))
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [1] }] }), { hidden_project_ids: [] })
     })
 
     test.each([
@@ -794,7 +821,7 @@ describe("privacy_status is resolved to the projects at that level", () => {
 
         await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
 
-        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] })
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith({ filter: [{ field: "project_id", operator: "IN", value: expected_ids }], limit: 10, page: 1, sort_by: [] }, { hidden_project_ids: [] })
     })
 
     test("no project at that level gives an empty IN, not an unfiltered list", async () => {
@@ -804,7 +831,7 @@ describe("privacy_status is resolved to the projects at that level", () => {
 
         await searchProjectUseCase.execute({ user_id: 1 }, options, filters)
 
-        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [] }] }))
+        expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({ filter: [{ field: "project_id", operator: "IN", value: [] }] }), { hidden_project_ids: [] })
     })
 
     test("combines with for_managing as two project_id filters", async () => {
@@ -816,7 +843,7 @@ describe("privacy_status is resolved to the projects at that level", () => {
 
         expect(mockProjectRepository.standardGetProjects).toBeCalledWith(expect.objectContaining({
             filter: [{ field: "project_id", operator: "IN", value: [1, 3] }, { field: "project_id", operator: "IN", value: [3] }]
-        }))
+        }), { hidden_project_ids: [] })
     })
 
     test.each([

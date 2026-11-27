@@ -222,8 +222,11 @@ export default function ProjectRouter(
      *       | `visible_duration` | number | |
      *       | `public_duration` | number | |
      *       | `serial_number` | string | |
+     *       | `ecotaxa_project_name` | string | Name of the linked EcoTaxa project |
      *       | `root_folder_path` | string | |
      *       | `project_creation_utc_date_time` | string (ISO timestamp) | |
+     *       | `nbr_sample` | number | Computed — number of samples of the project. Left out of the response, and NULL for filtering and sorting, on a project whose samples the user may not look into |
+     *       | `nbr_ctd_sample` | number | Computed — samples with an imported CTD file, same rule as `nbr_sample` |
      *       | `instrument_model` | string | Computed — resolved to instrument model IDs |
      *       | `for_managing` | boolean | Computed — restricts to projects where current user has a privilege |
      *       | `privacy_status` | string (`private`, `visible`, `public`, `open`) | Computed — level at the time of the request, operator `=` or `IN` |
@@ -234,7 +237,7 @@ export default function ProjectRouter(
      *
      *       **Pagination** — Use query parameters `page` (default 1) and `limit` (default 10).
      *
-     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`.
+     *       **Sorting** — Use the `sort_by` query parameter with the format `asc(field)` or `desc(field)`. Chain multiple sorts with commas, e.g. `asc(project_id),desc(project_title)`. `desc(nbr_sample),desc(project_id)` lists the projects with the most samples first (a hidden total sorts last).
      *     tags: [Projects]
      *     security:
      *       - cookieAccessToken: []

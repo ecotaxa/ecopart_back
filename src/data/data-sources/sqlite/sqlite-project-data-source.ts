@@ -1,7 +1,7 @@
 import { SQLiteDatabaseWrapper } from "../../interfaces/data-sources/database-wrapper";
 
 import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel } from "../../../domain/entities/project";
-import { ProjectDataSource } from "../../interfaces/data-sources/project-data-source";
+import { ProjectDataSource, ProjectSampleCountsOptions } from "../../interfaces/data-sources/project-data-source";
 import { PreparedSearchOptions, SearchResult } from "../../../domain/entities/search";
 import { sqlIdentifier } from "./sql-identifier"
 
@@ -13,6 +13,22 @@ const DOMAIN_TO_PHYSICAL_COLUMN: Record<string, string> = {
 };
 const toPhysicalColumn = (domainKey: string): string =>
     DOMAIN_TO_PHYSICAL_COLUMN[domainKey] ?? domainKey;
+
+// The sample totals of a project, computed (not stored) so that the lists can sort and filter on
+// them. The (project_id, sampling_utc_date_time) index keeps one count per project cheap.
+const SAMPLE_COUNT_SQL: Record<string, string> = {
+    nbr_sample: `(SELECT COUNT(*) FROM sample WHERE sample.project_id = project.project_id)`,
+    nbr_ctd_sample: `(SELECT COUNT(*) FROM sample WHERE sample.project_id = project.project_id AND sample.ctd_imported = 1)`,
+};
+const isSampleCountField = (field: string): boolean => Object.prototype.hasOwnProperty.call(SAMPLE_COUNT_SQL, field);
+
+// A project whose samples the user may not look into gets NULL totals: they are neither shown nor
+// used to rank it. The ids come from the database and are inlined as integers.
+const sampleCountSql = (field: string, hidden_project_ids: number[]): string => {
+    const ids = hidden_project_ids.filter(Number.isInteger);
+    if (ids.length === 0) return SAMPLE_COUNT_SQL[field];
+    return `(CASE WHEN project.project_id IN (${ids.join(",")}) THEN NULL ELSE ${SAMPLE_COUNT_SQL[field]} END)`;
+};
 
 // Acquisition date of the project's oldest sample, the start of its privacy delays. Only ISO dates are
 // compared: a sampling date the import could not parse is kept as found and would sort anywhere.
@@ -160,9 +176,20 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             });
         })
     }
-    async getAll(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
+    async getAll(options: PreparedSearchOptions, sample_counts?: ProjectSampleCountsOptions): Promise<SearchResult<ProjectResponseModel>> {
+        const hidden_ids = sample_counts?.hidden_project_ids ?? [];
+        // A sample total is an expression, any other field a column.
+        const toSqlField = (field: string): string =>
+            isSampleCountField(field) ? sampleCountSql(field, hidden_ids) : toPhysicalColumn(field);
+        // The totals are only computed when asked for, or when the request filters or sorts on them.
+        const with_counts = sample_counts !== undefined
+            || options.filter.some(f => isSampleCountField(f.field))
+            || options.sort_by.some(s => isSampleCountField(s.sort_by));
+        const counts_sql = with_counts
+            ? `, ${sampleCountSql("nbr_sample", hidden_ids)} AS nbr_sample, ${sampleCountSql("nbr_ctd_sample", hidden_ids)} AS nbr_ctd_sample`
+            : "";
         // Get the limited rows and the total count of rows //  WHERE your_condition
-        let sql = `SELECT project.*, instrument_model.instrument_model_name, ${OLDEST_SAMPLE_UTC_DATE_TIME_SQL} AS oldest_sample_utc_date_time, (SELECT COUNT(*) FROM project`
+        let sql = `SELECT project.*, instrument_model.instrument_model_name, ${OLDEST_SAMPLE_UTC_DATE_TIME_SQL} AS oldest_sample_utc_date_time${counts_sql}, (SELECT COUNT(*) FROM project`
         const params: any[] = []
         let filtering_sql = ""
         const params_filtering: any[] = []
@@ -171,7 +198,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
             filtering_sql += ` WHERE `;
             // For each filter, add to filtering_sql and params_filtering
             for (const filter of options.filter) {
-                const physicalField = toPhysicalColumn(filter.field);
+                const physicalField = toSqlField(filter.field);
                 // An empty IN matches no project (e.g. a privacy_status no project is at)
                 if (filter.operator == "IN" && Array.isArray(filter.value) && filter.value.length === 0) {
                     filtering_sql += `0 = 1`;
@@ -225,7 +252,7 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
         if (options.sort_by.length > 0) {
             sql += ` ORDER BY`;
             for (const sort of options.sort_by) {
-                sql += ` ` + toPhysicalColumn(sort.sort_by) + ` ` + sort.order_by + `,`;
+                sql += ` ` + toSqlField(sort.sort_by) + ` ` + sort.order_by + `,`;
             }
             // remove last ,
             sql = sql.slice(0, -1);
@@ -276,7 +303,11 @@ export class SQLiteProjectDataSource implements ProjectDataSource {
                             ecotaxa_project_id: row.ecotaxa_project_id,
                             ecotaxa_project_name: row.ecotaxa_project_name,
                             ecotaxa_instance_id: row.ecotaxa_instance_id,
-                            last_backup_utc_date_time: row.last_backup_utc_date_time ?? null
+                            last_backup_utc_date_time: row.last_backup_utc_date_time ?? null,
+                            ...(with_counts && {
+                                nbr_sample: row.nbr_sample ?? null,
+                                nbr_ctd_sample: row.nbr_ctd_sample ?? null,
+                            }),
                         })),
                         total: rows[0]?.total_count || 0
                     };

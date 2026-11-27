@@ -1,6 +1,6 @@
 import { InstrumentModelResponseModel } from "../../entities/instrument_model";
 import { PublicPrivilege } from "../../entities/privilege";
-import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../../entities/project";
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel, ProjectSampleCountsOptions } from "../../entities/project";
 import { ProjectPrivacyInputs } from "../../use-cases/project/project-access";
 import { PreparedSearchOptions, SearchResult } from "../../entities/search";
 import { TaskLogger } from "./task-repository";
@@ -14,7 +14,7 @@ export interface ProjectRepository {
     getProject(project: ProjectRequestModel): Promise<ProjectResponseModel | null>;
     computeDefaultDepthOffset(instrument_model: string): number | undefined;
     deleteProject(project: ProjectRequestModel): Promise<number>;
-    standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>>;
+    standardGetProjects(options: PreparedSearchOptions, sample_counts?: ProjectSampleCountsOptions): Promise<SearchResult<ProjectResponseModel>>;
     ensureFolderStructureForBackup(root_folder_path: string): Promise<void>;
     copyL0bToProjectFolder(source_folder: string, dest_folder: string, skip_already_imported: boolean, log?: TaskLogger): Promise<void>;
     removeInterruptedWriteLeftovers(project_id: number): Promise<string[]>;

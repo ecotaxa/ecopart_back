@@ -7,7 +7,7 @@ import { InstrumentModelRepository } from "../../interfaces/repositories/instrum
 import { PrivilegeRepository } from "../../interfaces/repositories/privilege-repository";
 import { SearchProjectsUseCase } from "../../interfaces/use-cases/project/search-project";
 import { ProjectPrivacyLevel, ProjectResponseModel, PublicProjectResponseModel } from "../../entities/project";
-import { ProjectRole, privacyOf, restrictProjectView } from "./project-access";
+import { ProjectRole, isProjectActionAllowed, privacyOf, restrictProjectView } from "./project-access";
 import { SampleRepository } from "../../interfaces/repositories/sample-repository";
 import { LandMask } from "../../interfaces/geography/land-mask";
 import { ProjectQcStateLabel } from "../../entities/project-stats";
@@ -50,10 +50,13 @@ export class SearchProject implements SearchProjectsUseCase {
         prepared_options = await this.applyAdditionalFilters(current_user, user_is_admin, prepared_options);
 
         // Fetch projects based on prepared search options
-        const result: SearchResult<ProjectResponseModel> = await this.projectRepository.standardGetProjects(prepared_options);
+        // An admin sees every project in full; anyone else as a member of the projects granted to them.
+        const granted_project_ids = new Set(user_is_admin ? [] : await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id }));
+        const hidden_project_ids = user_is_admin ? [] : await this.projectsClosedToFigures(granted_project_ids);
+        const result: SearchResult<ProjectResponseModel> = await this.projectRepository.standardGetProjects(prepared_options, { hidden_project_ids });
 
         // Map projects to public project response models, as seen from the user's role on each
-        const projects = await this.mapToPublicProjects(current_user, user_is_admin, result);
+        const projects = await this.mapToPublicProjects(user_is_admin, granted_project_ids, result);
 
         // Format search info
         const search_info: SearchInfo = this.searchRepository.formatSearchInfo(result, prepared_options);
@@ -249,11 +252,20 @@ export class SearchProject implements SearchProjectsUseCase {
         return userIds;
     }
 
+    // The sample totals follow the sample search: a project the user has no privilege on only shows
+    // (and ranks by) them once it is open enough for anyone to look into its samples.
+    private async projectsClosedToFigures(granted_project_ids: Set<number>): Promise<number[]> {
+        const now = new Date();
+        return (await this.projectRepository.listProjectsPrivacy())
+            .filter(project => !granted_project_ids.has(project.project_id))
+            .filter(project => !isProjectActionAllowed("user", privacyOf(project, now), "figures"))
+            .map(project => project.project_id);
+    }
+
     // Maps projects to public project response models. Every logged-in user may list every project,
     // but a project is only shown in full to admins and to its own members and managers.
-    private async mapToPublicProjects(current_user: UserUpdateModel, user_is_admin: boolean, result: SearchResult<ProjectResponseModel>): Promise<PublicProjectResponseModel[]> {
+    private async mapToPublicProjects(user_is_admin: boolean, granted_project_ids: Set<number>, result: SearchResult<ProjectResponseModel>): Promise<PublicProjectResponseModel[]> {
         if (result.items.length === 0) return [];
-        const granted_project_ids = new Set(user_is_admin ? [] : await this.privilegeRepository.getProjectsByUser({ user_id: current_user.user_id }));
         return Promise.all(result.items.map(async project => {
             const privileges = await this.privilegeRepository.getPublicPrivileges({ project_id: project.project_id });
             if (!privileges) throw new Error("Cannot find privileges");

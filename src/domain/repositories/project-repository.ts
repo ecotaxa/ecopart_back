@@ -2,7 +2,7 @@
 import { ProjectDataSource } from "../../data/interfaces/data-sources/project-data-source";
 import { InstrumentModelResponseModel } from "../entities/instrument_model";
 import { PublicPrivilege } from "../entities/privilege";
-import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel } from "../entities/project";
+import { ProjectRequestCreationModel, ProjectRequestModel, ProjectUpdateModel, ProjectResponseModel, PublicProjectResponseModel, PublicProjectRequestCreationModel, ProjectSampleCountsOptions } from "../entities/project";
 import { PreparedSearchOptions, SearchResult } from "../entities/search";
 import { ProjectRepository } from "../interfaces/repositories/project-repository";
 import { TaskLogger } from "../interfaces/repositories/task-repository";
@@ -94,18 +94,19 @@ export class ProjectRepositoryImpl implements ProjectRepository {
         return updated_project_nb
     }
 
-    async standardGetProjects(options: PreparedSearchOptions): Promise<SearchResult<ProjectResponseModel>> {
+    // `sample_counts` adds the sample totals of each project to the result (see ProjectSampleCountsOptions).
+    async standardGetProjects(options: PreparedSearchOptions, sample_counts?: ProjectSampleCountsOptions): Promise<SearchResult<ProjectResponseModel>> {
         // Can be filtered by 
-        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const filter_params_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_name", "project_creation_utc_date_time", "nbr_sample", "nbr_ctd_sample"]
 
         // Can be sort_by
-        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "project_creation_utc_date_time"]
+        const sort_param_restricted = ["project_id", "root_folder_path", "project_title", "project_acronym", "project_description", "cruise", "ship", "data_owner_name", "data_owner_email", "operator_name", "operator_email", "chief_scientist_name", "chief_scientist_email", "override_depth_offset", "enable_descent_filter", "filtered_project", "time_duration_check", "privacy_duration", "visible_duration", "public_duration", "instrument_model", "serial_number", "ecotaxa_project_name", "project_creation_utc_date_time", "nbr_sample", "nbr_ctd_sample"]
 
-        return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params)
+        return await this.getProjects(options, filter_params_restricted, sort_param_restricted, this.order_by_allow_params, this.filter_operator_allow_params, sample_counts)
     }
 
     //TODO MOVE TO SEARCH REPOSITORY
-    private async getProjects(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[]): Promise<SearchResult<ProjectResponseModel>> {
+    private async getProjects(options: PreparedSearchOptions, filtering_params: string[], sort_by_params: string[], order_by_params: string[], filter_operator_params: string[], sample_counts?: ProjectSampleCountsOptions): Promise<SearchResult<ProjectResponseModel>> {
         const unauthorizedParams: string[] = [];
         //TODO move to a search repository
         // Filter options.sort_by by sorting params 
@@ -142,7 +143,7 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             throw new Error(`Unauthorized or unexisting parameters : ${unauthorizedParams.join(', ')}`);
         }
 
-        return await this.projectDataSource.getAll(options);
+        return await this.projectDataSource.getAll(options, sample_counts);
     }
 
     formatProjectRequestCreationModel(public_project: PublicProjectRequestCreationModel, instrument: InstrumentModelResponseModel): ProjectRequestCreationModel {
@@ -214,7 +215,10 @@ export class ProjectRepositoryImpl implements ProjectRepository {
             ecotaxa_project_id: project.ecotaxa_project_id,
             ecotaxa_project_name: project.ecotaxa_project_name,
             ecotaxa_instance_id: project.ecotaxa_instance_id,
-            last_backup_utc_date_time: project.last_backup_utc_date_time ?? null
+            last_backup_utc_date_time: project.last_backup_utc_date_time ?? null,
+            // Left out when not computed, or hidden from the user (NULL)
+            ...(typeof project.nbr_sample === "number" && { nbr_sample: project.nbr_sample }),
+            ...(typeof project.nbr_ctd_sample === "number" && { nbr_ctd_sample: project.nbr_ctd_sample }),
         };
 
         return publicProject;
