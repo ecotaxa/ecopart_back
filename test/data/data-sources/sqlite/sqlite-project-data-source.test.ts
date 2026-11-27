@@ -373,3 +373,63 @@ describe('SQLiteProjectDataSource', () => {
     })
 
 });
+describe('SQLiteProjectDataSource sample totals', () => {
+    const DB_FILE = 'TEST_DB_SOURCE_PROJECT_SAMPLE_COUNTS'
+    let db: sqlite3.Database
+    let dataSource: SQLiteProjectDataSource
+    const run = (sql: string) => new Promise<void>((resolve, reject) => db.run(sql, (err) => err ? reject(err) : resolve()))
+
+    beforeAll(async () => {
+        db = new sqlite3.Database(DB_FILE)
+        await new MigrationManager(db).runAllMigrations(path.resolve(__dirname, '../../../../src/data/migrations'))
+        dataSource = new SQLiteProjectDataSource(db)
+        // Project 1: 1 sample, 2: 3 samples (2 with a CTD), 3: none
+        for (const project of [data_source_projectRequestCreationModel_2, data_source_projectRequestCreationModel_3, data_source_projectRequestCreationModel_4]) {
+            await dataSource.create(project)
+        }
+        // Only the project and the CTD flag matter: every other mandatory column gets a blank value
+        const columns = await new Promise<{ name: string, type: string, notnull: number, dflt_value: unknown, pk: number }[]>((resolve, reject) =>
+            db.all(`PRAGMA table_info(sample);`, (err, rows: any[]) => err ? reject(err) : resolve(rows)))
+        const blanks = columns.filter(c => c.notnull && c.dflt_value === null && !c.pk && !['project_id', 'ctd_imported', 'sample_name'].includes(c.name))
+        const blank = (type: string) => /CHAR|TEXT|CLOB/i.test(type) ? `''` : `0`
+        for (const [index, [project_id, ctd_imported]] of [[1, 0], [2, 1], [2, 1], [2, 0]].entries()) {
+            await run(`INSERT INTO sample (sample_name, project_id, ctd_imported${blanks.map(c => `, ${c.name}`).join('')}) VALUES ('s${index}', ${project_id}, ${ctd_imported}${blanks.map(c => `, ${blank(c.type)}`).join('')});`)
+        }
+    })
+
+    afterAll(async () => {
+        await new Promise<void>((resolve) => db.close(() => resolve()))
+        fs.rmSync(DB_FILE, { force: true })
+    })
+
+    test('are left out unless asked for', async () => {
+        const result = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [] })
+        expect(result.items[0]).not.toHaveProperty('nbr_sample')
+    })
+
+    test('are returned when asked for', async () => {
+        const result = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [{ sort_by: 'project_id', order_by: 'asc' }] }, { hidden_project_ids: [] })
+        expect(result.items.map(p => [p.project_id, p.nbr_sample, p.nbr_ctd_sample])).toStrictEqual([[1, 1, 0], [2, 3, 2], [3, 0, 0]])
+    })
+
+    test('sort the projects across every page, most samples first', async () => {
+        const result = await dataSource.getAll({ page: 1, limit: 1, filter: [], sort_by: [{ sort_by: 'nbr_sample', order_by: 'desc' }] })
+        expect(result.items.map(p => p.project_id)).toStrictEqual([2])
+        expect(result.total).toBe(3)
+    })
+
+    test('filter the projects, the total included', async () => {
+        const result = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'nbr_ctd_sample', operator: '>', value: 0 }], sort_by: [] })
+        expect(result.items.map(p => p.project_id)).toStrictEqual([2])
+        expect(result.total).toBe(1)
+    })
+
+    test('of a hidden project are NULL: never returned, filtered or ranked on', async () => {
+        const options = { hidden_project_ids: [2] }
+        const sorted = await dataSource.getAll({ page: 1, limit: 10, filter: [], sort_by: [{ sort_by: 'nbr_sample', order_by: 'desc' }] }, options)
+        expect(sorted.items.map(p => [p.project_id, p.nbr_sample])).toStrictEqual([[1, 1], [3, 0], [2, null]])
+        const filtered = await dataSource.getAll({ page: 1, limit: 10, filter: [{ field: 'nbr_sample', operator: '>', value: 0 }], sort_by: [] }, options)
+        expect(filtered.items.map(p => p.project_id)).toStrictEqual([1])
+        expect(filtered.total).toBe(1)
+    })
+})
